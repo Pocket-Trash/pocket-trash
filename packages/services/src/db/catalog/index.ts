@@ -821,7 +821,7 @@ export type CatalogProduct = {
   width: DimensionMeasurement | null;
 };
 
-/** One approved refill offering shown on a public refill page. */
+/** One refill offering shown on a public refill page. */
 export type CatalogRefillOffering = {
   /** Database identifier. */
   id: number;
@@ -839,8 +839,6 @@ export type CatalogCompatiblePen = {
   id: number;
   /** Pen display name. */
   name: string;
-  /** Compatibility outcome. */
-  outcome: "compatible" | "conditional";
   /** Required tip display name, when compatibility depends on a tip. */
   requiredTipName: string | null;
   /** Required tip product identifier, when compatibility depends on a tip. */
@@ -899,21 +897,34 @@ export type CatalogConfigurationSlot = {
 
 /** Lookup data required by the structured Pens catalog admin editor. */
 export type CatalogPensAdminOptions = {
-  /** Available compatibility evidence records. */
-  compatibilityEvidence: Array<{
-    /** Evidence identifier. */
+  /** Existing direct Pen compatibility relationships. */
+  compatibilityAssertions: Array<{
+    /** Relationship identifier. */
     id: number;
-    /** Evidence summary. */
-    name: string;
+    /** Pen accepting the refill or group. */
+    penProductId: number;
+    /** Optional Pen tip required by the relationship. */
+    requiredTipProductId: number | null;
+    /** Accepted compatibility group. */
+    targetGroupId: number | null;
+    /** Accepted refill product. */
+    targetRefillProductId: number | null;
   }>;
   /** Canonical concepts available for new compatibility groups. */
   compatibilityGroupConcepts: CatalogLookup[];
   /** Existing compatibility groups. */
   compatibilityGroups: CatalogLookup[];
+  /** Existing direct refill-to-group memberships. */
+  compatibilityMemberships: Array<{
+    /** Compatibility group. */
+    groupId: number;
+    /** Membership identifier. */
+    id: number;
+    /** Refill assigned to the group. */
+    refillProductId: number;
+  }>;
   /** Refill ink colors. */
   inkColors: CatalogLookup[];
-  /** Catalog markets. */
-  markets: CatalogLookup[];
   /** Existing refill offerings. */
   offerings: Array<{
     /** Offering identifier. */
@@ -925,13 +936,6 @@ export type CatalogPensAdminOptions = {
   }>;
   /** Reusable product-configuration slot kinds. */
   slotKinds: CatalogLookup[];
-  /** Available source evidence records. */
-  sourceEvidence: Array<{
-    /** Evidence identifier. */
-    id: number;
-    /** Evidence claim. */
-    name: string;
-  }>;
   /** Refill tip styles. */
   tipStyles: CatalogLookup[];
 };
@@ -1027,15 +1031,7 @@ export type ProductWriteInput = {
   };
 };
 
-/** One evidence link submitted with an approval-gated Pens claim. */
-export type PensEvidenceLink = {
-  /** Existing evidence row. */
-  evidenceId: number;
-  /** Whether the evidence supports or contradicts the claim. */
-  stance: "contradicts" | "supports";
-};
-
-/** Append-only administrative writes for structured Pens catalog data. */
+/** Administrative writes for structured Pens catalog data. */
 export type PensAdminWriteInput =
   | {
       /** Authenticated administrative actor. */
@@ -1056,20 +1052,6 @@ export type PensAdminWriteInput =
       name: string;
       /** Stable ink color slug. */
       slug: string;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Stable market code. */
-      code: string;
-      /** English market label fallback. */
-      displayName: string;
-      /** Localization key for the market label. */
-      displayNameKey: string;
-      /** Mutation discriminator. */
-      kind: "market";
-      /** Geographic market level. */
-      marketKind: "country" | "region";
     }
   | {
       /** Authenticated administrative actor. */
@@ -1134,38 +1116,6 @@ export type PensAdminWriteInput =
   | {
       /** Authenticated administrative actor. */
       actor: Actor;
-      /** Date when the evidence was captured. */
-      captureDate: string;
-      /** Optional catalog edition. */
-      catalogEdition?: string | null;
-      /** Preserved evidence claim. */
-      claim: string;
-      /** Mutation discriminator. */
-      kind: "source-evidence";
-      /** Optional source listing. */
-      listingId?: number | null;
-      /** Optional market scope. */
-      marketId?: number | null;
-      /** Original source URL. */
-      originalUrl: string;
-      /** Optional checksum of a preserved source. */
-      preservedSourceChecksum?: string | null;
-      /** Optional identity of a preserved source. */
-      preservedSourceIdentity?: string | null;
-      /** Optional source publication date. */
-      publicationDate?: string | null;
-      /** Source publisher. */
-      publisher: string;
-      /** Source classification. */
-      sourceKind: string;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Whether the offering is approved for public use. */
-      approved: boolean;
-      /** Evidence attached to the offering. */
-      evidence: PensEvidenceLink[];
       /** Ink color lookup. */
       inkColorId: number;
       /** Mutation discriminator. */
@@ -1180,40 +1130,12 @@ export type PensAdminWriteInput =
   | {
       /** Authenticated administrative actor. */
       actor: Actor;
-      /** Whether the market status is approved for public use. */
-      approved: boolean;
-      /** Optional effective date. */
-      effectiveDate?: string | null;
-      /** Evidence attached to the market status. */
-      evidence: PensEvidenceLink[];
-      /** Mutation discriminator. */
-      kind: "offering-market-status";
-      /** Lifecycle state in the selected market. */
-      lifecycle: "current" | "discontinued" | "historical";
-      /** Market scope. */
-      marketId: number;
-      /** Refill offering. */
-      offeringId: number;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Whether the identifier is approved for public use. */
-      approved: boolean;
-      /** Optional value comparison rule. */
-      comparisonRule?: string;
-      /** Optional effective date. */
-      effectiveDate?: string | null;
-      /** Evidence attached to the identifier. */
-      evidence: PensEvidenceLink[];
       /** Identifier classification. */
       identifierKind: "maker-code" | "sku";
       /** Mutation discriminator. */
       kind: "offering-identifier";
       /** Maker that owns the identifier. */
       makerId: number;
-      /** Market scope. */
-      marketId: number;
       /** Refill offering. */
       offeringId: number;
       /** Identifier as published by the source. */
@@ -1222,52 +1144,6 @@ export type PensAdminWriteInput =
   | {
       /** Authenticated administrative actor. */
       actor: Actor;
-      /** Optional manufacturer catalog edition. */
-      catalogEdition?: string | null;
-      /** Compatibility evidence classification. */
-      evidenceKind:
-        | "curated-observation"
-        | "dimensional-comparison"
-        | "manufacturer-statement"
-        | "physical-fit-test";
-      /** First measured refill format. */
-      firstMeasuredFormatLabel?: string | null;
-      /** Source URL for the first measured format. */
-      firstSourceUrl?: string | null;
-      /** Mutation discriminator. */
-      kind: "compatibility-evidence";
-      /** Optional evidence notes. */
-      notes?: string | null;
-      /** Pen used in a physical fit test. */
-      penProductId?: number | null;
-      /** Physical fit test procedure. */
-      procedure?: string | null;
-      /** Refill used in a physical fit test. */
-      refillProductId?: number | null;
-      /** Tip required by the compatibility evidence. */
-      requiredTipProductId?: number | null;
-      /** Physical fit test result. */
-      result?: string | null;
-      /** Second measured refill format. */
-      secondMeasuredFormatLabel?: string | null;
-      /** Source URL for the second measured format. */
-      secondSourceUrl?: string | null;
-      /** Optional source date. */
-      sourceDate?: string | null;
-      /** Manufacturer or observation source URL. */
-      sourceUrl?: string | null;
-      /** Evidence summary. */
-      summary: string;
-      /** Physical fit test date. */
-      testDate?: string | null;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Whether the membership is approved for public use. */
-      approved: boolean;
-      /** Evidence attached to the membership. */
-      evidence: PensEvidenceLink[];
       /** Compatibility group. */
       groupId: number;
       /** Mutation discriminator. */
@@ -1278,28 +1154,36 @@ export type PensAdminWriteInput =
   | {
       /** Authenticated administrative actor. */
       actor: Actor;
-      /** Whether the assertion is approved for public use. */
-      approved: boolean;
-      /** Evidence attached to the assertion. */
-      evidence: PensEvidenceLink[];
-      /** Explanation required for nuanced outcomes. */
-      explanation?: string | null;
+      /** Existing membership to remove. */
+      membershipId: number;
+      /** Mutation discriminator. */
+      kind: "compatibility-membership-remove";
+      /** Refill that owns the membership. */
+      refillProductId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
       /** Mutation discriminator. */
       kind: "compatibility-assertion";
-      /** Compatibility outcome. */
-      outcome: "compatible" | "conditional" | "incompatible" | "variable";
       /** Pen product receiving the assertion. */
       penProductId: number;
-      /** Remedy required for conditional compatibility. */
-      remedy?: string | null;
       /** Optional required Pen tip. */
       requiredTipProductId?: number | null;
       /** Target compatibility group. */
       targetGroupId?: number | null;
       /** Target refill product. */
       targetRefillProductId?: number | null;
-      /** Optional reader warning. */
-      warning?: string | null;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Existing relationship to remove. */
+      assertionId: number;
+      /** Mutation discriminator. */
+      kind: "compatibility-assertion-remove";
+      /** Pen that owns the relationship. */
+      penProductId: number;
     };
 
 /**
@@ -1317,10 +1201,10 @@ export type CatalogService = {
     id: number;
   }>;
   /**
-   * Lists lookups and evidence available to the Pens admin editor.
+   * Lists lookups available to the Pens admin editor.
    *
    * @param actor - Authenticated catalog manager.
-   * @returns Pens administration lookups and evidence.
+   * @returns Pens administration lookups.
    */
   listPensAdminOptions(actor: Actor): Promise<CatalogPensAdminOptions>;
   /**
@@ -2994,28 +2878,6 @@ export function createCatalogService(
               if (!row) throw new Error("Failed to create refill lookup.");
               return await complete(row);
             }
-            if (input.kind === "market") {
-              const code = requireBoundedText(input.code, 40, "market code");
-              const [row] = await tx
-                .insert(schema.catalogMarket)
-                .values({
-                  code,
-                  displayName: requireBoundedText(
-                    input.displayName,
-                    80,
-                    "market name",
-                  ),
-                  displayNameKey: requireBoundedText(
-                    input.displayNameKey,
-                    200,
-                    "market localization key",
-                  ),
-                  kind: input.marketKind,
-                })
-                .returning({ id: schema.catalogMarket.id });
-              if (!row) throw new Error("Failed to create catalog market.");
-              return await complete(row);
-            }
             if (input.kind === "compatibility-group") {
               const [concept] = await tx
                 .select({ id: schema.catalogTerminologyConcept.id })
@@ -3213,46 +3075,12 @@ export function createCatalogService(
                 );
               return await complete(row);
             }
-            if (input.kind === "source-evidence") {
-              const [row] = await tx
-                .insert(schema.catalogSourceEvidence)
-                .values({
-                  captureDate: input.captureDate,
-                  catalogEdition: cleanOptionalText(input.catalogEdition),
-                  claim: requireBoundedText(input.claim, 5000, "claim"),
-                  listingId: input.listingId ?? null,
-                  marketId: input.marketId ?? null,
-                  originalUrl: requireWebUrl(input.originalUrl),
-                  preservedSourceChecksum: cleanOptionalText(
-                    input.preservedSourceChecksum,
-                  ),
-                  preservedSourceIdentity: cleanOptionalText(
-                    input.preservedSourceIdentity,
-                  ),
-                  publicationDate: input.publicationDate ?? null,
-                  publisher: requireBoundedText(
-                    input.publisher,
-                    200,
-                    "publisher",
-                  ),
-                  sourceKind: requireBoundedText(
-                    input.sourceKind,
-                    200,
-                    "source kind",
-                  ),
-                })
-                .returning({ id: schema.catalogSourceEvidence.id });
-              if (!row) throw new Error("Failed to create source evidence.");
-              return await complete(row);
-            }
             if (input.kind === "refill-offering") {
               await assertProductHasType(tx, input.refillProductId, ["refill"]);
-              assertSupportingEvidence(input.approved, input.evidence);
               const tipSize = requireBoundedText(input.tipSize, 80, "tip size");
               const [row] = await tx
                 .insert(schema.refillOffering)
                 .values({
-                  approvedAt: input.approved ? new Date() : null,
                   inkColorId: input.inkColorId,
                   normalizedTipSize: normalizeCatalogSearch(tipSize),
                   refillProductId: input.refillProductId,
@@ -3261,103 +3089,41 @@ export function createCatalogService(
                 })
                 .returning({ id: schema.refillOffering.id });
               if (!row) throw new Error("Failed to create refill offering.");
-              await insertPensEvidenceLinks(
-                tx,
-                "offering",
-                row.id,
-                input.evidence,
-              );
-              return await complete(row);
-            }
-            if (input.kind === "offering-market-status") {
-              assertSupportingEvidence(input.approved, input.evidence);
-              const [row] = await tx
-                .insert(schema.refillOfferingMarketStatus)
-                .values({
-                  approvedAt: input.approved ? new Date() : null,
-                  effectiveDate: input.effectiveDate ?? null,
-                  lifecycle: input.lifecycle,
-                  marketId: input.marketId,
-                  offeringId: input.offeringId,
-                })
-                .returning({ id: schema.refillOfferingMarketStatus.id });
-              if (!row) throw new Error("Failed to create market status.");
-              await insertPensEvidenceLinks(
-                tx,
-                "market-status",
-                row.id,
-                input.evidence,
-              );
               return await complete(row);
             }
             if (input.kind === "offering-identifier") {
-              assertSupportingEvidence(input.approved, input.evidence);
               const sourceValue = requireBoundedText(
                 input.sourceValue,
                 200,
                 "identifier",
               );
-              const comparisonRule = input.comparisonRule?.trim() || "trim";
+              const [globalMarket] = await tx
+                .select({ id: schema.catalogMarket.id })
+                .from(schema.catalogMarket)
+                .where(eq(schema.catalogMarket.code, "GLOBAL"))
+                .limit(1);
+              if (!globalMarket)
+                throw new Error("Global catalog market does not exist.");
               const [row] = await tx
                 .insert(schema.refillOfferingIdentifier)
                 .values({
-                  approvedAt: input.approved ? new Date() : null,
-                  comparisonRule,
+                  comparisonRule: "trim",
                   comparisonValue: sourceValue.trim(),
-                  effectiveDate: input.effectiveDate ?? null,
                   kind: input.identifierKind,
                   makerId: input.makerId,
-                  marketId: input.marketId,
+                  marketId: globalMarket.id,
                   offeringId: input.offeringId,
                   sourceValue,
                 })
                 .returning({ id: schema.refillOfferingIdentifier.id });
               if (!row) throw new Error("Failed to create identifier.");
-              await insertPensEvidenceLinks(
-                tx,
-                "identifier",
-                row.id,
-                input.evidence,
-              );
-              return await complete(row);
-            }
-            if (input.kind === "compatibility-evidence") {
-              const [row] = await tx
-                .insert(schema.refillCompatibilityEvidence)
-                .values({
-                  catalogEdition: cleanOptionalText(input.catalogEdition),
-                  firstMeasuredFormatLabel: cleanOptionalText(
-                    input.firstMeasuredFormatLabel,
-                  ),
-                  firstSourceUrl: cleanOptionalUrl(input.firstSourceUrl),
-                  kind: input.evidenceKind,
-                  notes: cleanOptionalText(input.notes),
-                  penProductId: input.penProductId ?? null,
-                  procedure: cleanOptionalText(input.procedure),
-                  refillProductId: input.refillProductId ?? null,
-                  requiredTipProductId: input.requiredTipProductId ?? null,
-                  result: cleanOptionalText(input.result),
-                  secondMeasuredFormatLabel: cleanOptionalText(
-                    input.secondMeasuredFormatLabel,
-                  ),
-                  secondSourceUrl: cleanOptionalUrl(input.secondSourceUrl),
-                  sourceDate: input.sourceDate ?? null,
-                  sourceUrl: cleanOptionalUrl(input.sourceUrl),
-                  summary: requireBoundedText(input.summary, 2000, "summary"),
-                  testDate: input.testDate ?? null,
-                })
-                .returning({ id: schema.refillCompatibilityEvidence.id });
-              if (!row)
-                throw new Error("Failed to create compatibility evidence.");
               return await complete(row);
             }
             if (input.kind === "compatibility-membership") {
               await assertProductHasType(tx, input.refillProductId, ["refill"]);
-              assertSupportingEvidence(input.approved, input.evidence);
               const [row] = await tx
                 .insert(schema.refillCompatibilityGroupMembership)
                 .values({
-                  approvedAt: input.approved ? new Date() : null,
                   groupId: input.groupId,
                   refillProductId: input.refillProductId,
                 })
@@ -3365,12 +3131,48 @@ export function createCatalogService(
                   id: schema.refillCompatibilityGroupMembership.id,
                 });
               if (!row) throw new Error("Failed to create group membership.");
-              await insertPensEvidenceLinks(
-                tx,
-                "membership",
-                row.id,
-                input.evidence,
-              );
+              return await complete(row);
+            }
+            if (input.kind === "compatibility-membership-remove") {
+              const [row] = await tx
+                .delete(schema.refillCompatibilityGroupMembership)
+                .where(
+                  and(
+                    eq(
+                      schema.refillCompatibilityGroupMembership.id,
+                      input.membershipId,
+                    ),
+                    eq(
+                      schema.refillCompatibilityGroupMembership.refillProductId,
+                      input.refillProductId,
+                    ),
+                  ),
+                )
+                .returning({
+                  id: schema.refillCompatibilityGroupMembership.id,
+                });
+              if (!row)
+                throw new Error("Compatibility membership does not exist.");
+              return await complete(row);
+            }
+            if (input.kind === "compatibility-assertion-remove") {
+              const [row] = await tx
+                .delete(schema.refillCompatibilityAssertion)
+                .where(
+                  and(
+                    eq(
+                      schema.refillCompatibilityAssertion.id,
+                      input.assertionId,
+                    ),
+                    eq(
+                      schema.refillCompatibilityAssertion.penProductId,
+                      input.penProductId,
+                    ),
+                  ),
+                )
+                .returning({ id: schema.refillCompatibilityAssertion.id });
+              if (!row)
+                throw new Error("Compatibility relationship does not exist.");
               return await complete(row);
             }
             await assertProductHasType(tx, input.penProductId, ["pen"]);
@@ -3380,29 +3182,18 @@ export function createCatalogService(
               1
             )
               throw new Error("Compatibility needs exactly one target.");
-            assertSupportingEvidence(input.approved, input.evidence);
             const [row] = await tx
               .insert(schema.refillCompatibilityAssertion)
               .values({
-                approvedAt: input.approved ? new Date() : null,
-                explanation: cleanOptionalText(input.explanation),
-                outcome: input.outcome,
+                outcome: "compatible",
                 penProductId: input.penProductId,
-                remedy: cleanOptionalText(input.remedy),
                 requiredTipProductId: input.requiredTipProductId ?? null,
                 targetGroupId: input.targetGroupId ?? null,
                 targetRefillProductId: input.targetRefillProductId ?? null,
-                warning: cleanOptionalText(input.warning),
               })
               .returning({ id: schema.refillCompatibilityAssertion.id });
             if (!row)
               throw new Error("Failed to create compatibility assertion.");
-            await insertPensEvidenceLinks(
-              tx,
-              "assertion",
-              row.id,
-              input.evidence,
-            );
             return await complete(row);
           }),
       );
@@ -5098,10 +4889,10 @@ export function createCatalogService(
       );
     },
     /**
-     * Lists lookups and evidence available to the Pens admin editor.
+     * Lists lookups and direct relationships available to the Pens admin editor.
      *
      * @param actor - Authenticated catalog manager.
-     * @returns Pens administration lookups and evidence.
+     * @returns Pens administration lookups and direct relationships.
      * @rejects When the actor cannot manage products.
      */
     async listPensAdminOptions(actor) {
@@ -5114,11 +4905,10 @@ export function createCatalogService(
             slotKinds,
             tipStyles,
             inkColors,
-            marketRows,
             compatibilityGroups,
+            compatibilityMemberships,
+            compatibilityAssertions,
             compatibilityGroupConcepts,
-            sourceEvidence,
-            compatibilityEvidence,
             offeringRows,
           ] = await Promise.all([
             db
@@ -5147,14 +4937,6 @@ export function createCatalogService(
               .orderBy(asc(schema.refillInkColor.name)),
             db
               .select({
-                id: schema.catalogMarket.id,
-                name: schema.catalogMarket.displayName,
-                slug: schema.catalogMarket.code,
-              })
-              .from(schema.catalogMarket)
-              .orderBy(asc(schema.catalogMarket.displayName)),
-            db
-              .select({
                 id: schema.refillCompatibilityGroup.id,
                 name: schema.catalogTerminologyConcept.canonicalLabelFallback,
                 slug: schema.catalogTerminologyConcept.key,
@@ -5172,6 +4954,26 @@ export function createCatalogService(
               ),
             db
               .select({
+                groupId: schema.refillCompatibilityGroupMembership.groupId,
+                id: schema.refillCompatibilityGroupMembership.id,
+                refillProductId:
+                  schema.refillCompatibilityGroupMembership.refillProductId,
+              })
+              .from(schema.refillCompatibilityGroupMembership),
+            db
+              .select({
+                id: schema.refillCompatibilityAssertion.id,
+                penProductId: schema.refillCompatibilityAssertion.penProductId,
+                requiredTipProductId:
+                  schema.refillCompatibilityAssertion.requiredTipProductId,
+                targetGroupId:
+                  schema.refillCompatibilityAssertion.targetGroupId,
+                targetRefillProductId:
+                  schema.refillCompatibilityAssertion.targetRefillProductId,
+              })
+              .from(schema.refillCompatibilityAssertion),
+            db
+              .select({
                 id: schema.catalogTerminologyConcept.id,
                 name: schema.catalogTerminologyConcept.canonicalLabelFallback,
                 slug: schema.catalogTerminologyConcept.key,
@@ -5186,21 +4988,6 @@ export function createCatalogService(
               .orderBy(
                 asc(schema.catalogTerminologyConcept.canonicalLabelFallback),
               ),
-            db
-              .select({
-                id: schema.catalogSourceEvidence.id,
-                name: schema.catalogSourceEvidence.claim,
-              })
-              .from(schema.catalogSourceEvidence)
-              .orderBy(desc(schema.catalogSourceEvidence.createdAt)),
-            db
-              .select({
-                id: schema.refillCompatibilityEvidence.id,
-                name: schema.refillCompatibilityEvidence.summary,
-              })
-              .from(schema.refillCompatibilityEvidence)
-              .where(isNull(schema.refillCompatibilityEvidence.supersededAt))
-              .orderBy(desc(schema.refillCompatibilityEvidence.createdAt)),
             db
               .select({
                 id: schema.refillOffering.id,
@@ -5229,18 +5016,17 @@ export function createCatalogService(
               .orderBy(asc(schema.productDetailRefill.model)),
           ]);
           return {
-            compatibilityEvidence,
+            compatibilityAssertions,
             compatibilityGroupConcepts,
             compatibilityGroups,
+            compatibilityMemberships,
             inkColors,
-            markets: marketRows,
             offerings: offeringRows.map((offering) => ({
               id: offering.id,
               name: `${offering.refillModel} · ${offering.tipSize} · ${offering.tipStyle} · ${offering.inkColor}`,
               refillProductId: offering.refillProductId,
             })),
             slotKinds,
-            sourceEvidence,
             tipStyles,
           };
         },
@@ -9975,12 +9761,7 @@ async function loadPensCatalogDetails(
               schema.refillTipStyle,
               eq(schema.refillOffering.tipStyleId, schema.refillTipStyle.id),
             )
-            .where(
-              and(
-                inArray(schema.refillOffering.refillProductId, refillIds),
-                isNotNull(schema.refillOffering.approvedAt),
-              ),
-            )
+            .where(inArray(schema.refillOffering.refillProductId, refillIds))
             .orderBy(
               asc(schema.refillOffering.tipSize),
               asc(schema.refillInkColor.name),
@@ -9995,12 +9776,9 @@ async function loadPensCatalogDetails(
             })
             .from(schema.refillCompatibilityGroupMembership)
             .where(
-              and(
-                inArray(
-                  schema.refillCompatibilityGroupMembership.refillProductId,
-                  refillIds,
-                ),
-                isNotNull(schema.refillCompatibilityGroupMembership.approvedAt),
+              inArray(
+                schema.refillCompatibilityGroupMembership.refillProductId,
+                refillIds,
               ),
             )
         : Promise.resolve([]),
@@ -10067,7 +9845,6 @@ async function loadPensCatalogDetails(
   const requiredTip = alias(schema.product, "compatible_required_tip");
   const assertions = await db
     .select({
-      outcome: schema.refillCompatibilityAssertion.outcome,
       penProductId: schema.refillCompatibilityAssertion.penProductId,
       penName: penProduct.name,
       penSlug: penProduct.slug,
@@ -10092,11 +9869,6 @@ async function loadPensCatalogDetails(
     )
     .where(
       and(
-        isNotNull(schema.refillCompatibilityAssertion.approvedAt),
-        inArray(schema.refillCompatibilityAssertion.outcome, [
-          "compatible",
-          "conditional",
-        ]),
         or(
           inArray(
             schema.refillCompatibilityAssertion.targetRefillProductId,
@@ -10146,7 +9918,6 @@ async function loadPensCatalogDetails(
       compatible.set(key, {
         id: assertion.penProductId,
         name: assertion.penName,
-        outcome: assertion.outcome as "compatible" | "conditional",
         requiredTipName: assertion.requiredTipName,
         requiredTipProductId: assertion.requiredTipProductId,
         slug: assertion.penSlug,
@@ -12519,17 +12290,6 @@ async function assertProductHasType(
 }
 
 /**
- * Trims optional administrative text without inventing empty values.
- *
- * @param value - Optional text to normalize.
- * @returns Trimmed text, or null when empty.
- */
-function cleanOptionalText(value: string | null | undefined) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-/**
  * Requires bounded nonblank administrative text.
  *
  * @param value - Text to validate.
@@ -12543,125 +12303,6 @@ function requireBoundedText(value: string, maximum: number, label: string) {
   if (!trimmed || trimmed.length > maximum)
     throw new Error(`${label} must be between 1 and ${maximum} characters.`);
   return trimmed;
-}
-
-/**
- * Requires an HTTP(S) source URL.
- *
- * @param value - URL to validate.
- * @returns Trimmed HTTP or HTTPS URL.
- * @throws When the URL is invalid or uses another protocol.
- */
-function requireWebUrl(value: string) {
-  const trimmed = value.trim();
-  try {
-    if (!["http:", "https:"].includes(new URL(trimmed).protocol))
-      throw new Error();
-  } catch {
-    throw new Error("Source URL must use HTTP or HTTPS.");
-  }
-  return trimmed;
-}
-
-/**
- * Normalizes an optional HTTP(S) source URL.
- *
- * @param value - Optional URL to normalize.
- * @returns A validated URL, or null when empty.
- */
-function cleanOptionalUrl(value: string | null | undefined) {
-  const trimmed = cleanOptionalText(value);
-  return trimmed === null ? null : requireWebUrl(trimmed);
-}
-
-/**
- * Enforces evidence before an approval timestamp can be written.
- *
- * @param approved - Whether the claim should be approved.
- * @param evidence - Evidence relationships attached to the claim.
- * @throws When evidence repeats or an approved claim lacks support.
- */
-function assertSupportingEvidence(
-  approved: boolean,
-  evidence: PensEvidenceLink[],
-) {
-  if (
-    new Set(evidence.map(({ evidenceId }) => evidenceId)).size !==
-    evidence.length
-  )
-    throw new Error("Evidence links must be distinct.");
-  if (approved && !evidence.some(({ stance }) => stance === "supports"))
-    throw new Error("Approved Pens claims need supporting evidence.");
-}
-
-/**
- * Inserts evidence links for one newly authored Pens claim.
- *
- * @param tx - Caller-owned catalog transaction.
- * @param target - Evidence relationship table to use.
- * @param targetId - Claim receiving the evidence.
- * @param evidence - Evidence relationships to insert.
- * @returns A promise that resolves after links are inserted.
- */
-async function insertPensEvidenceLinks(
-  tx: CatalogTransaction,
-  target:
-    | "assertion"
-    | "identifier"
-    | "market-status"
-    | "membership"
-    | "offering",
-  targetId: number,
-  evidence: PensEvidenceLink[],
-) {
-  if (!evidence.length) return;
-  if (target === "offering") {
-    await tx.insert(schema.refillOfferingEvidence).values(
-      evidence.map(({ evidenceId, stance }) => ({
-        evidenceId,
-        offeringId: targetId,
-        stance,
-      })),
-    );
-    return;
-  }
-  if (target === "market-status") {
-    await tx.insert(schema.refillOfferingMarketStatusEvidence).values(
-      evidence.map(({ evidenceId, stance }) => ({
-        evidenceId,
-        stance,
-        statusId: targetId,
-      })),
-    );
-    return;
-  }
-  if (target === "identifier") {
-    await tx.insert(schema.refillOfferingIdentifierEvidence).values(
-      evidence.map(({ evidenceId, stance }) => ({
-        evidenceId,
-        identifierId: targetId,
-        stance,
-      })),
-    );
-    return;
-  }
-  if (target === "membership") {
-    await tx.insert(schema.refillCompatibilityGroupMembershipEvidence).values(
-      evidence.map(({ evidenceId, stance }) => ({
-        evidenceId,
-        membershipId: targetId,
-        stance,
-      })),
-    );
-    return;
-  }
-  await tx.insert(schema.refillCompatibilityAssertionEvidence).values(
-    evidence.map(({ evidenceId, stance }) => ({
-      assertionId: targetId,
-      evidenceId,
-      stance,
-    })),
-  );
 }
 
 /**

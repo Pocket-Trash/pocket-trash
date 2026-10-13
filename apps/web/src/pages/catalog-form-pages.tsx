@@ -172,23 +172,21 @@ const pensAdminActions = [
   "configuration-slot-required",
   "configuration-choice",
   "configuration-rule",
-  "source-evidence",
   "refill-offering",
-  "offering-market-status",
   "offering-identifier",
-  "compatibility-evidence",
   "compatibility-membership",
+  "compatibility-membership-remove",
   "compatibility-assertion",
+  "compatibility-assertion-remove",
   "refill-tip-style",
   "refill-ink-color",
-  "market",
   "compatibility-group",
 ] as const;
 /** One structured Pens administration action. */
 type PensAdminAction = (typeof pensAdminActions)[number];
 
 /**
- * Renders structured append-only Pens administration for an existing product.
+ * Renders structured Pens administration for an existing product.
  *
  * @param root0 - Editor properties.
  * @param root0.options - Available catalog lookups.
@@ -218,20 +216,15 @@ export function PensAdminEditor({
       ? "refill-offering"
       : "configuration-slot",
   );
-  const [approved, setApproved] = React.useState(false);
+  const [slotRequired, setSlotRequired] = React.useState(false);
   const [primaryId, setPrimaryId] = React.useState("");
   const [secondaryId, setSecondaryId] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [text, setText] = React.useState("");
   const [text2, setText2] = React.useState("");
-  const [text3, setText3] = React.useState("");
-  const [text4, setText4] = React.useState("");
-  const [date, setDate] = React.useState("");
   const [choiceKind, setChoiceKind] = React.useState<
     "finish" | "material" | "part"
   >("material");
-  const [evidenceKind, setEvidenceKind] = React.useState("physical-fit-test");
-  const [outcome, setOutcome] = React.useState("compatible");
   const [targetKind, setTargetKind] = React.useState<"group" | "refill">(
     "refill",
   );
@@ -255,9 +248,6 @@ export function PensAdminEditor({
           id !== targetChoice.id && slotPosition < targetChoice.slotPosition,
       )
     : [];
-  const evidenceOptions = action.startsWith("compatibility-")
-    ? admin.compatibilityEvidence
-    : admin.sourceEvidence;
   const partType = slot?.slotKindSlug
     ? (`pen-${slot.slotKindSlug}` as CatalogProductType)
     : "pen-tip";
@@ -279,6 +269,35 @@ export function PensAdminEditor({
                 candidate.productTypeSlug === partType,
             )
             .map(({ id, name }) => ({ id, name }));
+  const compatibilityMemberships = admin.compatibilityMemberships
+    .filter(({ refillProductId }) => refillProductId === product.id)
+    .map(({ groupId, id }) => ({
+      id,
+      name:
+        admin.compatibilityGroups.find((group) => group.id === groupId)?.name ??
+        String(groupId),
+    }));
+  const compatibilityAssertions = admin.compatibilityAssertions
+    .filter(({ penProductId }) => penProductId === product.id)
+    .map(
+      ({ id, requiredTipProductId, targetGroupId, targetRefillProductId }) => {
+        const target =
+          targetGroupId == null
+            ? options.relationshipProducts.find(
+                (candidate) => candidate.id === targetRefillProductId,
+              )?.name
+            : admin.compatibilityGroups.find(
+                (group) => group.id === targetGroupId,
+              )?.name;
+        const tip = options.relationshipProducts.find(
+          (candidate) => candidate.id === requiredTipProductId,
+        )?.name;
+        return {
+          id,
+          name: tip ? `${target ?? id} · ${tip}` : (target ?? String(id)),
+        };
+      },
+    );
 
   /**
    * Renders a labeled single-value select.
@@ -287,6 +306,7 @@ export function PensAdminEditor({
    * @param value - Selected value.
    * @param onChange - Selection callback.
    * @param items - Available values.
+   * @param required - Whether the browser requires a non-empty selection.
    * @returns The labeled select field.
    */
   const select = (
@@ -299,13 +319,14 @@ export function PensAdminEditor({
       /** Visible option name. */
       name: string;
     }>,
+    required = true,
   ) => (
     <Field label={label}>
       <select
         aria-label={label}
         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         onChange={(event) => onChange(event.target.value)}
-        required
+        required={required}
         value={value}
       >
         <option value="" />
@@ -344,29 +365,6 @@ export function PensAdminEditor({
     </Field>
   );
 
-  /** Evidence multi-select shared by approval-gated actions. */
-  const evidencePicker = (
-    <Field label={t("web.pens.admin.evidence" as TranslationKey)}>
-      <select
-        aria-label={t("web.pens.admin.evidence" as TranslationKey)}
-        className="min-h-24 rounded-md border border-input bg-background px-3 text-sm"
-        multiple
-        onChange={(event) =>
-          setSelectedIds(
-            [...event.currentTarget.selectedOptions].map(({ value }) => value),
-          )
-        }
-        value={selectedIds}
-      >
-        {evidenceOptions.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.name}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-
   /**
    * Validates and submits the selected structured mutation.
    *
@@ -375,10 +373,6 @@ export function PensAdminEditor({
   const submit = async () => {
     const id = Number(primaryId);
     const id2 = Number(secondaryId);
-    const evidence = selectedIds.map((evidenceId) => ({
-      evidenceId: Number(evidenceId),
-      stance: "supports" as const,
-    }));
     const data: unknown =
       action === "configuration-slot"
         ? {
@@ -391,7 +385,7 @@ export function PensAdminEditor({
           ? {
               kind: action,
               productId: product.id,
-              required: approved,
+              required: slotRequired,
               slotId: id,
             }
           : action === "configuration-choice"
@@ -410,122 +404,56 @@ export function PensAdminEditor({
                   requiredChoiceIds: selectedIds.map(Number),
                   targetChoiceId: id,
                 }
-              : action === "source-evidence"
+              : action === "refill-offering"
                 ? {
-                    captureDate: date,
-                    claim: text4,
+                    inkColorId: id2,
                     kind: action,
-                    marketId: id || null,
-                    originalUrl: text3,
-                    publisher: text,
-                    sourceKind: text2,
+                    refillProductId: product.id,
+                    tipSize: text,
+                    tipStyleId: id,
                   }
-                : action === "refill-offering"
+                : action === "offering-identifier"
                   ? {
-                      approved,
-                      evidence,
-                      inkColorId: id2,
+                      identifierKind: text2,
                       kind: action,
-                      refillProductId: product.id,
-                      tipSize: text,
-                      tipStyleId: id,
+                      makerId: product.makerId,
+                      offeringId: id,
+                      sourceValue: text,
                     }
-                  : action === "offering-market-status"
+                  : action === "compatibility-membership"
                     ? {
-                        approved,
-                        effectiveDate: date || null,
-                        evidence,
+                        groupId: id,
                         kind: action,
-                        lifecycle: text,
-                        marketId: id2,
-                        offeringId: id,
+                        refillProductId: product.id,
                       }
-                    : action === "offering-identifier"
+                    : action === "compatibility-membership-remove"
                       ? {
-                          approved,
-                          effectiveDate: date || null,
-                          evidence,
-                          identifierKind: text2,
                           kind: action,
-                          makerId: product.makerId,
-                          marketId: id2,
-                          offeringId: id,
-                          sourceValue: text,
+                          membershipId: id,
+                          refillProductId: product.id,
                         }
-                      : action === "compatibility-evidence"
-                        ? evidenceKind === "physical-fit-test"
+                      : action === "compatibility-assertion"
+                        ? {
+                            kind: action,
+                            penProductId: product.id,
+                            requiredTipProductId: id2 || null,
+                            targetGroupId: targetKind === "group" ? id : null,
+                            targetRefillProductId:
+                              targetKind === "refill" ? id : null,
+                          }
+                        : action === "compatibility-assertion-remove"
                           ? {
-                              evidenceKind,
+                              assertionId: id,
                               kind: action,
-                              penProductId:
-                                product.productTypeSlug === "pen"
-                                  ? product.id
-                                  : id,
-                              procedure: text3,
-                              refillProductId:
-                                product.productTypeSlug === "refill"
-                                  ? product.id
-                                  : id2,
-                              result: text2,
-                              summary: text,
-                              testDate: date,
+                              penProductId: product.id,
                             }
-                          : evidenceKind === "dimensional-comparison"
-                            ? {
-                                evidenceKind,
-                                firstMeasuredFormatLabel: text2,
-                                firstSourceUrl: text3,
-                                kind: action,
-                                secondMeasuredFormatLabel: text4,
-                                secondSourceUrl: secondaryId,
-                                summary: text,
-                              }
+                          : action === "compatibility-group"
+                            ? { conceptId: id, kind: action }
                             : {
-                                catalogEdition: text4 || null,
-                                evidenceKind,
                                 kind: action,
-                                sourceDate: date || null,
-                                sourceUrl: text3,
-                                summary: text,
-                              }
-                        : action === "compatibility-membership"
-                          ? {
-                              approved,
-                              evidence,
-                              groupId: id,
-                              kind: action,
-                              refillProductId: product.id,
-                            }
-                          : action === "compatibility-assertion"
-                            ? {
-                                approved,
-                                evidence,
-                                explanation: text || null,
-                                kind: action,
-                                outcome,
-                                penProductId: product.id,
-                                remedy: text2 || null,
-                                targetGroupId:
-                                  targetKind === "group" ? id : null,
-                                targetRefillProductId:
-                                  targetKind === "refill" ? id : null,
-                                warning: text3 || null,
-                              }
-                            : action === "market"
-                              ? {
-                                  code: text2,
-                                  displayName: text,
-                                  displayNameKey: text3,
-                                  kind: action,
-                                  marketKind: text4 || "country",
-                                }
-                              : action === "compatibility-group"
-                                ? { conceptId: id, kind: action }
-                                : {
-                                    kind: action,
-                                    name: text,
-                                    slug: text2,
-                                  };
+                                name: text,
+                                slug: text2,
+                              };
     const result = await authorCatalogPensData({ data });
     if (!result.ok) {
       setMessage(result.formError);
@@ -640,16 +568,6 @@ export function PensAdminEditor({
           </Field>
         </>
       ) : null}
-      {action === "source-evidence" ? (
-        <>
-          {input(copy("publisher"), text, setText)}
-          {input(copy("sourceKind"), text2, setText2)}
-          {input(copy("originalUrl"), text3, setText3, "url")}
-          {input(copy("captureDate"), date, setDate, "date")}
-          {input(copy("claim"), text4, setText4)}
-          {select(copy("market"), primaryId, setPrimaryId, admin.markets)}
-        </>
-      ) : null}
       {action === "refill-offering" ? (
         <>
           {select(copy("tipStyle"), primaryId, setPrimaryId, admin.tipStyles)}
@@ -660,99 +578,16 @@ export function PensAdminEditor({
             admin.inkColors,
           )}
           {input(copy("tipSize"), text, setText)}
-          {evidencePicker}
         </>
       ) : null}
-      {action === "offering-market-status" ||
-      action === "offering-identifier" ? (
+      {action === "offering-identifier" ? (
         <>
           {select(copy("offering"), primaryId, setPrimaryId, admin.offerings)}
-          {select(copy("market"), secondaryId, setSecondaryId, admin.markets)}
-          {action === "offering-market-status" ? (
-            select(copy("lifecycleLabel"), text, setText, [
-              { id: "current", name: copy("lifecycle.current") },
-              { id: "discontinued", name: copy("lifecycle.discontinued") },
-              { id: "historical", name: copy("lifecycle.historical") },
-            ])
-          ) : (
-            <>
-              {input(copy("identifier"), text, setText)}
-              {select(copy("identifierKindLabel"), text2, setText2, [
-                { id: "maker-code", name: copy("identifierKind.makerCode") },
-                { id: "sku", name: copy("identifierKind.sku") },
-              ])}
-            </>
-          )}
-          {input(copy("effectiveDate"), date, setDate, "date")}
-          {evidencePicker}
-        </>
-      ) : null}
-      {action === "compatibility-evidence" ? (
-        <>
-          {select(copy("evidenceKindLabel"), evidenceKind, setEvidenceKind, [
-            {
-              id: "manufacturer-statement",
-              name: copy("evidenceKind.manufacturerStatement"),
-            },
-            {
-              id: "dimensional-comparison",
-              name: copy("evidenceKind.dimensionalComparison"),
-            },
-            {
-              id: "physical-fit-test",
-              name: copy("evidenceKind.physicalFitTest"),
-            },
-            {
-              id: "curated-observation",
-              name: copy("evidenceKind.curatedObservation"),
-            },
+          {input(copy("identifier"), text, setText)}
+          {select(copy("identifierKindLabel"), text2, setText2, [
+            { id: "maker-code", name: copy("identifierKind.makerCode") },
+            { id: "sku", name: copy("identifierKind.sku") },
           ])}
-          {input(copy("summary"), text, setText)}
-          {evidenceKind === "physical-fit-test" ? (
-            <>
-              {select(
-                copy("pen"),
-                product.productTypeSlug === "pen"
-                  ? String(product.id)
-                  : primaryId,
-                setPrimaryId,
-                options.relationshipProducts.filter(
-                  ({ productTypeSlug }) => productTypeSlug === "pen",
-                ),
-              )}
-              {select(
-                copy("refill"),
-                product.productTypeSlug === "refill"
-                  ? String(product.id)
-                  : secondaryId,
-                setSecondaryId,
-                options.relationshipProducts.filter(
-                  ({ productTypeSlug }) => productTypeSlug === "refill",
-                ),
-              )}
-              {input(copy("testDate"), date, setDate, "date")}
-              {input(copy("result"), text2, setText2)}
-              {input(copy("procedure"), text3, setText3)}
-            </>
-          ) : evidenceKind === "dimensional-comparison" ? (
-            <>
-              {input(copy("firstFormat"), text2, setText2)}
-              {input(copy("firstSourceUrl"), text3, setText3, "url")}
-              {input(copy("secondFormat"), text4, setText4)}
-              {input(
-                copy("secondSourceUrl"),
-                secondaryId,
-                setSecondaryId,
-                "url",
-              )}
-            </>
-          ) : (
-            <>
-              {input(copy("sourceUrl"), text3, setText3, "url")}
-              {input(copy("sourceDate"), date, setDate, "date")}
-              {input(copy("catalogEdition"), text4, setText4)}
-            </>
-          )}
         </>
       ) : null}
       {action === "compatibility-membership" ? (
@@ -763,17 +598,18 @@ export function PensAdminEditor({
             setPrimaryId,
             admin.compatibilityGroups,
           )}
-          {evidencePicker}
         </>
       ) : null}
+      {action === "compatibility-membership-remove"
+        ? select(
+            copy("compatibilityMembership"),
+            primaryId,
+            setPrimaryId,
+            compatibilityMemberships,
+          )
+        : null}
       {action === "compatibility-assertion" ? (
         <>
-          {select(copy("outcomeLabel"), outcome, setOutcome, [
-            { id: "compatible", name: copy("outcome.compatible") },
-            { id: "incompatible", name: copy("outcome.incompatible") },
-            { id: "conditional", name: copy("outcome.conditional") },
-            { id: "variable", name: copy("outcome.variable") },
-          ])}
           {select(
             copy("targetTypeLabel"),
             targetKind,
@@ -793,27 +629,29 @@ export function PensAdminEditor({
                   ({ productTypeSlug }) => productTypeSlug === "refill",
                 ),
           )}
-          {input(copy("explanation"), text, setText)}
-          {input(copy("remedy"), text2, setText2)}
-          {input(copy("warning"), text3, setText3)}
-          {evidencePicker}
+          {select(
+            copy("requiredTip"),
+            secondaryId,
+            setSecondaryId,
+            options.relationshipProducts.filter(
+              ({ productTypeSlug }) => productTypeSlug === "pen-tip",
+            ),
+            false,
+          )}
         </>
       ) : null}
+      {action === "compatibility-assertion-remove"
+        ? select(
+            copy("compatibilityRelationship"),
+            primaryId,
+            setPrimaryId,
+            compatibilityAssertions,
+          )
+        : null}
       {action === "refill-tip-style" || action === "refill-ink-color" ? (
         <>
           {input(copy("name"), text, setText)}
           {input(copy("slug"), text2, setText2)}
-        </>
-      ) : null}
-      {action === "market" ? (
-        <>
-          {input(copy("displayName"), text, setText)}
-          {input(copy("code"), text2, setText2)}
-          {input(copy("localizationKey"), text3, setText3)}
-          {select(copy("marketKindLabel"), text4, setText4, [
-            { id: "country", name: copy("marketKind.country") },
-            { id: "region", name: copy("marketKind.region") },
-          ])}
         </>
       ) : null}
       {action === "compatibility-group"
@@ -824,28 +662,25 @@ export function PensAdminEditor({
             admin.compatibilityGroupConcepts,
           )
         : null}
-      {[
-        "refill-offering",
-        "offering-market-status",
-        "offering-identifier",
-        "compatibility-membership",
-        "compatibility-assertion",
-        "configuration-slot-required",
-      ].includes(action) ? (
+      {action === "configuration-slot-required" ? (
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
-            checked={approved}
-            onChange={(event) => setApproved(event.target.checked)}
+            checked={slotRequired}
+            onChange={(event) => setSlotRequired(event.target.checked)}
             type="checkbox"
           />
-          {action === "configuration-slot-required"
-            ? copy("required")
-            : copy("approved")}
+          {copy("required")}
         </label>
       ) : null}
       {message ? <Notice>{t(message as TranslationKey)}</Notice> : null}
-      <Button onClick={() => void submit()} type="button">
-        {t("web.action.save")}
+      <Button
+        onClick={() => void submit()}
+        type="button"
+        variant={action.endsWith("-remove") ? "destructive" : "default"}
+      >
+        {action.endsWith("-remove")
+          ? t("web.action.delete")
+          : t("web.action.save")}
       </Button>
     </section>
   );

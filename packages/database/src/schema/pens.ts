@@ -1158,7 +1158,9 @@ export const refillCompatibilityAssertion = pgTable(
     }).references(() => productDetailRefill.id, { onDelete: "restrict" }),
     outcome: text("outcome", {
       enum: ["compatible", "incompatible", "conditional", "variable"],
-    }).notNull(),
+    })
+      .notNull()
+      .default("compatible"),
     explanation: text("explanation"),
     remedy: text("remedy"),
     warning: text("warning"),

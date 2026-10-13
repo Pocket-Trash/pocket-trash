@@ -139,7 +139,6 @@ const refill: CatalogProduct = {
     {
       id: 3000,
       name: "Example Pen",
-      outcome: "compatible",
       requiredTipName: null,
       slug: "example-pen",
     },

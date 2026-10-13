@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+The refill evidence, market lifecycle, approval, and multi-outcome portions of this decision are superseded by ENG-459. The active application model is a direct positive relationship: a Pen accepts an exact refill or compatibility group, optionally for one required Pen tip; absence is unknown. The retained physical columns and tables are deployment and import compatibility shims until a later cleanup migration can remove them safely. The remaining product, collection, configuration, terminology, source-listing, and source-image decisions stay accepted.
+
 Sources:
 
 - [Approve the final pen and refill schema](https://linear.app/pocket-trash/issue/ENG-412/approve-the-final-pen-and-refill-schema)

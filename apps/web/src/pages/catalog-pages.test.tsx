@@ -1070,7 +1070,6 @@ describe("ProductDetailPage", () => {
             {
               id: 2,
               name: "Test Pen",
-              outcome: "conditional",
               requiredTipName: "Needle Tip",
               slug: "test-pen",
             },

@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+ENG-459 supersedes this record's evidence, approval, market-lifecycle, and current-availability requirements. Approved product, offering, identifier, compatibility-group, and membership facts remain the seed selection, but they are imported directly without evidence links or approval metadata. A refill's documented existence is sufficient even when current availability is unknown.
+
 Sources:
 
 - [Select the production refill seed set and provenance](https://linear.app/pocket-trash/issue/ENG-413/select-the-production-refill-seed-set-and-provenance)

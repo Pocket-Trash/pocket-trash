@@ -714,29 +714,7 @@ export const collectionDeletionSchema = productDeletionSchema
     destinationCollectionId: idSchema.nullable(),
   });
 
-/** Validates one evidence relationship submitted with a Pens claim. */
-const pensEvidenceLinkSchema = z.object({
-  evidenceId: idSchema,
-  stance: z.enum(["contradicts", "supports"]),
-});
-/** Validates evidence relationships submitted with a Pens claim. */
-const pensEvidenceLinksSchema = z.array(pensEvidenceLinkSchema);
-/** Validates nullable optional Pens text. */
-const optionalPensText = z.string().trim().nullable().optional();
-/** Validates an ISO calendar date. */
-const pensDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-/** Validates a nullable optional ISO calendar date. */
-const optionalPensDate = pensDate.nullable().optional();
-/** Validates a nullable optional HTTP or HTTPS URL. */
-const optionalPensUrl = z
-  .string()
-  .trim()
-  .refine((value) => !value || isWebUrl(value), "web.catalog.error.form")
-  .transform((value) => value || null)
-  .nullable()
-  .optional();
-
-/** Structured append-only Pens catalog mutation accepted from admin editors. */
+/** Structured Pens catalog mutation accepted from admin editors. */
 export const pensAdminWriteSchema = z
   .discriminatedUnion("kind", [
     z.object({
@@ -748,13 +726,6 @@ export const pensAdminWriteSchema = z
       kind: z.literal("refill-ink-color"),
       name: z.string().trim().min(1).max(80),
       slug: z.string().trim().min(1).max(80),
-    }),
-    z.object({
-      code: z.string().trim().min(2).max(40),
-      displayName: z.string().trim().min(1).max(80),
-      displayNameKey: z.string().trim().min(1).max(200),
-      kind: z.literal("market"),
-      marketKind: z.enum(["country", "region"]),
     }),
     z.object({
       conceptId: idSchema,
@@ -787,22 +758,6 @@ export const pensAdminWriteSchema = z
       targetChoiceId: idSchema,
     }),
     z.object({
-      captureDate: pensDate,
-      catalogEdition: optionalPensText,
-      claim: z.string().trim().min(1).max(5000),
-      kind: z.literal("source-evidence"),
-      listingId: idSchema.nullable().optional(),
-      marketId: idSchema.nullable().optional(),
-      originalUrl: z.string().trim().refine(isWebUrl),
-      preservedSourceChecksum: optionalPensText,
-      preservedSourceIdentity: optionalPensText,
-      publicationDate: optionalPensDate,
-      publisher: z.string().trim().min(1).max(200),
-      sourceKind: z.string().trim().min(1).max(200),
-    }),
-    z.object({
-      approved: z.boolean(),
-      evidence: pensEvidenceLinksSchema,
       inkColorId: idSchema,
       kind: z.literal("refill-offering"),
       refillProductId: idSchema,
@@ -810,87 +765,36 @@ export const pensAdminWriteSchema = z
       tipStyleId: idSchema,
     }),
     z.object({
-      approved: z.boolean(),
-      effectiveDate: optionalPensDate,
-      evidence: pensEvidenceLinksSchema,
-      kind: z.literal("offering-market-status"),
-      lifecycle: z.enum(["current", "discontinued", "historical"]),
-      marketId: idSchema,
-      offeringId: idSchema,
-    }),
-    z.object({
-      approved: z.boolean(),
-      comparisonRule: z.string().trim().min(1).max(80).optional(),
-      effectiveDate: optionalPensDate,
-      evidence: pensEvidenceLinksSchema,
       identifierKind: z.enum(["maker-code", "sku"]),
       kind: z.literal("offering-identifier"),
       makerId: idSchema,
-      marketId: idSchema,
       offeringId: idSchema,
       sourceValue: z.string().trim().min(1).max(200),
     }),
     z.object({
-      catalogEdition: optionalPensText,
-      evidenceKind: z.enum([
-        "curated-observation",
-        "dimensional-comparison",
-        "manufacturer-statement",
-        "physical-fit-test",
-      ]),
-      firstMeasuredFormatLabel: optionalPensText,
-      firstSourceUrl: optionalPensUrl,
-      kind: z.literal("compatibility-evidence"),
-      notes: optionalPensText,
-      penProductId: idSchema.nullable().optional(),
-      procedure: optionalPensText,
-      refillProductId: idSchema.nullable().optional(),
-      requiredTipProductId: idSchema.nullable().optional(),
-      result: optionalPensText,
-      secondMeasuredFormatLabel: optionalPensText,
-      secondSourceUrl: optionalPensUrl,
-      sourceDate: optionalPensDate,
-      sourceUrl: optionalPensUrl,
-      summary: z.string().trim().min(1).max(2000),
-      testDate: optionalPensDate,
-    }),
-    z.object({
-      approved: z.boolean(),
-      evidence: pensEvidenceLinksSchema,
       groupId: idSchema,
       kind: z.literal("compatibility-membership"),
       refillProductId: idSchema,
     }),
     z.object({
-      approved: z.boolean(),
-      evidence: pensEvidenceLinksSchema,
-      explanation: optionalPensText,
+      kind: z.literal("compatibility-membership-remove"),
+      membershipId: idSchema,
+      refillProductId: idSchema,
+    }),
+    z.object({
       kind: z.literal("compatibility-assertion"),
-      outcome: z.enum([
-        "compatible",
-        "conditional",
-        "incompatible",
-        "variable",
-      ]),
       penProductId: idSchema,
-      remedy: optionalPensText,
       requiredTipProductId: idSchema.nullable().optional(),
       targetGroupId: idSchema.nullable().optional(),
       targetRefillProductId: idSchema.nullable().optional(),
-      warning: optionalPensText,
+    }),
+    z.object({
+      assertionId: idSchema,
+      kind: z.literal("compatibility-assertion-remove"),
+      penProductId: idSchema,
     }),
   ])
   .superRefine((input, context) => {
-    if (
-      "evidence" in input &&
-      input.approved &&
-      !input.evidence.some(({ stance }) => stance === "supports")
-    )
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["evidence"],
-      });
     if (
       input.kind === "configuration-choice" &&
       [
@@ -924,39 +828,6 @@ export const pensAdminWriteSchema = z
         message: "web.catalog.error.form",
         path: ["targetRefillProductId"],
       });
-    if (
-      input.kind === "compatibility-assertion" &&
-      ((input.outcome === "incompatible" || input.outcome === "variable") &&
-      !input.explanation
-        ? true
-        : input.outcome === "conditional" && !input.remedy)
-    )
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: [input.outcome === "conditional" ? "remedy" : "explanation"],
-      });
-    if (input.kind === "compatibility-evidence") {
-      const invalid =
-        input.evidenceKind === "physical-fit-test"
-          ? !input.penProductId ||
-            !input.refillProductId ||
-            !input.testDate ||
-            !input.result ||
-            !input.procedure
-          : input.evidenceKind === "dimensional-comparison"
-            ? !input.firstMeasuredFormatLabel ||
-              !input.secondMeasuredFormatLabel ||
-              !input.firstSourceUrl ||
-              !input.secondSourceUrl
-            : !input.sourceUrl || (!input.sourceDate && !input.catalogEdition);
-      if (invalid)
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["evidenceKind"],
-        });
-    }
   });
 
 /** Validates explicit acknowledgement of permanent collection-item deletion. */

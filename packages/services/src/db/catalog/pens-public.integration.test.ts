@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("public Pens catalog reads", () => {
-  it("authors evidence-backed offerings, configuration rules, and compatibility", async () => {
+  it("authors direct offerings, configuration rules, and compatibility", async () => {
     const client = new PGlite();
     const db = drizzle({ client, relations: schema.relations });
 
@@ -136,8 +136,20 @@ describe("public Pens catalog reads", () => {
         .insert(schema.refillInkColor)
         .values({ name: "Author Blue", slug: "author-blue" })
         .returning({ id: schema.refillInkColor.id });
+      const [groupConcept] = await db
+        .select({ id: schema.catalogTerminologyConcept.id })
+        .from(schema.catalogTerminologyConcept)
+        .where(
+          and(
+            eq(
+              schema.catalogTerminologyConcept.namespace,
+              "refill-compatibility-group",
+            ),
+            eq(schema.catalogTerminologyConcept.key, "energel"),
+          ),
+        );
       await db.insert(schema.user).values({ clerkId: "pens-author" });
-      if (!productMaterial || !tipStyle || !inkColor)
+      if (!productMaterial || !tipStyle || !inkColor || !groupConcept)
         throw new Error("Pens authoring lookups were not created.");
       const service = createDbServices(
         db as unknown as Database,
@@ -211,61 +223,68 @@ describe("public Pens catalog reads", () => {
         }),
       ).resolves.toMatchObject({ id: expect.any(Number) });
 
-      const sourceEvidence = await service.authorPensCatalog({
-        actor,
-        captureDate: "2026-10-10",
-        claim: "The maker lists this refill offering.",
-        kind: "source-evidence",
-        originalUrl: "https://example.com/refill",
-        publisher: "Pens Author Maker",
-        sourceKind: "maker-catalog",
-      });
-      await expect(
-        service.authorPensCatalog({
-          actor,
-          approved: true,
-          evidence: [],
-          inkColorId: inkColor.id,
-          kind: "refill-offering",
-          refillProductId: refillId,
-          tipSize: "0.5 mm",
-          tipStyleId: tipStyle.id,
-        }),
-      ).rejects.toThrow("supporting evidence");
       const offering = await service.authorPensCatalog({
         actor,
-        approved: true,
-        evidence: [{ evidenceId: sourceEvidence.id, stance: "supports" }],
         inkColorId: inkColor.id,
         kind: "refill-offering",
         refillProductId: refillId,
         tipSize: "0.5 mm",
         tipStyleId: tipStyle.id,
       });
-      const compatibilityEvidence = await service.authorPensCatalog({
-        actor,
-        evidenceKind: "physical-fit-test",
-        kind: "compatibility-evidence",
-        penProductId: penId,
-        procedure: "Install the refill and actuate the pen three times.",
-        refillProductId: refillId,
-        result: "Fits and writes.",
-        summary: "Physical fit confirmed.",
-        testDate: "2026-10-10",
-      });
       await expect(
         service.authorPensCatalog({
           actor,
-          approved: true,
-          evidence: [
-            { evidenceId: compatibilityEvidence.id, stance: "supports" },
-          ],
           kind: "compatibility-assertion",
-          outcome: "compatible",
           penProductId: penId,
           targetRefillProductId: refillId,
         }),
       ).resolves.toMatchObject({ id: expect.any(Number) });
+      const group = await service.authorPensCatalog({
+        actor,
+        conceptId: groupConcept.id,
+        kind: "compatibility-group",
+      });
+      const membership = await service.authorPensCatalog({
+        actor,
+        groupId: group.id,
+        kind: "compatibility-membership",
+        refillProductId: refillId,
+      });
+      const scopedCompatibility = await service.authorPensCatalog({
+        actor,
+        kind: "compatibility-assertion",
+        penProductId: penId,
+        requiredTipProductId: tipId,
+        targetGroupId: group.id,
+      });
+      const authoredOptions = await service.listPensAdminOptions(actor);
+      expect(authoredOptions.compatibilityAssertions).toContainEqual(
+        expect.objectContaining({
+          id: scopedCompatibility.id,
+          requiredTipProductId: tipId,
+          targetGroupId: group.id,
+        }),
+      );
+      expect(authoredOptions.compatibilityMemberships).toContainEqual(
+        expect.objectContaining({ id: membership.id, groupId: group.id }),
+      );
+      await service.authorPensCatalog({
+        actor,
+        assertionId: scopedCompatibility.id,
+        kind: "compatibility-assertion-remove",
+        penProductId: penId,
+      });
+      await service.authorPensCatalog({
+        actor,
+        kind: "compatibility-membership-remove",
+        membershipId: membership.id,
+        refillProductId: refillId,
+      });
+      const removedOptions = await service.listPensAdminOptions(actor);
+      expect(removedOptions.compatibilityAssertions).not.toContainEqual(
+        expect.objectContaining({ id: scopedCompatibility.id }),
+      );
+      expect(removedOptions.compatibilityMemberships).toEqual([]);
       await expect(
         db
           .select({ id: schema.refillOffering.id })
@@ -372,7 +391,7 @@ describe("public Pens catalog reads", () => {
     }
   }, 30_000);
 
-  it("returns approved refill offerings, aliases, and compatible Pens", async () => {
+  it("resolves exact and group compatibility while absence stays unknown", async () => {
     const client = new PGlite();
     const db = drizzle({ client, relations: schema.relations });
 
@@ -394,11 +413,27 @@ describe("public Pens catalog reads", () => {
         .select({ id: schema.productType.id })
         .from(schema.productType)
         .where(eq(schema.productType.slug, "refill"));
-      if (!maker || !penType || !refillType)
+      const [tipType] = await db
+        .select({ id: schema.productType.id })
+        .from(schema.productType)
+        .where(eq(schema.productType.slug, "pen-tip"));
+      const [groupConcept] = await db
+        .select({ id: schema.catalogTerminologyConcept.id })
+        .from(schema.catalogTerminologyConcept)
+        .where(
+          and(
+            eq(
+              schema.catalogTerminologyConcept.namespace,
+              "refill-compatibility-group",
+            ),
+            eq(schema.catalogTerminologyConcept.key, "energel"),
+          ),
+        );
+      if (!maker || !penType || !refillType || !tipType || !groupConcept)
         throw new Error("Pens catalog fixtures were not created.");
 
       await db.transaction(async (transaction) => {
-        const [pen, refill] = await transaction
+        const products = await transaction
           .insert(schema.product)
           .values([
             {
@@ -415,19 +450,74 @@ describe("public Pens catalog reads", () => {
               productTypeId: refillType.id,
               slug: "bxs-v5rt",
             },
+            {
+              approvalStatus: "approved",
+              makerId: maker.id,
+              name: "Grouped Refill",
+              productTypeId: refillType.id,
+              slug: "grouped-refill",
+            },
+            {
+              approvalStatus: "approved",
+              makerId: maker.id,
+              name: "Unknown Refill",
+              productTypeId: refillType.id,
+              slug: "unknown-refill",
+            },
+            {
+              approvalStatus: "approved",
+              makerId: maker.id,
+              name: "Needle Tip",
+              productTypeId: tipType.id,
+              slug: "needle-tip",
+            },
           ])
           .returning({ id: schema.product.id, slug: schema.product.slug });
-        if (!pen || !refill) throw new Error("Pens products were not created.");
-        const penId = pen.slug === "compatible-pen" ? pen.id : refill.id;
-        const refillId = refill.slug === "bxs-v5rt" ? refill.id : pen.id;
+        /**
+         * Resolves one product created by this compatibility fixture.
+         *
+         * @param slug - Product slug to resolve.
+         * @returns Created product identifier.
+         * @throws When the fixture product is absent.
+         */
+        const productId = (slug: string) => {
+          const product = products.find((candidate) => candidate.slug === slug);
+          if (!product) throw new Error(`Missing Pens product ${slug}.`);
+          return product.id;
+        };
+        const penId = productId("compatible-pen");
+        const refillId = productId("bxs-v5rt");
+        const groupedRefillId = productId("grouped-refill");
+        const unknownRefillId = productId("unknown-refill");
+        const tipId = productId("needle-tip");
 
         await transaction.insert(schema.productDetailPen).values({ id: penId });
-        await transaction.insert(schema.productDetailRefill).values({
-          id: refillId,
-          makerId: maker.id,
-          model: "BXS-V5RT",
-          normalizedModel: "bxs-v5rt",
-        });
+        await transaction
+          .insert(schema.productDetailPenPart)
+          .values({ id: tipId });
+        await transaction
+          .insert(schema.productDetailPenTip)
+          .values({ id: tipId });
+        await transaction.insert(schema.productDetailRefill).values([
+          {
+            id: refillId,
+            makerId: maker.id,
+            model: "BXS-V5RT",
+            normalizedModel: "bxs-v5rt",
+          },
+          {
+            id: groupedRefillId,
+            makerId: maker.id,
+            model: "GROUPED-RF",
+            normalizedModel: "grouped-rf",
+          },
+          {
+            id: unknownRefillId,
+            makerId: maker.id,
+            model: "UNKNOWN-RF",
+            normalizedModel: "unknown-rf",
+          },
+        ]);
         await transaction.insert(schema.productAlias).values({
           label: "Pilot Precise V5 RT",
           normalizedValue: "pilot precise v5 rt",
@@ -441,22 +531,11 @@ describe("public Pens catalog reads", () => {
           .insert(schema.refillInkColor)
           .values({ name: "Blue", slug: "blue" })
           .returning({ id: schema.refillInkColor.id });
-        const [sourceEvidence] = await transaction
-          .insert(schema.catalogSourceEvidence)
-          .values({
-            captureDate: "2026-10-10",
-            claim: "The refill is sold in 0.5 mm blue.",
-            originalUrl: "https://example.com/refill",
-            publisher: "Pens Test Maker",
-            sourceKind: "manufacturer-catalog",
-          })
-          .returning({ id: schema.catalogSourceEvidence.id });
-        if (!tipStyle || !inkColor || !sourceEvidence)
+        if (!tipStyle || !inkColor)
           throw new Error("Refill offering fixtures were not created.");
         const [offering] = await transaction
           .insert(schema.refillOffering)
           .values({
-            approvedAt: new Date("2026-10-10"),
             inkColorId: inkColor.id,
             normalizedTipSize: "0.5 mm",
             refillProductId: refillId,
@@ -465,30 +544,9 @@ describe("public Pens catalog reads", () => {
           })
           .returning({ id: schema.refillOffering.id });
         if (!offering) throw new Error("Refill offering was not created.");
-        await transaction.insert(schema.refillOfferingEvidence).values({
-          evidenceId: sourceEvidence.id,
-          offeringId: offering.id,
-          stance: "supports",
-        });
-
-        const [compatibilityEvidence] = await transaction
-          .insert(schema.refillCompatibilityEvidence)
-          .values({
-            kind: "physical-fit-test",
-            penProductId: penId,
-            procedure: "Installed the refill and operated the pen.",
-            refillProductId: refillId,
-            result: "Fits and writes.",
-            summary: "The refill fits the pen.",
-            testDate: "2026-10-10",
-          })
-          .returning({ id: schema.refillCompatibilityEvidence.id });
-        if (!compatibilityEvidence)
-          throw new Error("Compatibility evidence was not created.");
         const [assertion] = await transaction
           .insert(schema.refillCompatibilityAssertion)
           .values({
-            approvedAt: new Date("2026-10-10"),
             outcome: "compatible",
             penProductId: penId,
             targetRefillProductId: refillId,
@@ -496,27 +554,42 @@ describe("public Pens catalog reads", () => {
           .returning({ id: schema.refillCompatibilityAssertion.id });
         if (!assertion)
           throw new Error("Compatibility assertion was not created.");
+        const [group] = await transaction
+          .insert(schema.refillCompatibilityGroup)
+          .values({ conceptId: groupConcept.id })
+          .returning({ id: schema.refillCompatibilityGroup.id });
+        if (!group) throw new Error("Compatibility group was not created.");
         await transaction
-          .insert(schema.refillCompatibilityAssertionEvidence)
+          .insert(schema.refillCompatibilityGroupMembership)
           .values({
-            assertionId: assertion.id,
-            evidenceId: compatibilityEvidence.id,
-            stance: "supports",
+            groupId: group.id,
+            refillProductId: groupedRefillId,
           });
+        await transaction.insert(schema.refillCompatibilityAssertion).values({
+          penProductId: penId,
+          requiredTipProductId: tipId,
+          targetGroupId: group.id,
+        });
       });
 
       const service = createDbServices(
         db as unknown as Database,
         createLogger({ app: "api", environment: "test" }),
       ).catalog;
-      const [refill] = await service.listProducts("refill");
+      const refills = await service.listProducts("refill");
+      const refill = refills.find(({ slug }) => slug === "bxs-v5rt");
+      const groupedRefill = refills.find(
+        ({ slug }) => slug === "grouped-refill",
+      );
+      const unknownRefill = refills.find(
+        ({ slug }) => slug === "unknown-refill",
+      );
 
       expect(refill).toMatchObject({
         aliases: ["Pilot Precise V5 RT"],
         compatiblePens: [
           {
             name: "Compatible Pen",
-            outcome: "compatible",
             requiredTipName: null,
             slug: "compatible-pen",
           },
@@ -527,6 +600,14 @@ describe("public Pens catalog reads", () => {
           { inkColor: "Blue", tipSize: "0.5 mm", tipStyle: "Needle" },
         ],
       });
+      expect(groupedRefill?.compatiblePens).toEqual([
+        expect.objectContaining({
+          name: "Compatible Pen",
+          requiredTipName: "Needle Tip",
+          slug: "compatible-pen",
+        }),
+      ]);
+      expect(unknownRefill?.compatiblePens).toEqual([]);
     } finally {
       await client.close();
     }
