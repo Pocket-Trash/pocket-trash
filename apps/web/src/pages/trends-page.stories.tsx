@@ -89,8 +89,13 @@ export const Populated: Story = {
       }),
     ).toBeVisible();
 
-    canvas.getByRole("combobox", { name: "Product type" }).focus();
+    const productTypeFilter = canvas.getByRole("combobox", {
+      name: "Product type",
+    });
+    productTypeFilter.focus();
     await userEvent.keyboard("{Enter}{ArrowDown}{Enter}");
+    await expect(productTypeFilter).not.toHaveTextContent("all");
+    await userEvent.keyboard("{Escape}");
 
     await expect(page.queryByRole("listbox")).toBeNull();
     await expect(canvas.getAllByRole("row")).toHaveLength(2);
