@@ -30,6 +30,13 @@
 
 
 
+
+## 0.10.1
+
+### Patch Changes
+
+* Create canonical Autmog finishes discovered during scraper synchronization. (@app/scraper)
+
 ## 0.10.0
 
 ### Minor Changes
