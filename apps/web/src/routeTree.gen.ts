@@ -13,7 +13,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountErasedRouteImport } from './routes/account-erased'
 import { Route as AccountErasureRouteImport } from './routes/account-erasure'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AutmogRouteImport } from './routes/autmog'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -26,7 +25,6 @@ import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminSliderMagnetPresetsRouteImport } from './routes/admin.slider-magnet-presets'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
 import { Route as ChangelogIndexRouteImport } from './routes/changelog.index'
 import { Route as ChangelogSlugRouteImport } from './routes/changelog.$slug'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
@@ -42,7 +40,6 @@ import { Route as MakersIndexRouteImport } from './routes/makers.index'
 import { Route as MakersSlugRouteImport } from './routes/makers.$slug'
 import { Route as MaterialsIndexRouteImport } from './routes/materials.index'
 import { Route as MaterialsMaterialSlugRouteImport } from './routes/materials.$materialSlug'
-import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as ProductsAddRouteImport } from './routes/products.add'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
@@ -109,11 +106,6 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AutmogRoute = AutmogRouteImport.update({
-  id: '/autmog',
-  path: '/autmog',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
@@ -174,11 +166,6 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
   getParentRoute: () => AdminRoute,
-} as any)
-const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
-  id: '/$penId',
-  path: '/$penId',
-  getParentRoute: () => AutmogRoute,
 } as any)
 const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
   id: '/changelog/',
@@ -253,11 +240,6 @@ const MaterialsIndexRoute = MaterialsIndexRouteImport.update({
 const MaterialsMaterialSlugRoute = MaterialsMaterialSlugRouteImport.update({
   id: '/materials/$materialSlug',
   path: '/materials/$materialSlug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PensPenIdRoute = PensPenIdRouteImport.update({
-  id: '/pens/$penId',
-  path: '/pens/$penId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
@@ -505,7 +487,6 @@ export interface FileRoutesByFullPath {
   '/account-erased': typeof AccountErasedRoute
   '/account-erasure': typeof AccountErasureRoute
   '/admin': typeof AdminRouteWithChildren
-  '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
   '/feedback': typeof FeedbackRouteWithChildren
   '/notifications': typeof NotificationsRoute
@@ -517,7 +498,6 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
   '/admin/users': typeof AdminUsersRoute
-  '/autmog/$penId': typeof AutmogPenIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -527,7 +507,6 @@ export interface FileRoutesByFullPath {
   '/help/$slug': typeof HelpSlugRoute
   '/makers/$slug': typeof MakersSlugRoute
   '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
-  '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
   '/resources/add': typeof ResourcesAddRoute
@@ -585,7 +564,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account-erased': typeof AccountErasedRoute
   '/account-erasure': typeof AccountErasureRoute
-  '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
   '/notifications': typeof NotificationsRoute
   '/privacy': typeof PrivacyRoute
@@ -594,7 +572,6 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
   '/admin/users': typeof AdminUsersRoute
-  '/autmog/$penId': typeof AutmogPenIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -604,7 +581,6 @@ export interface FileRoutesByTo {
   '/help/$slug': typeof HelpSlugRoute
   '/makers/$slug': typeof MakersSlugRoute
   '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
-  '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
   '/resources/add': typeof ResourcesAddRoute
@@ -664,7 +640,6 @@ export interface FileRoutesById {
   '/account-erased': typeof AccountErasedRoute
   '/account-erasure': typeof AccountErasureRoute
   '/admin': typeof AdminRouteWithChildren
-  '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
   '/feedback': typeof FeedbackRouteWithChildren
   '/notifications': typeof NotificationsRoute
@@ -676,7 +651,6 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
   '/admin/users': typeof AdminUsersRoute
-  '/autmog/$penId': typeof AutmogPenIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -686,7 +660,6 @@ export interface FileRoutesById {
   '/help/$slug': typeof HelpSlugRoute
   '/makers/$slug': typeof MakersSlugRoute
   '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
-  '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
   '/resources/add': typeof ResourcesAddRoute
@@ -747,7 +720,6 @@ export interface FileRouteTypes {
     | '/account-erased'
     | '/account-erasure'
     | '/admin'
-    | '/autmog'
     | '/contact'
     | '/feedback'
     | '/notifications'
@@ -759,7 +731,6 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/slider-magnet-presets'
     | '/admin/users'
-    | '/autmog/$penId'
     | '/changelog/$slug'
     | '/collections/$userId'
     | '/collections/add'
@@ -769,7 +740,6 @@ export interface FileRouteTypes {
     | '/help/$slug'
     | '/makers/$slug'
     | '/materials/$materialSlug'
-    | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
     | '/resources/add'
@@ -827,7 +797,6 @@ export interface FileRouteTypes {
     | '/'
     | '/account-erased'
     | '/account-erasure'
-    | '/autmog'
     | '/contact'
     | '/notifications'
     | '/privacy'
@@ -836,7 +805,6 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/slider-magnet-presets'
     | '/admin/users'
-    | '/autmog/$penId'
     | '/changelog/$slug'
     | '/collections/$userId'
     | '/collections/add'
@@ -846,7 +814,6 @@ export interface FileRouteTypes {
     | '/help/$slug'
     | '/makers/$slug'
     | '/materials/$materialSlug'
-    | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
     | '/resources/add'
@@ -905,7 +872,6 @@ export interface FileRouteTypes {
     | '/account-erased'
     | '/account-erasure'
     | '/admin'
-    | '/autmog'
     | '/contact'
     | '/feedback'
     | '/notifications'
@@ -917,7 +883,6 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/slider-magnet-presets'
     | '/admin/users'
-    | '/autmog/$penId'
     | '/changelog/$slug'
     | '/collections/$userId'
     | '/collections/add'
@@ -927,7 +892,6 @@ export interface FileRouteTypes {
     | '/help/$slug'
     | '/makers/$slug'
     | '/materials/$materialSlug'
-    | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
     | '/resources/add'
@@ -987,7 +951,6 @@ export interface RootRouteChildren {
   AccountErasedRoute: typeof AccountErasedRoute
   AccountErasureRoute: typeof AccountErasureRoute
   AdminRoute: typeof AdminRouteWithChildren
-  AutmogRoute: typeof AutmogRouteWithChildren
   ContactRoute: typeof ContactRoute
   FeedbackRoute: typeof FeedbackRouteWithChildren
   NotificationsRoute: typeof NotificationsRoute
@@ -1001,7 +964,6 @@ export interface RootRouteChildren {
   HelpSlugRoute: typeof HelpSlugRoute
   MakersSlugRoute: typeof MakersSlugRoute
   MaterialsMaterialSlugRoute: typeof MaterialsMaterialSlugRoute
-  PensPenIdRoute: typeof PensPenIdRoute
   ProductsAddRoute: typeof ProductsAddRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
@@ -1047,13 +1009,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/autmog': {
-      id: '/autmog'
-      path: '/autmog'
-      fullPath: '/autmog'
-      preLoaderRoute: typeof AutmogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -1139,13 +1094,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
-    }
-    '/autmog/$penId': {
-      id: '/autmog/$penId'
-      path: '/$penId'
-      fullPath: '/autmog/$penId'
-      preLoaderRoute: typeof AutmogPenIdRouteImport
-      parentRoute: typeof AutmogRoute
     }
     '/changelog/': {
       id: '/changelog/'
@@ -1250,13 +1198,6 @@ declare module '@tanstack/react-router' {
       path: '/materials/$materialSlug'
       fullPath: '/materials/$materialSlug'
       preLoaderRoute: typeof MaterialsMaterialSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pens/$penId': {
-      id: '/pens/$penId'
-      path: '/pens/$penId'
-      fullPath: '/pens/$penId'
-      preLoaderRoute: typeof PensPenIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products/': {
@@ -1645,17 +1586,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface AutmogRouteChildren {
-  AutmogPenIdRoute: typeof AutmogPenIdRoute
-}
-
-const AutmogRouteChildren: AutmogRouteChildren = {
-  AutmogPenIdRoute: AutmogPenIdRoute,
-}
-
-const AutmogRouteWithChildren =
-  AutmogRoute._addFileChildren(AutmogRouteChildren)
-
 interface FeedbackRouteChildren {
   FeedbackCompletedRoute: typeof FeedbackCompletedRoute
   FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
@@ -1727,7 +1657,6 @@ const rootRouteChildren: RootRouteChildren = {
   AccountErasedRoute: AccountErasedRoute,
   AccountErasureRoute: AccountErasureRoute,
   AdminRoute: AdminRouteWithChildren,
-  AutmogRoute: AutmogRouteWithChildren,
   ContactRoute: ContactRoute,
   FeedbackRoute: FeedbackRouteWithChildren,
   NotificationsRoute: NotificationsRoute,
@@ -1741,7 +1670,6 @@ const rootRouteChildren: RootRouteChildren = {
   HelpSlugRoute: HelpSlugRoute,
   MakersSlugRoute: MakersSlugRoute,
   MaterialsMaterialSlugRoute: MaterialsMaterialSlugRoute,
-  PensPenIdRoute: PensPenIdRoute,
   ProductsAddRoute: ProductsAddRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,

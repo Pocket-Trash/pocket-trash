@@ -40,7 +40,6 @@ request titles only, not the individual commits already present on the branch.
 | `lint` | `packages/lint/` |
 | `github-discord-notifier` | `packages/github-discord-notifier/` |
 | `infisical-runner` | `packages/infisical-runner/` |
-| `json-data` | `packages/json-data/` |
 | `logger` | `packages/logger/` |
 | `services` | `packages/services/` |
 | `tsconfig` | `packages/tsconfig/` |

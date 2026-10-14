@@ -254,7 +254,6 @@ export const loggerMessages = {
   },
   web: {
     accountLoaded: "web.account.loaded",
-    fxRatesFetchFailed: "web.fxRates.fetch.failed",
     localizationKeyMissing: "web.localization.key.missing",
     localeSyncFailed: "web.locale.sync.failed",
     routeError: "web.route.error",

@@ -77,6 +77,18 @@ describe("resource management routes", () => {
   });
 
   it.each([
+    "/autmog",
+    "/autmog/$penId",
+    "/pens/$penId",
+  ])("does not register the retired route %s", (fullPath) => {
+    expect(
+      Object.values(getRouter().routesById).some(
+        (candidate) => candidate.fullPath === fullPath,
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
     "/admin/resources/trash",
     "/admin/catalog-images/trash",
   ])("does not register the moved route %s", (fullPath) => {

@@ -5,12 +5,9 @@ import * as React from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import {
-  baseCurrency,
   type CurrencyCode,
-  type CurrencyRates,
   currencies,
   type MeasurementSystem,
-  todayUTCDateString,
 } from "@/lib/pen-formatters";
 import {
   defaultUserSettings,
@@ -21,8 +18,6 @@ import {
 } from "@/lib/user-settings";
 import { useLocale } from "@/providers/locale-provider";
 
-/** Local-storage key for cached CAD exchange rates. */
-const rateStorageKey = `pocket-trash.fxRates.${baseCurrency}`;
 /** User-selectable pen measurement and display preferences. */
 type PenSettings = Pick<
   typeof defaultUserSettings,
@@ -210,117 +205,4 @@ export function usePenSettings() {
     setMeasurementSystem: updateMeasurementSystem,
     saving,
   };
-}
-
-/**
- * Loads and caches CAD-based exchange rates for pen price formatting.
- *
- * @returns Current exchange rates and a forced-refresh callback.
- */
-export function useCurrencyRates() {
-  const [rates, setRates] = React.useState<CurrencyRates>({
-    [baseCurrency]: 1,
-  });
-
-  // `force` skips the once-a-day cache so pull-to-refresh always re-hits the FX
-  // API; the normal mount path still short-circuits on a same-day cache hit.
-  const loadRates = React.useCallback(async (force = false) => {
-    const today = todayUTCDateString();
-
-    if (!force) {
-      try {
-        const cached = JSON.parse(
-          window.localStorage.getItem(rateStorageKey) ?? "null",
-        ) as {
-          /** UTC date on which the rates were fetched. */
-          date?: string;
-          /** Cached rates keyed by target currency. */
-          rates?: CurrencyRates;
-        } | null;
-
-        if (cached?.date === today && cached.rates) {
-          setRates({ [baseCurrency]: 1, ...cached.rates });
-          return;
-        }
-      } catch {
-        // Ignore malformed cache entries and fetch fresh rates.
-      }
-
-      const symbols = currencies
-        .filter((currency) => currency !== baseCurrency)
-        .join(",");
-
-      try {
-        const response = await fetch(
-          `https://api.frankfurter.dev/v1/latest?base=${baseCurrency}&symbols=${symbols}`,
-          { cache: "no-store" },
-        );
-
-        if (!response.ok) throw new Error(`FX ${response.status}`);
-
-        const data = (await response.json()) as {
-          /** Provider rates keyed by target currency. */
-          rates?: CurrencyRates;
-        };
-        if (data.rates) {
-          const nextRates = { [baseCurrency]: 1, ...data.rates };
-          setRates(nextRates);
-          window.localStorage.setItem(
-            rateStorageKey,
-            JSON.stringify({ date: today, rates: data.rates }),
-          );
-        }
-      } catch (error) {
-        logger.warn(loggerMessages.web.fxRatesFetchFailed, {
-          attributes: {
-            baseCurrency,
-            symbols,
-          },
-          error,
-        });
-      }
-    }
-
-    try {
-      const symbols = currencies
-        .filter((currency) => currency !== baseCurrency)
-        .join(",");
-      const response = await fetch(
-        `https://api.frankfurter.dev/v1/latest?base=${baseCurrency}&symbols=${symbols}`,
-        { cache: "no-store" },
-      );
-
-      if (!response.ok) throw new Error(`FX ${response.status}`);
-
-      const data = (await response.json()) as {
-        /** Provider rates keyed by target currency. */
-        rates?: CurrencyRates;
-      };
-      if (data.rates) {
-        setRates({ [baseCurrency]: 1, ...data.rates });
-        window.localStorage.setItem(
-          rateStorageKey,
-          JSON.stringify({ date: today, rates: data.rates }),
-        );
-      }
-    } catch (error) {
-      logger.warn(loggerMessages.web.fxRatesFetchFailed, {
-        attributes: {
-          baseCurrency,
-          symbols: currencies
-            .filter((currency) => currency !== baseCurrency)
-            .join(","),
-        },
-        error,
-      });
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void loadRates();
-  }, [loadRates]);
-
-  const refreshRates = React.useCallback(() => loadRates(true), [loadRates]);
-
-  return { rates, refreshRates };
 }

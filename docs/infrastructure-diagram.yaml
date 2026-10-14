@@ -10,13 +10,11 @@ scope:
   packages:
     - "@package/database"
     - "@package/feature-flags"
-    - "@package/json-data"
     - "@package/logger"
     - "@package/markdown"
     - "@package/services"
     - "@package/storage"
-  excludedApps:
-    - "@app/autmog"
+  excludedApps: []
   excludedPackages:
     - "@package/lint"
     - "@package/tsconfig"

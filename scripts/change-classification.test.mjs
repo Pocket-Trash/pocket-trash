@@ -167,6 +167,7 @@ test("classifies package paths by affected domains", () => {
       "packages/markdown/src/index.ts",
       ["scraper", "web", "storybook", "preview", "safe_e2e", "validation"],
     ],
+    ["packages/json-data/autmog.json", ["validation"]],
     ["packages/lint/index.mjs", ["validation"]],
   ]) {
     assert.deepEqual(classifyChanges([path]), expected(enabled), path);
