@@ -12,6 +12,7 @@ import type {
   PensAdminWriteInput,
   ProductWriteInput,
   PublicCollectionItemTrends,
+  PublicCollectionMakerProductTrends,
   PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterialSummary,
@@ -1333,6 +1334,14 @@ export const getPublicCollectionItemTrends = createServerFn({
 }).handler(async (): Promise<PublicCollectionItemTrends | null> => {
   const { s } = await import("@/lib/services");
   return await s.db.trends.getPublicCollectionItemTrends();
+});
+
+/** Returns active privacy-safe maker and product popularity. */
+export const getPublicCollectionMakerProductTrends = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<PublicCollectionMakerProductTrends | null> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicCollectionMakerProductTrends();
 });
 
 /** Lists exact public catalog-product material counts. */

@@ -1,5 +1,6 @@
 import type {
   PublicCollectionItemTrends,
+  PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
@@ -100,6 +101,45 @@ const collectionMaterialTrends: PublicCollectionMaterialTrends = {
     ...value,
     count: 15,
   })),
+  stale: false,
+};
+
+/** Privacy-safe maker and product rows used by the drill-down story. */
+const makerProductTrends: PublicCollectionMakerProductTrends = {
+  generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+  hasSuppressedValues: true,
+  makerValues: [
+    {
+      collectorCount: 20,
+      itemCount: 30,
+      makerId: 4000,
+      makerName: "Machine Era",
+      makerSlug: "machine-era",
+      materialId: null,
+      materialSpecificId: null,
+      productId: null,
+      productName: null,
+      productSlug: null,
+      productTypeId: null,
+      productTypeSlug: null,
+    },
+  ],
+  productValues: [
+    {
+      collectorCount: 15,
+      itemCount: 20,
+      makerId: 4000,
+      makerName: "Machine Era",
+      makerSlug: "machine-era",
+      materialId: null,
+      materialSpecificId: null,
+      productId: 5000,
+      productName: "Original",
+      productSlug: "original",
+      productTypeId: null,
+      productTypeSlug: "pen",
+    },
+  ],
   stale: false,
 };
 
@@ -212,6 +252,18 @@ export const MaterialDrillDown: Story = {
     collectionTrends,
     onSearchChange: fn(),
     search: { materialId: 3000 },
+    trends,
+  },
+};
+
+/** Collector-ranked maker and product drill-downs. */
+export const MakerProductDrillDown: Story = {
+  args: {
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
+    collectionTrends,
+    makerProductTrends,
+    onSearchChange: fn(),
     trends,
   },
 };

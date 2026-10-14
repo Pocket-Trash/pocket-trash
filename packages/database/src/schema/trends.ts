@@ -10,7 +10,8 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { material, materialSpecific, productType } from "./scraper.js";
+import { product } from "./collection.js";
+import { maker, material, materialSpecific, productType } from "./scraper.js";
 
 /** Completed public Trends generations, with at most one active generation. */
 export const publicTrendsGeneration = pgTable(
@@ -40,11 +41,79 @@ export const publicTrendsGeneration = pgTable(
     hasSuppressedMaterialValues: boolean("has_suppressed_material_values")
       .default(false)
       .notNull(),
+    /** Whether at least one maker or product value was privacy-suppressed. */
+    hasSuppressedMakerProductValues: boolean(
+      "has_suppressed_maker_product_values",
+    )
+      .default(false)
+      .notNull(),
   },
   (table) => [
     uniqueIndex("public_trends_generation_active_unique")
       .on(table.active)
       .where(sql`${table.active}`),
+  ],
+);
+
+/** Privacy-transformed maker and product counts for one stable filter scope. */
+export const publicCollectionMakerProductTrend = pgTable(
+  "public_collection_maker_product_trend",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    generationId: bigint("generation_id", { mode: "number" })
+      .notNull()
+      .references(() => publicTrendsGeneration.id, { onDelete: "cascade" }),
+    /** Null for an all-product-types scope. */
+    productTypeId: bigint("product_type_id", { mode: "number" }).references(
+      () => productType.id,
+      { onDelete: "restrict" },
+    ),
+    /** Null when the scope has no material filter. */
+    materialId: bigint("material_id", { mode: "number" }).references(
+      () => material.id,
+      { onDelete: "restrict" },
+    ),
+    /** Specific material filter within the selected general material. */
+    materialSpecificId: bigint("material_specific_id", { mode: "number" }),
+    makerId: bigint("maker_id", { mode: "number" })
+      .notNull()
+      .references(() => maker.id, { onDelete: "restrict" }),
+    /** Null for a maker aggregate row. */
+    productId: bigint("product_id", { mode: "number" }),
+    /** Currently owned item count rounded to the nearest five. */
+    roundedItemCount: integer("rounded_item_count").notNull(),
+    /** Distinct collector count rounded to the nearest five. */
+    roundedCollectorCount: integer("rounded_collector_count").notNull(),
+  },
+  (table) => [
+    uniqueIndex("public_collection_maker_product_trend_scope_unique").on(
+      table.generationId,
+      sql`coalesce(${table.productTypeId}, 0)`,
+      sql`coalesce(${table.materialId}, 0)`,
+      sql`coalesce(${table.materialSpecificId}, 0)`,
+      table.makerId,
+      sql`coalesce(${table.productId}, 0)`,
+    ),
+    check(
+      "public_collection_maker_product_trend_count_valid",
+      sql`${table.roundedItemCount} > 0 and ${table.roundedItemCount} % 5 = 0 and ${table.roundedCollectorCount} > 0 and ${table.roundedCollectorCount} % 5 = 0`,
+    ),
+    check(
+      "public_collection_maker_product_trend_material_scope_valid",
+      sql`${table.materialSpecificId} is null or ${table.materialId} is not null`,
+    ),
+    foreignKey({
+      columns: [table.materialId, table.materialSpecificId],
+      foreignColumns: [materialSpecific.materialId, materialSpecific.id],
+      name: "public_collection_maker_product_trend_specific_parent_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.productId, table.makerId],
+      foreignColumns: [product.id, product.makerId],
+      name: "public_collection_maker_product_trend_product_maker_fk",
+    }).onDelete("restrict"),
   ],
 );
 
@@ -160,3 +229,6 @@ export type PublicPartAccessoryProductTypeTrend =
 /** Stored privacy-safe material Trend row. */
 export type PublicCollectionItemMaterialTrend =
   typeof publicCollectionItemMaterialTrend.$inferSelect;
+/** Stored privacy-safe maker or product Trend row. */
+export type PublicCollectionMakerProductTrend =
+  typeof publicCollectionMakerProductTrend.$inferSelect;

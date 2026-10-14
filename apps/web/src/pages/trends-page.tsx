@@ -1,6 +1,8 @@
 import type {
   PublicCollectionItemTrends,
+  PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
+  PublicMakerProductTrend,
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
@@ -64,6 +66,19 @@ type TrendsTranslationKey =
   | "web.trends.materialsStale"
   | "web.trends.materialsSuppressed"
   | "web.trends.materialsSuppressedEmpty"
+  | "web.trends.maker"
+  | "web.trends.allMakers"
+  | "web.trends.product"
+  | "web.trends.allProducts"
+  | "web.trends.makers"
+  | "web.trends.makersChartLabel"
+  | "web.trends.products"
+  | "web.trends.productsChartLabel"
+  | "web.trends.makerProductsEmpty"
+  | "web.trends.makerProductsError"
+  | "web.trends.makerProductsPrivacy"
+  | "web.trends.makerProductsStale"
+  | "web.trends.makerProductsSuppressed"
   | "web.trends.viewProducts";
 
 /** Properties for the public catalog-product Trends page. */
@@ -74,6 +89,8 @@ export type TrendsPageProps = {
   collectionMaterialTrends: PublicCollectionMaterialTrends | null;
   /** Active privacy-safe collection-item generation. */
   collectionTrends: PublicCollectionItemTrends | null;
+  /** Active privacy-safe maker and product generation. */
+  makerProductTrends?: PublicCollectionMakerProductTrends | null;
   /**
    * Updates stable Trends URL filters.
    *
@@ -99,6 +116,7 @@ export function TrendsPage({
   catalogMaterialTrends,
   collectionMaterialTrends,
   collectionTrends,
+  makerProductTrends = null,
   onSearchChange,
   partAccessoryTrends = null,
   search = {},
@@ -116,7 +134,8 @@ export function TrendsPage({
     key: TrendsTranslationKey,
     values: Record<string, string | number> = {},
   ) => formatTranslation(key as TranslationKey, values, locale);
-  const { materialId, materialSpecificId, productTypeId } = search;
+  const { makerId, materialId, materialSpecificId, productId, productTypeId } =
+    search;
   const visibleTrends = filterCatalogTrends(trends, productTypeId);
   const visibleCollectionTrends = filterCatalogTrends(
     collectionTrends?.values ?? [],
@@ -254,6 +273,48 @@ export function TrendsPage({
   const visibleCollectorMaterials = filterMaterials(
     collectionMaterialTrends?.collectorValues ?? [],
   );
+  /**
+   * Matches one maker or product result to the active overview filters.
+   *
+   * @param value - Privacy-safe maker or product result.
+   * @returns Whether the row belongs to the selected product-type and material scope.
+   */
+  const matchesMakerProductScope = (value: PublicMakerProductTrend) =>
+    value.productTypeId === (productTypeId ?? null) &&
+    value.materialId === (materialId ?? null) &&
+    value.materialSpecificId === (materialSpecificId ?? null);
+  const scopedMakerValues = (makerProductTrends?.makerValues ?? []).filter(
+    matchesMakerProductScope,
+  );
+  const scopedProductValues = (makerProductTrends?.productValues ?? []).filter(
+    matchesMakerProductScope,
+  );
+  const visibleMakerValues = makerId
+    ? scopedMakerValues.filter((value) => value.makerId === makerId)
+    : scopedMakerValues;
+  const visibleProductValues = scopedProductValues.filter(
+    (value) =>
+      (!makerId || value.makerId === makerId) &&
+      (!productId || value.productId === productId),
+  );
+  const makerOptions = Array.from(
+    new Map(
+      scopedMakerValues.map(
+        (value) => [value.makerId, value.makerName] as const,
+      ),
+    ),
+  ).sort((left, right) => left[1].localeCompare(right[1], locale));
+  const productOptions = Array.from(
+    new Map(
+      scopedProductValues
+        .filter((value) => !makerId || value.makerId === makerId)
+        .flatMap((value) =>
+          value.productId !== null && value.productName !== null
+            ? [[value.productId, value.productName] as const]
+            : [],
+        ),
+    ),
+  ).sort((left, right) => left[1].localeCompare(right[1], locale));
   return (
     <AppShell title={t("web.trends.title")}>
       <main className="space-y-6 p-4 md:p-6">
@@ -268,9 +329,11 @@ export function TrendsPage({
             onValueChange={(value) =>
               onSearchChange({
                 ...search,
+                makerId: undefined,
                 ...(value === "all"
                   ? { productTypeId: undefined }
                   : { productTypeId: Number(value) }),
+                productId: undefined,
               })
             }
             value={productTypeId?.toString() ?? "all"}
@@ -302,8 +365,10 @@ export function TrendsPage({
             onValueChange={(value) =>
               onSearchChange({
                 ...search,
+                makerId: undefined,
                 materialId: value === "all" ? undefined : Number(value),
                 materialSpecificId: undefined,
+                productId: undefined,
               })
             }
             value={materialId?.toString() ?? "all"}
@@ -337,8 +402,10 @@ export function TrendsPage({
                 onValueChange={(value) =>
                   onSearchChange({
                     ...search,
+                    makerId: undefined,
                     materialSpecificId:
                       value === "all" ? undefined : Number(value),
+                    productId: undefined,
                   })
                 }
                 value={materialSpecificId?.toString() ?? "all"}
@@ -362,6 +429,61 @@ export function TrendsPage({
               </Select>
             </>
           ) : null}
+          <span className="text-sm font-semibold" id="trends-maker-label">
+            {t("web.trends.maker")}
+          </span>
+          <Select
+            onValueChange={(value) =>
+              onSearchChange({
+                ...search,
+                makerId: value === "all" ? undefined : Number(value),
+                productId: undefined,
+              })
+            }
+            value={makerId?.toString() ?? "all"}
+          >
+            <SelectTrigger
+              aria-labelledby="trends-maker-label"
+              className="min-w-52"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("web.trends.allMakers")}</SelectItem>
+              {makerOptions.map(([id, name]) => (
+                <SelectItem key={id} value={id.toString()}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-sm font-semibold" id="trends-product-label">
+            {t("web.trends.product")}
+          </span>
+          <Select
+            onValueChange={(value) =>
+              onSearchChange({
+                ...search,
+                productId: value === "all" ? undefined : Number(value),
+              })
+            }
+            value={productId?.toString() ?? "all"}
+          >
+            <SelectTrigger
+              aria-labelledby="trends-product-label"
+              className="min-w-52"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("web.trends.allProducts")}</SelectItem>
+              {productOptions.map(([id, name]) => (
+                <SelectItem key={id} value={id.toString()}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <h2 className="text-lg font-semibold">
@@ -532,6 +654,94 @@ export function TrendsPage({
               {collectionMaterialTrends.hasSuppressedValues ? (
                 <p className="text-xs text-muted-foreground" role="status">
                   {t("web.trends.materialsSuppressed")}
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="maker-product-trends-title"
+          className="space-y-4"
+        >
+          <div className="space-y-1">
+            <h2
+              className="text-lg font-semibold"
+              id="maker-product-trends-title"
+            >
+              {t("web.trends.makers")}
+            </h2>
+            {makerProductTrends ? (
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.lastUpdated", {
+                  date: dateFormatter.format(makerProductTrends.generatedAt),
+                })}
+              </p>
+            ) : null}
+          </div>
+          {makerProductTrends?.stale ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {t("web.trends.makerProductsStale")}
+            </p>
+          ) : null}
+          {!makerProductTrends ? (
+            <p
+              className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+              role="alert"
+            >
+              {t("web.trends.makerProductsError")}
+            </p>
+          ) : (
+            <>
+              {visibleMakerValues.length > 0 ? (
+                <MakerProductTrendVisualization
+                  ariaLabel={t("web.trends.makersChartLabel")}
+                  collectorLabel={t("web.trends.approximateCollectors")}
+                  colorClass="bg-chart-4"
+                  entityLabel={t("web.trends.maker")}
+                  getLabel={(value) => value.makerName}
+                  otherLabel={t("web.trends.other")}
+                  itemLabel={t("web.trends.approximateItems")}
+                  values={visibleMakerValues}
+                  viewProductsLabel={t("web.trends.viewProducts")}
+                />
+              ) : (
+                <p
+                  className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+                  role="status"
+                >
+                  {t("web.trends.makerProductsEmpty")}
+                </p>
+              )}
+              <h3 className="font-semibold">{t("web.trends.products")}</h3>
+              {visibleProductValues.length > 0 ? (
+                <MakerProductTrendVisualization
+                  ariaLabel={t("web.trends.productsChartLabel")}
+                  collectorLabel={t("web.trends.approximateCollectors")}
+                  colorClass="bg-chart-3"
+                  entityLabel={t("web.trends.product")}
+                  getLabel={(value) =>
+                    `${value.makerName} — ${value.productName ?? ""}`
+                  }
+                  otherLabel={t("web.trends.other")}
+                  itemLabel={t("web.trends.approximateItems")}
+                  values={visibleProductValues}
+                  viewProductsLabel={t("web.trends.viewProducts")}
+                />
+              ) : (
+                <p
+                  className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+                  role="status"
+                >
+                  {t("web.trends.makerProductsEmpty")}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.makerProductsPrivacy")}
+              </p>
+              {makerProductTrends.hasSuppressedValues ? (
+                <p className="text-xs text-muted-foreground" role="status">
+                  {t("web.trends.makerProductsSuppressed")}
                 </p>
               ) : null}
             </>
@@ -958,6 +1168,170 @@ function MaterialTrendVisualization(props: {
                       {viewProductsLabel}
                     </a>
                   ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Renders collector-ranked maker or product results with an equivalent table.
+ *
+ * @param props - Localized labels, values, and bar presentation.
+ * @returns Accessible collector chart and complete result table.
+ */
+function MakerProductTrendVisualization(props: {
+  /** Chart and table label. */
+  ariaLabel: string;
+  /** Bar color utility. */
+  colorClass: string;
+  /** Localized collector-count label. */
+  collectorLabel: string;
+  /** First-column label. */
+  entityLabel: string;
+  /**
+   * Resolves the visible entity label.
+   *
+   * @param value - Maker or product row being rendered.
+   * @returns Localized or catalog-owned display label.
+   */
+  getLabel: (value: PublicMakerProductTrend) => string;
+  /** Localized Other label. */
+  otherLabel: string;
+  /** Localized item-count label. */
+  itemLabel: string;
+  /** Collector-descending rows in the active filter scope. */
+  values: PublicMakerProductTrend[];
+  /** Localized products-link label. */
+  viewProductsLabel: string;
+}) {
+  const {
+    ariaLabel,
+    collectorLabel,
+    colorClass,
+    entityLabel,
+    getLabel,
+    otherLabel,
+    itemLabel,
+    values,
+    viewProductsLabel,
+  } = props;
+  const overflow = values.slice(8);
+  const overflowSeed = overflow[0];
+  const chartValues = overflowSeed
+    ? [
+        ...values.slice(0, 8),
+        {
+          ...overflowSeed,
+          collectorCount: overflow.reduce(
+            (sum, value) => sum + value.collectorCount,
+            0,
+          ),
+          itemCount: overflow.reduce((sum, value) => sum + value.itemCount, 0),
+          makerId: -1,
+          makerName: otherLabel,
+          productId: null,
+          productName: null,
+          productSlug: null,
+        },
+      ]
+    : values;
+  const largestCount = Math.max(
+    ...chartValues.map(({ collectorCount }) => collectorCount),
+    1,
+  );
+  /**
+   * Builds a catalog destination that preserves representable chart filters.
+   *
+   * @param value - Maker or product row being linked.
+   * @returns Product detail or filterable catalog URL.
+   */
+  const productsHref = (value: PublicMakerProductTrend) => {
+    if (value.productSlug && value.productTypeSlug) {
+      return `/products/${value.productTypeSlug}/${value.productSlug}`;
+    }
+    const query = new URLSearchParams({
+      maker: value.makerId.toString(),
+      view: "all",
+    });
+    if (value.materialId !== null)
+      query.set("material", value.materialId.toString());
+    if (value.productTypeSlug) query.set("type", value.productTypeSlug);
+    return `/products?${query.toString()}`;
+  };
+  return (
+    <>
+      <ol
+        aria-label={ariaLabel}
+        className="space-y-3 rounded-md border border-border bg-card p-4"
+      >
+        {chartValues.map((value) => (
+          <li
+            className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
+            key={`${value.makerId}:${value.productId ?? "maker"}`}
+          >
+            <span className="truncate">
+              {value.makerId === -1 ? otherLabel : getLabel(value)}
+            </span>
+            <span aria-hidden="true" className="h-3 bg-muted">
+              <span
+                className={`block h-full ${colorClass}`}
+                style={{
+                  width: `${(value.collectorCount / largestCount) * 100}%`,
+                }}
+              />
+            </span>
+            <span className="tabular-nums">{value.collectorCount}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full border-collapse text-sm">
+          <caption className="bg-card p-3 text-left font-semibold">
+            {ariaLabel}
+          </caption>
+          <thead className="border-y border-border bg-muted/50 text-left">
+            <tr>
+              <th className="px-3 py-2" scope="col">
+                {entityLabel}
+              </th>
+              <th className="px-3 py-2 text-right" scope="col">
+                {collectorLabel}
+              </th>
+              <th className="px-3 py-2 text-right" scope="col">
+                {itemLabel}
+              </th>
+              <th className="px-3 py-2 text-right" scope="col">
+                <span className="sr-only">{viewProductsLabel}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {values.map((value) => (
+              <tr
+                className="border-b border-border last:border-0"
+                key={`${value.makerId}:${value.productId ?? "maker"}`}
+              >
+                <th className="px-3 py-2 text-left font-normal" scope="row">
+                  {getLabel(value)}
+                </th>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {value.collectorCount}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {value.itemCount}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <a
+                    className="font-medium underline underline-offset-4"
+                    href={productsHref(value)}
+                  >
+                    {viewProductsLabel}
+                  </a>
                 </td>
               </tr>
             ))}

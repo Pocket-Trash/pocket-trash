@@ -37,6 +37,7 @@ vi.mock("@pocket-trash/localizations", () => ({
     return (
       {
         "web.trends.approximateCollectors": "Approximate collectors",
+        "web.trends.approximateItems": "Approximate items",
         "web.trends.chartLabel": "Catalog products by product type",
         "web.trends.collectionItemsChartLabel":
           "Currently owned items by product type",
@@ -62,6 +63,19 @@ vi.mock("@pocket-trash/localizations", () => ({
         "web.trends.generalMaterial": "General",
         "web.trends.material": "Material",
         "web.trends.materialsPrivacy": "Material values are privacy safe.",
+        "web.trends.maker": "Maker",
+        "web.trends.allMakers": "All makers",
+        "web.trends.product": "Product",
+        "web.trends.allProducts": "All products",
+        "web.trends.makers": "Most collected makers",
+        "web.trends.makersChartLabel": "Makers by collectors",
+        "web.trends.products": "Most collected products",
+        "web.trends.productsChartLabel": "Products by collectors",
+        "web.trends.makerProductsEmpty": "No matching results.",
+        "web.trends.makerProductsError": "Maker Trends are unavailable.",
+        "web.trends.makerProductsPrivacy": "Maker values are privacy safe.",
+        "web.trends.makerProductsStale": "Maker Trends may be stale.",
+        "web.trends.makerProductsSuppressed": "Some maker results are hidden.",
         "web.trends.unspecifiedMaterial": "Unspecified",
         "web.trends.viewProducts": "View products",
         "web.trends.other": "Other",
@@ -116,6 +130,68 @@ const trends: PublicProductTypeTrend[] = Array.from(
 );
 
 describe("TrendsPage", () => {
+  it("keeps stable maker filters, ranks products by collectors, and preserves all table rows", () => {
+    const productValues = Array.from({ length: 10 }, (_, index) => ({
+      collectorCount: (10 - index) * 5,
+      itemCount: (12 - index) * 5,
+      makerId: 2001,
+      makerName: "Maker One",
+      makerSlug: "maker-one",
+      materialId: 42,
+      materialSpecificId: null,
+      productId: 3000 + index,
+      productName: `Product ${index + 1}`,
+      productSlug: `product-${index + 1}`,
+      productTypeId: 1001,
+      productTypeSlug: "slider",
+    }));
+    const firstProduct = productValues[0];
+    if (!firstProduct) throw new Error("Product fixture is empty.");
+    const html = renderToStaticMarkup(
+      <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
+        collectionTrends={null}
+        makerProductTrends={{
+          generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+          hasSuppressedValues: true,
+          makerValues: [
+            {
+              ...firstProduct,
+              productId: null,
+              productName: null,
+              productSlug: null,
+            },
+          ],
+          productValues,
+          stale: false,
+        }}
+        onSearchChange={vi.fn()}
+        search={{ materialId: 42, productTypeId: 1001 }}
+        trends={[{ count: 10, productTypeId: 1001, productTypeName: "Slider" }]}
+      />,
+    );
+    const productChart = html.match(
+      /<ol aria-label="Products by collectors"[\s\S]*?<\/ol>/,
+    )?.[0];
+    const productTable = html
+      .match(/<table[\s\S]*?<\/table>/g)
+      ?.find((table) => table.includes("Products by collectors"));
+
+    expect(productChart?.match(/<li/g)).toHaveLength(9);
+    expect(productChart).toContain("Other");
+    expect(productChart).not.toContain("Product 10");
+    expect(productTable).toContain("Product 10");
+    expect(productTable?.match(/<tr/g)).toHaveLength(11);
+    expect(html).toContain("Approximate collectors");
+    expect(html).toContain("Approximate items");
+    expect(html).toContain(
+      'href="/products?maker=2001&amp;view=all&amp;material=42&amp;type=slider"',
+    );
+    expect(html).toContain('href="/products/slider/product-1"');
+    expect(html).toContain("Some maker results are hidden.");
+  });
+
   it("charts the eight largest types plus Other while preserving the exact collapsed table", () => {
     const html = renderToStaticMarkup(
       <TrendsPage

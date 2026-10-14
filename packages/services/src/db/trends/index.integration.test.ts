@@ -112,6 +112,44 @@ describe("public collection-item Trends", () => {
           materialSpecificName: "6Al-4V",
         }),
       );
+      const makerProductTrends = await createTrendsService(
+        db as unknown as Database,
+      ).getPublicCollectionMakerProductTrends(generatedAt);
+      expect(makerProductTrends).toMatchObject({
+        hasSuppressedValues: true,
+        stale: false,
+      });
+      expect(makerProductTrends?.makerValues).toContainEqual(
+        expect.objectContaining({
+          collectorCount: 5,
+          itemCount: 15,
+          makerName: "Trend Maker",
+          materialId: null,
+          productId: null,
+          productTypeId: null,
+        }),
+      );
+      expect(makerProductTrends?.productValues).toContainEqual(
+        expect.objectContaining({
+          collectorCount: 5,
+          itemCount: 10,
+          makerName: "Trend Maker",
+          materialId: null,
+          productId: fixture.sliderProductId,
+          productName: "Private-source slider",
+          productTypeId: null,
+        }),
+      );
+      expect(makerProductTrends?.productValues).toContainEqual(
+        expect.objectContaining({
+          collectorCount: 5,
+          itemCount: 10,
+          materialId: fixture.titaniumMaterialId,
+          materialSpecificId: fixture.titaniumSpecificId,
+          productId: fixture.sliderProductId,
+          productTypeId: fixture.sliderTypeId,
+        }),
+      );
       expect(
         await createTrendsService(
           db as unknown as Database,
@@ -435,7 +473,13 @@ async function createFixture(database: Database) {
       ),
     );
   expect(storedAccessory).toHaveLength(5);
-  return { accessoryTypeId, sliderProductId, sliderTypeId };
+  return {
+    accessoryTypeId,
+    sliderProductId,
+    sliderTypeId,
+    titaniumMaterialId: titanium.id,
+    titaniumSpecificId: titaniumSpecific.id,
+  };
 }
 
 /**
