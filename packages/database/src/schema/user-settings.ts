@@ -1,4 +1,4 @@
-import { bigint, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+import { bigint, boolean, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import {
   currencyCodes,
   dimensionUnits,
@@ -33,6 +33,8 @@ export const userSettings = pgTable("user_settings", {
   measurementSystem: measurementSystemEnum("measurement_system")
     .notNull()
     .default("metric"),
+  /** Whether the owner publishes privacy-filtered personal Trends. */
+  publishTrends: boolean("publish_trends").notNull().default(false),
   theme: themeModeEnum("theme").notNull().default("system"),
 });
 

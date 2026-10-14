@@ -232,6 +232,7 @@ const installedButton: UserCollectionItem = {
 
 /** Public collection owner shared by the stories. */
 const owner: PublicCollectionOwner = {
+  publishTrends: false,
   imageUrl: null,
   collections: [collection],
   itemCount: 1,

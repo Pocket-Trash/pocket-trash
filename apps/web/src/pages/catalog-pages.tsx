@@ -1154,6 +1154,17 @@ export function PublicCollectionPage({
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
       ]}
+      headerActions={
+        owner.publishTrends ? (
+          <Link
+            className="underline underline-offset-4"
+            params={{ username: owner.username }}
+            to="/users/$username/trends"
+          >
+            {t("web.userTrends.title")}
+          </Link>
+        ) : null
+      }
       meta={
         <span className="flex items-center gap-2">
           <PublicProfileAvatar

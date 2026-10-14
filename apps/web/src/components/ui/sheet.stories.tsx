@@ -21,6 +21,7 @@ const settings: UserSettingsState = {
     currencyCode: "USD",
     measurementSystem: "metric",
     locale: "en-US",
+    publishTrends: false,
     theme: "system",
   },
 };

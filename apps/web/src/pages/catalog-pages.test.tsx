@@ -17,6 +17,7 @@ import {
   ProductDetailPage,
   ProductGrid,
   ProductsPage,
+  PublicCollectionPage,
   PublicCollectionsPage,
   UserCollectionsPage,
 } from "./catalog-pages";
@@ -263,6 +264,7 @@ const owners = [
       },
     ],
     imageUrl: null,
+    publishTrends: false,
     userId: 1002,
     username: "royanger",
   },
@@ -442,6 +444,23 @@ describe("PublicCollectionsPage", () => {
 
     expect(html).toContain("Daily Carry");
     expect(html).not.toContain("Other collection");
+  });
+});
+
+describe("PublicCollectionPage", () => {
+  it("discovers Trends only when the owner has published them", () => {
+    const owner = owners[0];
+    if (!owner) throw new Error("Owner fixture is required.");
+
+    const privateHtml = renderToStaticMarkup(
+      <PublicCollectionPage owner={owner} />,
+    );
+    const publicHtml = renderToStaticMarkup(
+      <PublicCollectionPage owner={{ ...owner, publishTrends: true }} />,
+    );
+
+    expect(privateHtml).not.toContain("/users/royanger/trends");
+    expect(publicHtml).toContain('href="/users/royanger/trends"');
   });
 });
 

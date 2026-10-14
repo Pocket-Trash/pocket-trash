@@ -21,7 +21,7 @@ import { useLocale } from "@/providers/locale-provider";
 /** User-selectable pen measurement and display preferences. */
 type PenSettings = Pick<
   typeof defaultUserSettings,
-  "currencyCode" | "measurementSystem"
+  "currencyCode" | "measurementSystem" | "publishTrends"
 >;
 
 /**
@@ -34,6 +34,7 @@ function readStoredPenSettings(): PenSettings {
     return {
       currencyCode: defaultUserSettings.currencyCode,
       measurementSystem: defaultUserSettings.measurementSystem,
+      publishTrends: defaultUserSettings.publishTrends,
     };
   }
 
@@ -52,11 +53,16 @@ function readStoredPenSettings(): PenSettings {
         stored?.measurementSystem === "imperial"
           ? stored.measurementSystem
           : defaultUserSettings.measurementSystem,
+      publishTrends:
+        typeof stored?.publishTrends === "boolean"
+          ? stored.publishTrends
+          : defaultUserSettings.publishTrends,
     };
   } catch {
     return {
       currencyCode: defaultUserSettings.currencyCode,
       measurementSystem: defaultUserSettings.measurementSystem,
+      publishTrends: defaultUserSettings.publishTrends,
     };
   }
 }
@@ -96,12 +102,16 @@ export function usePenSettings() {
     initialSettings.currencyCode,
   );
   const [saving, setSaving] = React.useState(false);
+  const [publishTrends, setPublishTrendsState] = React.useState(
+    initialSettings.publishTrends,
+  );
   const mutationVersionRef = React.useRef(0);
 
   const applyPenSettings = React.useCallback(
     (settings: PenSettings) => {
       setMeasurementSystem(settings.measurementSystem);
       setCurrencyState(settings.currencyCode);
+      setPublishTrendsState(settings.publishTrends);
       writeStoredPenSettings(settings);
     },
     [setMeasurementSystem],
@@ -182,27 +192,39 @@ export function usePenSettings() {
     (nextSystem: MeasurementSystem) => {
       saveSettings(
         { measurementSystem: nextSystem },
-        { currencyCode: currency, measurementSystem },
+        { currencyCode: currency, measurementSystem, publishTrends },
       );
     },
-    [currency, measurementSystem, saveSettings],
+    [currency, measurementSystem, publishTrends, saveSettings],
   );
 
   const setCurrency = React.useCallback(
     (nextCurrency: CurrencyCode) => {
       saveSettings(
         { currencyCode: nextCurrency },
-        { currencyCode: currency, measurementSystem },
+        { currencyCode: currency, measurementSystem, publishTrends },
       );
     },
-    [currency, measurementSystem, saveSettings],
+    [currency, measurementSystem, publishTrends, saveSettings],
+  );
+
+  const setPublishTrends = React.useCallback(
+    (nextValue: boolean) => {
+      saveSettings(
+        { publishTrends: nextValue },
+        { currencyCode: currency, measurementSystem, publishTrends },
+      );
+    },
+    [currency, measurementSystem, publishTrends, saveSettings],
   );
 
   return {
     currency,
     measurementSystem,
+    publishTrends,
     setCurrency,
     setMeasurementSystem: updateMeasurementSystem,
+    setPublishTrends,
     saving,
   };
 }

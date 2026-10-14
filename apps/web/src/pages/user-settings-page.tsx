@@ -29,6 +29,12 @@ import { useLocale } from "@/providers/locale-provider";
  */
 type SettingsTranslationFormatter = (key: TranslationKey) => string;
 
+/** Translation keys supplied by the companion public Trends localization change. */
+type PublicTrendsSettingsKey =
+  | TranslationKey
+  | "web.settings.publicTrendsDescription"
+  | "web.settings.publicTrendsLabel";
+
 /**
  * Renders the user's measurement and currency display preferences.
  *
@@ -42,13 +48,16 @@ export function UserSettingsPage() {
    * @param key - Translation key.
    * @returns The localized message.
    */
-  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+  const t = (key: PublicTrendsSettingsKey) =>
+    formatTranslation(key as TranslationKey, {}, locale);
   const {
     currency,
     measurementSystem,
+    publishTrends,
     saving,
     setCurrency,
     setMeasurementSystem,
+    setPublishTrends,
   } = usePenSettings();
 
   return (
@@ -72,6 +81,30 @@ export function UserSettingsPage() {
               </ToggleGroupItem>
               <ToggleGroupItem disabled={saving} value="imperial">
                 {t("web.settings.imperial")}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </fieldset>
+
+          <fieldset className="grid gap-2">
+            <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {t("web.settings.publicTrendsLabel")}
+            </legend>
+            <p className="text-sm text-muted-foreground">
+              {t("web.settings.publicTrendsDescription")}
+            </p>
+            <ToggleGroup
+              aria-label={t("web.settings.publicTrendsLabel")}
+              onValueChange={(value) => {
+                if (value) setPublishTrends(value === "public");
+              }}
+              type="single"
+              value={publishTrends ? "public" : "private"}
+            >
+              <ToggleGroupItem disabled={saving} value="private">
+                {t("web.resources.visibility.private")}
+              </ToggleGroupItem>
+              <ToggleGroupItem disabled={saving} value="public">
+                {t("web.resources.visibility.public")}
               </ToggleGroupItem>
             </ToggleGroup>
           </fieldset>

@@ -44,9 +44,11 @@ vi.mock("@/hooks/use-pen-settings", () => ({
   usePenSettings: () => ({
     currency: "USD",
     measurementSystem: "metric",
+    publishTrends: false,
     saving: false,
     setCurrency: vi.fn(),
     setMeasurementSystem: vi.fn(),
+    setPublishTrends: vi.fn(),
   }),
 }));
 
@@ -68,5 +70,7 @@ describe("UserSettingsPage", () => {
     expect(html).toContain("Imperial");
     expect(html).toContain('aria-label="Display currency"');
     expect(html).toContain('href="/user/settings/beta-features"');
+    expect(html).toContain("web.settings.publicTrendsLabel");
+    expect(html).toContain("Private");
   });
 });
