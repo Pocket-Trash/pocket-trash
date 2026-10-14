@@ -411,7 +411,7 @@ export const ConfigurablePen: Story = {
     );
     await expect(tip).toHaveValue("Needle tip");
     await expect(
-      canvas.getByText(/not supported|web\.pens\.collection\.notSupported/iu),
+      canvas.getByText("Compatibility not recorded for this configuration"),
     ).toBeVisible();
 
     const refill = canvas.getByRole("combobox", {
