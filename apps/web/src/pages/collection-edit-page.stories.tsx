@@ -147,6 +147,7 @@ function item(
     productId: catalogProduct.id,
     productImages: [],
     productSlug: catalogProduct.slug,
+    productTypeId: catalogProduct.productTypeId,
     productTypeName: catalogProduct.productTypeName,
     productTypeSlug: catalogProduct.productTypeSlug,
     sourceProductFinishOptionId: null,

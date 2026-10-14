@@ -211,6 +211,7 @@ const item: UserCollectionItem = {
   productId: product.id,
   productSlug: product.slug,
   productImages: product.images,
+  productTypeId: product.productTypeId,
   productTypeName: product.productTypeName,
   productTypeSlug: "spinner",
   sourceProductFinishOptionId: product.finishOptions[0]?.id ?? null,

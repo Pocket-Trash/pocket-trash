@@ -39,7 +39,8 @@ export type AppShellProps = {
           | "/notifications"
           | "/user"
           | "/user/account"
-          | "/user/collections";
+          | "/user/collections"
+          | "/user/trends";
       }
     | {
         /** General material breadcrumb label. */

@@ -9,6 +9,7 @@ import {
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
 import {
+  ChartNoAxesColumnIncreasing,
   Files,
   FlaskConical,
   Folder,
@@ -119,6 +120,10 @@ export function UserMenu() {
         <DropdownMenuItem render={<Link to="/user/collections" />}>
           <Folder />
           {t("web.navigation.collections")}
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/trends" />}>
+          <ChartNoAxesColumnIncreasing />
+          {t("web.trends.title")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/resources" />}>
           <Files />

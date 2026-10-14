@@ -256,6 +256,7 @@ const owners = [
         productId: 1,
         productSlug: "catla",
         productImages: [],
+        productTypeId: 1,
         productTypeName: "Spinner",
         productTypeSlug: "spinner",
         sourceProductFinishOptionId: null,

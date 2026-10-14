@@ -8,6 +8,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import {
+  ChartNoAxesColumnIncreasing,
   Files,
   FlaskConical,
   Folder,
@@ -31,7 +32,8 @@ export type UserSection =
   | "beta-features"
   | "collections"
   | "resources"
-  | "settings";
+  | "settings"
+  | "trends";
 
 /**
  * Renders a user-account page inside the shared application shell.
@@ -88,6 +90,12 @@ export function UserPageShell({
         },
       ],
       to: "/user/collections",
+    },
+    {
+      active: section === "trends",
+      icon: ChartNoAxesColumnIncreasing,
+      label: t("web.trends.title"),
+      to: "/user/trends",
     },
     {
       active: section === "resources",

@@ -13,6 +13,7 @@ import {
 } from "@pocket-trash/localizations";
 import { AppShell } from "@/components/app-shell";
 import { CatalogTrendsChart } from "@/components/catalog-trends-chart";
+import { TrendVisualization } from "@/components/trend-visualization";
 import {
   Select,
   SelectContent,
@@ -1083,24 +1084,6 @@ function MaterialTrendVisualization(props: {
     values,
     viewProductsLabel,
   } = props;
-  const overflow = values.slice(8);
-  const overflowSeed = overflow[0];
-  const chartValues = overflowSeed
-    ? [
-        ...values.slice(0, 8),
-        {
-          ...overflowSeed,
-          count: overflow.reduce((sum, value) => sum + value.count, 0),
-          materialId: -1,
-          materialName: otherLabel,
-          materialSlug: null,
-          materialSpecificId: null,
-          materialSpecificName: null,
-          materialSpecificSlug: null,
-        },
-      ]
-    : values;
-  const largestCount = Math.max(...chartValues.map(({ count }) => count), 1);
   /**
    * Returns a stable key for one scoped material row.
    *
@@ -1110,79 +1093,25 @@ function MaterialTrendVisualization(props: {
   const rowKey = (value: PublicMaterialTrend) =>
     `${value.productTypeId ?? "all"}:${value.materialId ?? "unspecified"}:${value.materialSpecificId ?? "general"}:${value.isSpecificBreakdown}`;
   return (
-    <>
-      <ol
-        aria-label={ariaLabel}
-        className="space-y-3 rounded-md border border-border bg-card p-4"
-      >
-        {chartValues.map((value) => (
-          <li
-            className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
-            key={rowKey(value)}
-          >
-            <span className="truncate">
-              {value.materialId === -1 ? otherLabel : getLabel(value)}
-            </span>
-            <span aria-hidden="true" className="h-3 bg-muted">
-              <span
-                className={`block h-full ${colorClass}`}
-                style={{ width: `${(value.count / largestCount) * 100}%` }}
-              />
-            </span>
-            <span className="tabular-nums">{value.count}</span>
-          </li>
-        ))}
-      </ol>
-      <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full border-collapse text-sm">
-          <caption className="bg-card p-3 text-left font-semibold">
-            {ariaLabel}
-          </caption>
-          <thead className="border-y border-border bg-muted/50 text-left">
-            <tr>
-              <th className="px-3 py-2" scope="col">
-                {columnLabel}
-              </th>
-              <th className="px-3 py-2 text-right" scope="col">
-                {countLabel}
-              </th>
-              <th className="px-3 py-2 text-right" scope="col">
-                <span className="sr-only">{viewProductsLabel}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {values.map((value) => (
-              <tr
-                className="border-b border-border last:border-0"
-                key={rowKey(value)}
-              >
-                <th className="px-3 py-2 text-left font-normal" scope="row">
-                  {getLabel(value)}
-                </th>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {value.count}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {value.materialSlug ? (
-                    <a
-                      className="font-medium underline underline-offset-4"
-                      href={
-                        value.materialSpecificSlug
-                          ? `/materials/${value.materialSlug}/${value.materialSpecificSlug}`
-                          : `/materials/${value.materialSlug}`
-                      }
-                    >
-                      {viewProductsLabel}
-                    </a>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <TrendVisualization
+      ariaLabel={ariaLabel}
+      colorClass={colorClass}
+      countLabel={countLabel}
+      emptyState={null}
+      labelColumn={columnLabel}
+      otherLabel={otherLabel}
+      values={values.map((value) => ({
+        count: value.count,
+        key: rowKey(value),
+        label: getLabel(value),
+        productsHref: value.materialSlug
+          ? value.materialSpecificSlug
+            ? `/materials/${value.materialSlug}/${value.materialSpecificSlug}`
+            : `/materials/${value.materialSlug}`
+          : undefined,
+      }))}
+      viewProductsLabel={viewProductsLabel}
+    />
   );
 }
 
