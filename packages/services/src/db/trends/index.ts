@@ -9,6 +9,106 @@ export const PUBLIC_TRENDS_ROUNDING_INCREMENT = 5;
 /** Age after which the active public generation is marked stale. */
 export const PUBLIC_TRENDS_STALE_MS = 36 * 60 * 60 * 1000;
 
+/** Stable time ranges offered by recorded-activity Trends. */
+export const activityTrendRanges = [
+  "week",
+  "30-days",
+  "6-months",
+  "year",
+  "all",
+] as const;
+
+/** Stable time range offered by recorded-activity Trends. */
+export type ActivityTrendRange = (typeof activityTrendRanges)[number];
+
+/** One UTC activity bucket. Null collection counts are privacy-suppressed gaps. */
+export type ActivityTrendPoint = {
+  /** UTC start of this daily, weekly, or monthly bucket. */
+  bucketStart: Date;
+  /** Exact catalog records created in the bucket. */
+  catalogCount: number;
+  /** Rounded collection records created in the bucket, or null when suppressed. */
+  collectionCount: number | null;
+};
+
+/** Recorded app-wide activity for one selected range. */
+export type PublicActivityTrends = {
+  /** Bucket size selected for the requested range. */
+  granularity: "day" | "week" | "month";
+  /** Stable selected range. */
+  range: ActivityTrendRange;
+  /** Chronological UTC activity buckets. */
+  values: ActivityTrendPoint[];
+};
+
+/** Exact private collection activity for one selected range. */
+export type UserActivityTrends = {
+  /** Bucket size selected for the requested range. */
+  granularity: PublicActivityTrends["granularity"];
+  /** Stable selected range. */
+  range: ActivityTrendRange;
+  /** Chronological UTC collection-item creation buckets. */
+  values: UserActivityTrendPoint[];
+};
+
+/** One exact private collection-item creation bucket. */
+export type UserActivityTrendPoint = {
+  /** UTC start of the bucket. */
+  bucketStart: Date;
+  /** Exact owner-scoped records created in the bucket. */
+  count: number;
+};
+
+/**
+ * Selects UTC boundaries and bucket size for one activity range.
+ *
+ * @param range - Stable range selected in URL state.
+ * @param now - Current time used to anchor the range.
+ * @returns Inclusive lower boundary and bucket granularity.
+ */
+export function getActivityTrendRange(
+  range: ActivityTrendRange,
+  now = new Date(),
+): {
+  /** Bucket size selected for the requested range. */
+  granularity: PublicActivityTrends["granularity"];
+  /** Inclusive UTC lower boundary, or null for all time. */
+  start: Date | null;
+} {
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  if (range === "week") start.setUTCDate(start.getUTCDate() - 6);
+  if (range === "30-days") start.setUTCDate(start.getUTCDate() - 29);
+  if (range === "6-months") shiftUtcMonths(start, -6);
+  if (range === "year") shiftUtcMonths(start, -12);
+  return {
+    granularity:
+      range === "week" || range === "30-days"
+        ? "day"
+        : range === "6-months"
+          ? "week"
+          : "month",
+    start: range === "all" ? null : start,
+  };
+}
+
+/**
+ * Moves a UTC date by whole calendar months without overflowing short months.
+ *
+ * @param date - Mutable UTC date at a day boundary.
+ * @param months - Signed number of months to move.
+ */
+function shiftUtcMonths(date: Date, months: number) {
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const daysInMonth = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  date.setUTCDate(Math.min(day, daysInMonth));
+}
+
 /** One privacy-safe collection-item count grouped by product type. */
 export type PublicCollectionItemProductTypeTrend = {
   /** Distinct collector count rounded to the nearest five. */
@@ -158,6 +258,119 @@ export function createTrendsService(
   hooks: PublicTrendsRefreshHooks = {},
 ) {
   return {
+    /**
+     * Reads exact catalog and privacy-safe collection record creation activity.
+     *
+     * @param range - Stable selected time range.
+     * @param now - Current time used to anchor the UTC boundary.
+     * @returns App-wide activity with suppressed collection points represented as gaps.
+     */
+    async getPublicActivityTrends(
+      range: ActivityTrendRange,
+      now = new Date(),
+    ): Promise<PublicActivityTrends> {
+      const { granularity, start } = getActivityTrendRange(range, now);
+      const result = await db.execute<{
+        /** UTC start of the activity bucket. */
+        bucketStart: Date | string;
+        /** Exact catalog record count. */
+        catalogCount: number | string;
+        /** Rounded public collection count, or null when suppressed. */
+        collectionCount: number | string | null;
+      }>(sql`
+        with catalog_activity as (
+          select
+            date_trunc(${granularity}, product.created_at at time zone 'UTC') at time zone 'UTC' as bucket_start,
+            count(*)::integer as catalog_count
+          from product
+          inner join product_types on product_types.id = product.product_type_id
+          where product.approval_status = 'approved'
+            and not product.is_private
+            and (not product_types.is_part_or_accessory or product_types.include_in_trends)
+            ${start ? sql`and product.created_at >= ${start}` : sql``}
+            and product.created_at <= ${now}
+          group by bucket_start
+        ), collection_activity as (
+          select
+            date_trunc(${granularity}, collection_item.created_at at time zone 'UTC') at time zone 'UTC' as bucket_start,
+            count(distinct collection_item.owner_id)::integer as contributor_count,
+            count(*)::integer as item_count
+          from collection_item
+          where ${start ? sql`collection_item.created_at >= ${start} and` : sql``}
+            collection_item.created_at <= ${now}
+          group by bucket_start
+        )
+        select
+          coalesce(catalog_activity.bucket_start, collection_activity.bucket_start) as "bucketStart",
+          coalesce(catalog_activity.catalog_count, 0)::integer as "catalogCount",
+          case
+            when collection_activity.contributor_count >= ${PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD}
+              then round(collection_activity.item_count::numeric / ${PUBLIC_TRENDS_ROUNDING_INCREMENT})::integer * ${PUBLIC_TRENDS_ROUNDING_INCREMENT}
+            else null
+          end as "collectionCount"
+        from catalog_activity
+        full outer join collection_activity using (bucket_start)
+        order by "bucketStart"
+      `);
+      return {
+        granularity,
+        range,
+        values: result.rows.map((row) => ({
+          bucketStart:
+            row.bucketStart instanceof Date
+              ? row.bucketStart
+              : new Date(row.bucketStart),
+          catalogCount: Number(row.catalogCount),
+          collectionCount:
+            row.collectionCount === null ? null : Number(row.collectionCount),
+        })),
+      };
+    },
+
+    /**
+     * Reads exact collection-item creation activity for one signed-in owner.
+     *
+     * @param actorClerkId - Authenticated owner Clerk identifier.
+     * @param range - Stable selected time range.
+     * @param now - Current time used to anchor the UTC boundary.
+     * @returns Exact private activity without public suppression.
+     */
+    async getUserActivityTrends(
+      actorClerkId: string,
+      range: ActivityTrendRange,
+      now = new Date(),
+    ): Promise<UserActivityTrends> {
+      const { granularity, start } = getActivityTrendRange(range, now);
+      const result = await db.execute<{
+        /** UTC start of the activity bucket. */
+        bucketStart: Date | string;
+        /** Exact owner-scoped collection record count. */
+        count: number | string;
+      }>(sql`
+        select
+          date_trunc(${granularity}, collection_item.created_at at time zone 'UTC') at time zone 'UTC' as "bucketStart",
+          count(*)::integer as count
+        from collection_item
+        inner join users on users.id = collection_item.owner_id
+        where users.clerk_id = ${actorClerkId}
+          ${start ? sql`and collection_item.created_at >= ${start}` : sql``}
+          and collection_item.created_at <= ${now}
+        group by "bucketStart"
+        order by "bucketStart"
+      `);
+      return {
+        granularity,
+        range,
+        values: result.rows.map((row) => ({
+          bucketStart:
+            row.bucketStart instanceof Date
+              ? row.bucketStart
+              : new Date(row.bucketStart),
+          count: Number(row.count),
+        })),
+      };
+    },
+
     /**
      * Reads privacy-safe maker and product popularity from the active generation.
      *

@@ -214,6 +214,9 @@ export {
   FeedbackSubmissionLimitError,
 } from "./feedback/index.js";
 export type {
+  ActivityTrendPoint,
+  ActivityTrendRange,
+  PublicActivityTrends,
   PublicCollectionItemProductTypeTrend,
   PublicCollectionItemTrends,
   PublicCollectionMakerProductTrends,
@@ -223,9 +226,13 @@ export type {
   PublicPartAccessoryProductTypeTrend,
   PublicPartAccessoryTrends,
   TrendsService,
+  UserActivityTrendPoint,
+  UserActivityTrends,
 } from "./trends/index.js";
 export {
+  activityTrendRanges,
   createTrendsService,
+  getActivityTrendRange,
   PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,

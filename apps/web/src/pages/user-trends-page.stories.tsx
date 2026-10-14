@@ -1,4 +1,4 @@
-import type { UserCollectionItem } from "@package/services";
+import type { UserActivityTrends, UserCollectionItem } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, fn, within } from "storybook/test";
@@ -26,6 +26,17 @@ export default meta;
 /** Personal Trends story contract. */
 type Story = StoryObj<typeof meta>;
 
+/** Exact personal collection activity used by the populated story. */
+const activityTrends: UserActivityTrends = {
+  granularity: "month",
+  range: "year",
+  values: [
+    { bucketStart: new Date("2026-08-01T00:00:00.000Z"), count: 2 },
+    { bucketStart: new Date("2026-09-01T00:00:00.000Z"), count: 3 },
+    { bucketStart: new Date("2026-10-01T00:00:00.000Z"), count: 5 },
+  ],
+};
+
 /**
  * Renders controlled personal Trends URL-filter state.
  *
@@ -35,6 +46,7 @@ function UserTrendsFixture() {
   const [search, setSearch] = useState<CatalogTrendsSearch>({});
   return (
     <UserTrendsPage
+      activityTrends={activityTrends}
       collectionCount={2}
       communityTrends={communityTrends}
       items={items}
@@ -47,6 +59,7 @@ function UserTrendsFixture() {
 /** Populated private current-state collection Trends. */
 export const Populated: Story = {
   args: {
+    activityTrends,
     collectionCount: 2,
     items: [],
     onSearchChange: fn(),
@@ -66,7 +79,7 @@ export const Populated: Story = {
    */
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole("table")).toHaveLength(4);
+    await expect(canvas.getAllByRole("table")).toHaveLength(5);
     await expect(canvas.getByText("10", { selector: "dd" })).toBeVisible();
     await expect(
       canvas.getAllByText(/Personal %|web\.userTrends\.personalPercentage/)

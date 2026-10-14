@@ -1,4 +1,5 @@
 import type {
+  ActivityTrendRange,
   CatalogFinishOption,
   CatalogLookup,
   CatalogProduct,
@@ -6,9 +7,12 @@ import type {
   PublicProductTypeTrend,
   UserCollectionItem,
 } from "@package/services";
+import { activityTrendRanges } from "@package/services";
 
 /** URL-search representation of the Trends product-type filter. */
 export type CatalogTrendsSearch = {
+  /** Stable recorded-activity range encoded in URL search. */
+  range?: ActivityTrendRange;
   /** Stable maker identifier encoded in URL search. */
   makerId?: number;
   /** Stable general-material identifier encoded in URL search. */
@@ -35,6 +39,7 @@ export function parseCatalogTrendsSearch(
   const makerId = Number(search.makerId);
   const productId = Number(search.productId);
   const productTypeId = Number(search.productTypeId);
+  const range = activityTrendRanges.find((value) => value === search.range);
   const hasMaterialId = Number.isSafeInteger(materialId) && materialId > 0;
   return {
     ...(Number.isSafeInteger(makerId) && makerId > 0 ? { makerId } : {}),
@@ -48,6 +53,7 @@ export function parseCatalogTrendsSearch(
       ? { productTypeId }
       : {}),
     ...(Number.isSafeInteger(productId) && productId > 0 ? { productId } : {}),
+    ...(range ? { range } : {}),
   };
 }
 

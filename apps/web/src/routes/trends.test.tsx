@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Provides public product-type Trends to the route loader. */
 const listPublicProductTypeTrends = vi.hoisted(() => vi.fn());
+/** Provides app-wide recorded activity to the route loader. */
+const getPublicActivityTrends = vi.hoisted(() => vi.fn());
 /** Provides the active collection-item generation to the route loader. */
 const getPublicCollectionItemTrends = vi.hoisted(() => vi.fn());
 /** Provides privacy-safe public maker and product Trends. */
@@ -14,6 +16,7 @@ const getPublicCollectionMaterialTrends = vi.hoisted(() => vi.fn());
 const getPublicPartAccessoryTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
+  getPublicActivityTrends,
   getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
   getPublicCollectionMakerProductTrends,
@@ -82,9 +85,18 @@ describe("Trends route", () => {
     getPublicPartAccessoryTrends.mockResolvedValueOnce(collectionTrends);
     getPublicCatalogMaterialTrends.mockResolvedValueOnce([]);
     getPublicCollectionMaterialTrends.mockResolvedValueOnce(null);
+    const activityTrends = {
+      granularity: "month",
+      range: "year",
+      values: [],
+    };
+    getPublicActivityTrends.mockResolvedValueOnce(activityTrends);
     await expect(
-      (loader as (context: unknown) => Promise<unknown>)({}),
+      (loader as (context: unknown) => Promise<unknown>)({
+        deps: { range: "year" },
+      }),
     ).resolves.toEqual({
+      activityTrends,
       catalogTrends: trends,
       catalogMaterialTrends: [],
       collectionMaterialTrends: null,
@@ -92,5 +104,6 @@ describe("Trends route", () => {
       makerProductTrends: null,
       partAccessoryTrends: collectionTrends,
     });
+    expect(getPublicActivityTrends).toHaveBeenCalledWith({ data: "year" });
   });
 });

@@ -3,6 +3,7 @@ import {
   getPublicCollectionItemTrends,
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
+  getUserActivityTrends,
   getUserCollection,
   getUserCollections,
 } from "@/lib/catalog-api";
@@ -12,21 +13,30 @@ import { UserTrendsPage } from "@/pages/user-trends-page";
 /** Shows exact current-state collection Trends to the signed-in owner. */
 export const Route = createFileRoute("/user/trends")({
   validateSearch: parseCatalogTrendsSearch,
+  loaderDeps: ({ search }) => ({ range: search.range ?? "year" }),
   /**
    * Loads owner-scoped current items and collection summaries.
    *
    * @returns Owner-scoped items and exact collection count.
    */
-  loader: async () => {
-    const [items, collections, collectionItems, makerProducts, materials] =
-      await Promise.all([
-        getUserCollection(),
-        getUserCollections(),
-        getPublicCollectionItemTrends(),
-        getPublicCollectionMakerProductTrends(),
-        getPublicCollectionMaterialTrends(),
-      ]);
+  loader: async ({ deps }) => {
+    const [
+      items,
+      collections,
+      activityTrends,
+      collectionItems,
+      makerProducts,
+      materials,
+    ] = await Promise.all([
+      getUserCollection(),
+      getUserCollections(),
+      getUserActivityTrends({ data: deps.range }),
+      getPublicCollectionItemTrends(),
+      getPublicCollectionMakerProductTrends(),
+      getPublicCollectionMaterialTrends(),
+    ]);
     return {
+      activityTrends,
       collectionCount: collections.length,
       communityTrends: { collectionItems, makerProducts, materials },
       items,
@@ -42,10 +52,12 @@ export const Route = createFileRoute("/user/trends")({
  */
 function UserTrendsRoute() {
   const navigate = useNavigate();
-  const { collectionCount, communityTrends, items } = Route.useLoaderData();
+  const { activityTrends, collectionCount, communityTrends, items } =
+    Route.useLoaderData();
   const search = Route.useSearch();
   return (
     <UserTrendsPage
+      activityTrends={activityTrends}
       collectionCount={collectionCount}
       communityTrends={communityTrends}
       items={items}

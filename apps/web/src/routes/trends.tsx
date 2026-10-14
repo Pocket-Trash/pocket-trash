@@ -1,6 +1,7 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+  getPublicActivityTrends,
   getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
   getPublicCollectionMakerProductTrends,
@@ -23,12 +24,22 @@ export const Route = createFileRoute("/trends")({
     meta: [{ title: formatTranslation("web.trends.title") }],
   }),
   /**
+   * Reloads recorded activity when the URL-backed range changes.
+   *
+   * @param context - Route dependency context.
+   * @param context.search - Validated Trends URL state.
+   * @returns Selected activity range.
+   */
+  loaderDeps: ({ search }) => ({ range: search.range ?? "year" }),
+  /**
    * Loads exact public catalog-product Trends.
    *
-   * @returns Public product-type Trends.
+   * @param context - Route loader context.
+   * @param context.deps - Validated activity range.
+   * @returns Public product-type and recorded-activity Trends.
    * @rejects When Trends cannot be loaded.
    */
-  loader: async () => {
+  loader: async ({ deps }) => {
     const [
       catalogTrends,
       collectionTrends,
@@ -36,6 +47,7 @@ export const Route = createFileRoute("/trends")({
       partAccessoryTrends,
       catalogMaterialTrends,
       collectionMaterialTrends,
+      activityTrends,
     ] = await Promise.all([
       listPublicProductTypeTrends(),
       getPublicCollectionItemTrends(),
@@ -43,8 +55,10 @@ export const Route = createFileRoute("/trends")({
       getPublicPartAccessoryTrends(),
       getPublicCatalogMaterialTrends(),
       getPublicCollectionMaterialTrends(),
+      getPublicActivityTrends({ data: deps.range }),
     ]);
     return {
+      activityTrends,
       catalogMaterialTrends,
       catalogTrends,
       collectionMaterialTrends,
@@ -72,6 +86,7 @@ function TrendsRoute() {
   const navigate = useNavigate();
   const search = Route.useSearch();
   const {
+    activityTrends,
     catalogMaterialTrends,
     catalogTrends,
     collectionMaterialTrends,
@@ -81,6 +96,7 @@ function TrendsRoute() {
   } = Route.useLoaderData();
   return (
     <TrendsPage
+      activityTrends={activityTrends}
       catalogMaterialTrends={catalogMaterialTrends}
       collectionMaterialTrends={collectionMaterialTrends}
       collectionTrends={collectionTrends}

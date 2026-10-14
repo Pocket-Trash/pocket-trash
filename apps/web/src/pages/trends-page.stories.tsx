@@ -1,4 +1,5 @@
 import type {
+  PublicActivityTrends,
   PublicCollectionItemTrends,
   PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
@@ -31,6 +32,29 @@ const trends: PublicProductTypeTrend[] = [
     productTypeName: "Pen",
   },
 ];
+
+/** Recorded catalog and privacy-safe collection activity used by populated stories. */
+const activityTrends: PublicActivityTrends = {
+  granularity: "month",
+  range: "year",
+  values: [
+    {
+      bucketStart: new Date("2026-08-01T00:00:00.000Z"),
+      catalogCount: 8,
+      collectionCount: 15,
+    },
+    {
+      bucketStart: new Date("2026-09-01T00:00:00.000Z"),
+      catalogCount: 12,
+      collectionCount: null,
+    },
+    {
+      bucketStart: new Date("2026-10-01T00:00:00.000Z"),
+      catalogCount: 7,
+      collectionCount: 20,
+    },
+  ],
+};
 
 /** Privacy-safe collection Trends used by populated stories. */
 const collectionTrends: PublicCollectionItemTrends = {
@@ -171,6 +195,7 @@ function TrendsFixture() {
   const [search, setSearch] = useState<CatalogTrendsSearch>({});
   return (
     <TrendsPage
+      activityTrends={activityTrends}
       catalogMaterialTrends={[]}
       collectionMaterialTrends={null}
       collectionTrends={collectionTrends}
@@ -185,6 +210,7 @@ function TrendsFixture() {
 export const Populated: Story = {
   /** Default component properties replaced by the controlled story renderer. */
   args: {
+    activityTrends,
     catalogMaterialTrends: [],
     collectionMaterialTrends: null,
     collectionTrends,
@@ -235,6 +261,7 @@ export const Populated: Story = {
 /** Public Trends with enabled Parts and Accessories. */
 export const PartsAndAccessories: Story = {
   args: {
+    activityTrends,
     catalogMaterialTrends: [],
     collectionMaterialTrends: null,
     collectionTrends,
@@ -247,6 +274,7 @@ export const PartsAndAccessories: Story = {
 /** Material-specific public and privacy-safe Trends. */
 export const MaterialDrillDown: Story = {
   args: {
+    activityTrends,
     catalogMaterialTrends,
     collectionMaterialTrends,
     collectionTrends,
@@ -259,6 +287,7 @@ export const MaterialDrillDown: Story = {
 /** Collector-ranked maker and product drill-downs. */
 export const MakerProductDrillDown: Story = {
   args: {
+    activityTrends,
     catalogMaterialTrends: [],
     collectionMaterialTrends: null,
     collectionTrends,

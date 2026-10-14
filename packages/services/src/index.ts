@@ -19,6 +19,8 @@ export {
 export { nextAvailableSlug, slugify, slugPattern } from "./catalog-slug.js";
 export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
+  ActivityTrendPoint,
+  ActivityTrendRange,
   AdminFeedbackItem,
   AdminFeedbackPage,
   AdminFeedbackSort,
@@ -93,6 +95,7 @@ export type {
   ProductApprovalStatus,
   ProductMaterialAssignment,
   ProductWriteInput,
+  PublicActivityTrends,
   PublicCollectionItemProductTypeTrend,
   PublicCollectionItemTrends,
   PublicCollectionMakerProductTrends,
@@ -117,6 +120,8 @@ export type {
   UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,
   UpsertUserSettingsInput,
+  UserActivityTrendPoint,
+  UserActivityTrends,
   UserBanState,
   UserCollectionItem,
   UserCollectionSummary,
@@ -131,6 +136,7 @@ export {
   AuditExportEmptyError,
   AuditExportInProgressError,
   AuditPayloadTooLargeError,
+  activityTrendRanges,
   CollectionAssemblyPrivacyBlockedError,
   CollectionButtonAlreadyInstalledError,
   CollectionItemPrivacyInheritedError,
@@ -146,6 +152,7 @@ export {
   FeedbackPlanRecoveryRequiredError,
   FeedbackStateError,
   FeedbackSubmissionLimitError,
+  getActivityTrendRange,
   PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,

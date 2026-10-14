@@ -11,6 +11,7 @@ import type {
   CatalogTerminologyAlias,
   PensAdminWriteInput,
   ProductWriteInput,
+  PublicActivityTrends,
   PublicCollectionItemTrends,
   PublicCollectionMakerProductTrends,
   PublicMakerDetail,
@@ -20,10 +21,12 @@ import type {
   PublicProductTypeTrend,
   SliderMagnetPreset,
   TrendsProductTypeConfiguration,
+  UserActivityTrends,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
 import {
+  activityTrendRanges,
   CollectionAssemblyPrivacyBlockedError,
   CollectionItemPrivacyInheritedError,
 } from "@package/services";
@@ -1335,6 +1338,23 @@ export const getPublicCollectionItemTrends = createServerFn({
   const { s } = await import("@/lib/services");
   return await s.db.trends.getPublicCollectionItemTrends();
 });
+
+/** Returns exact catalog and privacy-safe app-wide record creation activity. */
+export const getPublicActivityTrends = createServerFn({ method: "GET" })
+  .validator(z.enum(activityTrendRanges))
+  .handler(async ({ data }): Promise<PublicActivityTrends> => {
+    const { s } = await import("@/lib/services");
+    return await s.db.trends.getPublicActivityTrends(data);
+  });
+
+/** Returns exact collection-item creation activity for the signed-in owner. */
+export const getUserActivityTrends = createServerFn({ method: "GET" })
+  .validator(z.enum(activityTrendRanges))
+  .handler(async ({ data }): Promise<UserActivityTrends> => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    return await s.db.trends.getUserActivityTrends(actor.clerkId, data);
+  });
 
 /** Returns active privacy-safe maker and product popularity. */
 export const getPublicCollectionMakerProductTrends = createServerFn({
