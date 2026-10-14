@@ -1,5 +1,6 @@
 @import "@fontsource-variable/geist-mono/wght.css";
 @import "@package/markdown/theme.css";
+@import "highcharts/css/highcharts.css";
 @import "tailwindcss";
 @import "sonner/dist/styles.css";
 
@@ -151,6 +152,15 @@
   box-sizing: border-box;
   /* No grey flash on tap — native feel relies on active/press states instead. */
   -webkit-tap-highlight-color: transparent;
+}
+
+.highcharts-container {
+  color-scheme: light;
+  font-family: var(--font-mono);
+}
+
+.dark .highcharts-container {
+  color-scheme: dark;
 }
 
 html {

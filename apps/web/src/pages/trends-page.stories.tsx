@@ -70,7 +70,7 @@ export const Populated: Story = {
    */
   render: () => <TrendsFixture />,
   /**
-   * Filters Trends using only the keyboard and verifies the equivalent table.
+   * Opens the equivalent table, then filters Trends using only the keyboard.
    *
    * @param context - Story interaction context.
    * @param context.canvasElement - Rendered story canvas.
@@ -78,6 +78,11 @@ export const Populated: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const page = within(canvasElement.ownerDocument.body);
+    const tableDisclosure = canvas.getByText(
+      "Catalog products by product type",
+      { selector: "summary" },
+    );
+    await userEvent.click(tableDisclosure);
     await expect(
       canvas.getByRole("table", {
         name: "Catalog products by product type",

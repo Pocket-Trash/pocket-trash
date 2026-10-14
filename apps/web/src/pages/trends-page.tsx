@@ -4,6 +4,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { AppShell } from "@/components/app-shell";
+import { CatalogTrendsChart } from "@/components/catalog-trends-chart";
 import {
   Select,
   SelectContent,
@@ -48,21 +49,6 @@ export function TrendsPage({
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const visibleTrends = filterCatalogTrends(trends, selectedProductTypeId);
-  const chartTrends =
-    visibleTrends.length > 8
-      ? [
-          ...visibleTrends.slice(0, 8),
-          {
-            count: visibleTrends
-              .slice(8)
-              .reduce((sum, trend) => sum + trend.count, 0),
-            productTypeId: 0,
-            productTypeName: t("web.trends.other"),
-          },
-        ]
-      : visibleTrends;
-  const largestCount = Math.max(...chartTrends.map(({ count }) => count), 1);
-
   return (
     <AppShell title={t("web.trends.title")}>
       <main className="space-y-6 p-4 md:p-6">
@@ -110,64 +96,53 @@ export function TrendsPage({
           </p>
         ) : (
           <>
-            <ol
-              aria-label={t("web.trends.chartLabel")}
-              className="space-y-3 rounded-md border border-border bg-card p-4"
-            >
-              {chartTrends.map((trend) => (
-                <li
-                  className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
-                  key={trend.productTypeId}
-                >
-                  <span className="truncate">{trend.productTypeName}</span>
-                  <span aria-hidden="true" className="h-3 bg-muted">
-                    <span
-                      className="block h-full bg-chart-1"
-                      style={{
-                        width: `${(trend.count / largestCount) * 100}%`,
-                      }}
-                    />
-                  </span>
-                  <span className="tabular-nums">{trend.count}</span>
-                </li>
-              ))}
-            </ol>
+            <CatalogTrendsChart
+              catalogProductsLabel={t("web.trends.catalogProducts")}
+              chartLabel={t("web.trends.chartLabel")}
+              otherLabel={t("web.trends.other")}
+              trends={visibleTrends}
+            />
 
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full border-collapse text-sm">
-                <caption className="bg-card p-3 text-left font-semibold">
-                  {t("web.trends.chartLabel")}
-                </caption>
-                <thead className="border-y border-border bg-muted/50 text-left">
-                  <tr>
-                    <th className="px-3 py-2" scope="col">
-                      {t("web.trends.productType")}
-                    </th>
-                    <th className="px-3 py-2 text-right" scope="col">
-                      {t("web.trends.catalogProducts")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleTrends.map((trend) => (
-                    <tr
-                      className="border-b border-border last:border-0"
-                      key={trend.productTypeId}
-                    >
-                      <th
-                        className="px-3 py-2 text-left font-normal"
-                        scope="row"
-                      >
-                        {trend.productTypeName}
+            <details className="rounded-md border border-border bg-card">
+              <summary className="cursor-pointer p-3 font-semibold">
+                {t("web.trends.chartLabel")}
+              </summary>
+              <div className="overflow-x-auto border-t border-border">
+                <table className="w-full border-collapse text-sm">
+                  <caption className="sr-only">
+                    {t("web.trends.chartLabel")}
+                  </caption>
+                  <thead className="border-b border-border bg-muted/50 text-left">
+                    <tr>
+                      <th className="px-3 py-2" scope="col">
+                        {t("web.trends.productType")}
                       </th>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {trend.count}
-                      </td>
+                      <th className="px-3 py-2 text-right" scope="col">
+                        {t("web.trends.catalogProducts")}
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {visibleTrends.map((trend) => (
+                      <tr
+                        className="border-b border-border last:border-0"
+                        key={trend.productTypeId}
+                      >
+                        <th
+                          className="px-3 py-2 text-left font-normal"
+                          scope="row"
+                        >
+                          {trend.productTypeName}
+                        </th>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {trend.count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           </>
         )}
       </main>
