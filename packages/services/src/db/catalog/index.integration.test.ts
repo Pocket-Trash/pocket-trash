@@ -8,7 +8,7 @@ import {
   type LogTransport,
   loggerMessages,
 } from "@package/logger";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
@@ -156,8 +156,29 @@ describe("catalog product persistence", () => {
         namespace: "product-type",
         normalizedCanonicalLabel: "slider insert",
       });
+      const [refillGroup] = await db
+        .select({ id: schema.catalogTerminologyConcept.id })
+        .from(schema.catalogTerminologyConcept)
+        .where(
+          and(
+            eq(
+              schema.catalogTerminologyConcept.namespace,
+              "refill-compatibility-group",
+            ),
+            eq(schema.catalogTerminologyConcept.key, "energel"),
+          ),
+        );
       await db.insert(schema.user).values({ clerkId: "admin-alias" });
-      if (!maker) throw new Error("Alias fixtures were not created.");
+      if (!maker || !refillGroup)
+        throw new Error("Alias fixtures were not created.");
+      await db.insert(schema.catalogTerminologyAlias).values({
+        canonicalNamespace: "refill-compatibility-group",
+        conceptId: refillGroup.id,
+        isPreferred: true,
+        label: "Floatune",
+        makerId: maker.id,
+        normalizedValue: "floatune",
+      });
 
       const service = createDbServices(
         db as unknown as Database,
