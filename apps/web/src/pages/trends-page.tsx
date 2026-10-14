@@ -22,6 +22,7 @@ import { useLocale } from "@/providers/locale-provider";
 /** Trends keys supplied by the stacked localization change. */
 type TrendsTranslationKey =
   | TranslationKey
+  | "web.trends.approximateCollectors"
   | "web.trends.approximateItems"
   | "web.trends.collectionItems"
   | "web.trends.collectionItemsChartLabel"
@@ -31,6 +32,8 @@ type TrendsTranslationKey =
   | "web.trends.collectionItemsStale"
   | "web.trends.collectionItemsSuppressed"
   | "web.trends.collectionItemsSuppressedEmpty"
+  | "web.trends.collectors"
+  | "web.trends.collectorsChartLabel"
   | "web.trends.lastUpdated"
   | "web.trends.partsAndAccessories"
   | "web.trends.partsAndAccessoriesChartLabel"
@@ -104,6 +107,28 @@ export function TrendsPage({
       : visibleCollectionTrends;
   const largestCollectionCount = Math.max(
     ...collectionChartTrends.map(({ count }) => count),
+    1,
+  );
+  const visibleCollectorTrends = visibleCollectionTrends.map((trend) => ({
+    count: trend.collectorCount,
+    productTypeId: trend.productTypeId,
+    productTypeName: trend.productTypeName,
+  }));
+  const collectorChartTrends =
+    visibleCollectorTrends.length > 8
+      ? [
+          ...visibleCollectorTrends.slice(0, 8),
+          {
+            count: visibleCollectorTrends
+              .slice(8)
+              .reduce((sum, trend) => sum + trend.count, 0),
+            productTypeId: 0,
+            productTypeName: t("web.trends.other"),
+          },
+        ]
+      : visibleCollectorTrends;
+  const largestCollectorCount = Math.max(
+    ...collectorChartTrends.map(({ count }) => count),
     1,
   );
   const visiblePartAccessoryTrends = filterCatalogTrends(
@@ -322,6 +347,64 @@ export function TrendsPage({
                   </thead>
                   <tbody>
                     {visibleCollectionTrends.map((trend) => (
+                      <tr
+                        className="border-b border-border last:border-0"
+                        key={trend.productTypeId}
+                      >
+                        <th
+                          className="px-3 py-2 text-left font-normal"
+                          scope="row"
+                        >
+                          {trend.productTypeName}
+                        </th>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {trend.count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <h3 className="font-semibold">{t("web.trends.collectors")}</h3>
+              <ol
+                aria-label={t("web.trends.collectorsChartLabel")}
+                className="space-y-3 rounded-md border border-border bg-card p-4"
+              >
+                {collectorChartTrends.map((trend) => (
+                  <li
+                    className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
+                    key={trend.productTypeId}
+                  >
+                    <span className="truncate">{trend.productTypeName}</span>
+                    <span aria-hidden="true" className="h-3 bg-muted">
+                      <span
+                        className="block h-full bg-chart-3"
+                        style={{
+                          width: `${(trend.count / largestCollectorCount) * 100}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="tabular-nums">{trend.count}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full border-collapse text-sm">
+                  <caption className="bg-card p-3 text-left font-semibold">
+                    {t("web.trends.collectorsChartLabel")}
+                  </caption>
+                  <thead className="border-y border-border bg-muted/50 text-left">
+                    <tr>
+                      <th className="px-3 py-2" scope="col">
+                        {t("web.trends.productType")}
+                      </th>
+                      <th className="px-3 py-2 text-right" scope="col">
+                        {t("web.trends.approximateCollectors")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleCollectorTrends.map((trend) => (
                       <tr
                         className="border-b border-border last:border-0"
                         key={trend.productTypeId}

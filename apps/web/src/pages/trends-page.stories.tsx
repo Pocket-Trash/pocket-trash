@@ -35,7 +35,7 @@ const collectionTrends: PublicCollectionItemTrends = {
   stale: false,
   values: trends.map((trend) => ({
     ...trend,
-    collectorCount: trend.count * 5,
+    collectorCount: Math.ceil(trend.count / 2) * 5,
     count: trend.count * 5,
   })),
 };
@@ -132,11 +132,11 @@ export const Populated: Story = {
     await expect(productTypeFilter).not.toHaveTextContent("all");
     await userEvent.keyboard("{Escape}");
 
-    await expect(canvas.getAllByRole("table")).toHaveLength(2);
-    await expect(canvas.getAllByRole("row")).toHaveLength(4);
+    await expect(canvas.getAllByRole("table")).toHaveLength(3);
+    await expect(canvas.getAllByRole("row")).toHaveLength(6);
     await expect(
       canvas.getAllByRole("rowheader", { name: "Spinner" }),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
   },
 };
 
