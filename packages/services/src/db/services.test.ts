@@ -298,7 +298,12 @@ describe("database service logging", () => {
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.upsertForClerkId,
       outcome: "success",
-      settingKeys: ["currencyCode", "measurementSystem", "theme"],
+      settingKeys: [
+        "currencyCode",
+        "measurementSystem",
+        "publishTrends",
+        "theme",
+      ],
       settings,
     });
     expect(JSON.stringify(events)).not.toContain(clerkId);
