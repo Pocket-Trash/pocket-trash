@@ -14,6 +14,7 @@ import type {
   PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterialSummary,
+  PublicProductTypeTrend,
   SliderMagnetPreset,
   UserCollectionItem,
   UserCollectionSummary,
@@ -1248,6 +1249,19 @@ export const listCatalogProductTypes = createServerFn({
   method: "GET",
 }).handler(async (): Promise<CatalogProductTypeSummary[]> => {
   return await listProductTypes();
+});
+
+/**
+ * Lists exact approved public catalog-product counts for primary product types.
+ *
+ * @returns Public product-type Trends in descending count order.
+ * @rejects When service loading or the catalog query fails.
+ */
+export const listPublicProductTypeTrends = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<PublicProductTypeTrend[]> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listPublicProductTypeTrends();
 });
 
 /** Updates a product type's Parts and Accessories classification. */

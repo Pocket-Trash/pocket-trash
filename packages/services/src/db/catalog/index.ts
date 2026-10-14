@@ -239,6 +239,18 @@ export type CatalogProductTypeSummary = {
   slug: string;
 };
 
+/** Public catalog-product count for one primary product type. */
+export type PublicProductTypeTrend = {
+  /** Exact number of distinct approved public catalog products. */
+  count: number;
+  /** Stable product-type database identifier. */
+  productTypeId: number;
+  /** Product-type display name. */
+  productTypeName: string;
+  /** Stable product-type URL slug. */
+  productTypeSlug: string;
+};
+
 /** Registered canonical namespace supported by catalog terminology. */
 export type CatalogTerminologyNamespace = "product-type";
 
@@ -1737,6 +1749,13 @@ export type CatalogService = {
     productTypeSlug?: string,
     viewer?: CatalogViewer,
   ): Promise<CatalogProduct[]>;
+  /**
+   * Lists exact public catalog-product counts for primary product types.
+   *
+   * @returns Count-descending product-type Trends with stable identifiers.
+   * @rejects When the database query fails.
+   */
+  listPublicProductTypeTrends(): Promise<PublicProductTypeTrend[]>;
   /**
    * Lists reusable slider magnet presets by name.
    *
@@ -5033,6 +5052,42 @@ export function createCatalogService(
      */
     async listProducts(productTypeSlug, viewer) {
       return await queryProducts(db, productTypeSlug, undefined, viewer);
+    },
+    /**
+     * Lists exact public catalog-product counts for primary product types.
+     *
+     * @returns Count-descending product-type Trends with stable identifiers.
+     * @rejects When the database query fails.
+     */
+    async listPublicProductTypeTrends() {
+      return await db
+        .select({
+          count: countDistinct(schema.product.id),
+          productTypeId: schema.productType.id,
+          productTypeName: schema.productType.name,
+          productTypeSlug: schema.productType.slug,
+        })
+        .from(schema.product)
+        .innerJoin(
+          schema.productType,
+          eq(schema.product.productTypeId, schema.productType.id),
+        )
+        .where(
+          and(
+            eq(schema.product.approvalStatus, "approved"),
+            eq(schema.product.isPrivate, false),
+            eq(schema.productType.isPartOrAccessory, false),
+          ),
+        )
+        .groupBy(
+          schema.productType.id,
+          schema.productType.name,
+          schema.productType.slug,
+        )
+        .orderBy(
+          desc(countDistinct(schema.product.id)),
+          asc(schema.productType.name),
+        );
     },
     /**
      * Lists reusable slider magnet presets by name.
