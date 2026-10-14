@@ -10,6 +10,7 @@ import {
   matchesCatalogFilters,
   parseCatalogFilterSearch,
   parseCatalogProductsSearch,
+  parseCatalogTrendsSearch,
   pruneCatalogFilters,
 } from "./catalog-filters";
 
@@ -100,6 +101,23 @@ function item(finishOptions: CatalogFinishOption[]): FilterableCatalogItem {
 }
 
 describe("catalog filters", () => {
+  it("keeps only stable positive Trends filter identifiers", () => {
+    expect(
+      parseCatalogTrendsSearch({
+        materialId: "12",
+        materialSpecificId: "13",
+        productTypeId: "14",
+      }),
+    ).toEqual({ materialId: 12, materialSpecificId: 13, productTypeId: 14 });
+    expect(
+      parseCatalogTrendsSearch({
+        materialId: 0,
+        materialSpecificId: 13,
+        productTypeId: -1,
+      }),
+    ).toEqual({});
+  });
+
   it("accepts only the explicit products list view", () => {
     expect(
       parseCatalogProductsSearch({ type: "spinner", view: "all" }),

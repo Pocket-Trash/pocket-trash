@@ -1,11 +1,14 @@
 import type {
   PublicCollectionItemTrends,
+  PublicCollectionMaterialTrends,
+  PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
+import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { TrendsPage } from "./trends-page";
 
@@ -59,6 +62,47 @@ const partAccessoryTrends: PublicPartAccessoryTrends = {
   ],
 };
 
+/** Exact and filtered material rows used by the drill-down story. */
+const catalogMaterialTrends: PublicMaterialTrend[] = [
+  {
+    count: 14,
+    isSpecificBreakdown: false,
+    materialId: 3000,
+    materialName: "Titanium",
+    materialSlug: "titanium",
+    materialSpecificId: null,
+    materialSpecificName: null,
+    materialSpecificSlug: null,
+    productTypeId: null,
+  },
+  {
+    count: 9,
+    isSpecificBreakdown: true,
+    materialId: 3000,
+    materialName: "Titanium",
+    materialSlug: "titanium",
+    materialSpecificId: 3001,
+    materialSpecificName: "6Al-4V",
+    materialSpecificSlug: "6al-4v",
+    productTypeId: null,
+  },
+];
+
+/** Privacy-safe material rows used by the drill-down story. */
+const collectionMaterialTrends: PublicCollectionMaterialTrends = {
+  collectorValues: catalogMaterialTrends.map((value) => ({
+    ...value,
+    count: 5,
+  })),
+  generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+  hasSuppressedValues: true,
+  itemValues: catalogMaterialTrends.map((value) => ({
+    ...value,
+    count: 15,
+  })),
+  stale: false,
+};
+
 /** Trends page Storybook configuration. */
 const meta = {
   beforeEach: mockStoryAuth,
@@ -84,12 +128,14 @@ type Story = StoryObj<typeof meta>;
  * @returns A populated Trends page with a controlled product-type filter.
  */
 function TrendsFixture() {
-  const [productTypeId, setProductTypeId] = useState<number>();
+  const [search, setSearch] = useState<CatalogTrendsSearch>({});
   return (
     <TrendsPage
+      catalogMaterialTrends={[]}
+      collectionMaterialTrends={null}
       collectionTrends={collectionTrends}
-      onProductTypeChange={setProductTypeId}
-      selectedProductTypeId={productTypeId}
+      onSearchChange={setSearch}
+      search={search}
       trends={trends}
     />
   );
@@ -98,7 +144,13 @@ function TrendsFixture() {
 /** Populated public Trends with keyboard filter coverage. */
 export const Populated: Story = {
   /** Default component properties replaced by the controlled story renderer. */
-  args: { collectionTrends, onProductTypeChange: fn(), trends },
+  args: {
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
+    collectionTrends,
+    onSearchChange: fn(),
+    trends,
+  },
   /**
    * Renders the controlled populated fixture.
    *
@@ -143,9 +195,23 @@ export const Populated: Story = {
 /** Public Trends with enabled Parts and Accessories. */
 export const PartsAndAccessories: Story = {
   args: {
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
     collectionTrends,
-    onProductTypeChange: fn(),
+    onSearchChange: fn(),
     partAccessoryTrends,
+    trends,
+  },
+};
+
+/** Material-specific public and privacy-safe Trends. */
+export const MaterialDrillDown: Story = {
+  args: {
+    catalogMaterialTrends,
+    collectionMaterialTrends,
+    collectionTrends,
+    onSearchChange: fn(),
+    search: { materialId: 3000 },
     trends,
   },
 };
@@ -153,7 +219,13 @@ export const PartsAndAccessories: Story = {
 /** Localized empty state for a catalog without eligible products. */
 export const Empty: Story = {
   /** Empty Trends component properties. */
-  args: { collectionTrends: null, onProductTypeChange: fn(), trends: [] },
+  args: {
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
+    collectionTrends: null,
+    onSearchChange: fn(),
+    trends: [],
+  },
   /**
    * Verifies the localized empty status.
    *
@@ -161,22 +233,26 @@ export const Empty: Story = {
    * @param context.canvasElement - Rendered story canvas.
    */
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole("status")).toHaveTextContent(
-      "No catalog products are available for these filters.",
-    );
+    await expect(
+      within(canvasElement).getByText(
+        "No catalog products are available for these filters.",
+      ),
+    ).toBeVisible();
   },
 };
 
 /** Stale generation with every source category suppressed. */
 export const Suppressed: Story = {
   args: {
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
     collectionTrends: {
       generatedAt: new Date("2026-10-01T00:00:00.000Z"),
       hasSuppressedValues: true,
       stale: true,
       values: [],
     },
-    onProductTypeChange: fn(),
+    onSearchChange: fn(),
     trends,
   },
 };

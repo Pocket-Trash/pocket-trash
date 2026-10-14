@@ -1335,6 +1335,22 @@ export const getPublicCollectionItemTrends = createServerFn({
   return await s.db.trends.getPublicCollectionItemTrends();
 });
 
+/** Lists exact public catalog-product material counts. */
+export const getPublicCatalogMaterialTrends = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicCatalogMaterialTrends();
+});
+
+/** Returns active privacy-safe item and collector material counts. */
+export const getPublicCollectionMaterialTrends = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicCollectionMaterialTrends();
+});
+
 /**
  * Returns enabled Parts and Accessories from the active public generation.
  *

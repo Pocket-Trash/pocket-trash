@@ -9,6 +9,10 @@ import type {
 
 /** URL-search representation of the Trends product-type filter. */
 export type CatalogTrendsSearch = {
+  /** Stable general-material identifier encoded in URL search. */
+  materialId?: number;
+  /** Stable specific-material identifier encoded in URL search. */
+  materialSpecificId?: number;
   /** Stable product-type identifier encoded in URL search. */
   productTypeId?: number;
 };
@@ -22,10 +26,21 @@ export type CatalogTrendsSearch = {
 export function parseCatalogTrendsSearch(
   search: Record<string, unknown>,
 ): CatalogTrendsSearch {
+  const materialId = Number(search.materialId);
+  const materialSpecificId = Number(search.materialSpecificId);
   const productTypeId = Number(search.productTypeId);
-  return Number.isSafeInteger(productTypeId) && productTypeId > 0
-    ? { productTypeId }
-    : {};
+  const hasMaterialId = Number.isSafeInteger(materialId) && materialId > 0;
+  return {
+    ...(hasMaterialId ? { materialId } : {}),
+    ...(hasMaterialId &&
+    Number.isSafeInteger(materialSpecificId) &&
+    materialSpecificId > 0
+      ? { materialSpecificId }
+      : {}),
+    ...(Number.isSafeInteger(productTypeId) && productTypeId > 0
+      ? { productTypeId }
+      : {}),
+  };
 }
 
 /**

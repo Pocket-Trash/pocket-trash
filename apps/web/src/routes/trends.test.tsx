@@ -4,11 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const listPublicProductTypeTrends = vi.hoisted(() => vi.fn());
 /** Provides the active collection-item generation to the route loader. */
 const getPublicCollectionItemTrends = vi.hoisted(() => vi.fn());
+/** Provides exact catalog material Trends to the route loader. */
+const getPublicCatalogMaterialTrends = vi.hoisted(() => vi.fn());
+/** Provides privacy-safe collection material Trends to the route loader. */
+const getPublicCollectionMaterialTrends = vi.hoisted(() => vi.fn());
 /** Provides the active Parts and Accessories generation to the route loader. */
 const getPublicPartAccessoryTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
+  getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
+  getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
   listPublicProductTypeTrends,
 }));
@@ -62,10 +68,14 @@ describe("Trends route", () => {
     listPublicProductTypeTrends.mockResolvedValueOnce(trends);
     getPublicCollectionItemTrends.mockResolvedValueOnce(collectionTrends);
     getPublicPartAccessoryTrends.mockResolvedValueOnce(collectionTrends);
+    getPublicCatalogMaterialTrends.mockResolvedValueOnce([]);
+    getPublicCollectionMaterialTrends.mockResolvedValueOnce(null);
     await expect(
       (loader as (context: unknown) => Promise<unknown>)({}),
     ).resolves.toEqual({
       catalogTrends: trends,
+      catalogMaterialTrends: [],
+      collectionMaterialTrends: null,
       collectionTrends,
       partAccessoryTrends: collectionTrends,
     });
