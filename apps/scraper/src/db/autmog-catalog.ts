@@ -1,4 +1,5 @@
 import { type Database, schema } from "@package/database";
+import { slugify } from "@package/services";
 import { and, eq, inArray } from "drizzle-orm";
 import type {
   NormalizedAutmogPen,
@@ -162,6 +163,7 @@ export async function syncCanonicalAutmogPen(
     dryRun?: boolean;
   } = {},
 ): Promise<CanonicalAutmogPenSyncResult> {
+  if (!options.dryRun) await ensureCanonicalFinish(db, item);
   const lookups = await resolveLookups(db, item);
   const existing = await loadExistingState(db, lookups.makerId, item);
 
@@ -391,7 +393,7 @@ async function resolveLookups(
   if (missingMaterial)
     throw new Error(`Canonical material ${missingMaterial} does not exist.`);
 
-  const finishSlug = canonicalFinishSlug(item);
+  const finishSlug = canonicalFinish(item).slug;
   const [finish] = await db
     .select({ id: schema.finish.id })
     .from(schema.finish)
@@ -886,9 +888,44 @@ function canonicalMaterialSlugs(materials: readonly string[]): string[] {
  * @param item - Normalized Autmog source listing.
  * @returns The KVR or default machine-finish slug.
  */
-function canonicalFinishSlug(item: NormalizedAutmogPen): string {
+function canonicalFinish(item: NormalizedAutmogPen): {
+  /** Canonical display name. */
+  name: string;
+  /** Canonical URL-safe identity. */
+  slug: string;
+} {
   const source = `${item.title} ${item.description ?? ""}`;
-  return /\bkvr\b/iu.test(source) ? "kvr" : "machine-finish";
+  if (/\bkvr\b/iu.test(source)) return { name: "KVR", slug: "kvr" };
+
+  const name = item.finish?.trim();
+  if (name) {
+    const finishSlug = slugify(name);
+    if (finishSlug)
+      return {
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        slug: finishSlug,
+      };
+  }
+
+  return { name: "Machine finish", slug: "machine-finish" };
+}
+
+/**
+ * Creates a source-derived finish before resolving canonical relationships.
+ *
+ * @param db - Canonical application database.
+ * @param item - Normalized Autmog source listing.
+ * @returns Completion after the finish exists or a concurrent insert wins.
+ * @rejects When the finish cannot be inserted or resolved.
+ */
+async function ensureCanonicalFinish(
+  db: Database,
+  item: NormalizedAutmogPen,
+): Promise<void> {
+  await db
+    .insert(schema.finish)
+    .values(canonicalFinish(item))
+    .onConflictDoNothing();
 }
 
 /**

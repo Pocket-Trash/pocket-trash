@@ -950,6 +950,64 @@ describe("ProductsPage", () => {
 });
 
 describe("ProductDetailPage", () => {
+  it("renders released Pen configuration copy", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          configurationSlots: [
+            {
+              choices: [
+                {
+                  availableWhen: [],
+                  finishOptionId: null,
+                  id: 101,
+                  label: "Titanium",
+                  position: 0,
+                  productMaterialId: 101,
+                },
+              ],
+              id: 100,
+              labelFallback: "Material",
+              labelKey: "catalog.configurationSlots.material",
+              position: 0,
+              required: true,
+              slotKindId: 100,
+              slotKindSlug: "material",
+            },
+            {
+              choices: [
+                {
+                  availableWhen: [[101]],
+                  finishOptionId: null,
+                  id: 201,
+                  label: "Caramel PVD",
+                  position: 0,
+                },
+              ],
+              id: 200,
+              labelFallback: "Appearance",
+              labelKey: "catalog.configurationSlots.appearance",
+              position: 1,
+              required: true,
+              slotKindId: 200,
+              slotKindSlug: "appearance",
+            },
+          ],
+          productTypeId: 4,
+          productTypeName: "Pen",
+          productTypeSlug: "pen",
+        }}
+      />,
+    );
+
+    expect(html).toContain(">Configuration<");
+    expect(html).toContain(">Required<");
+    expect(html).toContain("Available when Titanium");
+    expect(html).not.toContain("web.pens.configuration.");
+  });
+
   it("shows the slider layout and derived click count", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage
@@ -1094,7 +1152,7 @@ describe("ProductDetailPage", () => {
     expect(html).toContain("Pilot Precise V5 RT");
     expect(html).toContain("0.5 mm · Needle · Blue");
     expect(html).toContain('href="/products/pen/test-pen"');
-    expect(html).toContain("web.pens.refill.requiresTip");
+    expect(html).toContain("Requires Needle Tip");
     expect(html).not.toContain("web.catalog.collectionsWithProduct");
   });
 });

@@ -29,6 +29,33 @@
 
 
 
+
+
+## 0.10.1
+
+### Patch Changes
+
+* Create canonical Autmog finishes discovered during scraper synchronization. (@app/scraper)
+
+## 0.10.0
+
+### Minor Changes
+
+* Add deterministic development and preview fixtures for Pens and refills. (@package/database)
+* Add complete Pens, parts, refill, configuration, evidence, market, and compatibility administration. (@package/services, @app/web, @package/logger)
+* Write recurring Autmog scraper updates directly to the canonical Pens catalog. (@app/scraper, @package/storage)
+* Add owned Pen configuration, serial numbers, refill compatibility warnings, and images. (@package/services, @package/logger, @app/web)
+* Add the normalized Pens, Pen parts, refill offerings, compatibility, provenance, market, evidence, and product-configuration schema. (@package/database, @package/services)
+* Retarget Grimsmo Saga material discovery to the canonical Pens catalog. (@app/scraper)
+* Simplify refill compatibility to direct catalog relationships without evidence or approval metadata. (@package/database, @package/services, @app/web)
+* Add public Pen and refill catalog details, search, and compatibility views. (@app/web, @package/services)
+
+### Patch Changes
+
+* Renew the temporary braces audit exception while no patched release exists. (@package/lint)
+* Remove dormant refill evidence and lifecycle schema. (@package/database, @package/services, @app/scraper)
+* Run the canonical Autmog and Grimsmo Saga scrapers every 30 minutes during cutover verification. (@app/scraper)
+
 ## 0.9.0
 
 ### Minor Changes
