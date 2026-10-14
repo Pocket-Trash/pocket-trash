@@ -160,23 +160,21 @@ export const AvailabilityRule: Story = {
    */
   play: async ({ canvas, userEvent }) => {
     await userEvent.selectOptions(
-      canvas.getByRole("combobox", { name: "web.pens.admin.actionLabel" }),
+      canvas.getByRole("combobox", { name: "Action" }),
       "configuration-rule",
     );
     await userEvent.selectOptions(
-      canvas.getByRole("combobox", { name: "web.pens.admin.targetChoice" }),
+      canvas.getByRole("combobox", { name: "Target choice" }),
       "1011",
     );
     const requirements = canvas.getByRole("listbox", {
-      name: "web.pens.admin.availableWhenAnd",
+      name: "Required choices (all)",
     });
     await expect(requirements).toHaveTextContent("Material: Titanium");
     await expect(requirements).not.toHaveTextContent("Caramel PVD");
     await userEvent.selectOptions(requirements, "1010");
-    await expect(
-      canvas
-        .getAllByText(/web\.pens\.admin\.availableWhen/)
-        .find(({ tagName }) => tagName === "P"),
-    ).toHaveTextContent("Material: Titanium");
+    await expect(canvas.getByText(/^Available when/)).toHaveTextContent(
+      "Material: Titanium",
+    );
   },
 };
