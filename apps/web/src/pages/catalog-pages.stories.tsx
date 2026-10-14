@@ -302,9 +302,7 @@ export const Collection: Story = {
       collection={collection}
       items={[item]}
       onFiltersChange={fn()}
-      ownerImageUrl={
-        new URL("/images/tmp/7887468134587-1.jpg", window.location.origin).href
-      }
+      ownerImageUrl="https://cdn.pocket-trash.app/assets/storybook/product-images/one.webp"
       ownerUsername={owner.username}
     />
   ),

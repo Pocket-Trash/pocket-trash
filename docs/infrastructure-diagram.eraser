@@ -85,7 +85,6 @@ shared_packages [label: "Shared packages and detected runtime links", color: "gr
   app_web [icon: box, label: "@app/web\napps/web"]
   package_database [icon: package, label: "@package/database\npackages/database"]
   package_feature_flags [icon: package, label: "@package/feature-flags\npackages/feature-flags"]
-  package_json_data [icon: package, label: "@package/json-data\npackages/json-data"]
   package_logger [icon: package, label: "@package/logger\npackages/logger"]
   package_markdown [icon: package, label: "@package/markdown\npackages/markdown"]
   package_services [icon: package, label: "@package/services\npackages/services"]

@@ -1,9 +1,0 @@
-{
-  "name": "@package/json-data",
-  "version": "0.10.1",
-  "private": true,
-  "type": "module",
-  "exports": {
-    "./autmog.json": "./autmog.json"
-  }
-}

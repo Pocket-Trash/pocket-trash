@@ -85,9 +85,7 @@ export const WithImage: Story = {
 /** Directory attribution with a selected profile picture. */
 export const WithProfilePicture: Story = {
   args: {
-    ownerImageUrl: new URL(
-      "/images/tmp/7887468134587-1.jpg",
-      window.location.origin,
-    ).href,
+    ownerImageUrl:
+      "https://cdn.pocket-trash.app/assets/storybook/product-images/one.webp",
   },
 };

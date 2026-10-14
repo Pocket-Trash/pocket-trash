@@ -3,11 +3,9 @@ import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { PublicProfileAvatar } from "./public-profile-avatar";
 
-/** Browser-local image fixture; production URLs always come from Clerk. */
-const picture = new URL(
-  "/images/tmp/7887468134587-1.jpg",
-  window.location.origin,
-).href;
+/** Storybook image fixture; production URLs always come from Clerk. */
+const picture =
+  "https://cdn.pocket-trash.app/assets/storybook/product-images/one.webp";
 /** Public avatar stories exercise the shared primitive and Clerk URL parameters. */
 const meta = {
   component: PublicProfileAvatar,

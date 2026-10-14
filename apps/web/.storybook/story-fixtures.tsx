@@ -8,13 +8,6 @@ import {
 } from "@tanstack/react-router";
 import * as React from "react";
 import { fn, mocked } from "storybook/test";
-import { products } from "../src/lib/pen-data";
-import type { ActiveFilters, MatchModes } from "../src/lib/pen-filters";
-import {
-  createDefaultMatchModes,
-  createEmptyFilters,
-} from "../src/lib/pen-filters";
-import type { CurrencyRates } from "../src/lib/pen-formatters";
 import { applyTheme, type ThemeMode } from "../src/lib/theme";
 import type { UserSettingsState } from "../src/lib/user-settings";
 import { LocaleProvider } from "../src/providers/locale-provider";
@@ -30,41 +23,6 @@ export const storySettings: UserSettingsState = {
     measurementSystem: "metric",
     theme: "light",
   },
-};
-
-/** First eight catalog products used by list stories. */
-export const storyProducts = products.slice(0, 8);
-/** First catalog product used as a deterministic fallback fixture. */
-const firstProduct = products[0];
-if (!firstProduct) {
-  throw new Error("Storybook fixtures require at least one product.");
-}
-
-/** Catalog product with a gallery when available, otherwise the first product. */
-export const storyProduct =
-  products.find((product) => product.images_local.length > 1) ?? firstProduct;
-/** Fixed CAD-based exchange rates used by price stories. */
-export const storyRates: CurrencyRates = {
-  AUD: 1.13,
-  CAD: 1,
-  CHF: 0.66,
-  EUR: 0.68,
-  GBP: 0.58,
-  JPY: 109,
-  NZD: 1.24,
-  USD: 0.74,
-};
-
-/** Active material and refill filters used by catalog stories. */
-export const storyActiveFilters: ActiveFilters = createEmptyFilters();
-storyActiveFilters.materials.add("Titanium");
-storyActiveFilters.refills.add("Pilot G2");
-storyActiveFilters.refills.add("EnerGel");
-
-/** Catalog match modes requiring every selected refill. */
-export const storyMatchModes: MatchModes = {
-  ...createDefaultMatchModes(),
-  refills: "all",
 };
 
 /**
