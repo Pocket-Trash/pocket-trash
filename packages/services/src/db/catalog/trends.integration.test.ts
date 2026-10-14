@@ -114,7 +114,6 @@ describe("catalog trends", () => {
           count: 2,
           productTypeId: spinnerTypeId,
           productTypeName: "Spinner",
-          productTypeSlug: "spinner",
         },
       ]);
     } finally {

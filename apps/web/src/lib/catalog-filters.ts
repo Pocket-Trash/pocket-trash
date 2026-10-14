@@ -3,8 +3,46 @@ import type {
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
+  PublicProductTypeTrend,
   UserCollectionItem,
 } from "@package/services";
+
+/** URL-search representation of the Trends product-type filter. */
+export type CatalogTrendsSearch = {
+  /** Stable product-type identifier encoded in URL search. */
+  productTypeId?: number;
+};
+
+/**
+ * Normalizes the Trends product-type URL filter.
+ *
+ * @param search - Unknown route search values.
+ * @returns A positive integer product-type filter or empty search state.
+ */
+export function parseCatalogTrendsSearch(
+  search: Record<string, unknown>,
+): CatalogTrendsSearch {
+  const productTypeId = Number(search.productTypeId);
+  return Number.isSafeInteger(productTypeId) && productTypeId > 0
+    ? { productTypeId }
+    : {};
+}
+
+/**
+ * Matches public catalog Trends to the selected product type.
+ *
+ * @param trends - Exact public catalog-product counts.
+ * @param productTypeId - Selected stable product-type identifier.
+ * @returns All Trends or the selected product-type Trend.
+ */
+export function filterCatalogTrends(
+  trends: PublicProductTypeTrend[],
+  productTypeId?: number,
+): PublicProductTypeTrend[] {
+  return productTypeId
+    ? trends.filter((trend) => trend.productTypeId === productTypeId)
+    : trends;
+}
 
 /**
  * Normalized catalog filter selections used by in-memory matching.

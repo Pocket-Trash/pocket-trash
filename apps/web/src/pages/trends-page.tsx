@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { filterCatalogTrends } from "@/lib/catalog-filters";
 import { useLocale } from "@/providers/locale-provider";
 
 /** Properties for the public catalog-product Trends page. */
@@ -46,11 +47,7 @@ export function TrendsPage({
    * @returns Localized Trends copy.
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
-  const visibleTrends = selectedProductTypeId
-    ? trends.filter(
-        ({ productTypeId }) => productTypeId === selectedProductTypeId,
-      )
-    : trends;
+  const visibleTrends = filterCatalogTrends(trends, selectedProductTypeId);
   const chartTrends =
     visibleTrends.length > 8
       ? [
@@ -61,7 +58,6 @@ export function TrendsPage({
               .reduce((sum, trend) => sum + trend.count, 0),
             productTypeId: 0,
             productTypeName: t("web.trends.other"),
-            productTypeSlug: "other",
           },
         ]
       : visibleTrends;
@@ -186,10 +182,17 @@ export function TrendsPage({
  */
 export function TrendsPendingPage() {
   const { locale } = useLocale();
+  /**
+   * Formats Trends copy for the active locale.
+   *
+   * @param key - Trends translation key.
+   * @returns Localized Trends copy.
+   */
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   return (
-    <AppShell title={formatTranslation("web.trends.title", {}, locale)}>
-      <main className="p-4 md:p-6" role="status">
-        {formatTranslation("web.trends.loading", {}, locale)}
+    <AppShell title={t("web.trends.title")}>
+      <main className="p-4 md:p-6">
+        <p role="status">{t("web.trends.loading")}</p>
       </main>
     </AppShell>
   );

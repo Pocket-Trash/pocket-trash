@@ -1,7 +1,7 @@
 import type { PublicProductTypeTrend } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { TrendsPage } from "./trends-page";
 
@@ -11,30 +11,18 @@ const trends: PublicProductTypeTrend[] = [
     count: 18,
     productTypeId: 1000,
     productTypeName: "Spinner",
-    productTypeSlug: "spinner",
   },
   {
     count: 12,
     productTypeId: 1001,
     productTypeName: "Slider",
-    productTypeSlug: "slider",
   },
   {
     count: 7,
     productTypeId: 1002,
     productTypeName: "Pen",
-    productTypeSlug: "pen",
   },
 ];
-
-/**
- * Ignores product-type changes in stories with static arguments.
- *
- * @param productTypeId - Selected product-type ID.
- */
-function ignoreProductTypeChange(productTypeId?: number) {
-  void productTypeId;
-}
 
 /** Trends page Storybook configuration. */
 const meta = {
@@ -74,7 +62,7 @@ function TrendsFixture() {
 /** Populated public Trends with keyboard filter coverage. */
 export const Populated: Story = {
   /** Default component properties replaced by the controlled story renderer. */
-  args: { onProductTypeChange: ignoreProductTypeChange, trends },
+  args: { onProductTypeChange: fn(), trends },
   /**
    * Renders the controlled populated fixture.
    *
@@ -110,7 +98,7 @@ export const Populated: Story = {
 /** Localized empty state for a catalog without eligible products. */
 export const Empty: Story = {
   /** Empty Trends component properties. */
-  args: { onProductTypeChange: ignoreProductTypeChange, trends: [] },
+  args: { onProductTypeChange: fn(), trends: [] },
   /**
    * Verifies the localized empty status.
    *

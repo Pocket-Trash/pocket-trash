@@ -247,8 +247,6 @@ export type PublicProductTypeTrend = {
   productTypeId: number;
   /** Product-type display name. */
   productTypeName: string;
-  /** Stable product-type URL slug. */
-  productTypeSlug: string;
 };
 
 /** Registered canonical namespace supported by catalog terminology. */
@@ -5065,7 +5063,6 @@ export function createCatalogService(
           count: countDistinct(schema.product.id),
           productTypeId: schema.productType.id,
           productTypeName: schema.productType.name,
-          productTypeSlug: schema.productType.slug,
         })
         .from(schema.product)
         .innerJoin(
@@ -5079,11 +5076,7 @@ export function createCatalogService(
             eq(schema.productType.isPartOrAccessory, false),
           ),
         )
-        .groupBy(
-          schema.productType.id,
-          schema.productType.name,
-          schema.productType.slug,
-        )
+        .groupBy(schema.productType.id, schema.productType.name)
         .orderBy(
           desc(countDistinct(schema.product.id)),
           asc(schema.productType.name),

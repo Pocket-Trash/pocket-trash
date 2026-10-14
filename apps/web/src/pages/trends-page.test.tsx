@@ -42,7 +42,6 @@ const trends: PublicProductTypeTrend[] = Array.from(
     count: 10 - index,
     productTypeId: 1000 + index,
     productTypeName: `Type ${index + 1}`,
-    productTypeSlug: `type-${index + 1}`,
   }),
 );
 

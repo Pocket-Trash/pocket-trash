@@ -43,7 +43,6 @@ describe("Trends route", () => {
         count: 2,
         productTypeId: 1001,
         productTypeName: "Spinner",
-        productTypeSlug: "spinner",
       },
     ];
     listPublicProductTypeTrends.mockResolvedValueOnce(trends);

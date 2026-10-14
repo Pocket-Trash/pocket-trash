@@ -1,6 +1,7 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { listPublicProductTypeTrends } from "@/lib/catalog-api";
+import { parseCatalogTrendsSearch } from "@/lib/catalog-filters";
 import { TrendsPage, TrendsPendingPage } from "@/pages/trends-page";
 
 /** Shows anonymous public catalog-product Trends. */
@@ -28,12 +29,7 @@ export const Route = createFileRoute("/trends")({
    * @param search - Untrusted URL search parameters.
    * @returns A positive integer product-type filter or empty search state.
    */
-  validateSearch: (search: Record<string, unknown>) => {
-    const productTypeId = Number(search.productTypeId);
-    return Number.isSafeInteger(productTypeId) && productTypeId > 0
-      ? { productTypeId }
-      : {};
-  },
+  validateSearch: parseCatalogTrendsSearch,
 });
 
 /**
