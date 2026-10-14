@@ -207,6 +207,7 @@ export const relations = defineRelations(tables, (r) => ({
       from: [r.collectionItem.ownerId],
       to: [r.user.id],
     }),
+    ownershipPeriods: r.many.collectionItemOwnershipPeriod(),
     // V1 relation keys cannot shadow the free-text counterparty columns.
     purchasedFromAccount: r.one.user({
       from: [r.collectionItem.purchasedFromUserId],
@@ -269,6 +270,12 @@ export const relations = defineRelations(tables, (r) => ({
     penTopCap: r.one.collectionDetailPenTopCap({
       from: [r.collectionItem.id],
       to: [r.collectionDetailPenTopCap.id],
+    }),
+  },
+  collectionItemOwnershipPeriod: {
+    collectionItem: r.one.collectionItem({
+      from: [r.collectionItemOwnershipPeriod.collectionItemId],
+      to: [r.collectionItem.id],
     }),
   },
   collectionItemImage: {
@@ -1093,6 +1100,10 @@ export const scraperRunsRelations = relations.scraperRuns;
 
 /** Connects a collection item to its collection, owner, trade users, catalog details, images, finish, and spinner data. */
 export const collectionItemRelations = relations.collectionItem;
+
+/** Connects an ownership period to its physical collection item. */
+export const collectionItemOwnershipPeriodRelations =
+  relations.collectionItemOwnershipPeriod;
 
 /** Connects a collection-item image to its item. */
 export const collectionItemImageRelations = relations.collectionItemImage;

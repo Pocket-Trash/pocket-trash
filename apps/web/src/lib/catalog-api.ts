@@ -35,6 +35,10 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";
+import {
+  collectionOwnershipEntryReasons,
+  collectionOwnershipExitReasons,
+} from "@/lib/catalog-ownership";
 import type { PublicMaterialPage } from "@/lib/materials";
 import { absoluteUrl } from "@/lib/site-url";
 import {
@@ -148,6 +152,52 @@ const idSchema = z
   .number(requiredMessage)
   .int(requiredMessage)
   .positive(requiredMessage);
+
+/** Strict calendar date accepted by ownership lifecycle forms. */
+const effectiveDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "web.collections.lifecycle.error.date")
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return (
+      !Number.isNaN(parsed.valueOf()) &&
+      parsed.toISOString().slice(0, 10) === value
+    );
+  }, "web.collections.lifecycle.error.date");
+
+/** Initial acquisition fields for a newly created physical item. */
+const ownershipStartSchema = z.object({
+  effectiveStartDate: effectiveDateSchema.nullable(),
+  entryReason: z.enum(collectionOwnershipEntryReasons),
+});
+
+/** Lifecycle correction, departure, or reacquisition fields. */
+const ownershipWriteSchema = ownershipStartSchema
+  .extend({
+    effectiveEndDate: effectiveDateSchema.nullable(),
+    exitReason: z.enum(collectionOwnershipExitReasons).nullable(),
+    periodId: idSchema.nullable(),
+  })
+  .superRefine((input, context) => {
+    if ((input.effectiveEndDate === null) !== (input.exitReason === null)) {
+      context.addIssue({
+        code: "custom",
+        message: "web.collections.lifecycle.error.departure",
+        path: ["effectiveEndDate"],
+      });
+    }
+    if (
+      input.effectiveStartDate !== null &&
+      input.effectiveEndDate !== null &&
+      input.effectiveEndDate < input.effectiveStartDate
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.collections.lifecycle.error.order",
+        path: ["effectiveEndDate"],
+      });
+    }
+  });
 
 /** Validated reusable slider magnet preset write. */
 const sliderMagnetPresetSchema = z
@@ -887,6 +937,10 @@ const collectionAddSchema = z
     finishOptionId: idSchema.nullable(),
     materialAssignmentId: idSchema.nullable(),
     newCollection: collectionWriteSchema.nullable().optional().default(null),
+    ownership: ownershipStartSchema.default({
+      effectiveStartDate: null,
+      entryReason: "unknown",
+    }),
     productId: idSchema,
     productTypeSlug: collectionProductTypeSchema,
     configurationSelections: z
@@ -1012,6 +1066,7 @@ const collectionEditSchema = z
     installedRefillProductId: idSchema.nullable().optional(),
     magnetConfiguration: sliderMagnetConfigurationSchema.nullable().optional(),
     materialAssignmentId: idSchema.nullable().optional(),
+    ownership: ownershipWriteSchema.optional(),
     reason: z.string().trim().max(1000).optional(),
     serialNumber: z
       .string()
@@ -2040,6 +2095,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           installedRefillProductId: parsed.data.installedRefillProductId,
           materialAssignmentId,
           newCollection: parsed.data.newCollection,
+          ownership: parsed.data.ownership,
           productId: parsed.data.productId,
           productTypeSlug: penProductType.data,
           serialNumber: parsed.data.serialNumber,
@@ -2070,6 +2126,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               displayName: parsed.data.displayName,
               description: parsed.data.description,
               newCollection: parsed.data.newCollection,
+              ownership: parsed.data.ownership,
               serialNumber: parsed.data.serialNumber,
             })
           ).spinnerItemId;
@@ -2085,6 +2142,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             displayName: parsed.data.displayName,
             description: parsed.data.description,
             newCollection: parsed.data.newCollection,
+            ownership: parsed.data.ownership,
             productId: parsed.data.productId,
             serialNumber: parsed.data.serialNumber,
           });
@@ -2103,6 +2161,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             finishOptionId: parsed.data.finishOptionId,
             materialAssignmentId,
             newCollection: parsed.data.newCollection,
+            ownership: parsed.data.ownership,
             productId: parsed.data.productId,
             productTypeSlug,
             serialNumber: parsed.data.serialNumber,

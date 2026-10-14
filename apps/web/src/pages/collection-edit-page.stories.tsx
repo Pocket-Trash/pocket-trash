@@ -175,6 +175,30 @@ const sliderItem = {
   ...item(4000, slider),
   installedInsertId: installedInsert.collectionItemId,
   installedPlateId: installedPlate.collectionItemId,
+  ownershipPeriods: [
+    {
+      effectiveEndDate: "2025-06-01",
+      effectiveStartDate: "2025-01-15",
+      endedRecordedAt: new Date("2025-06-02T12:00:00Z"),
+      entryReason: "purchase" as const,
+      exitReason: "sale" as const,
+      id: 5000,
+      startDateImputed: false,
+      startedRecordedAt: new Date("2025-01-16T12:00:00Z"),
+      updatedAt: new Date("2025-06-02T12:00:00Z"),
+    },
+    {
+      effectiveEndDate: null,
+      effectiveStartDate: "2025-09-10",
+      endedRecordedAt: null,
+      entryReason: "trade" as const,
+      exitReason: null,
+      id: 5001,
+      startDateImputed: false,
+      startedRecordedAt: new Date("2025-09-11T12:00:00Z"),
+      updatedAt: new Date("2025-09-11T12:00:00Z"),
+    },
+  ],
 };
 
 /** Destination collection offered by the edit page. */
@@ -249,12 +273,24 @@ export const InstalledSliderAssembly: Story = {
    * @returns A promise that resolves after the selector assertions pass.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
+    const historySelector = canvas.getByRole("combobox", {
+      name: /ownership history|web\.collections\.lifecycle\.title/iu,
+    });
+    await userEvent.click(historySelector);
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      await page.findByRole("option", { name: "2025-01-15 – 2025-06-01" }),
+    );
+    await expect(
+      canvas.getByLabelText(
+        /^(acquisition date|web\.collections\.lifecycle\.acquisitionDate)$/iu,
+      ),
+    ).toHaveValue("2025-01-15");
     const plateSelector = canvas.getByRole("combobox", {
       name: /installed plate|web\.slider\.component\.installedPlate/iu,
     });
     await expect(plateSelector).toHaveValue("Installed plate");
     await userEvent.click(plateSelector);
-    const page = within(canvasElement.ownerDocument.body);
     await expect(
       await page.findByRole("option", { name: "Spare plate" }),
     ).toBeVisible();
