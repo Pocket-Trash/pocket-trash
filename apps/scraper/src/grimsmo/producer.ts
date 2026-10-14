@@ -4,7 +4,7 @@ import { getGrimsmoVariationSyncState } from "../db/grimsmo.js";
 import {
   getGrimsmoKnifeVariationJobId,
   getGrimsmoPenVariationJobId,
-  getGrimsmoSagaMaterialsJobId,
+  getGrimsmoSagaCatalogJobId,
   getGrimsmoVariationBatchJobId,
 } from "../queue/job-ids.js";
 import {
@@ -15,6 +15,8 @@ import {
   type GrimsmoSourceName,
   type NormalizedGrimsmoKnifeVariation,
   type NormalizedGrimsmoPenVariation,
+  type SagaCatalogAppearance,
+  type SagaCatalogSnapshot,
   type ScraperItemJob,
   scraperSources,
 } from "../scraper-types.js";
@@ -147,19 +149,19 @@ export async function runGrimsmoProducer({
     let skippedUnchangedItems: number;
 
     if (definition.kind === "pen") {
-      const materialNames = getSagaMaterialNames(
+      const snapshot = createSagaCatalogSnapshot(
         items as NormalizedGrimsmoPenVariation[],
       );
       jobs = [
         {
           data: {
-            materialNames,
+            snapshot,
             source: scraperSources.grimsmoSaga,
-            type: "grimsmo.sagaMaterials",
+            type: "grimsmo.sagaCatalog",
           },
-          name: "grimsmo.sagaMaterials",
+          name: "grimsmo.sagaCatalog",
           opts: {
-            jobId: getGrimsmoSagaMaterialsJobId(materialNames),
+            jobId: getGrimsmoSagaCatalogJobId(snapshot),
           },
         },
       ];
@@ -265,19 +267,78 @@ export async function runGrimsmoProducer({
 }
 
 /**
- * Collects the distinct normalized material labels observed across Saga listings.
+ * Builds the bounded canonical Saga snapshot sent through the item queue.
  *
  * @param items - Normalized Saga listings from inventory and archive feeds.
- * @returns Sorted unique body and slider material labels.
+ * @returns Compact taxonomy, appearance, and image candidates.
  */
-function getSagaMaterialNames(
+export function createSagaCatalogSnapshot(
   items: readonly NormalizedGrimsmoPenVariation[],
-): string[] {
-  return [
-    ...new Set(
+): SagaCatalogSnapshot {
+  const appearances: SagaCatalogAppearance[] = [];
+  const appearanceKeys = new Set<string>();
+  const images: SagaCatalogSnapshot["images"] = [];
+  const imageUrls = new Set<string>();
+
+  for (const item of items) {
+    const appearance = {
+      colorNames: uniqueSorted([...item.bodyColors, ...item.sliderColors]),
+      finishNames: uniqueSorted(item.bodyFinishes),
+      sliderOption: item.sliderStyle,
+    };
+    const appearanceKey = JSON.stringify(appearance);
+    if (
+      appearances.length < 100 &&
+      !appearanceKeys.has(appearanceKey) &&
+      (appearance.colorNames.length > 0 ||
+        appearance.finishNames.length > 0 ||
+        appearance.sliderOption !== null)
+    ) {
+      appearanceKeys.add(appearanceKey);
+      appearances.push(appearance);
+    }
+
+    for (const image of item.images) {
+      if (images.length >= 30 || imageUrls.has(image.sourceUrl)) continue;
+      imageUrls.add(image.sourceUrl);
+      images.push({
+        listingUrl: item.productUrl,
+        sourceHandle: item.sourceHandle,
+        sourceImageId: image.sourceImageId ?? image.sourceHash,
+        sourceProductId: item.sourceProductId,
+        sourceUrl: image.sourceUrl,
+      });
+    }
+  }
+
+  return {
+    appearances,
+    colorNames: uniqueSorted(
+      items.flatMap((item) => [...item.bodyColors, ...item.sliderColors]),
+    ),
+    finishNames: uniqueSorted(items.flatMap((item) => item.bodyFinishes)),
+    images,
+    materialNames: uniqueSorted(
       items.flatMap((item) => [...item.bodyMaterials, ...item.sliderMaterials]),
     ),
-  ].sort();
+    sliderOptions: uniqueSorted(
+      items.flatMap((item) =>
+        item.sliderStyle === null ? [] : [item.sliderStyle],
+      ),
+    ),
+  };
+}
+
+/**
+ * Returns sorted unique non-empty labels.
+ *
+ * @param values - Source labels to deduplicate.
+ * @returns Sorted unique labels.
+ */
+function uniqueSorted(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right),
+  );
 }
 
 /**

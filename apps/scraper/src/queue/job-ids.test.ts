@@ -3,6 +3,8 @@ import {
   getAutmogArchiveJobId,
   getGrimsmoKnifeVariationJobId,
   getGrimsmoPenVariationJobId,
+  getGrimsmoSagaCatalogJobId,
+  getGrimsmoSagaImageUploadJobId,
   getGrimsmoSagaMaterialsJobId,
   getGrimsmoVariationBatchJobId,
   getTmpImageDeleteJobId,
@@ -58,6 +60,19 @@ describe("scraper job ids", () => {
         sourceHandles: ["c", "b", "a"],
       }),
       getGrimsmoSagaMaterialsJobId(["Titanium", "Bronze"]),
+      getGrimsmoSagaCatalogJobId({
+        appearances: [],
+        colorNames: [],
+        finishNames: [],
+        images: [],
+        materialNames: ["Titanium"],
+        sliderOptions: [],
+      }),
+      getGrimsmoSagaImageUploadJobId({
+        listingId: 1000,
+        sourceImageId: "123",
+        sourceUrl: "https://cdn.example.test/saga.jpg",
+      }),
       getTmpImageUploadJobId({
         imageId: 2000,
         source: "grimsmo-rask",
