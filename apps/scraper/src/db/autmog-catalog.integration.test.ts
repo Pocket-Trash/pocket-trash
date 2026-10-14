@@ -14,6 +14,51 @@ import {
 } from "./autmog-catalog.js";
 
 describe("canonical Autmog catalog synchronization", () => {
+  it("creates and reuses a missing canonical finish", async () => {
+    const { client, db } = await createTestDatabase({ seedFinishes: false });
+    const item = normalizeAutmogProduct(createProduct());
+
+    try {
+      await expect(syncCanonicalAutmogPen(db, item)).resolves.toMatchObject({
+        created: true,
+      });
+      await expect(syncCanonicalAutmogPen(db, item)).resolves.toMatchObject({
+        created: false,
+      });
+
+      await expect(
+        db
+          .select({ name: schema.finish.name, slug: schema.finish.slug })
+          .from(schema.finish),
+      ).resolves.toEqual([{ name: "Machine finish", slug: "machine-finish" }]);
+      await expect(countRows(db, schema.finishOptionFinish)).resolves.toBe(1);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("creates a normalized finish discovered in source text", async () => {
+    const { client, db } = await createTestDatabase({ seedFinishes: false });
+    const item = normalizeAutmogProduct(
+      createProduct({
+        body_html:
+          "<p>Tumbled titanium click pen with grip lines, a conical nose, and Pilot G2 refill.</p>",
+      }),
+    );
+
+    try {
+      await syncCanonicalAutmogPen(db, item);
+
+      await expect(
+        db
+          .select({ name: schema.finish.name, slug: schema.finish.slug })
+          .from(schema.finish),
+      ).resolves.toEqual([{ name: "Tumbled", slug: "tumbled" }]);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("creates, updates, and reuses a canonical Pen without staging writes", async () => {
     const { client, db } = await createTestDatabase();
     const original = normalizeAutmogProduct(createProduct());
@@ -162,15 +207,22 @@ describe("canonical Autmog catalog synchronization", () => {
 /**
  * Creates a migrated database with canonical Autmog lookup rows.
  *
+ * @param options - Lookup fixture controls.
  * @returns Disposable PGlite client and typed database.
  * @rejects When migrations or lookup seeding fail.
  */
-async function createTestDatabase(): Promise<{
+async function createTestDatabase(
+  options: {
+    /** Whether to insert the baseline finish rows. */
+    seedFinishes?: boolean;
+  } = {},
+): Promise<{
   /** Disposable PGlite client owned by the test. */
   client: PGlite;
   /** Migrated typed database used by the test. */
   db: Database;
 }> {
+  const { seedFinishes = true } = options;
   const client = new PGlite();
   const migrationsFolder = fileURLToPath(
     new URL("../../../../packages/database/drizzle", import.meta.url),
@@ -190,10 +242,12 @@ async function createTestDatabase(): Promise<{
     { name: "Titanium", slug: "titanium" },
     { name: "Aluminum", slug: "aluminum" },
   ]);
-  await db.insert(schema.finish).values([
-    { name: "Machine finish", slug: "machine-finish" },
-    { name: "KVR", slug: "kvr" },
-  ]);
+  if (seedFinishes) {
+    await db.insert(schema.finish).values([
+      { name: "Machine finish", slug: "machine-finish" },
+      { name: "KVR", slug: "kvr" },
+    ]);
+  }
   await db.insert(schema.pattern).values({
     name: "Grip lines",
     slug: "grip-lines",
