@@ -1,0 +1,2 @@
+ALTER TABLE "public_collection_item_product_type_trend" ADD COLUMN "rounded_collector_count" integer NOT NULL;--> statement-breakpoint
+ALTER TABLE "public_collection_item_product_type_trend" DROP CONSTRAINT "public_collection_item_product_type_trend_count_valid", ADD CONSTRAINT "public_collection_item_product_type_trend_count_valid" CHECK ("rounded_item_count" > 0 and "rounded_item_count" % 5 = 0 and "rounded_collector_count" > 0 and "rounded_collector_count" % 5 = 0);

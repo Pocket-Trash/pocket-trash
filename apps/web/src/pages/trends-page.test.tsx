@@ -26,6 +26,33 @@ vi.mock("@/components/catalog-trends-chart", () => ({
   ),
 }));
 
+vi.mock("@pocket-trash/localizations", () => ({
+  /**
+   * Supplies pending localization copy to the stacked application test.
+   *
+   * @param key - Localization key.
+   * @returns English copy or the unchanged key.
+   */
+  formatTranslation: (key: string) => {
+    return (
+      {
+        "web.trends.chartLabel": "Catalog products by product type",
+        "web.trends.collectionItemsChartLabel":
+          "Currently owned items by product type",
+        "web.trends.collectionItemsEmpty":
+          "No collection items are available yet.",
+        "web.trends.collectionItemsError":
+          "Collection-item Trends are unavailable right now.",
+        "web.trends.collectionItemsSuppressed":
+          "Some product types are hidden because they do not meet the privacy threshold.",
+        "web.trends.collectionItemsSuppressedEmpty":
+          "Collection-item Trends are hidden until the privacy threshold is met.",
+        "web.trends.other": "Other",
+      }[key] ?? key
+    );
+  },
+}));
+
 vi.mock("@/components/app-shell", () => ({
   /**
    * Renders a minimal application shell for Trends page tests.
@@ -71,7 +98,20 @@ const trends: PublicProductTypeTrend[] = Array.from(
 describe("TrendsPage", () => {
   it("charts the eight largest types plus Other while preserving the exact collapsed table", () => {
     const html = renderToStaticMarkup(
-      <TrendsPage onProductTypeChange={vi.fn()} trends={trends} />,
+      <TrendsPage
+        collectionTrends={{
+          generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+          hasSuppressedValues: true,
+          stale: false,
+          values: trends.map((trend) => ({
+            ...trend,
+            collectorCount: trend.count * 5,
+            count: trend.count * 5,
+          })),
+        }}
+        onProductTypeChange={vi.fn()}
+        trends={trends}
+      />,
     );
     const chart = html.match(
       /<div data-chart="pie-drilldown"[\s\S]*?<\/div>/,
@@ -90,5 +130,45 @@ describe("TrendsPage", () => {
     expect(table?.match(/<tr/g)).toHaveLength(11);
     expect(table).toContain("Type 10");
     expect(table).toContain(">1</td>");
+    expect(html).toContain("Currently owned items by product type");
+    expect(html).toContain("Some product types are hidden");
+  });
+
+  it("distinguishes unavailable, suppressed, and empty collection states", () => {
+    const unavailable = renderToStaticMarkup(
+      <TrendsPage
+        collectionTrends={null}
+        onProductTypeChange={vi.fn()}
+        trends={[]}
+      />,
+    );
+    const suppressed = renderToStaticMarkup(
+      <TrendsPage
+        collectionTrends={{
+          generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+          hasSuppressedValues: true,
+          stale: false,
+          values: [],
+        }}
+        onProductTypeChange={vi.fn()}
+        trends={[]}
+      />,
+    );
+    const empty = renderToStaticMarkup(
+      <TrendsPage
+        collectionTrends={{
+          generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+          hasSuppressedValues: false,
+          stale: false,
+          values: [],
+        }}
+        onProductTypeChange={vi.fn()}
+        trends={[]}
+      />,
+    );
+
+    expect(unavailable).toContain("unavailable right now");
+    expect(suppressed).toContain("hidden until the privacy threshold is met");
+    expect(empty).toContain("No collection items are available yet");
   });
 });

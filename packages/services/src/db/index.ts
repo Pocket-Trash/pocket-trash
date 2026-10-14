@@ -19,6 +19,7 @@ import {
   createFeedbackService,
   type FeedbackService,
 } from "./feedback/index.js";
+import { createTrendsService, type TrendsService } from "./trends/index.js";
 import {
   createUserSettingsService,
   defaultUserSettings,
@@ -38,6 +39,8 @@ export type DbServices = {
   erasure: ErasureService;
   /** Product-feedback service. */
   feedback: FeedbackService;
+  /** Privacy-safe public Trends service. */
+  trends: TrendsService;
   /** User settings service. */
   userSettings: UserSettingsService;
   /** Application user service. */
@@ -73,6 +76,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
     collections: createCollectionsService(db, users, audit, logger),
     erasure: createErasureService(db, logger, undefined, audit),
     feedback: createFeedbackService(db, logger, audit),
+    trends: createTrendsService(db),
     userSettings: createUserSettingsService(db, users, logger),
     users,
   };
@@ -102,7 +106,6 @@ export {
   AuditPayloadTooLargeError,
   createAuditService,
 } from "./audit/index.js";
-
 export type {
   AdminMaterial,
   AdminMaterialSummary,
@@ -209,6 +212,17 @@ export {
   FeedbackStateError,
   FeedbackSubmissionLimitError,
 } from "./feedback/index.js";
+export type {
+  PublicCollectionItemProductTypeTrend,
+  PublicCollectionItemTrends,
+  TrendsService,
+} from "./trends/index.js";
+export {
+  createTrendsService,
+  PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
+  PUBLIC_TRENDS_ROUNDING_INCREMENT,
+  PUBLIC_TRENDS_STALE_MS,
+} from "./trends/index.js";
 export type {
   UpsertUserSettingsInput,
   UserSettingsService,

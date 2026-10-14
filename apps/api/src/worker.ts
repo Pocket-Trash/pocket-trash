@@ -300,7 +300,7 @@ export async function handleWorkerScheduled(
           secretKey: env.CLERK_SECRET_KEY as string,
         });
         await drainAuditQueue(runtime.services.db.audit);
-        await drainErasureQueue(
+        const erasuresProcessed = await drainErasureQueue(
           runtime.services.db.erasure,
           createErasureOperations({
             clerk: clerk.users,
@@ -308,6 +308,12 @@ export async function handleWorkerScheduled(
             storage: runtime.services.storage,
           }),
         );
+        if (
+          erasuresProcessed > 0 ||
+          new Date(_controller.scheduledTime).getUTCHours() === 0
+        ) {
+          await runtime.services.db.trends.refreshPublicCollectionItemTrends();
+        }
         if (new Date(_controller.scheduledTime).getUTCHours() === 0) {
           const candidates = await findClerkOrphans(
             clerk.users,

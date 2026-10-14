@@ -2,8 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Provides public product-type Trends to the route loader. */
 const listPublicProductTypeTrends = vi.hoisted(() => vi.fn());
+/** Provides the active collection-item generation to the route loader. */
+const getPublicCollectionItemTrends = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/catalog-api", () => ({ listPublicProductTypeTrends }));
+vi.mock("@/lib/catalog-api", () => ({
+  getPublicCollectionItemTrends,
+  listPublicProductTypeTrends,
+}));
 vi.mock("@/pages/trends-page", () => ({
   /**
    * Renders the stable Trends route test marker.
@@ -45,9 +50,16 @@ describe("Trends route", () => {
         productTypeName: "Spinner",
       },
     ];
+    const collectionTrends = {
+      generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+      hasSuppressedValues: false,
+      stale: false,
+      values: trends,
+    };
     listPublicProductTypeTrends.mockResolvedValueOnce(trends);
+    getPublicCollectionItemTrends.mockResolvedValueOnce(collectionTrends);
     await expect(
       (loader as (context: unknown) => Promise<unknown>)({}),
-    ).resolves.toEqual(trends);
+    ).resolves.toEqual({ catalogTrends: trends, collectionTrends });
   });
 });

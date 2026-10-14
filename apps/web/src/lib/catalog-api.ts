@@ -11,6 +11,7 @@ import type {
   CatalogTerminologyAlias,
   PensAdminWriteInput,
   ProductWriteInput,
+  PublicCollectionItemTrends,
   PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterialSummary,
@@ -1317,6 +1318,19 @@ export const listPublicProductTypeTrends = createServerFn({
 }).handler(async (): Promise<PublicProductTypeTrend[]> => {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listPublicProductTypeTrends();
+});
+
+/**
+ * Returns the active privacy-safe collection-item Trends generation.
+ *
+ * @returns Active generation, or `null` before the first successful refresh.
+ * @rejects When service loading or the Trends query fails.
+ */
+export const getPublicCollectionItemTrends = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<PublicCollectionItemTrends | null> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicCollectionItemTrends();
 });
 
 /** Updates a product type's Parts and Accessories classification. */

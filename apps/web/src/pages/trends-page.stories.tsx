@@ -1,4 +1,7 @@
-import type { PublicProductTypeTrend } from "@package/services";
+import type {
+  PublicCollectionItemTrends,
+  PublicProductTypeTrend,
+} from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
@@ -23,6 +26,18 @@ const trends: PublicProductTypeTrend[] = [
     productTypeName: "Pen",
   },
 ];
+
+/** Privacy-safe collection Trends used by populated stories. */
+const collectionTrends: PublicCollectionItemTrends = {
+  generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+  hasSuppressedValues: true,
+  stale: false,
+  values: trends.map((trend) => ({
+    ...trend,
+    collectorCount: trend.count * 5,
+    count: trend.count * 5,
+  })),
+};
 
 /** Trends page Storybook configuration. */
 const meta = {
@@ -52,6 +67,7 @@ function TrendsFixture() {
   const [productTypeId, setProductTypeId] = useState<number>();
   return (
     <TrendsPage
+      collectionTrends={collectionTrends}
       onProductTypeChange={setProductTypeId}
       selectedProductTypeId={productTypeId}
       trends={trends}
@@ -62,7 +78,7 @@ function TrendsFixture() {
 /** Populated public Trends with keyboard filter coverage. */
 export const Populated: Story = {
   /** Default component properties replaced by the controlled story renderer. */
-  args: { onProductTypeChange: fn(), trends },
+  args: { collectionTrends, onProductTypeChange: fn(), trends },
   /**
    * Renders the controlled populated fixture.
    *
@@ -77,7 +93,6 @@ export const Populated: Story = {
    */
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const page = within(canvasElement.ownerDocument.body);
     const tableDisclosure = canvas.getByText(
       "Catalog products by product type",
       { selector: "summary" },
@@ -93,22 +108,22 @@ export const Populated: Story = {
       name: "Product type",
     });
     productTypeFilter.focus();
-    await userEvent.keyboard("{Enter}{ArrowDown}{Enter}");
+    await userEvent.keyboard("{Enter}{End}{Enter}");
     await expect(productTypeFilter).not.toHaveTextContent("all");
     await userEvent.keyboard("{Escape}");
 
-    await expect(page.queryByRole("listbox")).toBeNull();
-    await expect(canvas.getAllByRole("row")).toHaveLength(2);
+    await expect(canvas.getAllByRole("table")).toHaveLength(2);
+    await expect(canvas.getAllByRole("row")).toHaveLength(4);
     await expect(
-      canvas.getByRole("rowheader", { name: "Spinner" }),
-    ).toBeVisible();
+      canvas.getAllByRole("rowheader", { name: "Spinner" }),
+    ).toHaveLength(2);
   },
 };
 
 /** Localized empty state for a catalog without eligible products. */
 export const Empty: Story = {
   /** Empty Trends component properties. */
-  args: { onProductTypeChange: fn(), trends: [] },
+  args: { collectionTrends: null, onProductTypeChange: fn(), trends: [] },
   /**
    * Verifies the localized empty status.
    *
@@ -119,5 +134,19 @@ export const Empty: Story = {
     await expect(within(canvasElement).getByRole("status")).toHaveTextContent(
       "No catalog products are available for these filters.",
     );
+  },
+};
+
+/** Stale generation with every source category suppressed. */
+export const Suppressed: Story = {
+  args: {
+    collectionTrends: {
+      generatedAt: new Date("2026-10-01T00:00:00.000Z"),
+      hasSuppressedValues: true,
+      stale: true,
+      values: [],
+    },
+    onProductTypeChange: fn(),
+    trends,
   },
 };
