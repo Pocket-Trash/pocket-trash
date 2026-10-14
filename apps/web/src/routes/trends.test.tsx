@@ -4,9 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const listPublicProductTypeTrends = vi.hoisted(() => vi.fn());
 /** Provides the active collection-item generation to the route loader. */
 const getPublicCollectionItemTrends = vi.hoisted(() => vi.fn());
+/** Provides the active Parts and Accessories generation to the route loader. */
+const getPublicPartAccessoryTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
   getPublicCollectionItemTrends,
+  getPublicPartAccessoryTrends,
   listPublicProductTypeTrends,
 }));
 vi.mock("@/pages/trends-page", () => ({
@@ -58,8 +61,13 @@ describe("Trends route", () => {
     };
     listPublicProductTypeTrends.mockResolvedValueOnce(trends);
     getPublicCollectionItemTrends.mockResolvedValueOnce(collectionTrends);
+    getPublicPartAccessoryTrends.mockResolvedValueOnce(collectionTrends);
     await expect(
       (loader as (context: unknown) => Promise<unknown>)({}),
-    ).resolves.toEqual({ catalogTrends: trends, collectionTrends });
+    ).resolves.toEqual({
+      catalogTrends: trends,
+      collectionTrends,
+      partAccessoryTrends: collectionTrends,
+    });
   });
 });

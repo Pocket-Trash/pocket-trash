@@ -29,11 +29,39 @@ export const publicTrendsGeneration = pgTable(
     hasSuppressedValues: boolean("has_suppressed_values")
       .default(false)
       .notNull(),
+    /** Whether an enabled Parts and Accessories type was privacy-suppressed. */
+    hasSuppressedPartAccessoryValues: boolean(
+      "has_suppressed_part_accessory_values",
+    )
+      .default(false)
+      .notNull(),
   },
   (table) => [
     uniqueIndex("public_trends_generation_active_unique")
       .on(table.active)
       .where(sql`${table.active}`),
+  ],
+);
+
+/** Privacy-transformed Parts and Accessories counts for one generation. */
+export const publicPartAccessoryProductTypeTrend = pgTable(
+  "public_part_accessory_product_type_trend",
+  {
+    generationId: bigint("generation_id", { mode: "number" })
+      .notNull()
+      .references(() => publicTrendsGeneration.id, { onDelete: "cascade" }),
+    productTypeId: bigint("product_type_id", { mode: "number" })
+      .notNull()
+      .references(() => productType.id, { onDelete: "restrict" }),
+    /** Item count rounded to the nearest five before persistence. */
+    roundedItemCount: integer("rounded_item_count").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.generationId, table.productTypeId] }),
+    check(
+      "public_part_accessory_product_type_trend_count_valid",
+      sql`${table.roundedItemCount} > 0 and ${table.roundedItemCount} % 5 = 0`,
+    ),
   ],
 );
 
@@ -66,3 +94,6 @@ export type PublicTrendsGeneration = typeof publicTrendsGeneration.$inferSelect;
 /** Stored privacy-safe collection-item Trend row. */
 export type PublicCollectionItemProductTypeTrend =
   typeof publicCollectionItemProductTypeTrend.$inferSelect;
+/** Stored privacy-safe Parts and Accessories Trend row. */
+export type PublicPartAccessoryProductTypeTrend =
+  typeof publicPartAccessoryProductTypeTrend.$inferSelect;

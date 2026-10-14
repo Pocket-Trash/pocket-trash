@@ -1,6 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AdminConfigPage, AdminProductConfigPage } from "./admin-config-pages";
+import {
+  AdminConfigPage,
+  AdminProductConfigPage,
+  AdminTrendsConfigPage,
+} from "./admin-config-pages";
 
 vi.mock("@pocket-trash/localizations", () => ({
   /**
@@ -56,11 +60,41 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 describe("administrator configuration pages", () => {
-  it("links the configuration hub to product settings", () => {
+  it("links the configuration hub to product and Trends settings", () => {
     const html = renderToStaticMarkup(<AdminConfigPage />);
 
     expect(html).toContain('href="/admin/config/products"');
     expect(html).toContain("web.navigation.products");
+    expect(html).toContain('href="/admin/config/trends"');
+    expect(html).toContain("web.admin.config.trends.title");
+  });
+
+  it("keeps primary Trends types included and read-only", () => {
+    const html = renderToStaticMarkup(
+      <AdminTrendsConfigPage
+        productTypes={[
+          {
+            id: 1,
+            includeInTrends: true,
+            isPartOrAccessory: false,
+            name: "Slider",
+            slug: "slider",
+          },
+          {
+            id: 2,
+            includeInTrends: false,
+            isPartOrAccessory: true,
+            name: "Slider Plate",
+            slug: "slider-plate",
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("web.admin.config.trends.description");
+    expect(html.match(/type="checkbox"/gu)).toHaveLength(2);
+    expect(html).toMatch(/<input[^>]*disabled=""[^>]*checked=""/u);
+    expect(html).toContain("web.admin.config.trends.alwaysIncluded");
   });
 
   it("paginates the product-type table at 30 rows", () => {

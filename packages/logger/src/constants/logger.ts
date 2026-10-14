@@ -98,6 +98,8 @@ export const loggerMessages = {
       setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
       setProductTypePartOrAccessory:
         "database.catalog.setProductTypePartOrAccessory",
+      setProductTypeTrendsInclusion:
+        "database.catalog.setProductTypeTrendsInclusion",
       updateMaker: "database.catalog.updateMaker",
       updateProduct: "database.catalog.updateProduct",
       updateSliderMagnetPreset: "database.catalog.updateSliderMagnetPreset",

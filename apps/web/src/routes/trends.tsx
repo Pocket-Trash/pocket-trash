@@ -2,6 +2,7 @@ import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   getPublicCollectionItemTrends,
+  getPublicPartAccessoryTrends,
   listPublicProductTypeTrends,
 } from "@/lib/catalog-api";
 import { parseCatalogTrendsSearch } from "@/lib/catalog-filters";
@@ -25,11 +26,13 @@ export const Route = createFileRoute("/trends")({
    * @rejects When Trends cannot be loaded.
    */
   loader: async () => {
-    const [catalogTrends, collectionTrends] = await Promise.all([
-      listPublicProductTypeTrends(),
-      getPublicCollectionItemTrends(),
-    ]);
-    return { catalogTrends, collectionTrends };
+    const [catalogTrends, collectionTrends, partAccessoryTrends] =
+      await Promise.all([
+        listPublicProductTypeTrends(),
+        getPublicCollectionItemTrends(),
+        getPublicPartAccessoryTrends(),
+      ]);
+    return { catalogTrends, collectionTrends, partAccessoryTrends };
   },
   pendingComponent: TrendsPendingPage,
   /**
@@ -49,7 +52,8 @@ export const Route = createFileRoute("/trends")({
 function TrendsRoute() {
   const navigate = useNavigate();
   const { productTypeId } = Route.useSearch();
-  const { catalogTrends, collectionTrends } = Route.useLoaderData();
+  const { catalogTrends, collectionTrends, partAccessoryTrends } =
+    Route.useLoaderData();
   return (
     <TrendsPage
       collectionTrends={collectionTrends}
@@ -60,6 +64,7 @@ function TrendsRoute() {
           to: "/trends",
         })
       }
+      partAccessoryTrends={partAccessoryTrends}
       selectedProductTypeId={productTypeId}
       trends={catalogTrends}
     />

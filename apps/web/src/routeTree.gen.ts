@@ -56,6 +56,7 @@ import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as AdminAuditExportRouteImport } from './routes/admin.audit.export'
 import { Route as AdminConfigIndexRouteImport } from './routes/admin.config.index'
 import { Route as AdminConfigProductsRouteImport } from './routes/admin.config.products'
+import { Route as AdminConfigTrendsRouteImport } from './routes/admin.config.trends'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
 import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
@@ -323,6 +324,11 @@ const AdminConfigProductsRoute = AdminConfigProductsRouteImport.update({
   path: '/config/products',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminConfigTrendsRoute = AdminConfigTrendsRouteImport.update({
+  id: '/config/trends',
+  path: '/config/trends',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
   id: '/feedback/',
   path: '/feedback/',
@@ -535,6 +541,7 @@ export interface FileRoutesByFullPath {
   '/user/': typeof UserIndexRoute
   '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/config/products': typeof AdminConfigProductsRoute
+  '/admin/config/trends': typeof AdminConfigTrendsRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -610,6 +617,7 @@ export interface FileRoutesByTo {
   '/user': typeof UserIndexRoute
   '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/config/products': typeof AdminConfigProductsRoute
+  '/admin/config/trends': typeof AdminConfigTrendsRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -690,6 +698,7 @@ export interface FileRoutesById {
   '/user/': typeof UserIndexRoute
   '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/config/products': typeof AdminConfigProductsRoute
+  '/admin/config/trends': typeof AdminConfigTrendsRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -771,6 +780,7 @@ export interface FileRouteTypes {
     | '/user/'
     | '/admin/audit/export'
     | '/admin/config/products'
+    | '/admin/config/trends'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -846,6 +856,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/admin/audit/export'
     | '/admin/config/products'
+    | '/admin/config/trends'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -925,6 +936,7 @@ export interface FileRouteTypes {
     | '/user/'
     | '/admin/audit/export'
     | '/admin/config/products'
+    | '/admin/config/trends'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -1325,6 +1337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminConfigProductsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/config/trends': {
+      id: '/admin/config/trends'
+      path: '/config/trends'
+      fullPath: '/admin/config/trends'
+      preLoaderRoute: typeof AdminConfigTrendsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/feedback/': {
       id: '/admin/feedback/'
       path: '/feedback'
@@ -1557,6 +1576,7 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminConfigProductsRoute: typeof AdminConfigProductsRoute
+  AdminConfigTrendsRoute: typeof AdminConfigTrendsRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
   AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
@@ -1584,6 +1604,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminConfigProductsRoute: AdminConfigProductsRoute,
+  AdminConfigTrendsRoute: AdminConfigTrendsRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
   AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,

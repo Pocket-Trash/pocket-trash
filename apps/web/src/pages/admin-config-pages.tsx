@@ -1,4 +1,7 @@
-import type { CatalogProductTypeSummary } from "@package/services";
+import type {
+  CatalogProductTypeSummary,
+  TrendsProductTypeConfiguration,
+} from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -15,13 +18,16 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { Boxes } from "lucide-react";
+import { Boxes, ChartColumn } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { setProductTypePartOrAccessory } from "@/lib/catalog-api";
+import {
+  setProductTypePartOrAccessory,
+  setProductTypeTrendsInclusion,
+} from "@/lib/catalog-api";
 import { useLocale } from "@/providers/locale-provider";
 
 /** TanStack Table features required by product-type configuration. */
@@ -52,6 +58,17 @@ const productTypeColumns = productTypeColumnHelper.columns([
 /** Delay that collapses rapid classification changes into one request. */
 const productTypeSaveDebounceMs = 300;
 
+/** Configuration keys supplied by the stacked localization change. */
+type AdminConfigTranslationKey =
+  | TranslationKey
+  | "web.admin.config.trends.alwaysIncluded"
+  | "web.admin.config.trends.description"
+  | "web.admin.config.trends.includeLabel"
+  | "web.admin.config.trends.included"
+  | "web.admin.config.trends.title"
+  | "web.admin.config.trends.updateFailed"
+  | "web.admin.config.trends.updated";
+
 /**
  * Renders the administrator configuration hub.
  *
@@ -72,6 +89,169 @@ export function AdminConfigPage() {
             {formatTranslation("web.navigation.products", {}, locale)}
           </span>
         </Link>
+        <Link
+          className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          to="/admin/config/trends"
+        >
+          <ChartColumn aria-hidden="true" className="size-5" />
+          <span className="font-semibold">
+            {formatTranslation(
+              "web.admin.config.trends.title" as TranslationKey,
+              {},
+              locale,
+            )}
+          </span>
+        </Link>
+      </main>
+    </AdminPageShell>
+  );
+}
+
+/**
+ * Renders public Trends inclusion controls for product types.
+ *
+ * @param props - Trends configuration page properties.
+ * @param props.productTypes - Product types available to configure.
+ * @returns Trends configuration table.
+ */
+export function AdminTrendsConfigPage({
+  productTypes,
+}: {
+  /** Product types available to configure. */
+  productTypes: TrendsProductTypeConfiguration[];
+}) {
+  const { locale } = useLocale();
+  /**
+   * Formats localized Trends configuration copy.
+   *
+   * @param key - Translation key to format.
+   * @param values - Optional interpolation values.
+   * @returns Localized configuration copy.
+   */
+  const t = (
+    key: AdminConfigTranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key as TranslationKey, values, locale);
+  const [rows, setRows] = useState(productTypes);
+  const [savingIds, setSavingIds] = useState<Set<number>>(() => new Set());
+
+  /**
+   * Persists one secondary product type's public Trends inclusion state.
+   *
+   * @param productType - Secondary product type being changed.
+   * @param includeInTrends - Desired public inclusion state.
+   */
+  function updateInclusion(
+    productType: TrendsProductTypeConfiguration,
+    includeInTrends: boolean,
+  ) {
+    setRows((current) =>
+      current.map((candidate) =>
+        candidate.id === productType.id
+          ? { ...candidate, includeInTrends }
+          : candidate,
+      ),
+    );
+    setSavingIds((current) => new Set(current).add(productType.id));
+    void setProductTypeTrendsInclusion({
+      data: { includeInTrends, productTypeId: productType.id },
+    })
+      .then((saved) => {
+        setRows((current) =>
+          current.map((candidate) =>
+            candidate.id === saved.id ? saved : candidate,
+          ),
+        );
+        toast.success(
+          t("web.admin.config.trends.updated", { name: saved.name }),
+        );
+      })
+      .catch(() => {
+        setRows((current) =>
+          current.map((candidate) =>
+            candidate.id === productType.id ? productType : candidate,
+          ),
+        );
+        toast.error(
+          t("web.admin.config.trends.updateFailed", { name: productType.name }),
+        );
+      })
+      .finally(() => {
+        setSavingIds((current) => {
+          const next = new Set(current);
+          next.delete(productType.id);
+          return next;
+        });
+      });
+  }
+
+  const title = t("web.admin.config.trends.title");
+  return (
+    <AdminPageShell
+      breadcrumbItems={[
+        { label: t("web.admin.config.title"), to: "/admin/config" },
+      ]}
+      section="config"
+      title={title}
+    >
+      <main className="grid w-full max-w-4xl gap-5 p-4 md:p-6">
+        <p className="m-0 text-sm text-muted-foreground">
+          {t("web.admin.config.trends.description")}
+        </p>
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground uppercase">
+                <th className="px-4 py-3 font-semibold" scope="col">
+                  {t("web.catalog.field.productType")}
+                </th>
+                <th className="px-4 py-3 font-semibold" scope="col">
+                  {t("web.catalog.field.slug")}
+                </th>
+                <th className="px-4 py-3 text-center font-semibold" scope="col">
+                  {t("web.admin.config.trends.included")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((productType) => (
+                <tr
+                  className="border-b border-border last:border-0"
+                  key={productType.id}
+                >
+                  <th className="px-4 py-3 font-medium" scope="row">
+                    {productType.name}
+                  </th>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {productType.slug}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <input
+                      aria-label={t("web.admin.config.trends.includeLabel", {
+                        name: productType.name,
+                      })}
+                      checked={productType.includeInTrends}
+                      className="size-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      disabled={
+                        !productType.isPartOrAccessory ||
+                        savingIds.has(productType.id)
+                      }
+                      onChange={(event) =>
+                        updateInclusion(productType, event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    {!productType.isPartOrAccessory ? (
+                      <span className="sr-only">
+                        {t("web.admin.config.trends.alwaysIncluded")}
+                      </span>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </main>
     </AdminPageShell>
   );

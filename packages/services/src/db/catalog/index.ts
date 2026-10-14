@@ -244,6 +244,20 @@ export type CatalogProductTypeSummary = {
   slug: string;
 };
 
+/** Product type and its effective public Trends inclusion state. */
+export type TrendsProductTypeConfiguration = {
+  /** Database identifier. */
+  id: number;
+  /** Whether this type is currently included in public Trends. */
+  includeInTrends: boolean;
+  /** Whether this type is a configurable secondary type. */
+  isPartOrAccessory: boolean;
+  /** Display name. */
+  name: string;
+  /** URL-safe identifier. */
+  slug: string;
+};
+
 /** Public catalog-product count for one primary product type. */
 export type PublicProductTypeTrend = {
   /** Exact number of distinct approved public catalog products. */
@@ -1772,6 +1786,30 @@ export type CatalogService = {
    * @rejects When the database query fails.
    */
   listProductTypes(): Promise<CatalogProductTypeSummary[]>;
+  /**
+   * Lists product types and their effective public Trends inclusion state.
+   *
+   * @returns Product types ordered by name; primary types are always included.
+   * @rejects When the database query fails.
+   */
+  listTrendsProductTypeConfigurations(): Promise<
+    TrendsProductTypeConfiguration[]
+  >;
+  /**
+   * Changes whether a secondary product type appears in public Trends.
+   *
+   * @param input - Product type, desired inclusion state, and administrator.
+   * @returns Updated Trends configuration.
+   * @rejects When authorization, validation, persistence, auditing, or logging fails.
+   */
+  setProductTypeTrendsInclusion(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Desired public Trends inclusion state. */
+    includeInTrends: boolean;
+    /** Product-type identifier. */
+    productTypeId: number;
+  }): Promise<TrendsProductTypeConfiguration>;
   /**
    * Lists slugs.
    *
@@ -5191,6 +5229,91 @@ export function createCatalogService(
         })
         .from(schema.productType)
         .orderBy(asc(schema.productType.name));
+    },
+    /**
+     * Lists product types and their effective public Trends inclusion state.
+     *
+     * @returns Product types ordered by name; primary types are always included.
+     * @rejects When the database query fails.
+     */
+    async listTrendsProductTypeConfigurations() {
+      const rows = await db
+        .select({
+          id: schema.productType.id,
+          includeInTrends: schema.productType.includeInTrends,
+          isPartOrAccessory: schema.productType.isPartOrAccessory,
+          name: schema.productType.name,
+          slug: schema.productType.slug,
+        })
+        .from(schema.productType)
+        .orderBy(asc(schema.productType.name));
+      return rows.map((row) => ({
+        ...row,
+        includeInTrends: !row.isPartOrAccessory || row.includeInTrends,
+      }));
+    },
+    /**
+     * Changes whether a secondary product type appears in public Trends.
+     *
+     * @param input - Product type, desired inclusion state, and administrator.
+     * @returns Updated Trends configuration.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async setProductTypeTrendsInclusion(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product type does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.setProductTypeTrendsInclusion,
+        () =>
+          db.transaction(async (tx) => {
+            const [before] = await tx
+              .select({
+                id: schema.productType.id,
+                includeInTrends: schema.productType.includeInTrends,
+                isPartOrAccessory: schema.productType.isPartOrAccessory,
+                name: schema.productType.name,
+                slug: schema.productType.slug,
+              })
+              .from(schema.productType)
+              .where(eq(schema.productType.id, input.productTypeId))
+              .limit(1);
+            if (!before?.isPartOrAccessory)
+              throw new Error("Product type does not exist.");
+            const [after] = await tx
+              .update(schema.productType)
+              .set({
+                includeInTrends: input.includeInTrends,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.productType.id, input.productTypeId))
+              .returning({
+                id: schema.productType.id,
+                includeInTrends: schema.productType.includeInTrends,
+                isPartOrAccessory: schema.productType.isPartOrAccessory,
+                name: schema.productType.name,
+                slug: schema.productType.slug,
+              });
+            if (!after) throw new Error("Product type does not exist.");
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: { includeInTrends: after.includeInTrends },
+                before: { includeInTrends: before.includeInTrends },
+                definition: productAudit.productTypeTrendsInclusionChanged,
+                targetId: input.productTypeId,
+              });
+            return after;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          productTypeId: input.productTypeId,
+        }),
+      );
     },
     /**
      * Changes whether a product type belongs in Parts and Accessories.

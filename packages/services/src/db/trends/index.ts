@@ -33,6 +33,28 @@ export type PublicCollectionItemTrends = {
   values: PublicCollectionItemProductTypeTrend[];
 };
 
+/** One privacy-safe Parts and Accessories count grouped by product type. */
+export type PublicPartAccessoryProductTypeTrend = {
+  /** Count rounded to the nearest five. */
+  count: number;
+  /** Stable product-type identifier. */
+  productTypeId: number;
+  /** Product-type display name. */
+  productTypeName: string;
+};
+
+/** Active public Parts and Accessories Trends generation. */
+export type PublicPartAccessoryTrends = {
+  /** Time the active generation was completed. */
+  generatedAt: Date;
+  /** Whether an enabled category was removed by the contributor threshold. */
+  hasSuppressedValues: boolean;
+  /** Whether the active generation is older than the freshness target. */
+  stale: boolean;
+  /** Privacy-safe enabled Parts and Accessories counts. */
+  values: PublicPartAccessoryProductTypeTrend[];
+};
+
 /** Test-only lifecycle hook for forcing a refresh failure before activation. */
 export type PublicTrendsRefreshHooks = {
   /**
@@ -58,6 +80,59 @@ export function createTrendsService(
   hooks: PublicTrendsRefreshHooks = {},
 ) {
   return {
+    /**
+     * Reads enabled Parts and Accessories from the active public generation.
+     *
+     * @param now - Current time used to calculate freshness.
+     * @returns Active generation, or `null` before the first successful refresh.
+     * @rejects When the database query fails.
+     */
+    async getPublicPartAccessoryTrends(
+      now = new Date(),
+    ): Promise<PublicPartAccessoryTrends | null> {
+      const [generation] = await db
+        .select()
+        .from(schema.publicTrendsGeneration)
+        .where(eq(schema.publicTrendsGeneration.active, true))
+        .limit(1);
+      if (!generation) return null;
+
+      const values = await db
+        .select({
+          count: schema.publicPartAccessoryProductTypeTrend.roundedItemCount,
+          productTypeId:
+            schema.publicPartAccessoryProductTypeTrend.productTypeId,
+          productTypeName: schema.productType.name,
+        })
+        .from(schema.publicPartAccessoryProductTypeTrend)
+        .innerJoin(
+          schema.productType,
+          eq(
+            schema.publicPartAccessoryProductTypeTrend.productTypeId,
+            schema.productType.id,
+          ),
+        )
+        .where(
+          eq(
+            schema.publicPartAccessoryProductTypeTrend.generationId,
+            generation.id,
+          ),
+        )
+        .orderBy(
+          desc(schema.publicPartAccessoryProductTypeTrend.roundedItemCount),
+          asc(schema.productType.name),
+        );
+
+      return {
+        generatedAt: generation.generatedAt,
+        hasSuppressedValues: generation.hasSuppressedPartAccessoryValues,
+        stale:
+          now.getTime() - generation.generatedAt.getTime() >
+          PUBLIC_TRENDS_STALE_MS,
+        values,
+      };
+    },
+
     /**
      * Reads the active privacy-safe collection-item generation.
      *
@@ -133,6 +208,8 @@ export function createTrendsService(
           contributorCount: number | string;
           /** Exact item count used only inside the refresh transaction. */
           itemCount: number | string;
+          /** Whether the product type belongs in Parts and Accessories. */
+          isPartOrAccessory: boolean;
           /** Stable product-type identifier. */
           productTypeId: number | string;
         }>(sql`
@@ -151,7 +228,8 @@ export function createTrendsService(
           )
           select
             count(distinct collection_item.owner_id)::integer as "contributorCount",
-            count(collection_item.id)::integer as "itemCount",
+            count(distinct collection_item.id)::integer as "itemCount",
+            product_types.is_part_or_accessory as "isPartOrAccessory",
             product_types.id as "productTypeId"
           from item_products
           inner join collection_item on collection_item.id = item_products.collection_item_id
@@ -159,15 +237,29 @@ export function createTrendsService(
           inner join product_types on product_types.id = product.product_type_id
           where collection_item.owned
             and collection_item.sold_at is null
-            and not product_types.is_part_or_accessory
-          group by product_types.id
+            and (
+              not product_types.is_part_or_accessory
+              or product_types.include_in_trends
+            )
+          group by product_types.id, product_types.is_part_or_accessory
         `);
         const source = sourceResult.rows.map((row) => ({
           contributorCount: Number(row.contributorCount),
           itemCount: Number(row.itemCount),
+          isPartOrAccessory: row.isPartOrAccessory,
           productTypeId: Number(row.productTypeId),
         }));
-        const publishable = source.filter(
+        const primarySource = source.filter(
+          ({ isPartOrAccessory }) => !isPartOrAccessory,
+        );
+        const partAccessorySource = source.filter(
+          ({ isPartOrAccessory }) => isPartOrAccessory,
+        );
+        const publishable = primarySource.filter(
+          ({ contributorCount }) =>
+            contributorCount >= PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
+        );
+        const publishablePartAccessories = partAccessorySource.filter(
           ({ contributorCount }) =>
             contributorCount >= PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
         );
@@ -175,7 +267,9 @@ export function createTrendsService(
           .insert(schema.publicTrendsGeneration)
           .values({
             generatedAt,
-            hasSuppressedValues: publishable.length < source.length,
+            hasSuppressedPartAccessoryValues:
+              publishablePartAccessories.length < partAccessorySource.length,
+            hasSuppressedValues: publishable.length < primarySource.length,
           })
           .returning({ id: schema.publicTrendsGeneration.id });
         if (!generation) throw new Error("Failed to create Trends generation.");
@@ -191,6 +285,17 @@ export function createTrendsService(
                 Math.round(
                   row.contributorCount / PUBLIC_TRENDS_ROUNDING_INCREMENT,
                 ) * PUBLIC_TRENDS_ROUNDING_INCREMENT,
+            })),
+          );
+        }
+        if (publishablePartAccessories.length > 0) {
+          await tx.insert(schema.publicPartAccessoryProductTypeTrend).values(
+            publishablePartAccessories.map((row) => ({
+              generationId: generation.id,
+              productTypeId: row.productTypeId,
+              roundedItemCount:
+                Math.round(row.itemCount / PUBLIC_TRENDS_ROUNDING_INCREMENT) *
+                PUBLIC_TRENDS_ROUNDING_INCREMENT,
             })),
           );
         }

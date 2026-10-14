@@ -72,6 +72,26 @@ describe("catalog product persistence", () => {
         ]),
       );
       await expect(
+        service.listTrendsProductTypeConfigurations(),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          {
+            id: productType.id,
+            includeInTrends: true,
+            isPartOrAccessory: false,
+            name: "Spinner",
+            slug: "spinner",
+          },
+        ]),
+      );
+      await expect(
+        service.setProductTypeTrendsInclusion({
+          actor: { clerkId: "admin-product-type", role: "admin" },
+          includeInTrends: false,
+          productTypeId: productType.id,
+        }),
+      ).rejects.toThrow("Product type does not exist.");
+      await expect(
         service.setProductTypePartOrAccessory({
           actor: { clerkId: "user-product-type", role: "user" },
           isPartOrAccessory: true,
@@ -114,12 +134,38 @@ describe("catalog product persistence", () => {
           }),
         ]),
       );
+      await expect(
+        service.setProductTypeTrendsInclusion({
+          actor: { clerkId: "user-product-type", role: "user" },
+          includeInTrends: true,
+          productTypeId: productType.id,
+        }),
+      ).rejects.toThrow("Product type does not exist.");
+      await expect(
+        service.setProductTypeTrendsInclusion({
+          actor: { clerkId: "admin-product-type", role: "admin" },
+          includeInTrends: true,
+          productTypeId: productType.id,
+        }),
+      ).resolves.toEqual({
+        id: productType.id,
+        includeInTrends: true,
+        isPartOrAccessory: true,
+        name: "Spinner",
+        slug: "spinner",
+      });
       await expect(db.select().from(schema.auditEvent)).resolves.toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             action: "products.product_type.classification_changed",
             afterState: { isPartOrAccessory: true },
             beforeState: { isPartOrAccessory: false },
+            permission: "products.manage",
+          }),
+          expect.objectContaining({
+            action: "products.product_type.trends_inclusion_changed",
+            afterState: { includeInTrends: true },
+            beforeState: { includeInTrends: false },
             permission: "products.manage",
           }),
         ]),
