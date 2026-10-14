@@ -218,9 +218,6 @@ importers:
       '@fontsource-variable/geist-mono':
         specifier: ^5.3.0
         version: 5.3.0
-      '@highcharts/react':
-        specifier: ^5.3.0
-        version: 5.3.0(@types/react@19.3.0)(highcharts@13.1.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@milkdown/core':
         specifier: ^7.22.2
         version: 7.22.2(supports-color@10.2.2)
@@ -1946,17 +1943,6 @@ packages:
 
   '@hapi/topo@6.0.2':
     resolution: {integrity: sha512-KR3rD5inZbGMrHmgPxsJ9dbi6zEK+C3ZwUwTa+eMwWLz7oijWUTWD2pMSNNYJAU6Qq+65NkxXjqHr/7LM2Xkqg==}
-
-  '@highcharts/react@5.3.0':
-    resolution: {integrity: sha512-gpMB04bE9GcbmaKK3xYLooOqhJMOoewaRwkrl6QxwOfKRMZbiI5xXOlAJv8ewSaF7HywNVOIWzDh4vHlnmxRHw==}
-    peerDependencies:
-      '@types/react': '>=18'
-      highcharts: '>=13.0.0'
-      react: '>=18'
-      react-dom: '>=18'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
 
   '@hono/node-server@2.1.1':
     resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
@@ -9139,14 +9125,6 @@ snapshots:
     dependencies:
       '@hapi/hoek': 11.0.7
 
-  '@highcharts/react@5.3.0(@types/react@19.3.0)(highcharts@13.1.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
-    dependencies:
-      highcharts: 13.1.1
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-    optionalDependencies:
-      '@types/react': 19.3.0
-
   '@hono/node-server@2.1.1(hono@4.13.9)':
     dependencies:
       hono: 4.13.9
@@ -10788,7 +10766,7 @@ snapshots:
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.1.0
+      '@types/node': 26.6.4
       pg-protocol: 1.16.0
       pg-types: 2.2.0
 

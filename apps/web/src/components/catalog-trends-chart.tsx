@@ -1,8 +1,8 @@
-import { Chart, Tooltip } from "@highcharts/react";
-import { Accessibility } from "@highcharts/react/modules/Accessibility";
-import { Drilldown } from "@highcharts/react/modules/Drilldown";
-import { PieSeries } from "@highcharts/react/series/Pie";
 import type { PublicProductTypeTrend } from "@package/services";
+import Highcharts from "highcharts/es-modules/masters/highcharts.src.js";
+import "highcharts/es-modules/masters/modules/accessibility.src.js";
+import "highcharts/es-modules/masters/modules/drilldown.src.js";
+import { useEffect, useRef } from "react";
 
 /** One overview slice with optional nested drilldown data. */
 type CatalogPiePoint = {
@@ -35,65 +35,79 @@ export function CatalogTrendsChart({
   /** Exact public catalog-product counts in descending order. */
   trends: PublicProductTypeTrend[];
 }) {
-  const overflow = trends.slice(8);
-  const data: CatalogPiePoint[] = trends.slice(0, 8).map((trend) => ({
-    name: trend.productTypeName,
-    y: trend.count,
-  }));
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  if (overflow.length) {
-    data.push({
-      drilldown: "other-product-types",
-      name: otherLabel,
-      y: overflow.reduce((sum, trend) => sum + trend.count, 0),
-    });
-  }
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-  const seriesOptions = {
-    dataLabels: {
-      enabled: true,
-      format: "{point.name}: {point.percentage:.1f}%",
-    },
-    showInLegend: true,
-  } as const;
+    const overflow = trends.slice(8);
+    const data: CatalogPiePoint[] = trends.slice(0, 8).map((trend) => ({
+      name: trend.productTypeName,
+      y: trend.count,
+    }));
 
-  return (
-    <Chart
-      animation={false}
-      containerProps={{
-        className: "rounded-md border border-border bg-card",
-      }}
-      height={440}
-      styledMode
-      title={chartLabel}
-    >
-      <Accessibility
-        description={chartLabel}
-        point={{ valueSuffix: ` ${catalogProductsLabel}` }}
-        screenReaderSection={{
+    if (overflow.length) {
+      data.push({
+        drilldown: "other-product-types",
+        name: otherLabel,
+        y: overflow.reduce((sum, trend) => sum + trend.count, 0),
+      });
+    }
+
+    const chart = Highcharts.chart(containerRef.current, {
+      accessibility: {
+        description: chartLabel,
+        point: { valueSuffix: ` ${catalogProductsLabel}` },
+        screenReaderSection: {
           beforeChartFormat:
             "<div>{typeDescription}</div><div>{chartLongdesc}</div>",
-        }}
-        series={{ describeSingleSeries: true }}
-      />
-      <Tooltip>
-        {`{point.name}: <b>{point.y}</b> ${catalogProductsLabel}`}
-      </Tooltip>
-      <PieSeries
-        data={data}
-        name={catalogProductsLabel}
-        options={seriesOptions}
-      />
-      {overflow.length ? (
-        <Drilldown>
-          <PieSeries
-            data={overflow.map((trend) => [trend.productTypeName, trend.count])}
-            id="other-product-types"
-            name={otherLabel}
-            options={seriesOptions}
-          />
-        </Drilldown>
-      ) : null}
-    </Chart>
+        },
+        series: { describeSingleSeries: true },
+      },
+      chart: {
+        animation: false,
+        height: 440,
+        styledMode: true,
+        type: "pie",
+      },
+      drilldown: overflow.length
+        ? {
+            series: [
+              {
+                data: overflow.map((trend) => [
+                  trend.productTypeName,
+                  trend.count,
+                ]),
+                id: "other-product-types",
+                name: otherLabel,
+                type: "pie",
+              },
+            ],
+          }
+        : undefined,
+      plotOptions: {
+        pie: {
+          dataLabels: {
+            enabled: true,
+            format: "{point.name}: {point.percentage:.1f}%",
+          },
+          showInLegend: true,
+        },
+      },
+      series: [{ data, name: catalogProductsLabel, type: "pie" }],
+      title: { text: chartLabel },
+      tooltip: {
+        pointFormat: `{point.name}: <b>{point.y}</b> ${catalogProductsLabel}`,
+      },
+    });
+
+    return () => chart.destroy();
+  }, [catalogProductsLabel, chartLabel, otherLabel, trends]);
+
+  return (
+    <div
+      className="rounded-md border border-border bg-card"
+      ref={containerRef}
+    />
   );
 }
