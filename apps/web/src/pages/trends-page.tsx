@@ -501,6 +501,14 @@ export function TrendsPage({
             <CatalogTrendsChart
               catalogProductsLabel={t("web.trends.catalogProducts")}
               chartLabel={t("web.trends.chartLabel")}
+              onProductTypeSelect={(nextProductTypeId) =>
+                onSearchChange({
+                  ...search,
+                  makerId: undefined,
+                  productId: undefined,
+                  productTypeId: nextProductTypeId,
+                })
+              }
               otherLabel={t("web.trends.other")}
               trends={visibleTrends}
             />

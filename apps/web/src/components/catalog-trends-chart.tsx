@@ -8,6 +8,11 @@ import { useEffect, useRef } from "react";
 type CatalogPiePoint = {
   /** Drilldown series identifier for an interactive slice. */
   drilldown?: string;
+  /** Selects this product type through the page's stable URL state. */
+  events?: {
+    /** Applies this slice's product-type filter. */
+    click: () => void;
+  };
   /** Visible product-type label. */
   name: string;
   /** Exact catalog-product count. */
@@ -23,6 +28,7 @@ type CatalogPiePoint = {
 export function CatalogTrendsChart({
   catalogProductsLabel,
   chartLabel,
+  onProductTypeSelect,
   otherLabel,
   trends,
 }: {
@@ -30,6 +36,12 @@ export function CatalogTrendsChart({
   catalogProductsLabel: string;
   /** Localized chart title and accessible description. */
   chartLabel: string;
+  /**
+   * Opens the material, maker, and product breakdowns for a product type.
+   *
+   * @param productTypeId - Stable selected product-type identifier.
+   */
+  onProductTypeSelect: (productTypeId: number) => void;
   /** Localized label for categories outside the largest eight. */
   otherLabel: string;
   /** Exact public catalog-product counts in descending order. */
@@ -42,6 +54,14 @@ export function CatalogTrendsChart({
 
     const overflow = trends.slice(8);
     const data: CatalogPiePoint[] = trends.slice(0, 8).map((trend) => ({
+      events: {
+        /**
+         * Applies the selected product type to the Trends URL.
+         *
+         * @returns Nothing.
+         */
+        click: () => onProductTypeSelect(trend.productTypeId),
+      },
       name: trend.productTypeName,
       y: trend.count,
     }));
@@ -102,7 +122,13 @@ export function CatalogTrendsChart({
     });
 
     return () => chart.destroy();
-  }, [catalogProductsLabel, chartLabel, otherLabel, trends]);
+  }, [
+    catalogProductsLabel,
+    chartLabel,
+    onProductTypeSelect,
+    otherLabel,
+    trends,
+  ]);
 
   return (
     <div
