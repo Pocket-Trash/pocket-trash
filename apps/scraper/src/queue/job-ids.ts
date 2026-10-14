@@ -6,6 +6,7 @@ import type {
   NormalizedAutmogPen,
   NormalizedGrimsmoKnifeVariation,
   NormalizedGrimsmoPenVariation,
+  SagaCatalogSnapshot,
   ScraperSourceName,
 } from "../scraper-types.js";
 import { scraperSources } from "../scraper-types.js";
@@ -144,6 +145,45 @@ export function getGrimsmoSagaMaterialsJobId(
     scraperSources.grimsmoSaga,
     "materials",
     hashObject([...materialNames].sort()),
+  );
+}
+
+/**
+ * Builds the deterministic reconciliation job ID for a bounded Saga snapshot.
+ *
+ * @param snapshot - Compact taxonomy, appearance, and image source snapshot.
+ * @returns Deterministic Saga catalog job ID.
+ */
+export function getGrimsmoSagaCatalogJobId(
+  snapshot: SagaCatalogSnapshot,
+): string {
+  return createJobId(
+    scraperSources.grimsmoSaga,
+    "catalog",
+    hashObject(snapshot),
+  );
+}
+
+/**
+ * Builds the deterministic upload job ID for a canonical Saga source image.
+ *
+ * @param input - Canonical listing and mutable source-image identity.
+ * @returns Deterministic canonical Saga image upload job ID.
+ */
+export function getGrimsmoSagaImageUploadJobId(input: {
+  /** Canonical source-listing identifier. */
+  listingId: number;
+  /** Stable Shopify image identifier. */
+  sourceImageId: string;
+  /** Current Shopify image URL. */
+  sourceUrl: string;
+}): string {
+  return createJobId(
+    scraperSources.grimsmoSaga,
+    "catalog-image",
+    String(input.listingId),
+    input.sourceImageId,
+    hashObject(input.sourceUrl),
   );
 }
 

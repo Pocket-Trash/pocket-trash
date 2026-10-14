@@ -48,6 +48,14 @@ export const scraperQueueNames = {
  */
 export type ScraperItemJob =
   | {
+      /** Bounded canonical catalog snapshot observed across the Saga feed. */
+      snapshot: SagaCatalogSnapshot;
+      /** Grimsmo Saga source discriminator. */
+      source: typeof scraperSources.grimsmoSaga;
+      /** Canonical Saga catalog reconciliation discriminator. */
+      type: "grimsmo.sagaCatalog";
+    }
+  | {
       /**
        * Normalized Autmog pen to persist.
        */
@@ -136,6 +144,22 @@ export type ScraperItemJob =
  * Discriminated payload processed by the scraper image queue.
  */
 export type ScraperImageJob =
+  | {
+      /** Canonical source-listing identifier. */
+      listingId: number;
+      /** Canonical product identifier. */
+      productId: number;
+      /** Stable Shopify image identifier. */
+      sourceImageId: string;
+      /** Original Shopify image URL. */
+      sourceUrl: string;
+      /** Canonical product-image display position. */
+      position: number;
+      /** Grimsmo Saga source discriminator. */
+      source: typeof scraperSources.grimsmoSaga;
+      /** Canonical Saga image-upload job discriminator. */
+      type: "grimsmo.sagaImage.upload";
+    }
   | {
       /** Canonical source-listing identifier. */
       listingId: number;
@@ -323,6 +347,46 @@ export type NormalizedAutmogPenImage = {
    * Source image width in pixels, or `null` when unknown.
    */
   width: number | null;
+};
+
+/** One distinct Saga appearance retained for capped canonical reconciliation. */
+export type SagaCatalogAppearance = {
+  /** Body and slider colors included in the appearance. */
+  colorNames: string[];
+  /** Body finishes included in the appearance. */
+  finishNames: string[];
+  /** Slider style represented as the appearance pattern. */
+  sliderOption: string | null;
+};
+
+/** One distinct Saga source image eligible for the capped product gallery. */
+export type SagaCatalogImage = {
+  /** Source listing URL. */
+  listingUrl: string;
+  /** Stable Shopify image identifier. */
+  sourceImageId: string;
+  /** Stable Shopify listing handle. */
+  sourceHandle: string;
+  /** Stable Shopify listing identifier. */
+  sourceProductId: string;
+  /** Original Shopify image URL. */
+  sourceUrl: string;
+};
+
+/** Compact bounded snapshot used to reconcile the canonical Saga catalog. */
+export type SagaCatalogSnapshot = {
+  /** At most 100 distinct appearances in stable source order. */
+  appearances: SagaCatalogAppearance[];
+  /** Distinct normalized body and slider colors. */
+  colorNames: string[];
+  /** Distinct normalized body finishes. */
+  finishNames: string[];
+  /** At most 30 distinct source images in stable source order. */
+  images: SagaCatalogImage[];
+  /** Distinct normalized body and slider materials. */
+  materialNames: string[];
+  /** Distinct normalized slider styles. */
+  sliderOptions: string[];
 };
 
 /**

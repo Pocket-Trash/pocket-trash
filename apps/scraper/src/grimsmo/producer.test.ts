@@ -7,7 +7,7 @@ import type { ShopifyProduct } from "../shopify.js";
 import { runGrimsmoProducer } from "./producer.js";
 
 describe("runGrimsmoProducer", () => {
-  it("enqueues one canonical Saga material reconciliation for the complete feed", async () => {
+  it("enqueues one bounded canonical Saga catalog reconciliation", async () => {
     const addBulk = vi.fn().mockResolvedValue([]);
     const queues = createQueues(addBulk);
     const inventoryProduct = createProduct({
@@ -41,17 +41,25 @@ describe("runGrimsmoProducer", () => {
     const [jobs] = addBulk.mock.calls[0] ?? [];
     expect(jobs).toEqual([
       expect.objectContaining({
-        data: {
-          materialNames: ["Bronze", "Copper", "Titanium"],
+        data: expect.objectContaining({
           source: "grimsmo-saga",
-          type: "grimsmo.sagaMaterials",
-        },
-        name: "grimsmo.sagaMaterials",
+          snapshot: expect.objectContaining({
+            appearances: expect.arrayContaining([
+              expect.objectContaining({
+                finishNames: ["Stonewashed"],
+                sliderOption: "Plain",
+              }),
+            ]),
+            materialNames: ["Bronze", "Copper", "Titanium"],
+          }),
+          type: "grimsmo.sagaCatalog",
+        }),
+        name: "grimsmo.sagaCatalog",
       }),
     ]);
   });
 
-  it("re-enqueues an identical weekly material snapshot after completion", async () => {
+  it("re-enqueues an identical catalog snapshot after completion", async () => {
     const completedJob = {
       getState: vi.fn().mockResolvedValue("completed"),
       remove: vi.fn().mockResolvedValue(undefined),

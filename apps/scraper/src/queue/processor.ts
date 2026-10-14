@@ -11,7 +11,11 @@ import {
   reconcileGrimsmoKnifeVariationBatch,
   syncGrimsmoKnifeVariation,
 } from "../db/grimsmo.js";
-import { syncCanonicalSagaMaterials } from "../db/grimsmo-catalog.js";
+import {
+  syncCanonicalSagaCatalog,
+  syncCanonicalSagaImage,
+  syncCanonicalSagaMaterials,
+} from "../db/grimsmo-catalog.js";
 import {
   getTmpImageForProcessing,
   markTmpImageDeleted,
@@ -27,6 +31,7 @@ import {
 } from "../scraper-types.js";
 import {
   getAutmogImageUploadJobId,
+  getGrimsmoSagaImageUploadJobId,
   getTmpImageDeleteJobId,
   getTmpImageUploadJobId,
 } from "./job-ids.js";
@@ -503,6 +508,71 @@ async function processItemJob({
   const startedAt = Date.now();
 
   try {
+    if (job.data.type === "grimsmo.sagaCatalog") {
+      const result = await syncCanonicalSagaCatalog(db, job.data.snapshot, {
+        dryRun,
+      });
+      const imageJobs = result.imageCandidates.map((image) => ({
+        data: {
+          listingId: image.listingId,
+          position: image.position,
+          productId: image.productId,
+          source: scraperSources.grimsmoSaga,
+          sourceImageId: image.sourceImageId,
+          sourceUrl: image.sourceUrl,
+          type: "grimsmo.sagaImage.upload" as const,
+        },
+        name: "grimsmo.sagaImage.upload",
+        opts: {
+          jobId: getGrimsmoSagaImageUploadJobId({
+            listingId: image.listingId,
+            sourceImageId: image.sourceImageId,
+            sourceUrl: image.sourceUrl,
+          }),
+        },
+      }));
+      const removedCompletedImageJobs = dryRun
+        ? 0
+        : await enqueueImageJobs(queues, imageJobs);
+      logger.info(loggerMessages.scraper.database.mutationCompleted, {
+        attributes: {
+          created: false,
+          durationMs: Date.now() - startedAt,
+          enqueuedImageJobs: imageJobs.length,
+          jobId: job.id,
+          payload: {
+            cappedAppearanceCount: result.cappedAppearanceCount,
+            dryRun,
+            newAppearanceCount: result.newAppearanceCount,
+            newColorNames: result.newColorNames,
+            newFinishNames: result.newFinishNames,
+            newMaterialNames: result.newMaterialNames,
+            newSliderOptions: result.newSliderOptions,
+            plannedImageCount: result.plannedImageCount,
+            productId: result.productId,
+          },
+          removedCompletedImageJobs,
+          source: job.data.source,
+          updated:
+            result.newAppearanceCount > 0 ||
+            result.newColorNames.length > 0 ||
+            result.newFinishNames.length > 0 ||
+            result.newMaterialNames.length > 0 ||
+            result.newSliderOptions.length > 0,
+          versioned: false,
+        },
+      });
+      logger.info(loggerMessages.scraper.processor.itemJobCompleted, {
+        attributes: {
+          durationMs: Date.now() - startedAt,
+          jobId: job.id,
+          source: job.data.source,
+          type: job.data.type,
+        },
+      });
+      return;
+    }
+
     if (
       job.data.type === "grimsmo.sagaMaterials" ||
       job.data.type === "grimsmo.penVariation" ||
@@ -770,7 +840,10 @@ async function processImageJob({
 }): Promise<ImageJobResult> {
   const startedAt = Date.now();
 
-  if (job.data.type === "autmog.image.upload") {
+  if (
+    job.data.type === "autmog.image.upload" ||
+    job.data.type === "grimsmo.sagaImage.upload"
+  ) {
     if (dryRun) {
       logger.info(loggerMessages.scraper.processor.imageJobCompleted, {
         attributes: {
@@ -789,25 +862,33 @@ async function processImageJob({
       sourceUrl: job.data.sourceUrl,
     });
     if (!uploaded)
-      throw new Error("Canonical Autmog image upload returned no result.");
+      throw new Error("Canonical catalog image upload returned no result.");
     const fileName = uploaded.filePath.split("/").at(-1);
     if (!fileName)
-      throw new Error("Canonical Autmog image path has no file name.");
-    await syncCanonicalAutmogImage(db, {
-      listingId: job.data.listingId,
-      productId: job.data.productId,
-      uploaded: {
-        contentType: uploaded.contentType,
-        fileName,
-        objectPath: uploaded.filePath.replace(/^\//u, ""),
-        position: job.data.position,
-        sha256: uploaded.sha256,
-        size: uploaded.size,
-        sourceImageId: job.data.sourceImageId,
-        sourceUrl: job.data.sourceUrl,
-        url: uploaded.url,
-      },
-    });
+      throw new Error("Canonical catalog image path has no file name.");
+    const uploadedImage = {
+      contentType: uploaded.contentType,
+      fileName,
+      objectPath: uploaded.filePath.replace(/^\//u, ""),
+      position: job.data.position,
+      sha256: uploaded.sha256,
+      size: uploaded.size,
+      sourceImageId: job.data.sourceImageId,
+      sourceUrl: job.data.sourceUrl,
+      url: uploaded.url,
+    };
+    if (job.data.type === "autmog.image.upload")
+      await syncCanonicalAutmogImage(db, {
+        listingId: job.data.listingId,
+        productId: job.data.productId,
+        uploaded: uploadedImage,
+      });
+    else
+      await syncCanonicalSagaImage(db, {
+        listingId: job.data.listingId,
+        productId: job.data.productId,
+        uploaded: uploadedImage,
+      });
     logger.info(loggerMessages.scraper.processor.imageJobCompleted, {
       attributes: {
         durationMs: Date.now() - startedAt,
