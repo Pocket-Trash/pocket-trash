@@ -4,8 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getUserCollection = vi.hoisted(() => vi.fn());
 /** Owner-scoped collection-summary lookup. */
 const getUserCollections = vi.hoisted(() => vi.fn());
+/** Privacy-safe community product-type lookup. */
+const getPublicCollectionItemTrends = vi.hoisted(() => vi.fn());
+/** Privacy-safe community maker and product lookup. */
+const getPublicCollectionMakerProductTrends = vi.hoisted(() => vi.fn());
+/** Privacy-safe community material lookup. */
+const getPublicCollectionMaterialTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
+  getPublicCollectionItemTrends,
+  getPublicCollectionMakerProductTrends,
+  getPublicCollectionMaterialTrends,
   getUserCollection,
   getUserCollections,
 }));
@@ -23,9 +32,12 @@ import { Route } from "./user.trends";
 describe("private user Trends route", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("loads only the authenticated user's collection APIs", async () => {
+  it("loads owner data with active privacy-safe community generations", async () => {
     getUserCollection.mockResolvedValueOnce([{ collectionItemId: 1 }]);
     getUserCollections.mockResolvedValueOnce([{ id: 10 }, { id: 11 }]);
+    getPublicCollectionItemTrends.mockResolvedValueOnce({ values: [] });
+    getPublicCollectionMakerProductTrends.mockResolvedValueOnce(null);
+    getPublicCollectionMaterialTrends.mockResolvedValueOnce(null);
     const loader = Route.options.loader;
     if (!loader) throw new Error("Private Trends route loader is missing.");
 
@@ -33,10 +45,18 @@ describe("private user Trends route", () => {
       (loader as (context: unknown) => Promise<unknown>)({}),
     ).resolves.toEqual({
       collectionCount: 2,
+      communityTrends: {
+        collectionItems: { values: [] },
+        makerProducts: null,
+        materials: null,
+      },
       items: [{ collectionItemId: 1 }],
     });
     expect(getUserCollection).toHaveBeenCalledOnce();
     expect(getUserCollections).toHaveBeenCalledOnce();
+    expect(getPublicCollectionItemTrends).toHaveBeenCalledOnce();
+    expect(getPublicCollectionMakerProductTrends).toHaveBeenCalledOnce();
+    expect(getPublicCollectionMaterialTrends).toHaveBeenCalledOnce();
   });
 
   it("normalizes stable personal Trends URL filters", () => {

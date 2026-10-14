@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, fn, within } from "storybook/test";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
+import type { CommunityTrendsSource } from "@/lib/user-trends";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { UserTrendsPage } from "./user-trends-page";
 
@@ -35,6 +36,7 @@ function UserTrendsFixture() {
   return (
     <UserTrendsPage
       collectionCount={2}
+      communityTrends={communityTrends}
       items={items}
       onSearchChange={setSearch}
       search={search}
@@ -44,7 +46,12 @@ function UserTrendsFixture() {
 
 /** Populated private current-state collection Trends. */
 export const Populated: Story = {
-  args: { collectionCount: 2, items: [], onSearchChange: fn(), search: {} },
+  args: {
+    collectionCount: 2,
+    items: [],
+    onSearchChange: fn(),
+    search: {},
+  },
   /**
    * Renders the controlled populated fixture.
    *
@@ -61,6 +68,14 @@ export const Populated: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByRole("table")).toHaveLength(4);
     await expect(canvas.getByText("10", { selector: "dd" })).toBeVisible();
+    await expect(
+      canvas.getAllByText(/Personal %|web\.userTrends\.personalPercentage/)
+        .length,
+    ).toBeGreaterThan(0);
+    await expect(
+      canvas.getAllByText(/Community %|web\.userTrends\.communityPercentage/)
+        .length,
+    ).toBeGreaterThan(0);
     await expect(
       canvas.getAllByRole("link", {
         name: /View products|web\.trends\.viewProducts/,
@@ -137,3 +152,76 @@ const items = Array.from(
     productSlug: `product-${index + 1}`,
   }),
 );
+
+/** Thresholded and rounded community generations paired with the story data. */
+const communityTrends: CommunityTrendsSource = {
+  collectionItems: {
+    generatedAt: new Date("2026-10-14T12:00:00.000Z"),
+    hasSuppressedValues: true,
+    stale: true,
+    values: [
+      {
+        collectorCount: 10,
+        count: 15,
+        productTypeId: 1,
+        productTypeName: "Slider",
+      },
+    ],
+  },
+  makerProducts: {
+    generatedAt: new Date("2026-10-14T12:00:00.000Z"),
+    hasSuppressedValues: true,
+    makerValues: [
+      {
+        collectorCount: 10,
+        itemCount: 15,
+        makerId: 100,
+        makerName: "Maker 1",
+        makerSlug: "maker-1",
+        materialId: null,
+        materialSpecificId: null,
+        productId: null,
+        productName: null,
+        productSlug: null,
+        productTypeId: null,
+        productTypeSlug: null,
+      },
+    ],
+    productValues: [
+      {
+        collectorCount: 10,
+        itemCount: 15,
+        makerId: 100,
+        makerName: "Maker 1",
+        makerSlug: "maker-1",
+        materialId: null,
+        materialSpecificId: null,
+        productId: 200,
+        productName: "Product 1",
+        productSlug: "product-1",
+        productTypeId: null,
+        productTypeSlug: "slider",
+      },
+    ],
+    stale: false,
+  },
+  materials: {
+    collectorValues: [],
+    generatedAt: new Date("2026-10-14T12:00:00.000Z"),
+    hasSuppressedValues: true,
+    itemValues: [
+      {
+        count: 15,
+        isSpecificBreakdown: false,
+        materialId: 300,
+        materialName: "Titanium",
+        materialSlug: "titanium",
+        materialSpecificId: null,
+        materialSpecificName: null,
+        materialSpecificSlug: null,
+        productTypeId: null,
+      },
+    ],
+    stale: false,
+  },
+};

@@ -1,5 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { getUserCollection, getUserCollections } from "@/lib/catalog-api";
+import {
+  getPublicCollectionItemTrends,
+  getPublicCollectionMakerProductTrends,
+  getPublicCollectionMaterialTrends,
+  getUserCollection,
+  getUserCollections,
+} from "@/lib/catalog-api";
 import { parseCatalogTrendsSearch } from "@/lib/catalog-filters";
 import { UserTrendsPage } from "@/pages/user-trends-page";
 
@@ -12,11 +18,19 @@ export const Route = createFileRoute("/user/trends")({
    * @returns Owner-scoped items and exact collection count.
    */
   loader: async () => {
-    const [items, collections] = await Promise.all([
-      getUserCollection(),
-      getUserCollections(),
-    ]);
-    return { collectionCount: collections.length, items };
+    const [items, collections, collectionItems, makerProducts, materials] =
+      await Promise.all([
+        getUserCollection(),
+        getUserCollections(),
+        getPublicCollectionItemTrends(),
+        getPublicCollectionMakerProductTrends(),
+        getPublicCollectionMaterialTrends(),
+      ]);
+    return {
+      collectionCount: collections.length,
+      communityTrends: { collectionItems, makerProducts, materials },
+      items,
+    };
   },
   component: UserTrendsRoute,
 });
@@ -28,11 +42,12 @@ export const Route = createFileRoute("/user/trends")({
  */
 function UserTrendsRoute() {
   const navigate = useNavigate();
-  const { collectionCount, items } = Route.useLoaderData();
+  const { collectionCount, communityTrends, items } = Route.useLoaderData();
   const search = Route.useSearch();
   return (
     <UserTrendsPage
       collectionCount={collectionCount}
+      communityTrends={communityTrends}
       items={items}
       onSearchChange={(nextSearch) =>
         void navigate({ replace: true, search: nextSearch, to: "/user/trends" })

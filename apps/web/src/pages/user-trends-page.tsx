@@ -3,6 +3,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { CompositionComparison } from "@/components/composition-comparison";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
   Select,
@@ -13,7 +14,12 @@ import {
 } from "@/components/ui/select";
 import { UserPageShell } from "@/components/user-page-shell";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
-import { summarizeUserTrends } from "@/lib/user-trends";
+import {
+  type CommunityTrendsSource,
+  compareComposition,
+  summarizeCommunityTrends,
+  summarizeUserTrends,
+} from "@/lib/user-trends";
 import { useLocale } from "@/providers/locale-provider";
 
 /** Translation keys supplied by the companion localizations change. */
@@ -21,9 +27,17 @@ type UserTrendsTranslationKey =
   | TranslationKey
   | "web.userTrends.collectionCount"
   | "web.userTrends.collectionSize"
+  | "web.userTrends.communityComparison"
+  | "web.userTrends.communityPercentage"
+  | "web.userTrends.communityStale"
+  | "web.userTrends.communitySuppressed"
+  | "web.userTrends.communitySuppressedNote"
+  | "web.userTrends.communityUnavailable"
+  | "web.userTrends.comparisonDescription"
   | "web.userTrends.description"
   | "web.userTrends.empty"
   | "web.userTrends.items"
+  | "web.userTrends.personalPercentage"
   | "web.userTrends.privateNote"
   | "web.userTrends.title"
   | "web.trends.allMakers"
@@ -32,12 +46,15 @@ type UserTrendsTranslationKey =
   | "web.trends.allProducts"
   | "web.trends.collectionItemsChartLabel"
   | "web.trends.collectionMaterialsChartLabel"
+  | "web.trends.generalMaterial"
+  | "web.trends.lastUpdated"
   | "web.trends.maker"
   | "web.trends.makersChartLabel"
   | "web.trends.material"
   | "web.trends.materialSpecific"
   | "web.trends.product"
   | "web.trends.productsChartLabel"
+  | "web.trends.unspecifiedMaterial"
   | "web.trends.viewProducts";
 
 /**
@@ -58,12 +75,15 @@ type UserTrendOptionIdentifier = (
  */
 export function UserTrendsPage({
   collectionCount,
+  communityTrends,
   items,
   onSearchChange,
   search,
 }: {
   /** Number of collections owned by the signed-in user. */
   collectionCount: number;
+  /** Active privacy-safe public generations, available only to the owner view. */
+  communityTrends?: CommunityTrendsSource;
   /** Currently owned physical items visible only to their owner. */
   items: UserCollectionItem[];
   /**
@@ -89,6 +109,12 @@ export function UserTrendsPage({
     values: Record<string, string | number> = {},
   ) => formatTranslation(key as TranslationKey, values, locale);
   const trends = summarizeUserTrends(items, collectionCount, search);
+  const community = communityTrends
+    ? summarizeCommunityTrends(communityTrends, search, {
+        generalMaterial: t("web.trends.generalMaterial"),
+        unspecifiedMaterial: t("web.trends.unspecifiedMaterial"),
+      })
+    : undefined;
   const productTypes = options(items, (item) => [
     item.productTypeId,
     item.productTypeName,
@@ -128,6 +154,7 @@ export function UserTrendsPage({
       label: t("web.trends.productType"),
       title: t("web.trends.collectionItemsChartLabel"),
       values: trends.productTypes,
+      community: community?.productTypes,
     },
     {
       colorClass: "bg-chart-2",
@@ -135,6 +162,7 @@ export function UserTrendsPage({
       label: t("web.trends.material"),
       title: t("web.trends.collectionMaterialsChartLabel"),
       values: trends.materials,
+      community: community?.materials,
     },
     {
       colorClass: "bg-chart-3",
@@ -142,6 +170,7 @@ export function UserTrendsPage({
       label: t("web.trends.maker"),
       title: t("web.trends.makersChartLabel"),
       values: trends.makers,
+      community: community?.makers,
     },
     {
       colorClass: "bg-chart-4",
@@ -149,6 +178,7 @@ export function UserTrendsPage({
       label: t("web.trends.product"),
       title: t("web.trends.productsChartLabel"),
       values: trends.products,
+      community: community?.products,
     },
   ];
 
@@ -256,18 +286,26 @@ export function UserTrendsPage({
           />
         </div>
 
-        {visualizations.map((visualization) => (
-          <section
-            aria-labelledby={`user-trends-${visualization.id}-title`}
-            className="space-y-4"
-            key={visualization.id}
-          >
-            <h2
-              className="text-lg font-semibold"
-              id={`user-trends-${visualization.id}-title`}
-            >
-              {visualization.title}
+        {community ? (
+          <div className="space-y-1 rounded-md border border-border bg-card p-4">
+            <h2 className="font-semibold">
+              {t("web.userTrends.communityComparison")}
             </h2>
+            <p className="text-sm text-muted-foreground">
+              {t("web.userTrends.comparisonDescription")}
+            </p>
+          </div>
+        ) : null}
+
+        {visualizations.map((visualization) => {
+          const comparison = visualization.community
+            ? compareComposition(
+                visualization.values,
+                visualization.community.values,
+                visualization.community.hasSuppressedValues,
+              )
+            : [];
+          const personalVisualization = (
             <TrendVisualization
               ariaLabel={visualization.title}
               colorClass={visualization.colorClass}
@@ -281,8 +319,69 @@ export function UserTrendsPage({
               }))}
               viewProductsLabel={t("web.trends.viewProducts")}
             />
-          </section>
-        ))}
+          );
+          return (
+            <section
+              aria-labelledby={`user-trends-${visualization.id}-title`}
+              className="space-y-4"
+              key={visualization.id}
+            >
+              <h2
+                className="text-lg font-semibold"
+                id={`user-trends-${visualization.id}-title`}
+              >
+                {visualization.title}
+              </h2>
+              {visualization.community ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {t("web.trends.lastUpdated", {
+                      date: new Intl.DateTimeFormat(locale, {
+                        dateStyle: "medium",
+                      }).format(visualization.community.generatedAt),
+                    })}
+                  </p>
+                  {visualization.community.stale ? (
+                    <p className="text-sm text-muted-foreground" role="status">
+                      {t("web.userTrends.communityStale")}
+                    </p>
+                  ) : null}
+                  {comparison.length ? (
+                    <CompositionComparison
+                      ariaLabel={visualization.title}
+                      communityLabel={t("web.userTrends.communityPercentage")}
+                      labelColumn={visualization.label}
+                      locale={locale}
+                      personalLabel={t("web.userTrends.personalPercentage")}
+                      suppressedLabel={t("web.userTrends.communitySuppressed")}
+                      values={comparison}
+                      viewProductsLabel={t("web.trends.viewProducts")}
+                    />
+                  ) : (
+                    emptyState
+                  )}
+                  {visualization.community.hasSuppressedValues ? (
+                    <p className="text-xs text-muted-foreground" role="status">
+                      {t("web.userTrends.communitySuppressedNote")}
+                    </p>
+                  ) : null}
+                </>
+              ) : visualization.community === null ? (
+                <>
+                  <p
+                    className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+                    role="alert"
+                  >
+                    {t("web.userTrends.communityUnavailable")}
+                  </p>
+                  {personalVisualization}
+                </>
+              ) : (
+                personalVisualization
+              )}
+            </section>
+          );
+        })}
       </main>
     </UserPageShell>
   );
