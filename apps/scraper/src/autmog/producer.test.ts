@@ -167,7 +167,7 @@ describe("runAutmogProducer", () => {
               createProduct({
                 body_html: "<p>Clip add-on for an Autmog pen.</p>",
                 handle: "clip-add-on",
-                product_type: "Accessories",
+                product_type: "Pen",
                 title: "Clip Add-on for Pen",
               }),
               createProduct({

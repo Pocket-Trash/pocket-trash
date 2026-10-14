@@ -93,7 +93,7 @@ export async function runAutmogProducer({
 
     const items = products
       .map(normalizeAutmogProduct)
-      .filter((item) => item.productTypes.includes("pen"));
+      .filter((item) => item.normalizedData.category === "pen");
     const jobs: {
       /**
        * Queue payload for the scraper job.
