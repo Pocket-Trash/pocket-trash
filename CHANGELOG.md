@@ -31,6 +31,18 @@
 
 
 
+
+## 0.11.0
+
+### Minor Changes
+
+* Sync capped Grimsmo Saga appearances and product images. (@app/scraper)
+
+### Patch Changes
+
+* Remove the retired Autmog archive application and its bundled static data. (@app/web, @package/logger)
+* Render released Pens configuration translations. (@app/web)
+
 ## 0.10.1
 
 ### Patch Changes
