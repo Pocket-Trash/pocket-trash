@@ -32,6 +32,14 @@
 
 
 
+
+## 0.11.1
+
+### Patch Changes
+
+* Ignore non-product terminology aliases when loading catalog product type aliases. (@package/services)
+* Exclude Autmog accessories from canonical pen scraper jobs. (@app/scraper)
+
 ## 0.11.0
 
 ### Minor Changes
