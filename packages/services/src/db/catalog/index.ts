@@ -4387,6 +4387,12 @@ export function createCatalogService(
               schema.maker,
               eq(schema.catalogTerminologyAlias.makerId, schema.maker.id),
             )
+            .where(
+              eq(
+                schema.catalogTerminologyAlias.canonicalNamespace,
+                "product-type",
+              ),
+            )
             .orderBy(
               asc(schema.catalogTerminologyAlias.label),
               asc(schema.maker.name),
