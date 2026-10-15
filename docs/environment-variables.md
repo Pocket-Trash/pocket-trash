@@ -23,6 +23,7 @@ and the scraper on Railway.
 | `/apps/web` | Web development, builds, tests, and database commands; deploy workflows copy required values to Vercel |
 | `/apps/api` | Local API development and Cloudflare Worker deployment |
 | `/apps/scraper` | Local scraper commands and Railway services |
+| `/shared` | Values imported by applications and fetched by shared GitHub workflows |
 | `/local/database` | Optional developer-specific database URLs |
 | `/local/bunny` | Bunny account audits |
 | `/tools/logger-axiom-test` | Local live Axiom integration test |

@@ -109,6 +109,17 @@ jobs:
           env-slug: preview
           secret-path: tools/github/secrets
 
+      - name: Fetch shared secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: /shared
+
       - name: Run logger live Axiom test
         env:
           LOGGER_AXIOM_EXPECTED_DATASET: preview
