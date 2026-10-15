@@ -107,11 +107,11 @@ export function TrendsPage({
     width: t("web.catalog.field.width"),
   };
   const sliderMetricLabels: Record<SliderTrendMetricId, string> = {
-    bodyMaterial: t("web.trends.sliderBodyMaterial" as TranslationKey),
+    bodyMaterial: t("web.trends.sliderBodyMaterial"),
     length: t("web.archive.spec.length"),
     magnetLayout: t("web.slider.layout.label"),
     maker: t("web.trends.maker"),
-    plateMaterial: t("web.trends.sliderPlateMaterial" as TranslationKey),
+    plateMaterial: t("web.trends.sliderPlateMaterial"),
     positionCount: t("web.slider.setup.clickCount"),
     thickness: t("web.catalog.field.thickness"),
     weight: t("web.archive.spec.weight"),
@@ -662,10 +662,10 @@ export function TrendsPage({
           <section aria-labelledby="slider-trends-title" className="space-y-6">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold" id="slider-trends-title">
-                {t("web.trends.sliderTitle" as TranslationKey)}
+                {t("web.trends.sliderTitle")}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {t("web.trends.sliderDescription" as TranslationKey)}
+                {t("web.trends.sliderDescription")}
               </p>
             </div>
             {sliderTrends.trends.map((trend) => {
@@ -695,14 +695,14 @@ export function TrendsPage({
                   />
                   {trend.hasSuppressedCollectionValues ? (
                     <p className="text-xs text-muted-foreground" role="status">
-                      {t("web.trends.sliderSuppressed" as TranslationKey)}
+                      {t("web.trends.sliderSuppressed")}
                     </p>
                   ) : null}
                 </section>
               );
             })}
             <p className="text-xs text-muted-foreground">
-              {t("web.trends.sliderPrivacy" as TranslationKey)}
+              {t("web.trends.sliderPrivacy")}
             </p>
           </section>
         ) : null}
