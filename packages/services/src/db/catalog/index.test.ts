@@ -1040,8 +1040,14 @@ describe("catalog lookup writes", () => {
       bearing: "R188",
       description: "**Fast** spinner",
       id: 900,
-      makerProductUrl: "https://maker.example/spinner",
-      makerProductUrlValid: true,
+      productLinks: [
+        {
+          id: 5000,
+          isValid: true,
+          position: 0,
+          url: "https://maker.example/spinner",
+        },
+      ],
       spinDiameter: { unit: "mm", value: "52" },
     } as never);
 
@@ -1057,7 +1063,7 @@ describe("catalog lookup writes", () => {
           },
         ],
         makerId: 100,
-        makerProductUrl: " https://maker.example/spinner/ ",
+        productLinks: [" https://maker.example/spinner/ "],
         materialAssignments: [
           {
             weight: null,
@@ -1073,8 +1079,12 @@ describe("catalog lookup writes", () => {
       expect.objectContaining({
         bearing: "R188",
         description: "**Fast** spinner",
-        makerProductUrl: "https://maker.example/spinner",
-        makerProductUrlValid: true,
+        productLinks: [
+          expect.objectContaining({
+            isValid: true,
+            url: "https://maker.example/spinner",
+          }),
+        ],
         spinDiameter: { unit: "mm", value: "52" },
       }),
     );
@@ -1084,8 +1094,14 @@ describe("catalog lookup writes", () => {
           table: schema.product,
           value: expect.objectContaining({
             description: "**Fast** spinner",
-            makerProductUrl: "https://maker.example/spinner",
-            makerProductUrlValid: true,
+          }),
+        },
+        {
+          table: schema.productLink,
+          value: expect.objectContaining({
+            position: 0,
+            productId: 900,
+            url: "https://maker.example/spinner",
           }),
         },
         {
@@ -1113,8 +1129,6 @@ describe("catalog lookup writes", () => {
             isPrivate: false,
             makerId: 100,
             makerName: "Maker",
-            makerProductUrl: "https://maker.example/spinner",
-            makerProductUrlValid: false,
             name: "Catla",
             ownerClerkId: "user-secret",
             privatedByClerkId: null,
@@ -1140,45 +1154,19 @@ describe("catalog lookup writes", () => {
       expect.objectContaining({
         bearing: "R188",
         description: "**Fast** spinner",
-        makerProductUrl: "https://maker.example/spinner",
-        makerProductUrlValid: false,
+        productLinks: [],
         spinDiameter: { unit: "mm", value: "52" },
       }),
     );
   });
 
-  it.each([
-    {
-      existingMakerProductUrl: "https://maker.example/original/",
-      expectedValidity: false,
-      makerProductUrl: "https://maker.example/original",
-      name: "preserves invalidity when the URL is unchanged",
-    },
-    {
-      existingMakerProductUrl: "https://maker.example/original",
-      expectedValidity: true,
-      makerProductUrl: "https://maker.example/replacement",
-      name: "resets validity when the URL changes",
-    },
-    {
-      existingMakerProductUrl: "https://maker.example/original",
-      expectedValidity: undefined,
-      makerProductUrl: undefined,
-      name: "leaves validity untouched for unrelated edits",
-    },
-  ])("$name", async ({
-    existingMakerProductUrl,
-    expectedValidity,
-    makerProductUrl,
-  }) => {
+  it("updates product fields without storing links on the product row", async () => {
     const { db, updates } = setup(
       [[{ id: 5000 }]],
       [
         [
           {
             id: 900,
-            makerProductUrl: existingMakerProductUrl,
-            makerProductUrlValid: false,
             ownerClerkId: "user-secret",
           },
         ],
@@ -1202,7 +1190,6 @@ describe("catalog lookup writes", () => {
         },
       ],
       makerId: 100,
-      makerProductUrl,
       materialAssignments: [
         {
           weight: null,
@@ -1224,6 +1211,7 @@ describe("catalog lookup writes", () => {
     expect(value).toEqual(
       expect.objectContaining({ description: "Updated **description**" }),
     );
+    expect(value).not.toHaveProperty("productLinks");
     expect(
       updates.find(({ table }) => table === schema.productDetailSpinner)?.value,
     ).toEqual(
@@ -1233,36 +1221,30 @@ describe("catalog lookup writes", () => {
         spinDiameterUnit: "mm",
       }),
     );
-    if (expectedValidity === undefined) {
-      expect(value).not.toHaveProperty("makerProductUrlValid");
-    } else {
-      expect(value).toEqual(
-        expect.objectContaining({ makerProductUrlValid: expectedValidity }),
-      );
-    }
   });
 
-  it("marks maker product URL validity as a meaningful update", async () => {
+  it("marks product-link validity as a meaningful update", async () => {
     const { db, updates } = setup(
       [],
-      [[{ makerProductUrlValid: true, ownerUserId: 1000 }]],
+      [[{ isValid: true, ownerClerkId: "another-user", ownerUserId: 1000 }]],
     );
     const service = createCatalogService(
       db,
       createLogger({ app: "api", environment: "test" }),
     );
 
-    await service.setMakerProductUrlValidity({
+    await service.setProductLinkValidity({
       actor: actor("admin-secret", "admin"),
-      makerProductUrlValid: false,
+      isValid: false,
+      linkId: 5000,
       productId: 900,
       reason: "Broken source link",
     });
 
     expect(updates).toContainEqual({
-      table: schema.product,
+      table: schema.productLink,
       value: {
-        makerProductUrlValid: false,
+        isValid: false,
         updatedAt: expect.any(Date),
       },
     });

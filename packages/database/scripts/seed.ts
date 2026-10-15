@@ -31,6 +31,7 @@ import {
   productDetailSpinner,
   productDetailSpinnerButton,
   productImage,
+  productLink,
   productMaterial,
   productMaterialComponent,
   productType,
@@ -873,8 +874,6 @@ export async function seedKapedcProducts(
       description: value.description || null,
       isPrivate: false,
       makerId: kapMaker.id,
-      makerProductUrl: normalizeSeedUrl(value.sourceUrl),
-      makerProductUrlValid: true,
       name: value.name.trim(),
       ownerClerkId: seedOwnerClerkId,
       productTypeId,
@@ -891,6 +890,20 @@ export async function seedKapedcProducts(
       .returning({ id: product.id });
     if (!seededProduct)
       throw new Error(`Failed to seed KAP product ${value.name}.`);
+    const sourceUrl = normalizeSeedUrl(value.sourceUrl);
+    if (sourceUrl)
+      await db
+        .insert(productLink)
+        .values({
+          isValid: true,
+          position: 0,
+          productId: seededProduct.id,
+          url: sourceUrl,
+        })
+        .onConflictDoUpdate({
+          set: { position: 0, updatedAt: new Date() },
+          target: [productLink.productId, productLink.url],
+        });
 
     const subtype =
       value.type === "spinner"
@@ -1228,8 +1241,6 @@ export async function seedPensFixtures(
         description: `Synthetic ${kind} fixture for development and preview.`,
         isPrivate: false,
         makerId: fixtureMaker.id,
-        makerProductUrl: null,
-        makerProductUrlValid: false,
         name: `Pocket Trash Demo ${kind === "pen" ? "Pen" : "Refill"} ${String(ordinal).padStart(2, "0")}`,
         ownerClerkId: sliderFixtureOwnerClerkId,
         productTypeId,
@@ -1391,8 +1402,6 @@ export async function seedSliderFixtures(
       description: `Deterministic ${fixtureProduct.maker} development fixture.`,
       isPrivate: false,
       makerId,
-      makerProductUrl: null,
-      makerProductUrlValid: false,
       name: fixtureProduct.name,
       ownerClerkId: sliderFixtureOwnerClerkId,
       productTypeId,

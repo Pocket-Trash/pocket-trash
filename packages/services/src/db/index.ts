@@ -144,6 +144,7 @@ export type {
   PensAdminWriteInput,
   ProductApprovalAction,
   ProductApprovalStatus,
+  ProductLink,
   ProductMaterialAssignment,
   ProductMaterialComponent,
   ProductWriteInput,

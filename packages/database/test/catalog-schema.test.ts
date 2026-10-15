@@ -14,6 +14,7 @@ describe("catalog schema", () => {
       ]),
     );
     const product = getTableConfig(schema.product);
+    const productLink = getTableConfig(schema.productLink);
     const productMaterial = getTableConfig(schema.productMaterial);
     const productMaterialComponent = getTableConfig(
       schema.productMaterialComponent,
@@ -40,8 +41,6 @@ describe("catalog schema", () => {
       "approval_status",
       "approval_decision_reason",
       "approval_decided_at",
-      "maker_product_url",
-      "maker_product_url_valid",
       "is_private",
       "private_reason",
       "privated_at",
@@ -165,10 +164,27 @@ describe("catalog schema", () => {
       collectionItem.columns.find(({ name }) => name === "description")
         ?.notNull,
     ).toBe(false);
+    expect(productLink.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "product_id",
+      "position",
+      "url",
+      "is_valid",
+      "created_at",
+      "updated_at",
+    ]);
     expect(
-      product.columns.find(({ name }) => name === "maker_product_url_valid")
-        ?.hasDefault,
+      productLink.columns.find(({ name }) => name === "is_valid")?.hasDefault,
     ).toBe(true);
+    expect(productLink.checks.map(({ name }) => name)).toContain(
+      "product_link_position_valid",
+    );
+    expect(productLink.uniqueConstraints.map(({ name }) => name)).toContain(
+      "product_link_product_url_unique",
+    );
+    expect(productLink.indexes.map(({ config }) => config.name)).toContain(
+      "product_link_product_position_idx",
+    );
     expect(
       product.columns.find(({ name }) => name === "approval_status")
         ?.hasDefault,

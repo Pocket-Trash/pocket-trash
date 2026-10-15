@@ -413,11 +413,6 @@ export const product = pgTable(
       mode: "date",
       withTimezone: true,
     }),
-    makerProductUrl: text("maker_product_url"),
-    /** Whether the maker product URL may be shown publicly. */
-    makerProductUrlValid: boolean("maker_product_url_valid")
-      .default(true)
-      .notNull(),
     isPrivate: boolean("is_private").default(false).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
@@ -502,6 +497,36 @@ export const makerImage = pgTable(
       "maker_image_deleted_by_role_valid",
       sql`${table.deletedByRole} is null or ${table.deletedByRole} = 'admin'`,
     ),
+  ],
+);
+
+/** Ordered external links attached to a catalog product. */
+export const productLink = pgTable(
+  "product_link",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    productId: bigint("product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    url: text("url").notNull(),
+    isValid: boolean("is_valid").default(true).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("product_link_product_position_idx").on(
+      table.productId,
+      table.position,
+    ),
+    unique("product_link_product_url_unique").on(table.productId, table.url),
+    check("product_link_position_valid", sql`${table.position} >= 0`),
   ],
 );
 
