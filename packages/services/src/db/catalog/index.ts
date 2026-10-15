@@ -943,6 +943,8 @@ export type CatalogPensAdminOptions = {
 export type ProductWriteInput = {
   /** Replacement searchable product aliases. */
   aliases?: string[];
+  /** Complete replacement set of Pen-part products compatible with this Pen. */
+  compatiblePartProductIds?: number[];
   /**
    * Authenticated actor.
    */
@@ -3629,6 +3631,7 @@ export function createCatalogService(
             await assertProductRelationships(tx, row.id, input);
             await insertProductSubtype(tx, row.id, input);
             await replaceRefillCompatibility(tx, row.id, input);
+            await replaceCompatiblePenParts(tx, row.id, input);
             await replaceProductAliases(
               tx,
               row.id,
@@ -5832,6 +5835,7 @@ export function createCatalogService(
             await assertProductRelationships(tx, input.productId, input);
             await updateProductSubtype(tx, input.productId, input);
             await replaceRefillCompatibility(tx, input.productId, input);
+            await replaceCompatiblePenParts(tx, input.productId, input);
             if (input.aliases !== undefined)
               await replaceProductAliases(
                 tx,
@@ -12596,6 +12600,82 @@ async function replaceProductAliases(
       };
     }),
   );
+}
+
+/**
+ * Replaces one Pen's compatible-part set inside its caller transaction.
+ *
+ * @param tx - Active catalog transaction.
+ * @param productId - Pen product receiving the replacement set.
+ * @param input - Validated product write and actor context.
+ * @rejects When a selected target is duplicated, hidden, missing, or not a Pen part.
+ */
+async function replaceCompatiblePenParts(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+) {
+  if (input.compatiblePartProductIds === undefined) return;
+  const partProductIds = input.compatiblePartProductIds;
+  if (input.productTypeSlug !== "pen") {
+    if (partProductIds.length)
+      throw new Error("Only Pens may declare compatible parts.");
+    return;
+  }
+  if (new Set(partProductIds).size !== partProductIds.length)
+    throw new Error("A compatible Pen part may be selected only once.");
+  if (partProductIds.includes(productId))
+    throw new Error("A Pen cannot be compatible with itself.");
+
+  const parts = partProductIds.length
+    ? await tx
+        .select({
+          approvalStatus: schema.product.approvalStatus,
+          id: schema.product.id,
+          isPrivate: schema.product.isPrivate,
+          ownerClerkId: schema.product.ownerClerkId,
+          type: schema.productType.slug,
+        })
+        .from(schema.product)
+        .innerJoin(
+          schema.productType,
+          eq(schema.product.productTypeId, schema.productType.id),
+        )
+        .innerJoin(
+          schema.productDetailPenPart,
+          eq(schema.product.id, schema.productDetailPenPart.id),
+        )
+        .where(inArray(schema.product.id, partProductIds))
+    : [];
+  const acceptedTypes = new Set([
+    "pen-actuator",
+    "pen-clip",
+    "pen-mechanism",
+    "pen-tip",
+    "pen-top-cap",
+  ]);
+  if (
+    parts.length !== partProductIds.length ||
+    parts.some(
+      (part) =>
+        !acceptedTypes.has(part.type) ||
+        (!hasPermission(input.actor, "products.manage") &&
+          part.ownerClerkId !== input.actor.clerkId &&
+          (part.approvalStatus !== "approved" || part.isPrivate)),
+    )
+  )
+    throw new Error("Compatible parts must be visible Pen-part products.");
+
+  await tx
+    .delete(schema.penCompatiblePart)
+    .where(eq(schema.penCompatiblePart.penProductId, productId));
+  if (partProductIds.length)
+    await tx.insert(schema.penCompatiblePart).values(
+      partProductIds.map((partProductId) => ({
+        partProductId,
+        penProductId: productId,
+      })),
+    );
 }
 
 /**
