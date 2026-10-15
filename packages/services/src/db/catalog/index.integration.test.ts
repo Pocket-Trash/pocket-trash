@@ -63,9 +63,11 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: titanium.id, materialSpecificId: null }],
           },
           {
+            weight: { unit: "g", value: "42" },
             materials: [
               { materialId: zirconium.id, materialSpecificId: null },
               { materialId: mokume.id, materialSpecificId: null },
@@ -75,13 +77,17 @@ describe("catalog product persistence", () => {
         name: "Material spinner",
         productTypeSlug: "spinner",
         slug: "material-spinner",
-        specs: { bearing: "R188" },
+        specs: {
+          bearing: "R188",
+          weight: { unit: "g", value: "96" },
+        },
       });
       const combined = created.materials.find(
         ({ materials: components }) => components.length === 2,
       );
       expect(combined).toEqual({
         assignmentId: expect.any(Number),
+        weight: { unit: "g", value: "42" },
         materials: [
           { ...mokume, specific: null },
           { ...zirconium, specific: null },
@@ -95,12 +101,14 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [
               { materialId: mokume.id, materialSpecificId: null },
               { materialId: zirconium.id, materialSpecificId: null },
             ],
           },
           {
+            weight: null,
             materials: [{ materialId: titanium.id, materialSpecificId: null }],
           },
         ],
@@ -108,13 +116,22 @@ describe("catalog product persistence", () => {
         productId: created.id,
         productTypeSlug: "spinner",
         slug: created.slug,
-        specs: { bearing: "R188" },
+        specs: {
+          bearing: "R188",
+          weight: { unit: "g", value: "96" },
+        },
       });
+      expect(updated.weight).toEqual({ unit: "g", value: "96" });
       expect(
         updated.materials.find(
           ({ materials: components }) => components.length === 2,
-        )?.assignmentId,
-      ).toBe(combined.assignmentId);
+        ),
+      ).toEqual(
+        expect.objectContaining({
+          assignmentId: combined.assignmentId,
+          weight: null,
+        }),
+      );
       await expect(
         service.updateProduct({
           actor,
@@ -122,6 +139,7 @@ describe("catalog product persistence", () => {
           makerId: maker.id,
           materialAssignments: [
             {
+              weight: null,
               materials: [
                 { materialId: mokume.id, materialSpecificId: null },
                 { materialId: mokume.id, materialSpecificId: null },
@@ -139,11 +157,39 @@ describe("catalog product persistence", () => {
         service.getProduct("spinner", created.slug, actor),
       ).resolves.toEqual(
         expect.objectContaining({
+          weight: { unit: "g", value: "96" },
           materials: expect.arrayContaining([
             expect.objectContaining({ assignmentId: combined.assignmentId }),
           ]),
         }),
       );
+      await db
+        .insert(schema.productType)
+        .values({
+          isPartOrAccessory: true,
+          name: "Slider plate",
+          slug: "slider-plate",
+        })
+        .onConflictDoNothing();
+      await expect(
+        service.createProduct({
+          actor,
+          finishOptions: [],
+          makerId: maker.id,
+          materialAssignments: [
+            {
+              materials: [
+                { materialId: titanium.id, materialSpecificId: null },
+              ],
+              weight: { unit: "g", value: "10" },
+            },
+          ],
+          name: "Weighted plate",
+          productTypeSlug: "slider-plate",
+          slug: "weighted-plate",
+          specs: {},
+        }),
+      ).rejects.toThrow("Material-specific weights are not allowed.");
     } finally {
       await client.close();
     }
@@ -462,6 +508,7 @@ describe("catalog product persistence", () => {
         makerProductUrl: "https://maker.example/spinner/",
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -591,6 +638,7 @@ describe("catalog product persistence", () => {
         makerProductUrl: "https://maker.example/spinner/",
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -758,6 +806,7 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -773,6 +822,7 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -789,6 +839,7 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -838,6 +889,7 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -856,6 +908,7 @@ describe("catalog product persistence", () => {
           makerId: maker.id,
           materialAssignments: [
             {
+              weight: null,
               materials: [
                 { materialId: material.id, materialSpecificId: null },
               ],
@@ -924,6 +977,7 @@ describe("catalog product persistence", () => {
             makerId: maker.id,
             materialAssignments: [
               {
+                weight: null,
                 materials: [
                   { materialId: material.id, materialSpecificId: null },
                 ],
@@ -981,6 +1035,7 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],

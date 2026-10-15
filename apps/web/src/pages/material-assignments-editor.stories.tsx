@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import * as React from "react";
 import { expect, waitFor, within } from "storybook/test";
-import type { CatalogOptions, ProductFormValue } from "@/lib/catalog-api";
+import type { CatalogOptions } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { MaterialAssignmentsEditor } from "./catalog-form-pages";
@@ -42,6 +42,7 @@ const options: CatalogOptions = {
 function MaterialAssignmentsStory({
   initialValue = [
     {
+      weight: { unit: "g", value: "" },
       materials: [
         { materialId: 1000, materialSpecificId: null },
         { materialId: 1001, materialSpecificId: 2000 },
@@ -50,11 +51,10 @@ function MaterialAssignmentsStory({
   ],
 }: {
   /** Initial controlled material combinations. */
-  initialValue?: ProductFormValue["materialAssignments"];
+  initialValue?: Parameters<typeof MaterialAssignmentsEditor>[0]["value"];
 }) {
   const t = useCatalogCopy();
-  const [value, setValue] =
-    React.useState<ProductFormValue["materialAssignments"]>(initialValue);
+  const [value, setValue] = React.useState(initialValue);
   const [catalogOptions, setCatalogOptions] = React.useState(options);
   return (
     <MaterialAssignmentsEditor
@@ -159,6 +159,7 @@ export const DuplicateComponents: Story = {
   args: {
     initialValue: [
       {
+        weight: { unit: "g", value: "" },
         materials: [
           { materialId: 1000, materialSpecificId: null },
           { materialId: 1000, materialSpecificId: null },

@@ -501,6 +501,8 @@ export type ProductMaterialAssignment = {
   assignmentId: number;
   /** Canonical components in stable query order. */
   materials: ProductMaterialComponent[];
+  /** Optional weight recorded specifically for this assignment. */
+  weight: WeightMeasurement | null;
 };
 
 /** Canonical material pair supplied to a product write. */
@@ -515,6 +517,8 @@ export type MaterialSelection = {
 export type MaterialCombination = {
   /** General and optional specific materials in the combination. */
   materials: MaterialSelection[];
+  /** Optional weight recorded specifically for this combination. */
+  weight: WeightMeasurement | null;
 };
 
 /** Canonical alloy or grade exposed to catalog forms and administrators. */
@@ -5831,7 +5835,16 @@ export function createCatalogService(
             for (const [id, materials] of componentsByAssignment) {
               const signature = materialCombinationSignature({ materials });
               existingSignatures.add(signature);
-              if (!requestedBySignature.has(signature)) removedIds.push(id);
+              const requested = requestedBySignature.get(signature);
+              if (!requested) removedIds.push(id);
+              else
+                await tx
+                  .update(schema.productMaterial)
+                  .set({
+                    weight: requested.weight?.value ?? null,
+                    weightUnit: requested.weight?.unit ?? null,
+                  })
+                  .where(eq(schema.productMaterial.id, id));
             }
             if (removedIds.length)
               await tx
@@ -8771,12 +8784,13 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     magnetConfiguration: product.magnetConfiguration ?? null,
     magnetLayout: product.magnetLayout,
     materialAssignments: product.materials.map(
-      ({ assignmentId, materials }) => ({
+      ({ assignmentId, materials, weight }) => ({
         assignmentId,
         materials: materials.map(({ id, specific }) => ({
           materialId: id,
           materialSpecificId: specific?.id ?? null,
         })),
+        weight,
       }),
     ),
     name: product.name,
@@ -9714,6 +9728,8 @@ async function queryProducts(
       magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productDetailSlider.magnetLayout}, ${schema.productDetailSliderInsert.magnetLayout})`,
       mechanismId: schema.productDetailPenMechanism.mechanismId,
       materialAssignmentId: schema.productMaterial.id,
+      materialAssignmentWeight: schema.productMaterial.weight,
+      materialAssignmentWeightUnit: schema.productMaterial.weightUnit,
       materialSpecificId: schema.materialSpecific.id,
       materialSpecificName: schema.materialSpecific.name,
       materialSpecificSlug: schema.materialSpecific.slug,
@@ -9852,6 +9868,10 @@ async function queryProducts(
           existing.materials.push({
             assignmentId: row.materialAssignmentId,
             materials: [component],
+            weight: weightMeasurement(
+              row.materialAssignmentWeight,
+              row.materialAssignmentWeightUnit,
+            ),
           });
       }
       continue;
@@ -9919,6 +9939,10 @@ async function queryProducts(
                     slug: row.materialSlug,
                   },
                 ],
+                weight: weightMeasurement(
+                  row.materialAssignmentWeight,
+                  row.materialAssignmentWeightUnit,
+                ),
               },
             ]
           : [],
@@ -13476,7 +13500,9 @@ function assertNoSliderInsertBodySpecs(input: ProductWriteInput) {
  * @param combination - Material components whose order is not meaningful.
  * @returns Stable signature sorted by general and specific identifiers.
  */
-function materialCombinationSignature(combination: MaterialCombination) {
+function materialCombinationSignature(
+  combination: Pick<MaterialCombination, "materials">,
+) {
   return combination.materials
     .map(
       ({ materialId, materialSpecificId }) =>
@@ -13502,7 +13528,11 @@ async function insertProductMaterialCombinations(
   for (const combination of combinations) {
     const [assignment] = await tx
       .insert(schema.productMaterial)
-      .values({ productId })
+      .values({
+        productId,
+        weight: combination.weight?.value ?? null,
+        weightUnit: combination.weight?.unit ?? null,
+      })
       .returning({ id: schema.productMaterial.id });
     if (!assignment) throw new Error("Failed to create material assignment.");
     await tx.insert(schema.productMaterialComponent).values(
@@ -13538,6 +13568,11 @@ function assertProductMaterialsAndAppearance(input: ProductWriteInput) {
   );
   if (new Set(combinations).size !== combinations.length)
     throw new Error("web.materials.validation.duplicateAssignment");
+  if (
+    !["slider", "spinner", "spinner-button"].includes(input.productTypeSlug) &&
+    input.materialAssignments.some(({ weight }) => weight !== null)
+  )
+    throw new Error("Material-specific weights are not allowed.");
   if (input.productTypeSlug !== "slider-insert") return;
   if (input.materialAssignments.length !== 1)
     throw new Error("Slider inserts require exactly one material.");

@@ -68,6 +68,7 @@ describe("product audit adoption", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -88,6 +89,7 @@ describe("product audit adoption", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],

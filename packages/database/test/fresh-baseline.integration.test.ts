@@ -139,6 +139,27 @@ describe("fresh subtype baseline", () => {
     );
   });
 
+  it("enforces positive paired product material weights", async () => {
+    await database.exec(
+      "UPDATE product_material SET weight_value = 1, weight_unit = 'g' WHERE id = 1000",
+    );
+    for (const value of [0, -1]) {
+      await expect(
+        database.exec(
+          `UPDATE product_material SET weight_value = ${value} WHERE id = 1000`,
+        ),
+      ).rejects.toThrow(/product_material_weight_consistent/iu);
+    }
+    await expect(
+      database.exec(
+        "UPDATE product_material SET weight_unit = NULL WHERE id = 1000",
+      ),
+    ).rejects.toThrow(/product_material_weight_consistent/iu);
+    await database.exec(
+      "UPDATE product_material SET weight_value = NULL, weight_unit = NULL WHERE id = 1000",
+    );
+  });
+
   it.each([
     ["product", "description", 5000],
     ["collection_item", "description", 5000],
@@ -222,6 +243,7 @@ async function seedSubtypeRows(database: PGlite) {
       VALUES (1002, false, '2x4');
     INSERT INTO product_detail_slider_plate (id) VALUES (1003);
     INSERT INTO product_detail_slider_insert (id) VALUES (1004);
+    INSERT INTO product_material (product_id) VALUES (1000);
 
     INSERT INTO users (clerk_id, username) VALUES ('rename-owner', 'Rename owner');
     INSERT INTO user_collection (owner_id, name, normalized_name)

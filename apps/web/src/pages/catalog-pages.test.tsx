@@ -1019,6 +1019,40 @@ describe("ProductDetailPage", () => {
     expect(html).not.toContain("Custom setup");
   });
 
+  it("shows only populated material weights and labels the product weight as default", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          materials: [
+            {
+              assignmentId: 10,
+              materials: [
+                { id: 10, name: "Bronze", slug: "bronze", specific: null },
+              ],
+              weight: { unit: "g", value: "42" },
+            },
+            {
+              assignmentId: 11,
+              materials: [
+                { id: 11, name: "Steel", slug: "steel", specific: null },
+              ],
+              weight: null,
+            },
+          ],
+          weight: { unit: "g", value: "96" },
+        }}
+      />,
+    );
+
+    expect(html).toContain("Weights by material");
+    expect(html).toContain("42 g");
+    expect(html).not.toContain("Steel</a>: ");
+    expect(html).toContain("Default weight");
+    expect(html).toContain("96 g");
+  });
+
   it("shows the exact included insert", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage

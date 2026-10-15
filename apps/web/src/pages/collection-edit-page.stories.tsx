@@ -62,7 +62,7 @@ function product(
     makerProductUrlValid: true,
     makerUrl: null,
     magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
-    materials: [{ assignmentId: 1000, materials: [material] }],
+    materials: [{ assignmentId: 1000, materials: [material], weight: null }],
     name,
     refillModel: null,
     refillOfferings: [],

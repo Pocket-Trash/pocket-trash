@@ -77,9 +77,11 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     specs: {},
     materialAssignments: [
       {
+        weight: null,
         materials: [{ materialId: material!.id, materialSpecificId: null }],
       },
       {
+        weight: null,
         materials: [
           { materialId: material!.id, materialSpecificId: specific.id },
           { materialId: titanium!.id, materialSpecificId: null },

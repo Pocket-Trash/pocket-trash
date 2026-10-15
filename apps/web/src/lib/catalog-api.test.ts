@@ -38,7 +38,10 @@ const base = {
   makerProductUrl: "",
   magnetLayout: null,
   materialAssignments: [
-    { materials: [{ materialId: 1000, materialSpecificId: null }] },
+    {
+      weight: null,
+      materials: [{ materialId: 1000, materialSpecificId: null }],
+    },
   ],
   name: "Spinner",
   productId: null,
@@ -65,6 +68,62 @@ const validFinishOptions = [
     patternId: null,
   },
 ];
+
+describe("product material weights", () => {
+  it("accepts positive weights and normalizes blank weights", () => {
+    expect(
+      productFormSchema.parse({
+        ...base,
+        materialAssignments: [
+          {
+            materials: [{ materialId: 1000, materialSpecificId: null }],
+            weight: { unit: "oz", value: "" },
+          },
+        ],
+      }).materialAssignments[0]?.weight,
+    ).toBeNull();
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        materialAssignments: [
+          {
+            materials: [{ materialId: 1000, materialSpecificId: null }],
+            weight: { unit: "g", value: "12.5" },
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each(["0", "-1"])("rejects a %s material weight", (value) => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        materialAssignments: [
+          {
+            materials: [{ materialId: 1000, materialSpecificId: null }],
+            weight: { unit: "g", value },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects material weights for unsupported product types", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        materialAssignments: [
+          {
+            materials: [{ materialId: 1000, materialSpecificId: null }],
+            weight: { unit: "g", value: "12.5" },
+          },
+        ],
+        productTypeSlug: "slider-plate",
+      }).success,
+    ).toBe(false);
+  });
+});
 
 describe("collection-item approval decisions", () => {
   it("requires an item, a supported action, and a bounded nonblank reason", () => {
@@ -207,6 +266,7 @@ describe("product appearance options", () => {
         ...base,
         materialAssignments: [
           {
+            weight: null,
             materials: [
               { materialId: 1000, materialSpecificId: null },
               { materialId: 1000, materialSpecificId: null },
@@ -220,12 +280,14 @@ describe("product appearance options", () => {
         ...base,
         materialAssignments: [
           {
+            weight: null,
             materials: [
               { materialId: 1000, materialSpecificId: null },
               { materialId: 2000, materialSpecificId: null },
             ],
           },
           {
+            weight: null,
             materials: [
               { materialId: 2000, materialSpecificId: null },
               { materialId: 1000, materialSpecificId: null },
@@ -608,9 +670,11 @@ describe("slider catalog product validation", () => {
         magnetLayout: "2x4",
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: 1000, materialSpecificId: null }],
           },
           {
+            weight: null,
             materials: [{ materialId: 2000, materialSpecificId: null }],
           },
         ],

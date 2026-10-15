@@ -617,8 +617,14 @@ export const productMaterial = pgTable(
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => product.id, { onDelete: "cascade" }),
+    weight: decimal("weight_value"),
+    weightUnit: weightUnitEnum("weight_unit"),
   },
   (table) => [
+    check(
+      "product_material_weight_consistent",
+      sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
+    ),
     unique("product_material_id_product_unique").on(table.id, table.productId),
   ],
 );

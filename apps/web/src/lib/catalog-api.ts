@@ -447,6 +447,7 @@ export const productFormSchema = z
             }),
           )
           .min(1),
+        weight: weightMeasurementSchema.default(null),
       }),
     ),
     name: slugNameSchema,
@@ -759,6 +760,15 @@ export const productFormSchema = z
         context.addIssue({
           code: "custom",
           message: "web.materials.validation.duplicateAssignment",
+          path: ["materialAssignments"],
+        });
+      if (
+        !["slider", "spinner", "spinner-button"].includes(productTypeSlug) &&
+        materialAssignments.some(({ weight }) => weight !== null)
+      )
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
           path: ["materialAssignments"],
         });
       const signatures = finishOptions.map(
