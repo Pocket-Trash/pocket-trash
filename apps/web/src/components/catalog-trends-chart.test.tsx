@@ -42,6 +42,7 @@ describe("CatalogTrendsChart", () => {
         <CatalogTrendsChart
           catalogProductsLabel="Catalog products"
           chartLabel="Catalog products by product type"
+          onProductTypeSelect={vi.fn()}
           otherLabel="Other"
           trends={Array.from({ length: 10 }, (_, index) => ({
             count: 10 - index,
@@ -83,5 +84,36 @@ describe("CatalogTrendsChart", () => {
         },
       ],
     });
+  });
+
+  it("selects a product type when its slice is clicked", async () => {
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    const onProductTypeSelect = vi.fn();
+
+    await act(() =>
+      root.render(
+        <CatalogTrendsChart
+          catalogProductsLabel="Catalog products"
+          chartLabel="Catalog products by product type"
+          onProductTypeSelect={onProductTypeSelect}
+          otherLabel="Other"
+          trends={[
+            {
+              count: 137,
+              productTypeId: 1,
+              productTypeName: "Pen",
+            },
+          ]}
+        />,
+      ),
+    );
+
+    const options = chartMock.mock.calls[0]?.[1];
+    const point = options?.series?.[0]?.data?.[0];
+    point?.events?.click?.call(point);
+
+    expect(onProductTypeSelect).toHaveBeenCalledWith(1);
   });
 });

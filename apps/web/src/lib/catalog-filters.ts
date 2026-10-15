@@ -9,12 +9,16 @@ import type {
 
 /** URL-search representation of the Trends product-type filter. */
 export type CatalogTrendsSearch = {
+  /** Stable maker identifier encoded in URL search. */
+  makerId?: number;
   /** Stable general-material identifier encoded in URL search. */
   materialId?: number;
   /** Stable specific-material identifier encoded in URL search. */
   materialSpecificId?: number;
   /** Stable product-type identifier encoded in URL search. */
   productTypeId?: number;
+  /** Stable product identifier encoded in URL search. */
+  productId?: number;
 };
 
 /**
@@ -28,9 +32,12 @@ export function parseCatalogTrendsSearch(
 ): CatalogTrendsSearch {
   const materialId = Number(search.materialId);
   const materialSpecificId = Number(search.materialSpecificId);
+  const makerId = Number(search.makerId);
+  const productId = Number(search.productId);
   const productTypeId = Number(search.productTypeId);
   const hasMaterialId = Number.isSafeInteger(materialId) && materialId > 0;
   return {
+    ...(Number.isSafeInteger(makerId) && makerId > 0 ? { makerId } : {}),
     ...(hasMaterialId ? { materialId } : {}),
     ...(hasMaterialId &&
     Number.isSafeInteger(materialSpecificId) &&
@@ -40,6 +47,7 @@ export function parseCatalogTrendsSearch(
     ...(Number.isSafeInteger(productTypeId) && productTypeId > 0
       ? { productTypeId }
       : {}),
+    ...(Number.isSafeInteger(productId) && productId > 0 ? { productId } : {}),
   };
 }
 

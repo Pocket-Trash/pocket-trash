@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
+  getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
   listPublicProductTypeTrends,
@@ -31,12 +32,14 @@ export const Route = createFileRoute("/trends")({
     const [
       catalogTrends,
       collectionTrends,
+      makerProductTrends,
       partAccessoryTrends,
       catalogMaterialTrends,
       collectionMaterialTrends,
     ] = await Promise.all([
       listPublicProductTypeTrends(),
       getPublicCollectionItemTrends(),
+      getPublicCollectionMakerProductTrends(),
       getPublicPartAccessoryTrends(),
       getPublicCatalogMaterialTrends(),
       getPublicCollectionMaterialTrends(),
@@ -46,6 +49,7 @@ export const Route = createFileRoute("/trends")({
       catalogTrends,
       collectionMaterialTrends,
       collectionTrends,
+      makerProductTrends,
       partAccessoryTrends,
     };
   },
@@ -72,6 +76,7 @@ function TrendsRoute() {
     catalogTrends,
     collectionMaterialTrends,
     collectionTrends,
+    makerProductTrends,
     partAccessoryTrends,
   } = Route.useLoaderData();
   return (
@@ -79,6 +84,7 @@ function TrendsRoute() {
       catalogMaterialTrends={catalogMaterialTrends}
       collectionMaterialTrends={collectionMaterialTrends}
       collectionTrends={collectionTrends}
+      makerProductTrends={makerProductTrends}
       onSearchChange={(nextSearch) =>
         void navigate({
           replace: true,

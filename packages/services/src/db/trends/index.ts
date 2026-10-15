@@ -91,6 +91,48 @@ export type PublicCollectionMaterialTrends = {
   itemValues: PublicMaterialTrend[];
 };
 
+/** One privacy-safe maker or product result in a stable filter scope. */
+export type PublicMakerProductTrend = {
+  /** Distinct collector count rounded to the nearest five. */
+  collectorCount: number;
+  /** Currently owned item count rounded to the nearest five. */
+  itemCount: number;
+  /** Stable maker identifier. */
+  makerId: number;
+  /** Maker display name. */
+  makerName: string;
+  /** Maker URL slug. */
+  makerSlug: string;
+  /** Stable general-material filter, or null when unfiltered. */
+  materialId: number | null;
+  /** Stable specific-material filter, or null when unfiltered. */
+  materialSpecificId: number | null;
+  /** Stable product identifier, or null for a maker aggregate. */
+  productId: number | null;
+  /** Product display name, or null for a maker aggregate. */
+  productName: string | null;
+  /** Product URL slug, or null for a maker aggregate. */
+  productSlug: string | null;
+  /** Stable product-type filter, or null when unfiltered. */
+  productTypeId: number | null;
+  /** Product-type URL slug, or null when unfiltered. */
+  productTypeSlug: string | null;
+};
+
+/** Active privacy-safe maker and product Trends generation. */
+export type PublicCollectionMakerProductTrends = {
+  /** Time the active generation was completed. */
+  generatedAt: Date;
+  /** Whether at least one maker or product result was privacy-suppressed. */
+  hasSuppressedValues: boolean;
+  /** Privacy-safe maker aggregates ordered by collector count. */
+  makerValues: PublicMakerProductTrend[];
+  /** Privacy-safe product results ordered by collector count. */
+  productValues: PublicMakerProductTrend[];
+  /** Whether the active generation is older than the freshness target. */
+  stale: boolean;
+};
+
 /** Test-only lifecycle hook for forcing a refresh failure before activation. */
 export type PublicTrendsRefreshHooks = {
   /**
@@ -116,6 +158,78 @@ export function createTrendsService(
   hooks: PublicTrendsRefreshHooks = {},
 ) {
   return {
+    /**
+     * Reads privacy-safe maker and product popularity from the active generation.
+     *
+     * @param now - Current time used to calculate freshness.
+     * @returns Active maker and product generation, or null before the first refresh.
+     * @rejects When the database query fails.
+     */
+    async getPublicCollectionMakerProductTrends(
+      now = new Date(),
+    ): Promise<PublicCollectionMakerProductTrends | null> {
+      const [generation] = await db
+        .select()
+        .from(schema.publicTrendsGeneration)
+        .where(eq(schema.publicTrendsGeneration.active, true))
+        .limit(1);
+      if (!generation) return null;
+
+      const values = await db
+        .select({
+          collectorCount:
+            schema.publicCollectionMakerProductTrend.roundedCollectorCount,
+          itemCount: schema.publicCollectionMakerProductTrend.roundedItemCount,
+          makerId: schema.publicCollectionMakerProductTrend.makerId,
+          makerName: schema.maker.name,
+          makerSlug: schema.maker.slug,
+          materialId: schema.publicCollectionMakerProductTrend.materialId,
+          materialSpecificId:
+            schema.publicCollectionMakerProductTrend.materialSpecificId,
+          productId: schema.publicCollectionMakerProductTrend.productId,
+          productName: schema.product.name,
+          productSlug: schema.product.slug,
+          productTypeId: schema.publicCollectionMakerProductTrend.productTypeId,
+          productTypeSlug: sql<string | null>`coalesce(
+            (select product_types.slug from product_types where product_types.id = ${schema.product.productTypeId}),
+            (select product_types.slug from product_types where product_types.id = ${schema.publicCollectionMakerProductTrend.productTypeId})
+          )`,
+        })
+        .from(schema.publicCollectionMakerProductTrend)
+        .innerJoin(
+          schema.maker,
+          eq(schema.publicCollectionMakerProductTrend.makerId, schema.maker.id),
+        )
+        .leftJoin(
+          schema.product,
+          eq(
+            schema.publicCollectionMakerProductTrend.productId,
+            schema.product.id,
+          ),
+        )
+        .where(
+          eq(
+            schema.publicCollectionMakerProductTrend.generationId,
+            generation.id,
+          ),
+        )
+        .orderBy(
+          desc(schema.publicCollectionMakerProductTrend.roundedCollectorCount),
+          desc(schema.publicCollectionMakerProductTrend.roundedItemCount),
+          asc(schema.maker.name),
+          asc(schema.product.name),
+        );
+      return {
+        generatedAt: generation.generatedAt,
+        hasSuppressedValues: generation.hasSuppressedMakerProductValues,
+        makerValues: values.filter(({ productId }) => productId === null),
+        productValues: values.filter(({ productId }) => productId !== null),
+        stale:
+          now.getTime() - generation.generatedAt.getTime() >
+          PUBLIC_TRENDS_STALE_MS,
+      };
+    },
+
     /**
      * Lists exact approved public catalog-product material counts.
      *
@@ -556,6 +670,94 @@ export function createTrendsService(
           ({ contributorCount }) =>
             contributorCount >= PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
         );
+        const makerProductResult = await tx.execute<{
+          /** Exact contributor count used only inside the refresh transaction. */
+          contributorCount: number | string;
+          /** Exact item count used only inside the refresh transaction. */
+          itemCount: number | string;
+          /** Stable maker identifier. */
+          makerId: number | string;
+          /** Stable general-material filter. */
+          materialId: number | string | null;
+          /** Stable specific-material filter. */
+          materialSpecificId: number | string | null;
+          /** Stable product identifier, null for maker aggregates. */
+          productId: number | string | null;
+          /** Stable product-type filter. */
+          productTypeId: number | string | null;
+        }>(sql`
+          with item_products as (
+            select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
+            union all select id, product_pen_clip_id from collection_detail_pen_clip
+            union all select id, product_pen_tip_id from collection_detail_pen_tip
+            union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
+            union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
+            union all select id, product_pen_actuator_id from collection_detail_pen_actuator
+            union all select id, product_spinner_id from collection_detail_spinner
+            union all select id, product_spinner_button_id from collection_detail_spinner_button
+            union all select id, product_slider_id from collection_detail_slider
+            union all select id, product_slider_plate_id from collection_detail_slider_plate
+            union all select id, product_slider_insert_id from collection_detail_slider_insert
+          ), eligible_items as (
+            select distinct
+              collection_item.id,
+              collection_item.owner_id,
+              product.id as product_id,
+              product.maker_id,
+              product.product_type_id,
+              product_material.material_id,
+              product_material.material_specific_id
+            from item_products
+            inner join collection_item on collection_item.id = item_products.collection_item_id
+            inner join product on product.id = item_products.product_id
+            inner join product_types on product_types.id = product.product_type_id
+            left join product_material on product_material.product_id = product.id
+            where collection_item.owned
+              and collection_item.sold_at is null
+              and (
+                not product_types.is_part_or_accessory
+                or product_types.include_in_trends
+              )
+          ), scoped_items as (
+            select id, owner_id, product_id, maker_id, null::bigint as product_type_id, null::bigint as material_id, null::bigint as material_specific_id from eligible_items
+            union select id, owner_id, product_id, maker_id, product_type_id, null, null from eligible_items
+            union select id, owner_id, product_id, maker_id, null, material_id, null from eligible_items where material_id is not null
+            union select id, owner_id, product_id, maker_id, product_type_id, material_id, null from eligible_items where material_id is not null
+            union select id, owner_id, product_id, maker_id, null, material_id, material_specific_id from eligible_items where material_specific_id is not null
+            union select id, owner_id, product_id, maker_id, product_type_id, material_id, material_specific_id from eligible_items where material_specific_id is not null
+          ), entity_items as (
+            select id, owner_id, product_type_id, material_id, material_specific_id, maker_id, null::bigint as product_id from scoped_items
+            union all
+            select id, owner_id, product_type_id, material_id, material_specific_id, maker_id, product_id from scoped_items
+          )
+          select
+            count(distinct owner_id)::integer as "contributorCount",
+            count(distinct id)::integer as "itemCount",
+            maker_id as "makerId",
+            material_id as "materialId",
+            material_specific_id as "materialSpecificId",
+            product_id as "productId",
+            product_type_id as "productTypeId"
+          from entity_items
+          group by product_type_id, material_id, material_specific_id, maker_id, product_id
+        `);
+        const makerProductSource = makerProductResult.rows.map((row) => ({
+          contributorCount: Number(row.contributorCount),
+          itemCount: Number(row.itemCount),
+          makerId: Number(row.makerId),
+          materialId: row.materialId === null ? null : Number(row.materialId),
+          materialSpecificId:
+            row.materialSpecificId === null
+              ? null
+              : Number(row.materialSpecificId),
+          productId: row.productId === null ? null : Number(row.productId),
+          productTypeId:
+            row.productTypeId === null ? null : Number(row.productTypeId),
+        }));
+        const publishableMakerProducts = makerProductSource.filter(
+          ({ contributorCount }) =>
+            contributorCount >= PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
+        );
         const [generation] = await tx
           .insert(schema.publicTrendsGeneration)
           .values({
@@ -564,6 +766,8 @@ export function createTrendsService(
               publishablePartAccessories.length < partAccessorySource.length,
             hasSuppressedMaterialValues:
               publishableMaterials.length < materialSource.length,
+            hasSuppressedMakerProductValues:
+              publishableMakerProducts.length < makerProductSource.length,
             hasSuppressedValues: publishable.length < primarySource.length,
           })
           .returning({ id: schema.publicTrendsGeneration.id });
@@ -601,6 +805,25 @@ export function createTrendsService(
               isSpecificBreakdown: row.isSpecificBreakdown,
               materialId: row.materialId,
               materialSpecificId: row.materialSpecificId,
+              productTypeId: row.productTypeId,
+              roundedCollectorCount:
+                Math.round(
+                  row.contributorCount / PUBLIC_TRENDS_ROUNDING_INCREMENT,
+                ) * PUBLIC_TRENDS_ROUNDING_INCREMENT,
+              roundedItemCount:
+                Math.round(row.itemCount / PUBLIC_TRENDS_ROUNDING_INCREMENT) *
+                PUBLIC_TRENDS_ROUNDING_INCREMENT,
+            })),
+          );
+        }
+        if (publishableMakerProducts.length > 0) {
+          await tx.insert(schema.publicCollectionMakerProductTrend).values(
+            publishableMakerProducts.map((row) => ({
+              generationId: generation.id,
+              makerId: row.makerId,
+              materialId: row.materialId,
+              materialSpecificId: row.materialSpecificId,
+              productId: row.productId,
               productTypeId: row.productTypeId,
               roundedCollectorCount:
                 Math.round(

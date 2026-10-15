@@ -689,12 +689,12 @@ describe("collection edit conditional fields", () => {
       }),
     );
 
-    expect(html).toContain("web.collections.lifecycle.title");
+    expect(html).toContain("Ownership history");
     expect(html).toContain("2025-09-10");
-    expect(html).toContain('aria-label="web.collections.lifecycle.title"');
-    expect(html).toContain("web.collections.lifecycle.acquisitionDate");
-    expect(html).toContain("web.collections.lifecycle.entryReason");
-    expect(html).toContain("web.collections.lifecycle.recordedStart");
+    expect(html).toContain('aria-label="Ownership history"');
+    expect(html).toContain("Acquisition date");
+    expect(html).toContain("Acquisition reason");
+    expect(html).toContain("Acquisition recorded Sep 11, 2025");
   });
 
   it.each([
