@@ -224,9 +224,13 @@ export type {
   PublicMaterialTrend,
   PublicPartAccessoryProductTypeTrend,
   PublicPartAccessoryTrends,
+  PublicSliderTrend,
+  PublicSliderTrends,
+  PublicSliderTrendValue,
   PublicSpinnerTrend,
   PublicSpinnerTrends,
   PublicSpinnerTrendValue,
+  SliderTrendMetricId,
   SpinnerTrendMetricId,
   TrendsService,
   UserActivityTrendPoint,
@@ -239,7 +243,9 @@ export {
   PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,
+  SLIDER_TRENDS_COVERAGE_THRESHOLD,
   SPINNER_TRENDS_COVERAGE_THRESHOLD,
+  sliderTrendMetricIds,
   spinnerTrendMetricIds,
 } from "./trends/index.js";
 export type {

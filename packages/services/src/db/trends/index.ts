@@ -6,6 +6,7 @@ import {
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,
 } from "./constants.js";
+import { getPublicSliderTrends as loadPublicSliderTrends } from "./slider.js";
 import { getPublicSpinnerTrends as loadPublicSpinnerTrends } from "./spinner.js";
 
 export {
@@ -13,6 +14,16 @@ export {
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,
 } from "./constants.js";
+export type {
+  PublicSliderTrend,
+  PublicSliderTrends,
+  PublicSliderTrendValue,
+  SliderTrendMetricId,
+} from "./slider.js";
+export {
+  SLIDER_TRENDS_COVERAGE_THRESHOLD,
+  sliderTrendMetricIds,
+} from "./slider.js";
 export type {
   PublicSpinnerTrend,
   PublicSpinnerTrends,
@@ -273,6 +284,16 @@ export function createTrendsService(
   hooks: PublicTrendsRefreshHooks = {},
 ) {
   return {
+    /**
+     * Reads coverage-qualified Slider characteristics with privacy-safe item counts.
+     *
+     * @returns Public Slider Trends, or null when the Slider type is absent.
+     * @rejects When a database query fails.
+     */
+    async getPublicSliderTrends() {
+      return await loadPublicSliderTrends(db);
+    },
+
     /**
      * Reads coverage-qualified Spinner characteristics with privacy-safe item counts.
      *

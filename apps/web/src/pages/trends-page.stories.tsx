@@ -6,6 +6,7 @@ import type {
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
+  PublicSliderTrends,
   PublicSpinnerTrends,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
@@ -73,6 +74,51 @@ const spinnerTrends: PublicSpinnerTrends = {
           key: "55",
           label: "55",
           numericValue: 55,
+        },
+      ],
+    },
+  ],
+};
+
+/** Coverage-qualified Slider distributions used by the drill-down story. */
+const sliderTrends: PublicSliderTrends = {
+  catalogProductCount: 12,
+  productTypeId: 1001,
+  trends: [
+    {
+      coveragePercent: 100,
+      hasSuppressedCollectionValues: false,
+      metric: "magnetLayout",
+      unit: null,
+      values: [
+        {
+          catalogCount: 8,
+          collectionCount: 20,
+          key: "3",
+          label: "2×4",
+          numericValue: null,
+        },
+        {
+          catalogCount: 4,
+          collectionCount: 10,
+          key: "2",
+          label: "2×3",
+          numericValue: null,
+        },
+      ],
+    },
+    {
+      coveragePercent: 75,
+      hasSuppressedCollectionValues: true,
+      metric: "plateMaterial",
+      unit: null,
+      values: [
+        {
+          catalogCount: 9,
+          collectionCount: null,
+          key: "3000",
+          label: "Zirconium",
+          numericValue: null,
         },
       ],
     },
@@ -368,6 +414,34 @@ export const SpinnerDrillDown: Story = {
     ).toBeVisible();
     await expect(canvas.getAllByText("Machine Era")[0]).toBeVisible();
     await expect(canvas.getByText("72.2% coverage")).toBeVisible();
+  },
+};
+
+/** Selected Slider with component-aware characteristic distributions. */
+export const SliderDrillDown: Story = {
+  args: {
+    activityTrends,
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
+    collectionTrends,
+    onSearchChange: fn(),
+    search: { productTypeId: 1001 },
+    sliderTrends,
+    trends,
+  },
+  /**
+   * Verifies selected Slider characteristic distributions.
+   *
+   * @param context - Story interaction context.
+   * @param context.canvasElement - Rendered story canvas.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Slider details" }),
+    ).toBeVisible();
+    await expect(canvas.getAllByText("2×4")[0]).toBeVisible();
+    await expect(canvas.getByText("75% coverage")).toBeVisible();
   },
 };
 

@@ -19,6 +19,7 @@ import type {
   PublicMaterialSummary,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
+  PublicSliderTrends,
   PublicSpinnerTrends,
   SliderMagnetPreset,
   TrendsProductTypeConfiguration,
@@ -1300,6 +1301,14 @@ export const getPublicSpinnerTrends = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicSpinnerTrends | null> => {
     const { s } = await import("@/lib/services");
     return await s.db.trends.getPublicSpinnerTrends();
+  },
+);
+
+/** Returns coverage-qualified Slider characteristics and privacy-safe counts. */
+export const getPublicSliderTrends = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PublicSliderTrends | null> => {
+    const { s } = await import("@/lib/services");
+    return await s.db.trends.getPublicSliderTrends();
   },
 );
 

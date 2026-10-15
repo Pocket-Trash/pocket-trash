@@ -1,5 +1,6 @@
 import type {
   PublicProductTypeTrend,
+  PublicSliderTrends,
   PublicSpinnerTrends,
 } from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -92,6 +93,12 @@ vi.mock("@pocket-trash/localizations", () => ({
         "web.trends.spinnerPrivacy": "Collection counts are privacy safe.",
         "web.trends.spinnerSuppressed": "Some values are hidden.",
         "web.trends.spinnerTitle": "Spinner details",
+        "web.trends.sliderBodyMaterial": "Slider body material",
+        "web.trends.sliderDescription": "Slider details",
+        "web.trends.sliderPlateMaterial": "Plate material",
+        "web.trends.sliderPrivacy": "Collection counts are privacy safe.",
+        "web.trends.sliderSuppressed": "Some Slider values are hidden.",
+        "web.trends.sliderTitle": "Slider details",
         "web.trends.suppressed": "Suppressed",
         "web.trends.value": "Value",
       }[key] ?? key
@@ -164,6 +171,29 @@ const spinnerTrends: PublicSpinnerTrends = {
   ],
 };
 
+/** Coverage-qualified Slider Trends used by product-type drill-down tests. */
+const sliderTrends: PublicSliderTrends = {
+  catalogProductCount: 12,
+  productTypeId: 1001,
+  trends: [
+    {
+      coveragePercent: 75,
+      hasSuppressedCollectionValues: true,
+      metric: "plateMaterial",
+      unit: null,
+      values: [
+        {
+          catalogCount: 9,
+          collectionCount: null,
+          key: "43",
+          label: "Zirconium",
+          numericValue: null,
+        },
+      ],
+    },
+  ],
+};
+
 describe("TrendsPage", () => {
   it("shows Spinner details only for the selected Spinner product type", () => {
     const selected = renderToStaticMarkup(
@@ -194,6 +224,35 @@ describe("TrendsPage", () => {
     expect(selected).toContain("<summary");
     expect(selected).not.toContain("<details open");
     expect(unselected).not.toContain("Example Maker");
+  });
+
+  it("shows Slider details only for the selected Slider product type", () => {
+    const selected = renderToStaticMarkup(
+      <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
+        collectionTrends={null}
+        onSearchChange={vi.fn()}
+        search={{ productTypeId: 1001 }}
+        sliderTrends={sliderTrends}
+        trends={trends}
+      />,
+    );
+    const unselected = renderToStaticMarkup(
+      <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
+        collectionTrends={null}
+        onSearchChange={vi.fn()}
+        sliderTrends={sliderTrends}
+        trends={trends}
+      />,
+    );
+
+    expect(selected).toContain("75% coverage");
+    expect(selected).toContain("Zirconium");
+    expect(selected).toContain("Some Slider values are hidden.");
+    expect(unselected).not.toContain("Zirconium");
   });
 
   it("keeps stable maker filters, ranks products by collectors, and preserves all table rows", () => {

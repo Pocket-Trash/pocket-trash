@@ -1,7 +1,17 @@
 import type {
+  PublicSliderTrend,
+  PublicSliderTrendValue,
   PublicSpinnerTrend,
   PublicSpinnerTrendValue,
 } from "@package/services";
+
+/** Product-specific trend shape shared by Spinner and Slider metrics. */
+type PublicProductDetailTrend = PublicSpinnerTrend | PublicSliderTrend;
+
+/** Exact value shared by Spinner and Slider detail metrics. */
+type PublicProductDetailTrendValue =
+  | PublicSpinnerTrendValue
+  | PublicSliderTrendValue;
 
 /** One chart bucket derived from exact Spinner values. */
 export type SpinnerTrendChartValue = {
@@ -16,7 +26,7 @@ export type SpinnerTrendChartValue = {
 };
 
 /** Exact Spinner trend value with a canonical measurement. */
-type NumericSpinnerTrendValue = PublicSpinnerTrendValue & {
+type NumericSpinnerTrendValue = PublicProductDetailTrendValue & {
   /** Canonical measurement value. */
   numericValue: number;
 };
@@ -53,7 +63,7 @@ export function SpinnerTrendVisualization({
   /** Label for a privacy-suppressed collection value. */
   suppressedLabel: string;
   /** Coverage-qualified Spinner metric. */
-  trend: PublicSpinnerTrend;
+  trend: PublicProductDetailTrend;
   /** Exact-value table column label. */
   valueLabel: string;
 }) {
@@ -74,7 +84,7 @@ export function SpinnerTrendVisualization({
    * @param value - Exact Spinner trend value.
    * @returns Localized display label.
    */
-  const exactLabel = (value: PublicSpinnerTrendValue) =>
+  const exactLabel = (value: PublicProductDetailTrendValue) =>
     value.numericValue === null
       ? value.label
       : `${numberFormatter.format(value.numericValue)} ${trend.unit}`;
@@ -180,7 +190,7 @@ export function SpinnerTrendVisualization({
  * @returns Chart-ready exact categories or numeric ranges.
  */
 export function spinnerTrendChartValues(
-  trend: PublicSpinnerTrend,
+  trend: PublicProductDetailTrend,
   locale: string,
   otherLabel: string,
 ): SpinnerTrendChartValue[] {
@@ -226,7 +236,7 @@ export function spinnerTrendChartValues(
   const formatter = new Intl.NumberFormat(locale, {
     maximumFractionDigits: 2,
   });
-  const buckets = new Map<number, PublicSpinnerTrendValue[]>();
+  const buckets = new Map<number, PublicProductDetailTrendValue[]>();
   for (const value of numericValues) {
     const index = Math.min(
       7,
@@ -253,7 +263,7 @@ export function spinnerTrendChartValues(
  * @returns Whether the value contains a canonical number.
  */
 function hasNumericValue(
-  value: PublicSpinnerTrendValue,
+  value: PublicProductDetailTrendValue,
 ): value is NumericSpinnerTrendValue {
   return value.numericValue !== null;
 }
@@ -265,7 +275,7 @@ function hasNumericValue(
  * @returns Summed rounded count, or null when every value is suppressed.
  */
 function sumCollectionCounts(
-  values: Array<Pick<PublicSpinnerTrendValue, "collectionCount">>,
+  values: Array<Pick<PublicProductDetailTrendValue, "collectionCount">>,
 ) {
   const publishable = values.flatMap(({ collectionCount }) =>
     collectionCount === null ? [] : [collectionCount],
