@@ -11,11 +11,11 @@ import type { ScraperSourceName } from "./scraper-types.js";
 
 /** Reviewed UTC producer schedules; every source must declare one. */
 export const scraperSchedules: Record<ScraperSourceName, string> = {
-  autmog: "*/30 * * * *",
+  autmog: "0 2 * * 1",
   "grimsmo-fjell": "0 * * * *",
   "grimsmo-norseman": "0 * * * *",
   "grimsmo-rask": "0 * * * *",
-  "grimsmo-saga": "*/30 * * * *",
+  "grimsmo-saga": "0 2 * * 4",
 };
 
 /**
