@@ -7,7 +7,9 @@ import type {
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
+  PublicSliderTrends,
   PublicSpinnerTrends,
+  SliderTrendMetricId,
   SpinnerTrendMetricId,
 } from "@package/services";
 import {
@@ -53,6 +55,8 @@ export type TrendsPageProps = {
   partAccessoryTrends?: PublicPartAccessoryTrends | null;
   /** Stable filters selected in URL search. */
   search?: CatalogTrendsSearch;
+  /** Coverage-qualified Slider characteristics. */
+  sliderTrends?: PublicSliderTrends | null;
   /** Coverage-qualified Spinner characteristics. */
   spinnerTrends?: PublicSpinnerTrends | null;
   /** Exact public catalog-product counts in descending order. */
@@ -74,6 +78,7 @@ export function TrendsPage({
   onSearchChange,
   partAccessoryTrends = null,
   search = {},
+  sliderTrends = null,
   spinnerTrends = null,
   trends,
 }: TrendsPageProps) {
@@ -98,6 +103,17 @@ export function TrendsPage({
     spinDiameter: t("web.catalog.field.spinDiameter"),
     thickness: t("web.catalog.field.thickness"),
     thicknessWithButton: t("web.catalog.field.thicknessWithButton"),
+    weight: t("web.archive.spec.weight"),
+    width: t("web.catalog.field.width"),
+  };
+  const sliderMetricLabels: Record<SliderTrendMetricId, string> = {
+    bodyMaterial: t("web.trends.sliderBodyMaterial"),
+    length: t("web.archive.spec.length"),
+    magnetLayout: t("web.slider.layout.label"),
+    maker: t("web.trends.maker"),
+    plateMaterial: t("web.trends.sliderPlateMaterial"),
+    positionCount: t("web.slider.setup.clickCount"),
+    thickness: t("web.catalog.field.thickness"),
     weight: t("web.archive.spec.weight"),
     width: t("web.catalog.field.width"),
   };
@@ -638,6 +654,55 @@ export function TrendsPage({
             })}
             <p className="text-xs text-muted-foreground">
               {t("web.trends.spinnerPrivacy")}
+            </p>
+          </section>
+        ) : null}
+
+        {sliderTrends && productTypeId === sliderTrends.productTypeId ? (
+          <section aria-labelledby="slider-trends-title" className="space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold" id="slider-trends-title">
+                {t("web.trends.sliderTitle")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("web.trends.sliderDescription")}
+              </p>
+            </div>
+            {sliderTrends.trends.map((trend) => {
+              const label = sliderMetricLabels[trend.metric];
+              return (
+                <section className="space-y-3" key={trend.metric}>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold">{label}</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {t("web.trends.coverage", {
+                        coverage: new Intl.NumberFormat(locale, {
+                          maximumFractionDigits: 1,
+                        }).format(trend.coveragePercent),
+                      })}
+                    </p>
+                  </div>
+                  <SpinnerTrendVisualization
+                    approximateItemsLabel={t("web.trends.approximateItems")}
+                    catalogProductsLabel={t("web.trends.catalogProducts")}
+                    chartLabel={label}
+                    detailsLabel={t("web.trends.exactValues")}
+                    locale={locale}
+                    otherLabel={t("web.trends.other")}
+                    suppressedLabel={t("web.trends.suppressed")}
+                    trend={trend}
+                    valueLabel={t("web.trends.value")}
+                  />
+                  {trend.hasSuppressedCollectionValues ? (
+                    <p className="text-xs text-muted-foreground" role="status">
+                      {t("web.trends.sliderSuppressed")}
+                    </p>
+                  ) : null}
+                </section>
+              );
+            })}
+            <p className="text-xs text-muted-foreground">
+              {t("web.trends.sliderPrivacy")}
             </p>
           </section>
         ) : null}
