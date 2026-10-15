@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
+  type AxiomManagementFetch,
+  checkAxiomMapFields,
   createAxiomTransport,
   createLogger,
   createProxyTransport,
@@ -55,6 +57,10 @@ const defaultPollIntervalMs = 5_000;
  */
 async function main(): Promise<void> {
   const config = readConfig();
+  await checkAxiomMapFields(
+    { dataset: config.dataset, token: config.managementToken },
+    fetch as AxiomManagementFetch,
+  );
   const startedAt = new Date(Date.now() - 60_000).toISOString();
   const runId = randomUUID();
   const runPrefix = `logger-live-${runId}`;
@@ -376,6 +382,8 @@ function readConfig(): {
   edgeDomain?: string;
   /** Logger level used for live emissions. */
   logLevel: LogLevel;
+  /** Token allowed to inspect Axiom dataset map fields. */
+  managementToken: string;
   /** Client key accepted by the simulated log proxy. */
   logProxyClientKey: string;
   /** Delay between Axiom query attempts in milliseconds. */
@@ -389,6 +397,7 @@ function readConfig(): {
   const dataset = requiredEnv("AXIOM_DATASET");
   const logLevelValue = requiredEnv("LOG_LEVEL");
   const logProxyClientKey = requiredEnv("LOG_PROXY_CLIENT_KEY");
+  const managementToken = requiredEnv("AXIOM_MANAGEMENT_TOKEN");
   const logLevel = parseLogLevel(logLevelValue);
 
   assert.equal(
@@ -407,6 +416,7 @@ function readConfig(): {
     edgeDomain: optionalEnv("AXIOM_EDGE_DOMAIN"),
     logLevel,
     logProxyClientKey,
+    managementToken,
     pollIntervalMs: parseOptionalPositiveInteger(
       "AXIOM_TEST_POLL_INTERVAL_MS",
       defaultPollIntervalMs,
@@ -611,6 +621,8 @@ async function queryAxiom(input: {
   const apl = [
     `[${quoteAplString(input.config.dataset)}]`,
     `| where message contains ${quoteAplString(input.runPrefix)}`,
+    "| extend mapEmittedLevel = ['attributes']['emittedLevel'], mapSource = ['attributes']['source'], mapOutcome = ['attributes']['outcome'], mapOperation = ['attributes']['operation'], mapDurationMs = ['attributes']['durationMs']",
+    "| extend mapProxyContext = ['context']['proxyContext'], mapChildContext = ['context']['childContext'], mapErrorName = ['error']['name'], mapErrorMessage = ['error']['message']",
     "| limit 100",
   ].join("\n");
   const response = await fetch(
@@ -730,7 +742,7 @@ function assertRows(
     assert.equal(getField(directRow, "deploymentId"), input.runId);
     assert.equal(getField(directRow, "deploymentTarget"), "test");
     assert.equal(getField(directRow, "level"), level);
-    assert.equal(getField(directRow, "attributes.emittedLevel"), level);
+    assert.equal(getField(directRow, "mapEmittedLevel"), level);
 
     const proxyRow = requireRow(
       rows,
@@ -741,31 +753,34 @@ function assertRows(
     assert.equal(getField(proxyRow, "deploymentTarget"), "web-client");
     assert.equal(getField(proxyRow, "environment"), "automated-tests");
     assert.equal(getField(proxyRow, "level"), level);
-    assert.equal(getField(proxyRow, "attributes.source"), "log-proxy");
-    assert.equal(getField(proxyRow, "context.proxyContext"), "client-value");
+    assert.equal(getField(proxyRow, "mapSource"), "log-proxy");
+    assert.equal(getField(proxyRow, "mapProxyContext"), "client-value");
   }
 
   const childRow = requireRow(
     rows,
     message(input.runPrefix, "direct.child-context"),
   );
-  assert.equal(getField(childRow, "context.childContext"), "child-value");
+  assert.equal(getField(childRow, "mapChildContext"), "child-value");
 
   const directErrorRow = requireRow(
     rows,
     message(input.runPrefix, "direct.error"),
   );
-  assert.equal(getField(directErrorRow, "error.name"), "Error");
-  assert.equal(getField(directErrorRow, "error.message"), "Direct live error");
+  assert.equal(getField(directErrorRow, "mapErrorName"), "Error");
+  assert.equal(
+    getField(directErrorRow, "mapErrorMessage"),
+    "Direct live error",
+  );
 
   const proxyErrorRow = requireRow(
     rows,
     message(input.runPrefix, "proxy.error"),
   );
   assert.equal(getField(proxyErrorRow, "app"), "web");
-  assert.equal(getField(proxyErrorRow, "error.name"), "TypeError");
+  assert.equal(getField(proxyErrorRow, "mapErrorName"), "TypeError");
   assert.equal(
-    getField(proxyErrorRow, "error.message"),
+    getField(proxyErrorRow, "mapErrorMessage"),
     "Proxy client live error",
   );
 
@@ -773,13 +788,13 @@ function assertRows(
     rows,
     `${message(input.runPrefix, "direct.operation.success")}.succeeded`,
   );
-  assert.equal(getField(operationSuccessRow, "attributes.outcome"), "success");
+  assert.equal(getField(operationSuccessRow, "mapOutcome"), "success");
   assert.equal(
-    getField(operationSuccessRow, "attributes.operation"),
+    getField(operationSuccessRow, "mapOperation"),
     message(input.runPrefix, "direct.operation.success"),
   );
   assert.ok(
-    typeof getField(operationSuccessRow, "attributes.durationMs") === "number",
+    typeof getField(operationSuccessRow, "mapDurationMs") === "number",
     "Operation success duration should be numeric.",
   );
 
@@ -787,9 +802,9 @@ function assertRows(
     rows,
     `${message(input.runPrefix, "direct.operation.failure")}.failed`,
   );
-  assert.equal(getField(operationFailureRow, "attributes.outcome"), "failure");
+  assert.equal(getField(operationFailureRow, "mapOutcome"), "failure");
   assert.equal(
-    getField(operationFailureRow, "error.message"),
+    getField(operationFailureRow, "mapErrorMessage"),
     "Direct operation failure",
   );
 

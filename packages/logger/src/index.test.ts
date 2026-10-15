@@ -515,16 +515,26 @@ describe("transports", () => {
       token: "token-1",
     });
 
-    await transport.log({
+    /** Runtime event carrying a field outside the static logger contract. */
+    const event: LogEvent = {
+      ...{ undeclaredTopLevel: "drop-me" },
       app: "api",
+      attributes: { requestId: "request-1" },
       console: {
         mode: "verbose",
       },
+      context: { route: "/health" },
+      deploymentId: "deploy-1",
+      deploymentTarget: "worker",
       environment: "test",
+      error: { message: "safe", name: "Error" },
       level: "info",
       message: "hello",
+      rawPayload: { visible: true },
       timestamp: "2026-01-01T00:00:00.000Z",
-    });
+    };
+
+    await transport.log(event);
 
     expect(fetcher).toHaveBeenCalledWith(
       "https://api.axiom.co/v1/datasets/logs/ingest",
@@ -532,10 +542,16 @@ describe("transports", () => {
         body: JSON.stringify([
           {
             app: "api",
+            deploymentId: "deploy-1",
+            deploymentTarget: "worker",
             environment: "test",
             level: "info",
             message: "hello",
             timestamp: "2026-01-01T00:00:00.000Z",
+            attributes: { requestId: "request-1" },
+            context: { route: "/health" },
+            error: { message: "safe", name: "Error" },
+            rawPayload: { visible: true },
           },
         ]),
         headers: {
