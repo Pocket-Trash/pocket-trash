@@ -504,8 +504,15 @@ async function materialsForProducts(db: Database, productIds: number[]) {
     })
     .from(schema.productMaterial)
     .innerJoin(
+      schema.productMaterialComponent,
+      eq(
+        schema.productMaterial.id,
+        schema.productMaterialComponent.productMaterialId,
+      ),
+    )
+    .innerJoin(
       schema.material,
-      eq(schema.productMaterial.materialId, schema.material.id),
+      eq(schema.productMaterialComponent.materialId, schema.material.id),
     )
     .where(inArray(schema.productMaterial.productId, [...new Set(productIds)]))
     .orderBy(asc(schema.productMaterial.productId), asc(schema.material.name));
