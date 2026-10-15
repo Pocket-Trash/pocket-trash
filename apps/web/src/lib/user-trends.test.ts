@@ -1,6 +1,10 @@
 import type { UserCollectionItem } from "@package/services";
 import { describe, expect, it } from "vitest";
-import { summarizeUserTrends } from "./user-trends";
+import {
+  compareComposition,
+  summarizeCommunityTrends,
+  summarizeUserTrends,
+} from "./user-trends";
 
 describe("summarizeUserTrends", () => {
   it("counts private duplicate and secondary physical items exactly once", () => {
@@ -44,6 +48,73 @@ describe("summarizeUserTrends", () => {
       itemCount: 2,
       makers: [{ count: 1, id: 11, label: "Other maker" }],
       products: [{ count: 1 }],
+    });
+  });
+
+  it("compares percentages without exposing raw community totals", () => {
+    expect(
+      compareComposition(
+        [
+          { count: 3, id: 1, label: "Slider" },
+          { count: 1, id: 2, label: "Pen" },
+        ],
+        [{ count: 15, id: 1, label: "Slider" }],
+        true,
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        communityPercentage: 100,
+        id: 1,
+        personalPercentage: 75,
+      }),
+      expect.objectContaining({
+        communityPercentage: null,
+        id: 2,
+        personalPercentage: 25,
+      }),
+    ]);
+  });
+
+  it("shows zero personal composition for community-only categories", () => {
+    expect(
+      compareComposition([], [{ count: 10, id: 1, label: "Slider" }], false),
+    ).toEqual([
+      expect.objectContaining({
+        communityPercentage: 100,
+        personalPercentage: 0,
+      }),
+    ]);
+  });
+
+  it("preserves aggregate freshness and suppression metadata", () => {
+    const generatedAt = new Date("2026-10-14T12:00:00.000Z");
+    const community = summarizeCommunityTrends(
+      {
+        collectionItems: {
+          generatedAt,
+          hasSuppressedValues: true,
+          stale: true,
+          values: [
+            {
+              collectorCount: 10,
+              count: 15,
+              productTypeId: 1,
+              productTypeName: "Slider",
+            },
+          ],
+        },
+        makerProducts: null,
+        materials: null,
+      },
+      {},
+      { generalMaterial: "General", unspecifiedMaterial: "Unspecified" },
+    );
+
+    expect(community.productTypes).toMatchObject({
+      generatedAt,
+      hasSuppressedValues: true,
+      stale: true,
+      values: [{ count: 15, id: 1, label: "Slider" }],
     });
   });
 });
