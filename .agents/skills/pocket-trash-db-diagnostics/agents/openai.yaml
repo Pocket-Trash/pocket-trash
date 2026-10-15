@@ -4,3 +4,5 @@ interface:
   default_prompt:
     "Use $pocket-trash-db-diagnostics to show the top cumulative SQL on Pocket
     Trash production."
+policy:
+  allow_implicit_invocation: false

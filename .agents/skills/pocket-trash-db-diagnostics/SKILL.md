@@ -4,6 +4,7 @@ description: >-
   Inspect Pocket Trash's Neon production database for the SQL with the most
   calls and cumulative execution time. Use for pg_stat_statements results, Neon
   query usage, slow or frequent SQL, and database performance checks.
+disable-model-invocation: true
 ---
 
 # Pocket Trash DB Diagnostics
