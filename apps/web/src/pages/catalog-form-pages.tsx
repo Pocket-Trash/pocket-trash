@@ -3838,7 +3838,7 @@ export function CollectionAddPage({
           open={productSelectorOpen}
         >
           <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            {t("web.collections.productSelector" as TranslationKey)}
+            {t("web.collections.productSelector")}
           </summary>
           <div className="mt-4 grid gap-4">
             <Field label={t("web.catalog.field.productType")}>
