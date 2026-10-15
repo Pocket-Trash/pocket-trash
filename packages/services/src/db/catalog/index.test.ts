@@ -651,6 +651,17 @@ describe("collection catalog writes", () => {
         },
       },
       {
+        table: schema.collectionItemOwnershipPeriod,
+        value: {
+          collectionItemId: 2001,
+          effectiveStartDate: expect.any(String),
+          entryReason: "unknown",
+          startDateImputed: true,
+          startedRecordedAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        },
+      },
+      {
         table: schema.collectionDetailSpinner,
         value: {
           id: 2001,

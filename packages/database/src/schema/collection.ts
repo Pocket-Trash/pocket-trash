@@ -4,6 +4,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   decimal,
   foreignKey,
   index,
@@ -38,6 +39,24 @@ export const productApprovalStatuses = [
   "pending",
   "approved",
   "rejected",
+] as const;
+/** Supported reasons for starting an ownership period. */
+export const ownershipEntryReasons = [
+  "purchase",
+  "gift",
+  "trade",
+  "made",
+  "other",
+  "unknown",
+] as const;
+/** Supported reasons for ending an ownership period. */
+export const ownershipExitReasons = [
+  "sale",
+  "gift",
+  "trade",
+  "lost",
+  "disposed",
+  "other",
 ] as const;
 
 /** Named collections owned by application users. */
@@ -206,6 +225,74 @@ export const collectionItem = pgTable(
     check(
       "collection_item_serial_number_valid",
       sql`${table.serialNumber} is null or char_length(trim(${table.serialNumber})) between 1 and 200`,
+    ),
+  ],
+);
+
+/** Effective and recorded ownership history for one physical collection item. */
+export const collectionItemOwnershipPeriod = pgTable(
+  "collection_item_ownership_period",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    collectionItemId: bigint("collection_item_id", { mode: "number" })
+      .notNull()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    effectiveStartDate: date("effective_start_date", {
+      mode: "string",
+    }).notNull(),
+    /** Whether Pocket Trash entry time supplies the unknown acquisition date. */
+    startDateImputed: boolean("start_date_imputed").default(false).notNull(),
+    entryReason: text("entry_reason", {
+      enum: ownershipEntryReasons,
+    }).notNull(),
+    effectiveEndDate: date("effective_end_date", { mode: "string" }),
+    exitReason: text("exit_reason", { enum: ownershipExitReasons }),
+    /** When the acquisition was first recorded in Pocket Trash. */
+    startedRecordedAt: timestamp("started_recorded_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+    /** When the departure was first recorded in Pocket Trash. */
+    endedRecordedAt: timestamp("ended_recorded_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    /** When effective dates or reasons were most recently corrected. */
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("collection_item_ownership_period_item_date_idx").on(
+      table.collectionItemId,
+      table.effectiveStartDate,
+    ),
+    uniqueIndex("collection_item_ownership_period_open_unique")
+      .on(table.collectionItemId)
+      .where(sql`${table.effectiveEndDate} is null`),
+    check(
+      "collection_item_ownership_period_entry_reason_valid",
+      sql`${table.entryReason} in ('purchase', 'gift', 'trade', 'made', 'other', 'unknown')`,
+    ),
+    check(
+      "collection_item_ownership_period_exit_reason_valid",
+      sql`${table.exitReason} is null or ${table.exitReason} in ('sale', 'gift', 'trade', 'lost', 'disposed', 'other')`,
+    ),
+    check(
+      "collection_item_ownership_period_end_metadata_consistent",
+      sql`num_nonnulls(${table.effectiveEndDate}, ${table.exitReason}, ${table.endedRecordedAt}) in (0, 3)`,
+    ),
+    check(
+      "collection_item_ownership_period_dates_ordered",
+      sql`${table.effectiveEndDate} is null or ${table.effectiveEndDate} >= ${table.effectiveStartDate}`,
+    ),
+    check(
+      "collection_item_ownership_period_recorded_times_ordered",
+      sql`${table.endedRecordedAt} is null or ${table.endedRecordedAt} >= ${table.startedRecordedAt}`,
     ),
   ],
 );

@@ -178,6 +178,7 @@ describe("account database erasure", () => {
             (select count(*)::int from user_settings) as settings,
             (select count(*)::int from user_collection where name = 'Erased collection') as collections,
             (select count(*)::int from collection_item where display_name = 'Erased item') as items,
+            (select count(*)::int from collection_item_ownership_period) as "ownershipPeriods",
             (select count(*)::int from resources where name = 'Erased resource') as resources,
             (select count(*)::int from feedback where title = 'Erased feedback') as feedback,
             (select count(*)::int from upload_session) as uploads,
@@ -188,6 +189,7 @@ describe("account database erasure", () => {
         collections: 0,
         feedback: 0,
         items: 0,
+        ownershipPeriods: 1,
         resources: 0,
         settings: 0,
         uploads: 0,
@@ -557,6 +559,10 @@ async function seedInventory(client: PGlite) {
       from user_collection uc cross join users target
       where uc.name = 'Preserved collection'
         and target.clerk_id = 'user_to_erase';
+    insert into collection_item_ownership_period (
+      collection_item_id, effective_start_date, start_date_imputed, entry_reason
+    ) select id, current_date, true, 'unknown'
+      from collection_item where display_name in ('Erased item', 'Preserved item');
     insert into collection_image (
       collection_id, is_current, position, file_name, content_type, size,
       sha256, object_path, url, uploaded_by_clerk_id

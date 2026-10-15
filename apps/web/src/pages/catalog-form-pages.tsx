@@ -8,6 +8,9 @@ import type {
   CatalogProduct,
   CatalogProductType,
   CatalogTerminologyAlias,
+  CollectionItemOwnershipPeriod,
+  OwnershipEntryReason,
+  OwnershipExitReason,
   SliderMagnetConfiguration,
   SliderMagnetLayout,
   UserCollectionItem,
@@ -51,6 +54,13 @@ import {
   type ComboboxOption,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UserPageShell } from "@/components/user-page-shell";
 import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
@@ -82,6 +92,10 @@ import {
   updateCollectionItem,
 } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
+import {
+  collectionOwnershipEntryReasons,
+  collectionOwnershipExitReasons,
+} from "@/lib/catalog-ownership";
 import { getImageUploadGuidance } from "@/lib/help-content";
 import {
   deleteCollectionCover,
@@ -2985,6 +2999,282 @@ export function CollectionDeletionSection({
   );
 }
 
+/** Controlled lifecycle fields used by collection-item create and edit forms. */
+type OwnershipEditorValue = {
+  /** Effective acquisition date when known. */
+  effectiveStartDate: string;
+  /** Effective departure date when the item is no longer owned. */
+  effectiveEndDate: string;
+  /** Acquisition reason code. */
+  entryReason: OwnershipEntryReason;
+  /** Departure reason code, or an empty unselected value. */
+  exitReason: OwnershipExitReason | "";
+  /** Whether the selected period is still open. */
+  currentlyOwned: boolean;
+  /** Existing period identifier, or null for a new period. */
+  periodId: number | null;
+  /** Whether Pocket Trash entry time supplies the acquisition date. */
+  startDateUnknown: boolean;
+};
+
+/**
+ * Builds editable lifecycle state from an existing period or a new acquisition.
+ *
+ * @param period - Existing period, or nothing for a new acquisition.
+ * @returns Editable form state.
+ */
+function ownershipEditorValue(
+  period?: CollectionItemOwnershipPeriod,
+): OwnershipEditorValue {
+  return {
+    currentlyOwned: period?.effectiveEndDate == null,
+    effectiveEndDate: period?.effectiveEndDate ?? "",
+    effectiveStartDate: period?.startDateImputed
+      ? ""
+      : (period?.effectiveStartDate ?? ""),
+    entryReason: period?.entryReason ?? "unknown",
+    exitReason: period?.exitReason ?? "",
+    periodId: period?.id ?? null,
+    startDateUnknown: period?.startDateImputed ?? true,
+  };
+}
+
+/**
+ * Renders localized ownership period controls and recorded-time context.
+ *
+ * @param root0 - Ownership lifecycle field properties.
+ * @returns Ownership lifecycle fields.
+ */
+function OwnershipLifecycleFields({
+  allowDeparture,
+  onChange,
+  onPeriodChange,
+  periods = [],
+  value,
+}: {
+  /** Whether this form can close an ownership period. */
+  allowDeparture: boolean;
+  /**
+   * Receives lifecycle field changes.
+   *
+   * @param value - Next lifecycle field state.
+   * @returns Nothing.
+   */
+  onChange(value: OwnershipEditorValue): void;
+  /**
+   * Selects an existing period or starts a reacquisition.
+   *
+   * @param periodId - Existing period identifier, or `null` for reacquisition.
+   * @returns Nothing.
+   */
+  onPeriodChange?(periodId: number | null): void;
+  /** Existing periods available for review and correction. */
+  periods?: CollectionItemOwnershipPeriod[];
+  /** Current lifecycle field values. */
+  value: OwnershipEditorValue;
+}) {
+  const t = useCatalogCopy();
+  const { locale } = useLocale();
+  const selectedPeriod = periods.find(({ id }) => id === value.periodId);
+  const dateFormatter = React.useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }),
+    [locale],
+  );
+  const periodOptions = periods.map((period) => ({
+    label: `${period.effectiveStartDate} – ${period.effectiveEndDate ?? t("web.collections.lifecycle.currentlyOwned")}`,
+    value: String(period.id),
+  }));
+  if (
+    periods.length &&
+    periods.every(({ effectiveEndDate }) => effectiveEndDate !== null)
+  ) {
+    periodOptions.push({
+      label: t("web.collections.lifecycle.newPeriod"),
+      value: "new",
+    });
+  }
+  return (
+    <fieldset className="grid gap-4 rounded-md border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.collections.lifecycle.title")}
+      </legend>
+      {periodOptions.length > 1 ? (
+        <Field label={t("web.collections.lifecycle.title")}>
+          <Select
+            items={periodOptions}
+            onValueChange={(next) =>
+              onPeriodChange?.(next === "new" ? null : Number(next))
+            }
+            value={value.periodId === null ? "new" : String(value.periodId)}
+          >
+            <SelectTrigger
+              aria-label={t("web.collections.lifecycle.title")}
+              className="w-full"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {periodOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
+      <label className="flex items-center gap-3 text-sm">
+        <input
+          checked={value.startDateUnknown}
+          className="size-4"
+          onChange={(event) =>
+            onChange({
+              ...value,
+              effectiveStartDate: event.target.checked
+                ? ""
+                : value.effectiveStartDate,
+              startDateUnknown: event.target.checked,
+            })
+          }
+          type="checkbox"
+        />
+        <span>{t("web.collections.lifecycle.acquisitionDateUnknown")}</span>
+      </label>
+      <Field label={t("web.collections.lifecycle.acquisitionDate")}>
+        <Input
+          aria-label={t("web.collections.lifecycle.acquisitionDate")}
+          disabled={value.startDateUnknown}
+          onChange={(event) =>
+            onChange({ ...value, effectiveStartDate: event.target.value })
+          }
+          required={!value.startDateUnknown}
+          type="date"
+          value={value.effectiveStartDate}
+        />
+      </Field>
+      <Field label={t("web.collections.lifecycle.entryReason")}>
+        <Select
+          items={collectionOwnershipEntryReasons.map((reason) => ({
+            label: t(`web.collections.lifecycle.reason.entry.${reason}`),
+            value: reason,
+          }))}
+          onValueChange={(entryReason) =>
+            onChange({
+              ...value,
+              entryReason: entryReason as OwnershipEntryReason,
+            })
+          }
+          value={value.entryReason}
+        >
+          <SelectTrigger
+            aria-label={t("web.collections.lifecycle.entryReason")}
+            className="w-full"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {collectionOwnershipEntryReasons.map((reason) => (
+              <SelectItem key={reason} value={reason}>
+                {t(`web.collections.lifecycle.reason.entry.${reason}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      {allowDeparture ? (
+        <>
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              checked={value.currentlyOwned}
+              className="size-4"
+              disabled={value.periodId === null}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  currentlyOwned: event.target.checked,
+                  effectiveEndDate: event.target.checked
+                    ? ""
+                    : value.effectiveEndDate,
+                  exitReason: event.target.checked ? "" : value.exitReason,
+                })
+              }
+              type="checkbox"
+            />
+            <span>{t("web.collections.lifecycle.currentlyOwned")}</span>
+          </label>
+          {!value.currentlyOwned ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("web.collections.lifecycle.departureDate")}>
+                <Input
+                  aria-label={t("web.collections.lifecycle.departureDate")}
+                  onChange={(event) =>
+                    onChange({ ...value, effectiveEndDate: event.target.value })
+                  }
+                  required
+                  type="date"
+                  value={value.effectiveEndDate}
+                />
+              </Field>
+              <Field label={t("web.collections.lifecycle.exitReason")}>
+                <Select
+                  items={collectionOwnershipExitReasons.map((reason) => ({
+                    label: t(`web.collections.lifecycle.reason.exit.${reason}`),
+                    value: reason,
+                  }))}
+                  onValueChange={(exitReason) =>
+                    onChange({
+                      ...value,
+                      exitReason: exitReason as OwnershipExitReason,
+                    })
+                  }
+                  value={value.exitReason || null}
+                >
+                  <SelectTrigger
+                    aria-label={t("web.collections.lifecycle.exitReason")}
+                    className="w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {collectionOwnershipExitReasons.map((reason) => (
+                      <SelectItem key={reason} value={reason}>
+                        {t(`web.collections.lifecycle.reason.exit.${reason}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {selectedPeriod ? (
+        <div className="grid gap-1 text-xs text-muted-foreground">
+          <span>
+            {t("web.collections.lifecycle.recordedStart", {
+              date: dateFormatter.format(
+                new Date(selectedPeriod.startedRecordedAt),
+              ),
+            })}
+          </span>
+          {selectedPeriod.startDateImputed ? (
+            <span>{t("web.collections.lifecycle.imputed")}</span>
+          ) : null}
+          {selectedPeriod.endedRecordedAt ? (
+            <span>
+              {t("web.collections.lifecycle.recordedEnd", {
+                date: dateFormatter.format(
+                  new Date(selectedPeriod.endedRecordedAt),
+                ),
+              })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </fieldset>
+  );
+}
+
 /**
  * Renders the form for adding a product to a collection.
  *
@@ -3074,6 +3364,9 @@ export function CollectionAddPage({
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const [bearing, setBearing] = React.useState("");
   const [serialNumber, setSerialNumber] = React.useState<string | null>(null);
+  const [ownership, setOwnership] = React.useState<OwnershipEditorValue>(() =>
+    ownershipEditorValue(),
+  );
   const [configurationSelections, setConfigurationSelections] = React.useState<
     Record<number, OwnedConfigurationSelection>
   >({});
@@ -3293,6 +3586,12 @@ export function CollectionAddPage({
             : null,
         productId: product.id,
         productTypeSlug: product.productTypeSlug,
+        ownership: {
+          effectiveStartDate: ownership.startDateUnknown
+            ? null
+            : ownership.effectiveStartDate,
+          entryReason: ownership.entryReason,
+        },
         serialNumber,
       },
     });
@@ -3414,6 +3713,11 @@ export function CollectionAddPage({
             value={serialNumber}
           />
         ) : null}
+        <OwnershipLifecycleFields
+          allowDeparture={false}
+          onChange={setOwnership}
+          value={ownership}
+        />
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
         ) : null}
@@ -4381,6 +4685,10 @@ export function CollectionEditPage({
   const [serialNumber, setSerialNumber] = React.useState<string | null>(
     item.serialNumber ?? null,
   );
+  const ownershipPeriods = item.ownershipPeriods ?? [];
+  const [ownership, setOwnership] = React.useState<OwnershipEditorValue>(() =>
+    ownershipEditorValue(ownershipPeriods.at(-1)),
+  );
   const [configurationSelections, setConfigurationSelections] = React.useState<
     Record<number, OwnedConfigurationSelection>
   >(() =>
@@ -4577,6 +4885,19 @@ export function CollectionEditPage({
               value={serialNumber}
             />
           ) : null}
+          <OwnershipLifecycleFields
+            allowDeparture
+            onChange={setOwnership}
+            onPeriodChange={(periodId) =>
+              setOwnership(
+                ownershipEditorValue(
+                  ownershipPeriods.find(({ id }) => id === periodId),
+                ),
+              )
+            }
+            periods={ownershipPeriods}
+            value={ownership}
+          />
           <CollectionSelector
             addLabel={t("web.collections.select.addNew")}
             collections={collections}
@@ -5080,6 +5401,19 @@ export function CollectionEditPage({
                     : material?.id === -1
                       ? undefined
                       : material?.id,
+                  ownership: {
+                    effectiveEndDate: ownership.currentlyOwned
+                      ? null
+                      : ownership.effectiveEndDate || null,
+                    effectiveStartDate: ownership.startDateUnknown
+                      ? null
+                      : ownership.effectiveStartDate,
+                    entryReason: ownership.entryReason,
+                    exitReason: ownership.currentlyOwned
+                      ? null
+                      : ownership.exitReason || null,
+                    periodId: ownership.periodId,
+                  },
                   reason,
                   serialNumber,
                 },

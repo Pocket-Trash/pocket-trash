@@ -399,7 +399,7 @@ describe("finish option editor", () => {
 
     expect(html).toContain(">Spinner</legend>");
     expect(html).toContain(">Button</legend>");
-    expect(html.match(/<fieldset/g)).toHaveLength(2);
+    expect(html.match(/<fieldset/g)).toHaveLength(3);
   });
 
   it("offers only available slider components and restores the installed assembly", () => {
@@ -485,7 +485,7 @@ describe("collection item deletion", () => {
     expect(ownerHtml.match(/>Permanently delete item<\/button>/g)).toHaveLength(
       2,
     );
-    expect(ownerHtml).not.toContain("Reason");
+    expect(ownerHtml).not.toContain('maxLength="1000"');
     expect(adminHtml).toContain("Permanently delete item");
     expect(adminHtml).toContain('maxLength="1000"');
     expect(strangerHtml).not.toContain("Permanently delete item");
@@ -649,6 +649,54 @@ describe("product form conditional fields", () => {
 });
 
 describe("collection edit conditional fields", () => {
+  it("shows ownership history, effective dates, reasons, and recorded context", () => {
+    const product = productFixture(1006, "Test product", "slider");
+    const item = {
+      ...collectionFixture(30, product, 1007),
+      ownershipPeriods: [
+        {
+          effectiveEndDate: "2025-06-01",
+          effectiveStartDate: "2025-01-15",
+          endedRecordedAt: new Date("2025-06-02T12:00:00Z"),
+          entryReason: "purchase" as const,
+          exitReason: "sale" as const,
+          id: 5000,
+          startDateImputed: false,
+          startedRecordedAt: new Date("2025-01-16T12:00:00Z"),
+          updatedAt: new Date("2025-06-02T12:00:00Z"),
+        },
+        {
+          effectiveEndDate: null,
+          effectiveStartDate: "2025-09-10",
+          endedRecordedAt: null,
+          entryReason: "trade" as const,
+          exitReason: null,
+          id: 5001,
+          startDateImputed: false,
+          startedRecordedAt: new Date("2025-09-11T12:00:00Z"),
+          updatedAt: new Date("2025-09-11T12:00:00Z"),
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        buttonProducts: [],
+        collections: [],
+        item,
+        options: emptyCatalogOptions,
+        ownedButtons: [],
+        product,
+      }),
+    );
+
+    expect(html).toContain("web.collections.lifecycle.title");
+    expect(html).toContain("2025-09-10");
+    expect(html).toContain('aria-label="web.collections.lifecycle.title"');
+    expect(html).toContain("web.collections.lifecycle.acquisitionDate");
+    expect(html).toContain("web.collections.lifecycle.entryReason");
+    expect(html).toContain("web.collections.lifecycle.recordedStart");
+  });
+
   it.each([
     "spinner",
     "spinner-button",

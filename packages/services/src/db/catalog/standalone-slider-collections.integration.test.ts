@@ -3,7 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
@@ -27,6 +27,10 @@ describe("standalone slider collection items", () => {
         .insert(schema.user)
         .values({ clerkId: "slider-owner", username: "Slider owner" })
         .returning();
+      const [otherOwner] = await db
+        .insert(schema.user)
+        .values({ clerkId: "other-owner", username: "Other owner" })
+        .returning();
       const [maker] = await db
         .insert(schema.maker)
         .values({ name: "Slider maker", slug: "slider-maker" })
@@ -35,7 +39,9 @@ describe("standalone slider collection items", () => {
         .insert(schema.material)
         .values({ name: "Titanium", slug: "titanium" })
         .returning();
-      if (!owner || !maker || !material) throw new Error("Fixtures missing.");
+      if (!owner || !otherOwner || !maker || !material) {
+        throw new Error("Fixtures missing.");
+      }
       const productTypes = await db
         .insert(schema.productType)
         .values([
@@ -146,12 +152,37 @@ describe("standalone slider collection items", () => {
               )[0]!.id,
               productId: productIds[slug],
               productTypeSlug: slug,
+              ...(slug === "slider"
+                ? {
+                    ownership: {
+                      effectiveStartDate: "2025-01-15",
+                      entryReason: "purchase" as const,
+                    },
+                  }
+                : {}),
             }),
         ),
       );
       const sliderItemId = itemIds[0];
       const insertItemId = itemIds[2];
       if (!sliderItemId || !insertItemId) throw new Error("Items missing.");
+      await expect(
+        db
+          .select()
+          .from(schema.collectionItemOwnershipPeriod)
+          .where(
+            eq(
+              schema.collectionItemOwnershipPeriod.collectionItemId,
+              itemIds[1]!,
+            ),
+          ),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          effectiveStartDate: expect.any(String),
+          entryReason: "unknown",
+          startDateImputed: true,
+        }),
+      ]);
       await expect(collectionsService.listOwned(actor)).resolves.toEqual(
         expect.arrayContaining(
           (["slider", "slider-plate", "slider-insert"] as const).map(
@@ -183,6 +214,151 @@ describe("standalone slider collection items", () => {
         displayName: "Moved slider",
         productTypeSlug: "slider",
       });
+
+      const [initialPeriod] = await db
+        .select()
+        .from(schema.collectionItemOwnershipPeriod)
+        .where(
+          eq(
+            schema.collectionItemOwnershipPeriod.collectionItemId,
+            sliderItemId,
+          ),
+        );
+      if (!initialPeriod) throw new Error("Ownership period missing.");
+      await expect(
+        collectionsService.updateItem({
+          actor: { clerkId: otherOwner.clerkId, role: "user" },
+          collectionItemId: sliderItemId,
+          customFinish: null,
+          displayName: "Unauthorized",
+          finishOptionId: null,
+          ownership: {
+            effectiveEndDate: null,
+            effectiveStartDate: "2025-01-10",
+            entryReason: "gift",
+            exitReason: null,
+            periodId: initialPeriod.id,
+          },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        collectionsService.updateItem({
+          actor,
+          collectionItemId: sliderItemId,
+          customFinish: null,
+          displayName: "Must roll back",
+          finishOptionId: null,
+          ownership: {
+            effectiveEndDate: "2024-01-01",
+            effectiveStartDate: "2025-01-10",
+            entryReason: "gift",
+            exitReason: "sale",
+            periodId: initialPeriod.id,
+          },
+        }),
+      ).rejects.toThrow("departure cannot precede acquisition");
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({ displayName: "Moved slider" });
+
+      await collectionsService.updateItem({
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+        ownership: {
+          effectiveEndDate: "2025-02-01",
+          effectiveStartDate: "2025-01-10",
+          entryReason: "gift",
+          exitReason: "sale",
+          periodId: initialPeriod.id,
+        },
+      });
+      await expect(
+        collectionsService.updateItem({
+          actor,
+          collectionItemId: sliderItemId,
+          customFinish: null,
+          displayName: "Must still roll back",
+          finishOptionId: null,
+          ownership: {
+            effectiveEndDate: null,
+            effectiveStartDate: "2025-01-20",
+            entryReason: "trade",
+            exitReason: null,
+            periodId: null,
+          },
+        }),
+      ).rejects.toThrow("Ownership periods cannot overlap");
+      await collectionsService.updateItem({
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+        ownership: {
+          effectiveEndDate: null,
+          effectiveStartDate: "2025-03-01",
+          entryReason: "trade",
+          exitReason: null,
+          periodId: null,
+        },
+      });
+      const periods = await db
+        .select()
+        .from(schema.collectionItemOwnershipPeriod)
+        .where(
+          eq(
+            schema.collectionItemOwnershipPeriod.collectionItemId,
+            sliderItemId,
+          ),
+        )
+        .orderBy(asc(schema.collectionItemOwnershipPeriod.id));
+      expect(periods).toEqual([
+        expect.objectContaining({
+          effectiveEndDate: "2025-02-01",
+          effectiveStartDate: "2025-01-10",
+          endedRecordedAt: expect.any(Date),
+          entryReason: "gift",
+          exitReason: "sale",
+          startedRecordedAt: initialPeriod.startedRecordedAt,
+        }),
+        expect.objectContaining({
+          effectiveEndDate: null,
+          effectiveStartDate: "2025-03-01",
+          entryReason: "trade",
+        }),
+      ]);
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        ownershipPeriods: [
+          expect.objectContaining({ effectiveEndDate: "2025-02-01" }),
+          expect.objectContaining({ effectiveEndDate: null }),
+        ],
+      });
+
+      const duplicateItemId = await collectionsService.addSliderProduct({
+        actor,
+        collectionId: primary.id,
+        customFinish: null,
+        displayName: "Another physical slider",
+        finishOptionId: null,
+        materialAssignmentId: (
+          await db
+            .select({ id: schema.productMaterial.id })
+            .from(schema.productMaterial)
+            .where(eq(schema.productMaterial.productId, sliderProductId))
+        )[0]!.id,
+        ownership: {
+          effectiveStartDate: "2025-03-02",
+          entryReason: "purchase",
+        },
+        productId: sliderProductId,
+        productTypeSlug: "slider",
+      });
+      expect(duplicateItemId).not.toBe(sliderItemId);
 
       await collectionsService.deleteItem({
         actor,

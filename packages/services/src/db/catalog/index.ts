@@ -59,6 +59,11 @@ import {
   collectionItemDeletionState,
 } from "./deletion-state.js";
 
+/** Entry reason codes accepted by collection lifecycle writes. */
+export const collectionOwnershipEntryReasons = schema.ownershipEntryReasons;
+/** Exit reason codes accepted by collection lifecycle writes. */
+export const collectionOwnershipExitReasons = schema.ownershipExitReasons;
+
 /**
  * Error raised for collection button already installed.
  */
@@ -1931,6 +1936,56 @@ export type CatalogService = {
 /**
  * Owned collection item with its product snapshot and visibility state.
  */
+/** Reason code recorded when an item enters a collection. */
+export type OwnershipEntryReason =
+  (typeof schema.ownershipEntryReasons)[number];
+
+/** Reason code recorded when an item leaves a collection. */
+export type OwnershipExitReason = (typeof schema.ownershipExitReasons)[number];
+
+/** One effective ownership interval and its Pocket Trash recording times. */
+export type CollectionItemOwnershipPeriod = {
+  /** Stable ownership-period identifier. */
+  id: number;
+  /** Effective acquisition date, formatted as YYYY-MM-DD. */
+  effectiveStartDate: string;
+  /** Effective departure date, formatted as YYYY-MM-DD. */
+  effectiveEndDate: string | null;
+  /** Why the item entered the collection. */
+  entryReason: OwnershipEntryReason;
+  /** When the departure was recorded. */
+  endedRecordedAt: Date | null;
+  /** Why the item left the collection. */
+  exitReason: OwnershipExitReason | null;
+  /** Whether the acquisition date was imputed from Pocket Trash entry time. */
+  startDateImputed: boolean;
+  /** When the acquisition was recorded. */
+  startedRecordedAt: Date;
+  /** When the period was most recently corrected. */
+  updatedAt: Date;
+};
+
+/** Editable lifecycle state for one existing or newly reacquired item period. */
+export type CollectionItemOwnershipWrite = {
+  /** Effective acquisition date, or null when it is unknown. */
+  effectiveStartDate: string | null;
+  /** Effective departure date, or null while ownership remains active. */
+  effectiveEndDate: string | null;
+  /** Why the item entered the collection. */
+  entryReason: OwnershipEntryReason;
+  /** Why the item left the collection; required with a departure date. */
+  exitReason: OwnershipExitReason | null;
+  /** Existing period to correct, or null to open a reacquisition period. */
+  periodId: number | null;
+};
+
+/** Initial lifecycle fields recorded when a physical item enters a collection. */
+export type CollectionItemOwnershipStart = Pick<
+  CollectionItemOwnershipWrite,
+  "effectiveStartDate" | "entryReason"
+>;
+
+/** Owned collection item with its product snapshot and visibility state. */
 export type UserCollectionItem = {
   /** Durable administrative review state, independent of privacy. */
   approvalStatus: CatalogApprovalStatus;
@@ -2081,6 +2136,8 @@ export type UserCollectionItem = {
    * Owner database user identifier.
    */
   ownerUserId: number;
+  /** Ownership periods ordered from earliest to latest. */
+  ownershipPeriods?: CollectionItemOwnershipPeriod[];
   /**
    * Product identifier.
    */
@@ -2278,6 +2335,8 @@ export type CollectionsService = {
     materialAssignmentId: number | null;
     /** Optional collection created with the item. */
     newCollection?: CollectionWriteInput | null;
+    /** Initial ownership period for this physical item. */
+    ownership?: CollectionItemOwnershipStart;
     /** Exact catalog product identifier. */
     productId: number;
     /** Exact Pen or Pen-part subtype. */
@@ -2355,6 +2414,8 @@ export type CollectionsService = {
      * New collection.
      */
     newCollection?: CollectionWriteInput | null;
+    /** Initial ownership period shared by the spinner and included button. */
+    ownership?: CollectionItemOwnershipStart;
     /** Optional maker serial. */
     serialNumber?: string | null;
   }): Promise<{
@@ -2411,6 +2472,8 @@ export type CollectionsService = {
      * New collection.
      */
     newCollection?: CollectionWriteInput | null;
+    /** Initial ownership period for this physical item. */
+    ownership?: CollectionItemOwnershipStart;
     /** Optional maker serial. */
     serialNumber?: string | null;
   }): Promise<number>;
@@ -2438,6 +2501,8 @@ export type CollectionsService = {
     materialAssignmentId: number;
     /** Optional collection created with the item. */
     newCollection?: CollectionWriteInput | null;
+    /** Initial ownership period for this physical item. */
+    ownership?: CollectionItemOwnershipStart;
     /** Exact catalog product identifier. */
     productId: number;
     /** Exact standalone slider product subtype. */
@@ -2795,6 +2860,8 @@ export type CollectionsService = {
      * Material identifier.
      */
     materialAssignmentId?: number | null;
+    /** Current period correction, departure, or a new reacquisition period. */
+    ownership?: CollectionItemOwnershipWrite;
     /**
      * Administrative reason for the operation.
      */
@@ -6178,6 +6245,7 @@ export function createCollectionsService(
               })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
+            await createInitialOwnershipPeriod(tx, item.id, input.ownership);
             if (input.productTypeSlug === "pen") {
               await tx.insert(schema.collectionDetailPen).values({
                 id: item.id,
@@ -6315,6 +6383,11 @@ export function createCollectionsService(
                 })
                 .returning({ id: schema.collectionItem.id });
               if (!buttonItem) throw new Error("Failed to create button item.");
+              await createInitialOwnershipPeriod(
+                tx,
+                buttonItem.id,
+                input.ownership,
+              );
               await tx.insert(schema.collectionDetailSpinnerButton).values({
                 id: buttonItem.id,
                 productSpinnerButtonId: input.buttonProductId,
@@ -6366,6 +6439,11 @@ export function createCollectionsService(
               })
               .returning({ id: schema.collectionItem.id });
             if (!spinnerItem) throw new Error("Failed to create spinner item.");
+            await createInitialOwnershipPeriod(
+              tx,
+              spinnerItem.id,
+              input.ownership,
+            );
             await tx.insert(schema.collectionDetailSpinner).values({
               ...(input.bearing !== undefined
                 ? { bearing: normalizeOptionalText(input.bearing) }
@@ -6464,6 +6542,7 @@ export function createCollectionsService(
               })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
+            await createInitialOwnershipPeriod(tx, item.id, input.ownership);
             await tx.insert(schema.collectionDetailSpinnerButton).values({
               id: item.id,
               productSpinnerButtonId: input.productId,
@@ -6583,6 +6662,7 @@ export function createCollectionsService(
               })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
+            await createInitialOwnershipPeriod(tx, item.id, input.ownership);
             if (input.productTypeSlug === "slider") {
               const magnetLayout =
                 product.includedInsertMagnetLayout ?? product.bodyMagnetLayout;
@@ -7169,6 +7249,7 @@ export function createCollectionsService(
             canManage ? undefined : actor.clerkId,
             collectionItemId,
             {
+              includeDeparted: true,
               includePrivate: true,
               viewerClerkId: actor.clerkId,
               viewerCanManage: canManage,
@@ -7838,9 +7919,9 @@ export function createCollectionsService(
                     : owner
                       ? eq(schema.collectionItem.ownerId, owner.id)
                       : sql`false`,
-                  eq(schema.collectionItem.owned, true),
                 ),
               )
+              .for("update", { of: schema.collectionItem })
               .limit(1);
             const productId =
               item?.spinnerProductId ??
@@ -7858,6 +7939,23 @@ export function createCollectionsService(
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
             }
+            const ownershipBefore = input.ownership
+              ? await tx
+                  .select()
+                  .from(schema.collectionItemOwnershipPeriod)
+                  .where(
+                    eq(
+                      schema.collectionItemOwnershipPeriod.collectionItemId,
+                      input.collectionItemId,
+                    ),
+                  )
+                  .orderBy(
+                    asc(
+                      schema.collectionItemOwnershipPeriod.effectiveStartDate,
+                    ),
+                    asc(schema.collectionItemOwnershipPeriod.id),
+                  )
+              : [];
             const before = {
               collectionId: item.collectionId,
               description: item.description,
@@ -8365,6 +8463,13 @@ export function createCollectionsService(
                 });
               }
             }
+            if (input.ownership) {
+              await applyOwnershipWrite(
+                tx,
+                input.collectionItemId,
+                input.ownership,
+              );
+            }
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
@@ -8399,6 +8504,7 @@ export function createCollectionsService(
                   ? item.installedRefillProductId
                   : input.installedRefillProductId,
               materialAssignmentId: input.materialAssignmentId ?? null,
+              ...(input.ownership ? { ownership: input.ownership } : {}),
               serialNumber:
                 input.serialNumber === undefined
                   ? item.serialNumber
@@ -8409,7 +8515,21 @@ export function createCollectionsService(
               actor: input.actor,
               actorUser: owner,
               after,
-              before,
+              before: {
+                ...before,
+                ...(input.ownership
+                  ? {
+                      ownershipPeriods: ownershipBefore.map((period) => ({
+                        ...period,
+                        endedRecordedAt:
+                          period.endedRecordedAt?.toISOString() ?? null,
+                        startedRecordedAt:
+                          period.startedRecordedAt.toISOString(),
+                        updatedAt: period.updatedAt.toISOString(),
+                      })),
+                    }
+                  : {}),
+              },
               definition: collectionAudit.itemUpdated,
               ownerUserId: item.ownerId,
               reason: input.reason,
@@ -8882,6 +9002,256 @@ async function insertCollection(
     .returning({ id: schema.userCollection.id });
   if (!collection) throw new Error("Failed to create collection.");
   return collection.id;
+}
+
+/**
+ * Returns a validated effective date or an explicitly imputed fallback.
+ *
+ * @param value - Candidate calendar date, or `null` when unknown.
+ * @param fallback - Recorded timestamp used for an unknown date.
+ * @returns Normalized date and whether it was imputed.
+ * @throws When the candidate is not a real calendar date.
+ */
+function effectiveOwnershipDate(value: string | null, fallback: Date) {
+  if (value === null) {
+    return {
+      date: fallback.toISOString().slice(0, 10),
+      imputed: true,
+    };
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+    Number.isNaN(parsed.valueOf()) ||
+    parsed.toISOString().slice(0, 10) !== value
+  ) {
+    throw new Error("Ownership effective date is invalid.");
+  }
+  return { date: value, imputed: false };
+}
+
+/**
+ * Rejects overlapping effective ranges for one physical item.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param collectionItemId - Physical collection-item identifier.
+ * @param range - Candidate effective range.
+ * @param excludedPeriodId - Period being corrected, or `null` for a new range.
+ * @returns Completion after the range is validated.
+ * @rejects When the candidate overlaps another ownership period.
+ */
+async function validateOwnershipPeriodRange(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+  range: {
+    /** Inclusive acquisition date. */
+    start: string;
+    /** Departure date, or `null` for the active period. */
+    end: string | null;
+  },
+  excludedPeriodId: number | null,
+) {
+  const periods = await tx
+    .select({
+      effectiveEndDate: schema.collectionItemOwnershipPeriod.effectiveEndDate,
+      effectiveStartDate:
+        schema.collectionItemOwnershipPeriod.effectiveStartDate,
+      id: schema.collectionItemOwnershipPeriod.id,
+    })
+    .from(schema.collectionItemOwnershipPeriod)
+    .where(
+      eq(
+        schema.collectionItemOwnershipPeriod.collectionItemId,
+        collectionItemId,
+      ),
+    );
+  const overlaps = periods.some(
+    (period) =>
+      period.id !== excludedPeriodId &&
+      (range.end === null || period.effectiveStartDate < range.end) &&
+      (period.effectiveEndDate === null ||
+        range.start < period.effectiveEndDate),
+  );
+  if (overlaps) throw new Error("Ownership periods cannot overlap.");
+}
+
+/**
+ * Opens the first ownership period inside the caller's item transaction.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param collectionItemId - Physical collection-item identifier.
+ * @param input - Effective acquisition date and reason.
+ * @returns Completion after the period and legacy fields are persisted.
+ * @rejects When validation or persistence fails.
+ */
+async function createInitialOwnershipPeriod(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+  input: CollectionItemOwnershipStart = {
+    effectiveStartDate: null,
+    entryReason: "unknown",
+  },
+) {
+  const recordedAt = new Date();
+  const start = effectiveOwnershipDate(input.effectiveStartDate, recordedAt);
+  await tx.insert(schema.collectionItemOwnershipPeriod).values({
+    collectionItemId,
+    effectiveStartDate: start.date,
+    entryReason: input.entryReason,
+    startDateImputed: start.imputed,
+    startedRecordedAt: recordedAt,
+    updatedAt: recordedAt,
+  });
+  await tx
+    .update(schema.collectionItem)
+    .set({
+      owned: true,
+      purchasedAt: start.imputed
+        ? null
+        : new Date(`${start.date}T00:00:00.000Z`),
+      soldAt: null,
+    })
+    .where(eq(schema.collectionItem.id, collectionItemId));
+}
+
+/**
+ * Applies a correction, departure, or reacquisition inside an item transaction.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param collectionItemId - Physical collection-item identifier.
+ * @param input - Lifecycle write to apply.
+ * @returns Completion after the lifecycle and legacy fields are synchronized.
+ * @rejects When authorization-independent lifecycle validation or persistence fails.
+ */
+async function applyOwnershipWrite(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+  input: CollectionItemOwnershipWrite,
+) {
+  const recordedAt = new Date();
+  if ((input.effectiveEndDate === null) !== (input.exitReason === null)) {
+    throw new Error("Ownership departure date and reason are both required.");
+  }
+  if (input.periodId === null) {
+    const [open] = await tx
+      .select({ id: schema.collectionItemOwnershipPeriod.id })
+      .from(schema.collectionItemOwnershipPeriod)
+      .where(
+        and(
+          eq(
+            schema.collectionItemOwnershipPeriod.collectionItemId,
+            collectionItemId,
+          ),
+          isNull(schema.collectionItemOwnershipPeriod.effectiveEndDate),
+        ),
+      )
+      .limit(1);
+    if (open) throw new Error("Collection item is already owned.");
+    if (input.effectiveEndDate !== null) {
+      throw new Error("A reacquisition period must be open.");
+    }
+    const start = effectiveOwnershipDate(input.effectiveStartDate, recordedAt);
+    await validateOwnershipPeriodRange(
+      tx,
+      collectionItemId,
+      { end: null, start: start.date },
+      null,
+    );
+    await createInitialOwnershipPeriod(tx, collectionItemId, input);
+    return;
+  }
+
+  const [period] = await tx
+    .select({
+      effectiveEndDate: schema.collectionItemOwnershipPeriod.effectiveEndDate,
+      startedRecordedAt: schema.collectionItemOwnershipPeriod.startedRecordedAt,
+    })
+    .from(schema.collectionItemOwnershipPeriod)
+    .where(
+      and(
+        eq(schema.collectionItemOwnershipPeriod.id, input.periodId),
+        eq(
+          schema.collectionItemOwnershipPeriod.collectionItemId,
+          collectionItemId,
+        ),
+      ),
+    )
+    .limit(1);
+  if (!period) throw new Error("Ownership period does not exist.");
+  if (period.effectiveEndDate !== null && input.effectiveEndDate === null) {
+    throw new Error("Reacquisition requires a new ownership period.");
+  }
+  const start = effectiveOwnershipDate(
+    input.effectiveStartDate,
+    period.startedRecordedAt,
+  );
+  const end =
+    input.effectiveEndDate === null
+      ? null
+      : effectiveOwnershipDate(input.effectiveEndDate, recordedAt).date;
+  if (end !== null && end < start.date) {
+    throw new Error("Ownership departure cannot precede acquisition.");
+  }
+  await validateOwnershipPeriodRange(
+    tx,
+    collectionItemId,
+    { end, start: start.date },
+    input.periodId,
+  );
+  await tx
+    .update(schema.collectionItemOwnershipPeriod)
+    .set({
+      effectiveEndDate: end,
+      effectiveStartDate: start.date,
+      endedRecordedAt:
+        end === null
+          ? null
+          : period.effectiveEndDate === null
+            ? recordedAt
+            : undefined,
+      entryReason: input.entryReason,
+      exitReason: input.exitReason,
+      startDateImputed: start.imputed,
+      updatedAt: recordedAt,
+    })
+    .where(eq(schema.collectionItemOwnershipPeriod.id, input.periodId));
+
+  const [latest] = await tx
+    .select({
+      effectiveEndDate: schema.collectionItemOwnershipPeriod.effectiveEndDate,
+      effectiveStartDate:
+        schema.collectionItemOwnershipPeriod.effectiveStartDate,
+      startDateImputed: schema.collectionItemOwnershipPeriod.startDateImputed,
+    })
+    .from(schema.collectionItemOwnershipPeriod)
+    .where(
+      eq(
+        schema.collectionItemOwnershipPeriod.collectionItemId,
+        collectionItemId,
+      ),
+    )
+    .orderBy(
+      desc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
+      desc(schema.collectionItemOwnershipPeriod.startedRecordedAt),
+    )
+    .limit(1);
+  const open = latest?.effectiveEndDate === null ? latest : undefined;
+  await tx
+    .update(schema.collectionItem)
+    .set({
+      owned: Boolean(open),
+      purchasedAt: open?.startDateImputed
+        ? null
+        : open
+          ? new Date(`${open.effectiveStartDate}T00:00:00.000Z`)
+          : undefined,
+      soldAt:
+        open || !latest?.effectiveEndDate
+          ? null
+          : new Date(`${latest.effectiveEndDate}T00:00:00.000Z`),
+      updatedAt: recordedAt,
+    })
+    .where(eq(schema.collectionItem.id, collectionItemId));
 }
 
 /**
@@ -10324,6 +10694,8 @@ async function queryOwnedItems(
     includePrivate?: boolean;
     /** Maker identifier. */
     makerId?: number;
+    /** Include departed items for direct owner or staff editing. */
+    includeDeparted?: boolean;
     /**
      * Directly assigned material identifier.
      */
@@ -10359,10 +10731,12 @@ async function queryOwnedItems(
     (select collection_item_id from collection_item_configuration_selection where installed_part_collection_item_id = ${schema.collectionItem.id})
   )`;
   const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
-  const conditions = [
-    eq(schema.collectionItem.owned, true),
-    isNull(schema.collectionItem.soldAt),
-  ];
+  const conditions = options.includeDeparted
+    ? []
+    : [
+        eq(schema.collectionItem.owned, true),
+        isNull(schema.collectionItem.soldAt),
+      ];
   if (actorClerkId !== undefined) {
     conditions.push(eq(schema.user.clerkId, actorClerkId));
   }
@@ -10740,6 +11114,7 @@ async function queryOwnedItems(
       ownerImageUrl: row.ownerImageUrl,
       ownerUsername: row.ownerUsername,
       ownerUserId: row.ownerUserId,
+      ownershipPeriods: [],
       productId: row.productId,
       productSlug: row.productSlug,
       productTypeName: row.productTypeName,
@@ -10760,23 +11135,42 @@ async function queryOwnedItems(
     options.includePrivate,
   );
   if (items.length) {
-    const selections = await db
-      .select({
-        choiceId: schema.collectionItemConfigurationSelection.choiceId,
-        collectionItemId:
-          schema.collectionItemConfigurationSelection.collectionItemId,
-        installedPartCollectionItemId:
-          schema.collectionItemConfigurationSelection
-            .installedPartCollectionItemId,
-        slotId: schema.collectionItemConfigurationSelection.slotId,
-      })
-      .from(schema.collectionItemConfigurationSelection)
-      .where(
-        inArray(
-          schema.collectionItemConfigurationSelection.collectionItemId,
-          items.map(({ collectionItemId }) => collectionItemId),
+    const itemIds = items.map(({ collectionItemId }) => collectionItemId);
+    const [selections, ownershipPeriods] = await Promise.all([
+      db
+        .select({
+          choiceId: schema.collectionItemConfigurationSelection.choiceId,
+          collectionItemId:
+            schema.collectionItemConfigurationSelection.collectionItemId,
+          installedPartCollectionItemId:
+            schema.collectionItemConfigurationSelection
+              .installedPartCollectionItemId,
+          slotId: schema.collectionItemConfigurationSelection.slotId,
+        })
+        .from(schema.collectionItemConfigurationSelection)
+        .where(
+          inArray(
+            schema.collectionItemConfigurationSelection.collectionItemId,
+            itemIds,
+          ),
         ),
-      );
+      options.viewerCanManage ||
+      items.some(({ ownerClerkId }) => ownerClerkId === options.viewerClerkId)
+        ? db
+            .select()
+            .from(schema.collectionItemOwnershipPeriod)
+            .where(
+              inArray(
+                schema.collectionItemOwnershipPeriod.collectionItemId,
+                itemIds,
+              ),
+            )
+            .orderBy(
+              asc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
+              asc(schema.collectionItemOwnershipPeriod.id),
+            )
+        : Promise.resolve([]),
+    ]);
     const itemsById = new Map(
       items.map((item) => [item.collectionItemId, item]),
     );
@@ -10785,6 +11179,27 @@ async function queryOwnedItems(
         choiceId: selection.choiceId,
         installedPartCollectionItemId: selection.installedPartCollectionItemId,
         slotId: selection.slotId,
+      });
+    }
+    for (const period of ownershipPeriods) {
+      const item = itemsById.get(period.collectionItemId);
+      if (
+        !item ||
+        (!options.viewerCanManage &&
+          item.ownerClerkId !== options.viewerClerkId)
+      ) {
+        continue;
+      }
+      item.ownershipPeriods?.push({
+        effectiveEndDate: period.effectiveEndDate,
+        effectiveStartDate: period.effectiveStartDate,
+        endedRecordedAt: period.endedRecordedAt,
+        entryReason: period.entryReason,
+        exitReason: period.exitReason,
+        id: period.id,
+        startDateImputed: period.startDateImputed,
+        startedRecordedAt: period.startedRecordedAt,
+        updatedAt: period.updatedAt,
       });
     }
     const viewer = options.viewerClerkId

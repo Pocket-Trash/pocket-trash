@@ -28,6 +28,10 @@ type ErasureTargets = {
    */
   collectionItemIds: Array<number | string>;
   /**
+   * Collection item ownership period identifiers.
+   */
+  collectionItemOwnershipPeriodIds: Array<number | string>;
+  /**
    * Collection item image identifiers.
    */
   collectionItemImageIds: Array<number | string>;
@@ -99,6 +103,7 @@ export async function eraseAccountDatabaseData(
         array(select id from audit_event where owner_user_id = ${userId}) as "auditOwnerEventIds",
         array(select id from user_collection where owner_id = ${userId}) as "collectionIds",
         array(select id from collection_item where owner_id = ${userId}) as "collectionItemIds",
+        array(select ciop.id from collection_item_ownership_period ciop join collection_item ci on ci.id = ciop.collection_item_id where ci.owner_id = ${userId}) as "collectionItemOwnershipPeriodIds",
         array(select ci.id from collection_image ci join user_collection uc on uc.id = ci.collection_id where uc.owner_id = ${userId}) as "collectionImageIds",
         array(select cii.id from collection_item_image cii join collection_item ci on ci.id = cii.collection_item_id where ci.owner_id = ${userId}) as "collectionItemImageIds",
         array(select id from resources where uploader_clerk_id = ${targetClerkId}) as "resourceIds",
@@ -287,6 +292,7 @@ export async function eraseAccountDatabaseData(
       union all select 'feature_flag_user_overrides.updated_by_clerk_id', count(*) from feature_flag_user_overrides where updated_by_clerk_id = ${targetClerkId}
       union all select 'target.user_collection.id', count(*) from user_collection where ${inArray(schema.userCollection.id, numericIds(targets.collectionIds))}
       union all select 'target.collection_item.id', count(*) from collection_item where ${inArray(schema.collectionItem.id, numericIds(targets.collectionItemIds))}
+      union all select 'target.collection_item_ownership_period.id', count(*) from collection_item_ownership_period where ${inArray(schema.collectionItemOwnershipPeriod.id, numericIds(targets.collectionItemOwnershipPeriodIds))}
       union all select 'target.collection_image.id', count(*) from collection_image where ${inArray(schema.collectionImage.id, numericIds(targets.collectionImageIds))}
       union all select 'target.collection_item_image.id', count(*) from collection_item_image where ${inArray(schema.collectionItemImage.id, numericIds(targets.collectionItemImageIds))}
       union all select 'target.resources.id', count(*) from resources where ${inArray(schema.resources.id, numericIds(targets.resourceIds))}
@@ -296,6 +302,7 @@ export async function eraseAccountDatabaseData(
       union all select 'target.upload_session.id', count(*) from upload_session where ${inArray(schema.uploadSession.id, targets.uploadSessionIds)}
       union all select 'target.upload_file.id', count(*) from upload_file where ${inArray(schema.uploadFile.id, targets.uploadFileIds)}
       union all select 'orphan.collection_item.collection_id', count(*) from collection_item ci left join user_collection uc on uc.id = ci.collection_id and uc.owner_id = ci.owner_id where uc.id is null
+      union all select 'orphan.collection_item_ownership_period.collection_item_id', count(*) from collection_item_ownership_period ciop left join collection_item ci on ci.id = ciop.collection_item_id where ci.id is null
       union all select 'orphan.collection_image.collection_id', count(*) from collection_image ci left join user_collection uc on uc.id = ci.collection_id where uc.id is null
       union all select 'orphan.collection_item_image.collection_item_id', count(*) from collection_item_image cii left join collection_item ci on ci.id = cii.collection_item_id where ci.id is null
       union all select 'orphan.resource_images.resource_id', count(*) from resource_images ri left join resources r on r.id = ri.resource_id where r.id is null
