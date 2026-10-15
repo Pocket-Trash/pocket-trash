@@ -7,7 +7,15 @@ import type {
   PublicProductTypeTrend,
   UserCollectionItem,
 } from "@package/services";
-import { activityTrendRanges } from "@package/services";
+
+/** Stable recorded-activity ranges shared by Trends URL and request validation. */
+export const activityTrendRanges = [
+  "week",
+  "30-days",
+  "6-months",
+  "year",
+  "all",
+] as const satisfies readonly ActivityTrendRange[];
 
 /** URL-search representation of the Trends product-type filter. */
 export type CatalogTrendsSearch = {

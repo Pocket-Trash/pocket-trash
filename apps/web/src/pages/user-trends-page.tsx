@@ -3,8 +3,8 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { CompositionComparison } from "@/components/composition-comparison";
 import { ActivityTrendsChart } from "@/components/activity-trends-chart";
+import { CompositionComparison } from "@/components/composition-comparison";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
   Select,
@@ -316,7 +316,10 @@ export function UserTrendsPage({
           className="space-y-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold" id="user-activity-trends-title">
+            <h2
+              className="text-lg font-semibold"
+              id="user-activity-trends-title"
+            >
               {t("web.trends.activity")}
             </h2>
             <Select
@@ -335,14 +338,18 @@ export function UserTrendsPage({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="week">{t("web.trends.rangeWeek")}</SelectItem>
+                <SelectItem value="week">
+                  {t("web.trends.rangeWeek")}
+                </SelectItem>
                 <SelectItem value="30-days">
                   {t("web.trends.range30Days")}
                 </SelectItem>
                 <SelectItem value="6-months">
                   {t("web.trends.range6Months")}
                 </SelectItem>
-                <SelectItem value="year">{t("web.trends.rangeYear")}</SelectItem>
+                <SelectItem value="year">
+                  {t("web.trends.rangeYear")}
+                </SelectItem>
                 <SelectItem value="all">{t("web.trends.rangeAll")}</SelectItem>
               </SelectContent>
             </Select>

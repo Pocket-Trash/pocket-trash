@@ -26,7 +26,6 @@ import type {
   UserCollectionSummary,
 } from "@package/services";
 import {
-  activityTrendRanges,
   CollectionAssemblyPrivacyBlockedError,
   CollectionItemPrivacyInheritedError,
 } from "@package/services";
@@ -55,6 +54,7 @@ import {
   slugify,
   slugPattern,
 } from "./catalog";
+import { activityTrendRanges } from "./catalog-filters";
 import { getResourceViewer } from "./resources";
 
 /**

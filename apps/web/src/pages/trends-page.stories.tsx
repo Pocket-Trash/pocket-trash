@@ -250,8 +250,8 @@ export const Populated: Story = {
     await expect(productTypeFilter).not.toHaveTextContent("all");
     await userEvent.keyboard("{Escape}");
 
-    await expect(canvas.getAllByRole("table")).toHaveLength(3);
-    await expect(canvas.getAllByRole("row")).toHaveLength(6);
+    await expect(canvas.getAllByRole("table")).toHaveLength(4);
+    await expect(canvas.getAllByRole("row")).toHaveLength(10);
     await expect(
       canvas.getAllByRole("rowheader", { name: "Spinner" }),
     ).toHaveLength(3);

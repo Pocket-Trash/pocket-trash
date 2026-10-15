@@ -13,10 +13,19 @@ import { UserTrendsPage } from "@/pages/user-trends-page";
 /** Shows exact current-state collection Trends to the signed-in owner. */
 export const Route = createFileRoute("/user/trends")({
   validateSearch: parseCatalogTrendsSearch,
+  /**
+   * Reloads private activity when the URL-backed range changes.
+   *
+   * @param context - Route dependency context.
+   * @param context.search - Validated Trends URL state.
+   * @returns Selected activity range.
+   */
   loaderDeps: ({ search }) => ({ range: search.range ?? "year" }),
   /**
    * Loads owner-scoped current items and collection summaries.
    *
+   * @param root0 - Route loader context.
+   * @param root0.deps - Validated activity range.
    * @returns Owner-scoped items and exact collection count.
    */
   loader: async ({ deps }) => {
