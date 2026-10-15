@@ -792,9 +792,7 @@ describe("collection add form", () => {
     expect(html).toContain(">Zoom Zoom</span>");
     expect(html).toMatch(/<details[^>]*>/u);
     expect(html).not.toMatch(/<details[^>]* open=/u);
-    expect(html).toMatch(
-      /<summary[^>]*>web\.collections\.productSelector<\/summary>/u,
-    );
+    expect(html).toMatch(/<summary[^>]*>Product selector<\/summary>/u);
     expect(html).toContain('aria-label="Close: Bronze"');
     expect(html).toContain('aria-label="Close: Polished"');
     expect(html).toContain(">Collection<");
@@ -843,10 +841,14 @@ describe("collection add form", () => {
         ...base.materials,
         {
           assignmentId: 1016,
-          id: 1016,
-          name: "Steel",
-          slug: "steel",
-          specific: null,
+          materials: [
+            {
+              id: 1016,
+              name: "Steel",
+              slug: "steel",
+              specific: null,
+            },
+          ],
         },
       ].slice(0, materialCount),
     };

@@ -93,10 +93,14 @@ const products: CatalogProduct[] = [
             ...product.materials,
             {
               assignmentId: 1016,
-              id: 1016,
-              name: "Steel",
-              slug: "steel",
-              specific: null,
+              materials: [
+                {
+                  id: 1016,
+                  name: "Steel",
+                  slug: "steel",
+                  specific: null,
+                },
+              ],
             },
           ]
         : product.materials,
@@ -270,7 +274,7 @@ export const Preselected: Story = {
    * @returns A promise that resolves after chooser assertions pass.
    */
   play: async ({ canvas, userEvent }) => {
-    const chooser = canvas.getByText("web.collections.productSelector", {
+    const chooser = canvas.getByText("Product selector", {
       selector: "summary",
     });
     await expect(

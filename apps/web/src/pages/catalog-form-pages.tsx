@@ -3515,6 +3515,7 @@ function collectionProductDefaults(
 ): CollectionProductDefaults {
   const assignment =
     product?.materials.length === 1 ? product.materials[0] : null;
+  const material = assignment?.materials[0];
   const option =
     product?.finishOptions.length === 1 ? product.finishOptions[0] : null;
   return {
@@ -3522,15 +3523,14 @@ function collectionProductDefaults(
     finish: option
       ? { id: option.id, name: localizedFinishLabel(option, t) }
       : null,
-    material: assignment
-      ? {
-          id: assignment.assignmentId,
-          name: assignment.specific
-            ? `${assignment.name}: ${assignment.specific.name}`
-            : assignment.name,
-          slug: assignment.slug,
-        }
-      : null,
+    material:
+      assignment && material
+        ? {
+            id: assignment.assignmentId,
+            name: materialCombinationLabel(assignment.materials),
+            slug: material.slug,
+          }
+        : null,
   };
 }
 
