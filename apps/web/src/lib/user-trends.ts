@@ -87,12 +87,17 @@ export type UserTrends = {
 /**
  * Resolves one personal Trends bucket.
  *
- * @param item - One scoped collection item.
- * @returns Stable bucket identity and presentation.
+ * @template Item - Source value being grouped.
  */
-type UserTrendIdentifier = (
-  item: UserCollectionItem,
-) => Omit<UserTrendValue, "count">;
+interface UserTrendIdentifier<Item> {
+  /**
+   * Identifies one source item.
+   *
+   * @param item - Source item being grouped.
+   * @returns Stable bucket identity and presentation.
+   */
+  (item: Item): Omit<UserTrendValue, "count">;
+}
 
 /**
  * Builds exact personal Trends from the same owned-item result used by My Collections.
@@ -110,9 +115,13 @@ export function summarizeUserTrends(
   const scopedItems = items.filter(
     (item) =>
       (!search.productTypeId || item.productTypeId === search.productTypeId) &&
-      (!search.materialId || item.material?.id === search.materialId) &&
-      (!search.materialSpecificId ||
-        item.material?.specific?.id === search.materialSpecificId) &&
+      ((!search.materialId && !search.materialSpecificId) ||
+        item.materials.some(
+          (material) =>
+            (!search.materialId || material.id === search.materialId) &&
+            (!search.materialSpecificId ||
+              material.specific?.id === search.materialSpecificId),
+        )) &&
       (!search.makerId || item.makerId === search.makerId) &&
       (!search.productId || item.productId === search.productId),
   );
@@ -126,10 +135,12 @@ export function summarizeUserTrends(
       productsHref: `/products?maker=${item.makerId}&view=all`,
     })),
     materials: groupTrends(
-      scopedItems.filter((item) => item.material !== null),
-      (item) => {
-        const material = item.material;
-        if (!material) throw new Error("Material Trends require a material.");
+      scopedItems.flatMap((item) =>
+        item.materials.filter(
+          (material) => !search.materialId || material.id === search.materialId,
+        ),
+      ),
+      (material) => {
         const specific = search.materialId ? material.specific : null;
         return {
           id: specific?.id ?? material.id,
@@ -345,14 +356,12 @@ function percentage(count: number, total: number) {
 /**
  * Counts physical items without deduplicating repeated catalog products.
  *
+ * @template Item - Source value being grouped.
  * @param items - Items in the active filter scope.
  * @param identify - Stable bucket identity and presentation.
  * @returns Count-descending buckets with stable label ordering for ties.
  */
-function groupTrends(
-  items: UserCollectionItem[],
-  identify: UserTrendIdentifier,
-) {
+function groupTrends<Item>(items: Item[], identify: UserTrendIdentifier<Item>) {
   const grouped = new Map<number, UserTrendValue>();
   for (const item of items) {
     const value = identify(item);

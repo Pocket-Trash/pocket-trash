@@ -81,12 +81,17 @@ type UserTrendsTranslationKey =
 /**
  * Resolves one stable personal Trends filter option.
  *
- * @param item - One owner-scoped item.
- * @returns Stable identifier and label.
+ * @template Item - Source value used to derive the option.
  */
-type UserTrendOptionIdentifier = (
-  item: UserCollectionItem,
-) => readonly [number, string];
+interface UserTrendOptionIdentifier<Item> {
+  /**
+   * Identifies one filter option source.
+   *
+   * @param item - Source value used to derive the option.
+   * @returns Stable identifier and label.
+   */
+  (item: Item): readonly [number, string];
+}
 
 /**
  * Renders exact current-state Trends for the signed-in owner's collection.
@@ -153,19 +158,17 @@ export function UserTrendsPage({
     item.productTypeName,
   ]);
   const materials = options(
-    items.flatMap((item) => (item.material ? [item] : [])),
-    (item) => [item.material?.id ?? 0, item.material?.name ?? ""],
+    items.flatMap((item) => item.materials),
+    (material) => [material.id, material.name],
   );
   const materialSpecifics = options(
-    items.filter(
-      (item) =>
-        item.material?.id === search.materialId &&
-        Boolean(item.material?.specific),
+    items.flatMap((item) =>
+      item.materials.filter(
+        (material) =>
+          material.id === search.materialId && Boolean(material.specific),
+      ),
     ),
-    (item) => [
-      item.material?.specific?.id ?? 0,
-      item.material?.specific?.name ?? "",
-    ],
+    (material) => [material.specific?.id ?? 0, material.specific?.name ?? ""],
   );
   const makers = options(items, (item) => [item.makerId, item.makerName]);
   const products = options(
@@ -591,13 +594,14 @@ function TrendFilter({
 /**
  * Returns de-duplicated label-sorted filter options.
  *
+ * @template Item - Source value used to derive the options.
  * @param items - Owner-scoped items used to derive choices.
  * @param identify - Resolves one stable identifier and label.
  * @returns De-duplicated label-sorted filter options.
  */
-function options(
-  items: UserCollectionItem[],
-  identify: UserTrendOptionIdentifier,
+function options<Item>(
+  items: Item[],
+  identify: UserTrendOptionIdentifier<Item>,
 ) {
   return [...new Map(items.map(identify)).entries()].sort((left, right) =>
     left[1].localeCompare(right[1]),

@@ -51,6 +51,29 @@ describe("summarizeUserTrends", () => {
     });
   });
 
+  it("counts every component in a material combination", () => {
+    const steel = {
+      id: 31,
+      name: "Steel",
+      slug: "steel",
+      specific: { id: 32, name: "M390", slug: "m390" },
+    };
+    const combined = item({
+      materials: [
+        { id: 30, name: "Titanium", slug: "titanium", specific: null },
+        steel,
+      ],
+    });
+
+    expect(summarizeUserTrends([combined], 1, {}).materials).toEqual([
+      expect.objectContaining({ count: 1, id: 31, label: "Steel" }),
+      expect.objectContaining({ count: 1, id: 30, label: "Titanium" }),
+    ]);
+    expect(
+      summarizeUserTrends([combined], 1, { materialId: 31 }).materials,
+    ).toEqual([expect.objectContaining({ count: 1, id: 32, label: "M390" })]);
+  });
+
   it("compares percentages without exposing raw community totals", () => {
     expect(
       compareComposition(
@@ -157,12 +180,14 @@ function item(overrides: Partial<UserCollectionItem>): UserCollectionItem {
     makerName: "Maker",
     makerSlug: "maker",
     makerUrl: null,
-    material: {
-      id: 30,
-      name: "Titanium",
-      slug: "titanium",
-      specific: null,
-    },
+    materials: [
+      {
+        id: 30,
+        name: "Titanium",
+        slug: "titanium",
+        specific: null,
+      },
+    ],
     name: "Product",
     ownerClerkId: "user_owner",
     ownerImageUrl: null,

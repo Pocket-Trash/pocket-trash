@@ -339,10 +339,6 @@ export const relations = defineRelations(tables, (r) => ({
   },
   productMaterial: {
     components: r.many.productMaterialComponent(),
-    configurationChoices: r.many.productConfigurationChoice({
-      from: r.productMaterial.id,
-      to: r.productConfigurationChoice.productMaterialId,
-    }),
     product: r.one.product({
       from: [r.productMaterial.productId],
       to: [r.product.id],
