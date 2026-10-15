@@ -235,6 +235,8 @@ export type {
   TrendsService,
   UserActivityTrendPoint,
   UserActivityTrends,
+  UserCollectionHistoryTrendPoint,
+  UserCollectionHistoryTrends,
 } from "./trends/index.js";
 export {
   activityTrendRanges,

@@ -130,6 +130,8 @@ export type {
   UserActivityTrendPoint,
   UserActivityTrends,
   UserBanState,
+  UserCollectionHistoryTrendPoint,
+  UserCollectionHistoryTrends,
   UserCollectionItem,
   UserCollectionSummary,
   UserSettingsService,

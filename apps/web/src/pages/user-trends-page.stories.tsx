@@ -1,4 +1,8 @@
-import type { UserActivityTrends, UserCollectionItem } from "@package/services";
+import type {
+  UserActivityTrends,
+  UserCollectionHistoryTrends,
+  UserCollectionItem,
+} from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, fn, within } from "storybook/test";
@@ -37,6 +41,34 @@ const activityTrends: UserActivityTrends = {
   ],
 };
 
+/** Effective-date collection history used by the populated story. */
+const collectionHistoryTrends: UserCollectionHistoryTrends = {
+  exactDateCount: 2,
+  granularity: "month",
+  imputedDateCount: 1,
+  range: "year",
+  values: [
+    {
+      acquisitionCount: 2,
+      bucketStart: new Date("2026-08-01T00:00:00.000Z"),
+      collectionCount: 2,
+      departureCount: 0,
+    },
+    {
+      acquisitionCount: 0,
+      bucketStart: new Date("2026-09-01T00:00:00.000Z"),
+      collectionCount: 1,
+      departureCount: 1,
+    },
+    {
+      acquisitionCount: 1,
+      bucketStart: new Date("2026-10-01T00:00:00.000Z"),
+      collectionCount: 2,
+      departureCount: 0,
+    },
+  ],
+};
+
 /**
  * Renders controlled personal Trends URL-filter state.
  *
@@ -48,6 +80,7 @@ function UserTrendsFixture() {
     <UserTrendsPage
       activityTrends={activityTrends}
       collectionCount={2}
+      collectionHistoryTrends={collectionHistoryTrends}
       communityTrends={communityTrends}
       items={items}
       onSearchChange={setSearch}
@@ -61,6 +94,7 @@ export const Populated: Story = {
   args: {
     activityTrends,
     collectionCount: 2,
+    collectionHistoryTrends,
     items: [],
     onSearchChange: fn(),
     search: {},
@@ -79,7 +113,12 @@ export const Populated: Story = {
    */
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole("table")).toHaveLength(5);
+    await expect(canvas.getAllByRole("table")).toHaveLength(6);
+    await expect(
+      canvas.getByRole("heading", {
+        name: /Collection history|web\.userTrends\.collectionHistory/,
+      }),
+    ).toBeVisible();
     await expect(canvas.getByText("10", { selector: "dd" })).toBeVisible();
     await expect(
       canvas.getAllByText(/Personal %|web\.userTrends\.personalPercentage/)

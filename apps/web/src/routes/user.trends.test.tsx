@@ -12,12 +12,15 @@ const getPublicCollectionMakerProductTrends = vi.hoisted(() => vi.fn());
 const getPublicCollectionMaterialTrends = vi.hoisted(() => vi.fn());
 /** Provides exact owner-scoped recorded activity. */
 const getUserActivityTrends = vi.hoisted(() => vi.fn());
+/** Provides exact owner-scoped effective-date history. */
+const getUserCollectionHistoryTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
   getPublicCollectionItemTrends,
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getUserActivityTrends,
+  getUserCollectionHistoryTrends,
   getUserCollection,
   getUserCollections,
 }));
@@ -47,6 +50,16 @@ describe("private user Trends route", () => {
       values: [],
     };
     getUserActivityTrends.mockResolvedValueOnce(activityTrends);
+    const collectionHistoryTrends = {
+      exactDateCount: 1,
+      granularity: "month",
+      imputedDateCount: 0,
+      range: "year",
+      values: [],
+    };
+    getUserCollectionHistoryTrends.mockResolvedValueOnce(
+      collectionHistoryTrends,
+    );
     const loader = Route.options.loader;
     if (!loader) throw new Error("Private Trends route loader is missing.");
 
@@ -56,6 +69,7 @@ describe("private user Trends route", () => {
       }),
     ).resolves.toEqual({
       activityTrends,
+      collectionHistoryTrends,
       collectionCount: 2,
       communityTrends: {
         collectionItems: { values: [] },
@@ -67,6 +81,9 @@ describe("private user Trends route", () => {
     expect(getUserCollection).toHaveBeenCalledOnce();
     expect(getUserCollections).toHaveBeenCalledOnce();
     expect(getUserActivityTrends).toHaveBeenCalledWith({ data: "year" });
+    expect(getUserCollectionHistoryTrends).toHaveBeenCalledWith({
+      data: "year",
+    });
     expect(getPublicCollectionItemTrends).toHaveBeenCalledOnce();
     expect(getPublicCollectionMakerProductTrends).toHaveBeenCalledOnce();
     expect(getPublicCollectionMaterialTrends).toHaveBeenCalledOnce();
