@@ -48,7 +48,7 @@ const product: CatalogProduct = {
   compatibleButtonId: null,
   compatibleButtonName: null,
   compatiblePens: [],
-  configurationSlots: [],
+  compatibleParts: [],
   createdAt: new Date("2026-01-01"),
   description: "A **compact** spinner.",
   diameter: { unit: "mm", value: "50.8" },

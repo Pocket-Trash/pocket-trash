@@ -445,18 +445,6 @@
                   "full"
             ],
             "fields": [
-                  "listing_id PK/FK bigint",
-                  "choice_id PK/FK bigint"
-            ],
-            "id": "catalog_source_listing_choice",
-            "name": "catalog_source_listing_choice",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
                   "id PK bigint",
                   "maker_id? FK bigint",
                   "concept_id FK bigint",
@@ -702,22 +690,6 @@
                   "full"
             ],
             "fields": [
-                  "collection_item_id PK/FK bigint",
-                  "slot_id PK/FK bigint",
-                  "choice_id FK bigint",
-                  "installed_part_collection_item_id? FK bigint",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "collection_item_configuration_selection",
-            "name": "collection_item_configuration_selection",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
                   "id PK bigint",
                   "collection_item_id FK bigint",
                   "position integer",
@@ -736,6 +708,40 @@
             ],
             "id": "collection_item_image",
             "name": "collection_item_image",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "pen_collection_item_id PK/FK bigint",
+                  "part_collection_item_id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_item_installed_pen_part",
+            "name": "collection_item_installed_pen_part",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "collection_item_id FK bigint",
+                  "effective_start_date date",
+                  "start_date_imputed boolean",
+                  "entry_reason text",
+                  "effective_end_date? date",
+                  "exit_reason? text",
+                  "started_recorded_at timestamp with time zone",
+                  "ended_recorded_at? timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_item_ownership_period",
+            "name": "collection_item_ownership_period",
             "status": "existing"
       },
       {
@@ -767,22 +773,6 @@
             ],
             "id": "color_effect",
             "name": "color_effect",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "slug text",
-                  "label_key text",
-                  "label_fallback text",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "configuration_slot_kind",
-            "name": "configuration_slot_kind",
             "status": "existing"
       },
       {
@@ -1100,6 +1090,20 @@
                   "full"
             ],
             "fields": [
+                  "pen_product_id PK/FK bigint",
+                  "part_product_id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "pen_compatible_part",
+            "name": "pen_compatible_part",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
                   "product_id PK/FK bigint",
                   "concept_id FK bigint",
                   "namespace FK text"
@@ -1164,71 +1168,6 @@
             ],
             "id": "product_alias",
             "name": "product_alias",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "product_id FK bigint",
-                  "slot_id FK bigint",
-                  "position integer",
-                  "product_material_id? FK bigint",
-                  "finish_option_id? FK bigint",
-                  "part_product_id? FK bigint",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_configuration_choice",
-            "name": "product_configuration_choice",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "rule_id PK/FK bigint",
-                  "product_id FK bigint",
-                  "required_choice_id PK/FK bigint"
-            ],
-            "id": "product_configuration_choice_requirement",
-            "name": "product_configuration_choice_requirement",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "product_id FK bigint",
-                  "target_choice_id FK bigint",
-                  "position integer",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_configuration_choice_rule",
-            "name": "product_configuration_choice_rule",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "product_id FK bigint",
-                  "slot_kind_id FK bigint",
-                  "position integer",
-                  "required boolean",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_configuration_slot",
-            "name": "product_configuration_slot",
             "status": "existing"
       },
       {
@@ -1508,6 +1447,34 @@
             ],
             "id": "product_types",
             "name": "product_types",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "generation_id PK/FK bigint",
+                  "product_type_id PK/FK bigint",
+                  "rounded_item_count integer",
+                  "rounded_collector_count integer"
+            ],
+            "id": "public_collection_item_product_type_trend",
+            "name": "public_collection_item_product_type_trend",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "active boolean",
+                  "generated_at timestamp with time zone",
+                  "has_suppressed_values boolean"
+            ],
+            "id": "public_trends_generation",
+            "name": "public_trends_generation",
             "status": "existing"
       },
       {
@@ -2315,16 +2282,6 @@
             "maker_id → id"
       ],
       [
-            "catalog_source_listing_choice",
-            "catalog_source_listing",
-            "listing_id → id"
-      ],
-      [
-            "catalog_source_listing_choice",
-            "product_configuration_choice",
-            "choice_id → id"
-      ],
-      [
             "catalog_terminology_alias",
             "makers",
             "maker_id → id"
@@ -2505,22 +2462,22 @@
             "collection_id, owner_id → id, owner_id"
       ],
       [
-            "collection_item_configuration_selection",
+            "collection_item_image",
             "collection_item",
             "collection_item_id → id"
       ],
       [
-            "collection_item_configuration_selection",
+            "collection_item_installed_pen_part",
+            "collection_detail_pen",
+            "pen_collection_item_id → id"
+      ],
+      [
+            "collection_item_installed_pen_part",
             "collection_item",
-            "installed_part_collection_item_id → id"
+            "part_collection_item_id → id"
       ],
       [
-            "collection_item_configuration_selection",
-            "product_configuration_choice",
-            "choice_id, slot_id → id, slot_id"
-      ],
-      [
-            "collection_item_image",
+            "collection_item_ownership_period",
             "collection_item",
             "collection_item_id → id"
       ],
@@ -2610,6 +2567,16 @@
             "material_id → id"
       ],
       [
+            "pen_compatible_part",
+            "product_detail_pen",
+            "pen_product_id → id"
+      ],
+      [
+            "pen_compatible_part",
+            "product_detail_pen_part",
+            "part_product_id → id"
+      ],
+      [
             "pen_nose_profile_assignment",
             "product",
             "product_id → id"
@@ -2643,51 +2610,6 @@
             "product_alias",
             "product",
             "product_id → id"
-      ],
-      [
-            "product_configuration_choice",
-            "product_detail_pen_part",
-            "part_product_id → id"
-      ],
-      [
-            "product_configuration_choice",
-            "product_configuration_slot",
-            "slot_id, product_id → id, product_id"
-      ],
-      [
-            "product_configuration_choice",
-            "product_material",
-            "product_material_id, product_id → id, product_id"
-      ],
-      [
-            "product_configuration_choice",
-            "finish_option",
-            "finish_option_id, product_id → id, product_id"
-      ],
-      [
-            "product_configuration_choice_requirement",
-            "product_configuration_choice_rule",
-            "rule_id, product_id → id, product_id"
-      ],
-      [
-            "product_configuration_choice_requirement",
-            "product_configuration_choice",
-            "required_choice_id, product_id → id, product_id"
-      ],
-      [
-            "product_configuration_choice_rule",
-            "product_configuration_choice",
-            "target_choice_id, product_id → id, product_id"
-      ],
-      [
-            "product_configuration_slot",
-            "product",
-            "product_id → id"
-      ],
-      [
-            "product_configuration_slot",
-            "configuration_slot_kind",
-            "slot_kind_id → id"
       ],
       [
             "product_detail_pen",
@@ -2833,6 +2755,16 @@
             "product_source_listing",
             "catalog_source_listing",
             "listing_id → id"
+      ],
+      [
+            "public_collection_item_product_type_trend",
+            "public_trends_generation",
+            "generation_id → id"
+      ],
+      [
+            "public_collection_item_product_type_trend",
+            "product_types",
+            "product_type_id → id"
       ],
       [
             "refill_compatibility_assertion",

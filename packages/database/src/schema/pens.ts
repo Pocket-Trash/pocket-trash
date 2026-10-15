@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
-  boolean,
   check,
   foreignKey,
   index,
@@ -13,13 +12,7 @@ import {
   unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import {
-  collectionItem,
-  finishOption,
-  product,
-  productImage,
-  productMaterial,
-} from "./collection.js";
+import { collectionItem, product, productImage } from "./collection.js";
 import { maker, mechanism } from "./scraper.js";
 
 /** Shared creation and meaningful-update timestamps for mutable Pens entities. */
@@ -262,6 +255,28 @@ export const penPartRoleAssignment = pgTable(
   ],
 );
 
+/** Direct compatibility between one Pen and one independently cataloged Pen part. */
+export const penCompatiblePart = pgTable(
+  "pen_compatible_part",
+  {
+    penProductId: bigint("pen_product_id", { mode: "number" })
+      .notNull()
+      .references(() => productDetailPen.id, { onDelete: "cascade" }),
+    partProductId: bigint("part_product_id", { mode: "number" })
+      .notNull()
+      .references(() => productDetailPenPart.id, { onDelete: "restrict" }),
+    ...entityTimestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.penProductId, table.partProductId] }),
+    index("pen_compatible_part_part_idx").on(table.partProductId),
+    check(
+      "pen_compatible_part_distinct",
+      sql`${table.penProductId} <> ${table.partProductId}`,
+    ),
+  ],
+);
+
 /** Nose profile assigned to a Pen or Pen-tip product. */
 export const penNoseProfileAssignment = pgTable(
   "pen_nose_profile_assignment",
@@ -313,206 +328,6 @@ export const refillCompatibilityGroup = pgTable(
     check(
       "refill_compatibility_group_namespace_valid",
       sql`${table.namespace} = 'refill-compatibility-group'`,
-    ),
-  ],
-);
-
-/** Reviewed reusable product-configuration slot kind. */
-export const configurationSlotKind = pgTable(
-  "configuration_slot_kind",
-  {
-    id: identity(),
-    slug: text("slug").notNull(),
-    labelKey: text("label_key").notNull(),
-    labelFallback: text("label_fallback").notNull(),
-    ...entityTimestamps,
-  },
-  (table) => [
-    unique("configuration_slot_kind_slug_unique").on(table.slug),
-    check(
-      "configuration_slot_kind_slug_valid",
-      sql`char_length(trim(${table.slug})) between 1 and 80`,
-    ),
-  ],
-);
-
-/** Ordered independently selected dimension for a configurable product. */
-export const productConfigurationSlot = pgTable(
-  "product_configuration_slot",
-  {
-    id: identity(),
-    productId: bigint("product_id", { mode: "number" })
-      .notNull()
-      .references(() => product.id, { onDelete: "cascade" }),
-    slotKindId: bigint("slot_kind_id", { mode: "number" })
-      .notNull()
-      .references(() => configurationSlotKind.id, { onDelete: "restrict" }),
-    position: integer("position").notNull(),
-    required: boolean("required").default(false).notNull(),
-    ...entityTimestamps,
-  },
-  (table) => [
-    unique("product_configuration_slot_product_kind_unique").on(
-      table.productId,
-      table.slotKindId,
-    ),
-    unique("product_configuration_slot_product_position_unique").on(
-      table.productId,
-      table.position,
-    ),
-    unique("product_configuration_slot_id_product_unique").on(
-      table.id,
-      table.productId,
-    ),
-    index("product_configuration_slot_kind_idx").on(table.slotKindId),
-    check(
-      "product_configuration_slot_position_valid",
-      sql`${table.position} >= 0`,
-    ),
-  ],
-);
-
-/** One selectable material, appearance, or Pen-part choice in a slot. */
-export const productConfigurationChoice = pgTable(
-  "product_configuration_choice",
-  {
-    id: identity(),
-    productId: bigint("product_id", { mode: "number" }).notNull(),
-    slotId: bigint("slot_id", { mode: "number" }).notNull(),
-    position: integer("position").notNull(),
-    productMaterialId: bigint("product_material_id", { mode: "number" }),
-    finishOptionId: bigint("finish_option_id", { mode: "number" }),
-    partProductId: bigint("part_product_id", { mode: "number" }).references(
-      () => productDetailPenPart.id,
-      { onDelete: "restrict" },
-    ),
-    ...entityTimestamps,
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.slotId, table.productId],
-      foreignColumns: [
-        productConfigurationSlot.id,
-        productConfigurationSlot.productId,
-      ],
-      name: "product_configuration_choice_slot_product_fk",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.productMaterialId, table.productId],
-      foreignColumns: [productMaterial.id, productMaterial.productId],
-      name: "product_configuration_choice_material_product_fk",
-    }).onDelete("restrict"),
-    foreignKey({
-      columns: [table.finishOptionId, table.productId],
-      foreignColumns: [finishOption.id, finishOption.productId],
-      name: "product_configuration_choice_finish_product_fk",
-    }).onDelete("restrict"),
-    unique("product_configuration_choice_slot_position_unique").on(
-      table.slotId,
-      table.position,
-    ),
-    unique("product_configuration_choice_id_slot_product_unique").on(
-      table.id,
-      table.slotId,
-      table.productId,
-    ),
-    unique("product_configuration_choice_id_slot_unique").on(
-      table.id,
-      table.slotId,
-    ),
-    unique("product_configuration_choice_id_product_unique").on(
-      table.id,
-      table.productId,
-    ),
-    index("product_configuration_choice_material_idx").on(
-      table.productMaterialId,
-    ),
-    index("product_configuration_choice_finish_idx").on(table.finishOptionId),
-    index("product_configuration_choice_part_idx").on(table.partProductId),
-    check(
-      "product_configuration_choice_carrier_valid",
-      sql`num_nonnulls(${table.productMaterialId}, ${table.finishOptionId}, ${table.partProductId}) = 1`,
-    ),
-    check(
-      "product_configuration_choice_part_distinct",
-      sql`${table.partProductId} is null or ${table.partProductId} <> ${table.productId}`,
-    ),
-    check(
-      "product_configuration_choice_position_valid",
-      sql`${table.position} >= 0`,
-    ),
-  ],
-);
-
-/** One OR branch describing when a target choice is available. */
-export const productConfigurationChoiceRule = pgTable(
-  "product_configuration_choice_rule",
-  {
-    id: identity(),
-    productId: bigint("product_id", { mode: "number" }).notNull(),
-    targetChoiceId: bigint("target_choice_id", { mode: "number" }).notNull(),
-    position: integer("position").notNull(),
-    ...entityTimestamps,
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.targetChoiceId, table.productId],
-      foreignColumns: [
-        productConfigurationChoice.id,
-        productConfigurationChoice.productId,
-      ],
-      name: "product_configuration_choice_rule_target_fk",
-    }).onDelete("cascade"),
-    unique("product_configuration_choice_rule_target_position_unique").on(
-      table.targetChoiceId,
-      table.position,
-    ),
-    unique("product_configuration_choice_rule_id_target_product_unique").on(
-      table.id,
-      table.targetChoiceId,
-      table.productId,
-    ),
-    unique("product_configuration_choice_rule_id_product_unique").on(
-      table.id,
-      table.productId,
-    ),
-    check(
-      "product_configuration_choice_rule_position_valid",
-      sql`${table.position} >= 0`,
-    ),
-  ],
-);
-
-/** One AND requirement in a product-configuration availability rule. */
-export const productConfigurationChoiceRequirement = pgTable(
-  "product_configuration_choice_requirement",
-  {
-    ruleId: bigint("rule_id", { mode: "number" }).notNull(),
-    productId: bigint("product_id", { mode: "number" }).notNull(),
-    requiredChoiceId: bigint("required_choice_id", {
-      mode: "number",
-    }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.ruleId, table.requiredChoiceId] }),
-    foreignKey({
-      columns: [table.ruleId, table.productId],
-      foreignColumns: [
-        productConfigurationChoiceRule.id,
-        productConfigurationChoiceRule.productId,
-      ],
-      name: "product_configuration_choice_requirement_rule_fk",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.requiredChoiceId, table.productId],
-      foreignColumns: [
-        productConfigurationChoice.id,
-        productConfigurationChoice.productId,
-      ],
-      name: "product_configuration_choice_requirement_choice_fk",
-    }).onDelete("restrict"),
-    index("product_configuration_choice_requirement_choice_idx").on(
-      table.requiredChoiceId,
     ),
   ],
 );
@@ -712,35 +527,26 @@ export const collectionDetailPenActuator = pgTable(
   ],
 );
 
-/** Saved configuration choice for one owned catalog item. */
-export const collectionItemConfigurationSelection = pgTable(
-  "collection_item_configuration_selection",
+/** One independently owned Pen part installed on an owned Pen. */
+export const collectionItemInstalledPenPart = pgTable(
+  "collection_item_installed_pen_part",
   {
-    collectionItemId: bigint("collection_item_id", { mode: "number" })
+    penCollectionItemId: bigint("pen_collection_item_id", { mode: "number" })
       .notNull()
-      .references(() => collectionItem.id, { onDelete: "cascade" }),
-    slotId: bigint("slot_id", { mode: "number" }).notNull(),
-    choiceId: bigint("choice_id", { mode: "number" }).notNull(),
-    installedPartCollectionItemId: bigint("installed_part_collection_item_id", {
+      .references(() => collectionDetailPen.id, { onDelete: "cascade" }),
+    partCollectionItemId: bigint("part_collection_item_id", {
       mode: "number",
-    }).references(() => collectionItem.id, { onDelete: "restrict" }),
+    })
+      .notNull()
+      .references(() => collectionItem.id, { onDelete: "restrict" }),
     ...entityTimestamps,
   },
   (table) => [
-    primaryKey({ columns: [table.collectionItemId, table.slotId] }),
-    foreignKey({
-      columns: [table.choiceId, table.slotId],
-      foreignColumns: [
-        productConfigurationChoice.id,
-        productConfigurationChoice.slotId,
-      ],
-      name: "collection_item_configuration_selection_choice_slot_fk",
-    }).onDelete("restrict"),
-    index("collection_item_configuration_selection_choice_idx").on(
-      table.choiceId,
-    ),
-    index("collection_item_configuration_selection_installed_part_idx").on(
-      table.installedPartCollectionItemId,
+    primaryKey({
+      columns: [table.penCollectionItemId, table.partCollectionItemId],
+    }),
+    unique("collection_item_installed_pen_part_part_unique").on(
+      table.partCollectionItemId,
     ),
   ],
 );
@@ -787,25 +593,6 @@ export const productSourceListing = pgTable(
       .references(() => catalogSourceListing.id, { onDelete: "restrict" }),
   },
   (table) => [index("product_source_listing_product_idx").on(table.productId)],
-);
-
-/** Configuration choice represented by a source listing. */
-export const catalogSourceListingChoice = pgTable(
-  "catalog_source_listing_choice",
-  {
-    listingId: bigint("listing_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogSourceListing.id, { onDelete: "restrict" }),
-    choiceId: bigint("choice_id", { mode: "number" })
-      .notNull()
-      .references(() => productConfigurationChoice.id, {
-        onDelete: "restrict",
-      }),
-  },
-  (table) => [
-    primaryKey({ columns: [table.listingId, table.choiceId] }),
-    index("catalog_source_listing_choice_choice_idx").on(table.choiceId),
-  ],
 );
 
 /** Preserved source identity for an existing product image. */
@@ -973,7 +760,6 @@ export type NewPensSchemaRows = {
 export const pensTables = {
   catalogSourceImage,
   catalogSourceListing,
-  catalogSourceListingChoice,
   catalogTerminologyConcept,
   collectionDetailPen,
   collectionDetailPenActuator,
@@ -981,15 +767,11 @@ export const pensTables = {
   collectionDetailPenMechanism,
   collectionDetailPenTip,
   collectionDetailPenTopCap,
-  collectionItemConfigurationSelection,
-  configurationSlotKind,
+  collectionItemInstalledPenPart,
   penNoseProfileAssignment,
+  penCompatiblePart,
   penPartRoleAssignment,
   productAlias,
-  productConfigurationChoice,
-  productConfigurationChoiceRequirement,
-  productConfigurationChoiceRule,
-  productConfigurationSlot,
   productDetailPen,
   productDetailPenActuator,
   productDetailPenClip,

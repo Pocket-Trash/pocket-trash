@@ -237,15 +237,15 @@ export const relations = defineRelations(tables, (r) => ({
       from: [r.collectionItem.id],
       to: [r.collectionDetailSliderPlate.id],
     }),
-    configurationSelections: r.many.collectionItemConfigurationSelection({
+    installedPenParts: r.many.collectionItemInstalledPenPart({
       from: r.collectionItem.id,
-      to: r.collectionItemConfigurationSelection.collectionItemId,
-      alias: "configuredItem",
+      to: r.collectionItemInstalledPenPart.penCollectionItemId,
+      alias: "installedPenParts",
     }),
-    installedInSelections: r.many.collectionItemConfigurationSelection({
+    installedInPen: r.one.collectionItemInstalledPenPart({
       from: r.collectionItem.id,
-      to: r.collectionItemConfigurationSelection.installedPartCollectionItemId,
-      alias: "installedPart",
+      to: r.collectionItemInstalledPenPart.partCollectionItemId,
+      alias: "installedInPen",
     }),
     pen: r.one.collectionDetailPen({
       from: [r.collectionItem.id],
@@ -286,7 +286,6 @@ export const relations = defineRelations(tables, (r) => ({
   },
   product: {
     aliases: r.many.productAlias(),
-    configurationSlots: r.many.productConfigurationSlot(),
     finishOptions: r.many.finishOption(),
     images: r.many.productImage(),
     maker: r.one.maker({
@@ -346,10 +345,6 @@ export const relations = defineRelations(tables, (r) => ({
     sourceImages: r.many.catalogSourceImage(),
   },
   productMaterial: {
-    configurationChoices: r.many.productConfigurationChoice({
-      from: r.productMaterial.id,
-      to: r.productConfigurationChoice.productMaterialId,
-    }),
     specific: r.one.materialSpecific({
       from: [r.productMaterial.materialSpecificId],
       to: [r.materialSpecific.id],
@@ -376,10 +371,6 @@ export const relations = defineRelations(tables, (r) => ({
     options: r.many.finishOption(),
   },
   finishOption: {
-    configurationChoices: r.many.productConfigurationChoice({
-      from: r.finishOption.id,
-      to: r.productConfigurationChoice.finishOptionId,
-    }),
     product: r.one.product({
       from: [r.finishOption.productId],
       to: [r.product.id],
@@ -679,6 +670,7 @@ export const relations = defineRelations(tables, (r) => ({
   },
   productDetailPen: {
     collectionItems: r.many.collectionDetailPen(),
+    compatibleParts: r.many.penCompatiblePart(),
     compatibilityAssertions: r.many.refillCompatibilityAssertion(),
     product: r.one.product({
       from: [r.productDetailPen.id],
@@ -686,7 +678,7 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   productDetailPenPart: {
-    choices: r.many.productConfigurationChoice(),
+    compatiblePens: r.many.penCompatiblePart(),
     product: r.one.product({
       from: [r.productDetailPenPart.id],
       to: [r.product.id],
@@ -831,85 +823,26 @@ export const relations = defineRelations(tables, (r) => ({
       to: [r.productDetailPenActuator.id],
     }),
   },
-  configurationSlotKind: {
-    slots: r.many.productConfigurationSlot(),
-  },
-  productConfigurationSlot: {
-    choices: r.many.productConfigurationChoice(),
-    kind: r.one.configurationSlotKind({
-      from: [r.productConfigurationSlot.slotKindId],
-      to: [r.configurationSlotKind.id],
-    }),
-    product: r.one.product({
-      from: [r.productConfigurationSlot.productId],
-      to: [r.product.id],
-    }),
-    selections: r.many.collectionItemConfigurationSelection(),
-  },
-  productConfigurationChoice: {
-    finishOption: r.one.finishOption({
-      from: [r.productConfigurationChoice.finishOptionId],
-      to: [r.finishOption.id],
-    }),
-    listingChoices: r.many.catalogSourceListingChoice(),
-    material: r.one.productMaterial({
-      from: [r.productConfigurationChoice.productMaterialId],
-      to: [r.productMaterial.id],
-    }),
+  penCompatiblePart: {
     part: r.one.productDetailPenPart({
-      from: [r.productConfigurationChoice.partProductId],
+      from: [r.penCompatiblePart.partProductId],
       to: [r.productDetailPenPart.id],
     }),
-    requiredBy: r.many.productConfigurationChoiceRequirement({
-      from: r.productConfigurationChoice.id,
-      to: r.productConfigurationChoiceRequirement.requiredChoiceId,
-      alias: "requiredChoice",
-    }),
-    rules: r.many.productConfigurationChoiceRule(),
-    selections: r.many.collectionItemConfigurationSelection(),
-    slot: r.one.productConfigurationSlot({
-      from: [r.productConfigurationChoice.slotId],
-      to: [r.productConfigurationSlot.id],
+    pen: r.one.productDetailPen({
+      from: [r.penCompatiblePart.penProductId],
+      to: [r.productDetailPen.id],
     }),
   },
-  productConfigurationChoiceRule: {
-    requirements: r.many.productConfigurationChoiceRequirement(),
-    target: r.one.productConfigurationChoice({
-      from: [r.productConfigurationChoiceRule.targetChoiceId],
-      to: [r.productConfigurationChoice.id],
-    }),
-  },
-  productConfigurationChoiceRequirement: {
-    requiredChoice: r.one.productConfigurationChoice({
-      from: [r.productConfigurationChoiceRequirement.requiredChoiceId],
-      to: [r.productConfigurationChoice.id],
-      alias: "requiredChoice",
-    }),
-    rule: r.one.productConfigurationChoiceRule({
-      from: [r.productConfigurationChoiceRequirement.ruleId],
-      to: [r.productConfigurationChoiceRule.id],
-    }),
-  },
-  collectionItemConfigurationSelection: {
-    choice: r.one.productConfigurationChoice({
-      from: [r.collectionItemConfigurationSelection.choiceId],
-      to: [r.productConfigurationChoice.id],
-    }),
-    installedPart: r.one.collectionItem({
-      from: [
-        r.collectionItemConfigurationSelection.installedPartCollectionItemId,
-      ],
+  collectionItemInstalledPenPart: {
+    part: r.one.collectionItem({
+      from: [r.collectionItemInstalledPenPart.partCollectionItemId],
       to: [r.collectionItem.id],
-      alias: "installedPart",
+      alias: "installedPenPart",
     }),
-    item: r.one.collectionItem({
-      from: [r.collectionItemConfigurationSelection.collectionItemId],
+    pen: r.one.collectionItem({
+      from: [r.collectionItemInstalledPenPart.penCollectionItemId],
       to: [r.collectionItem.id],
-      alias: "configuredItem",
-    }),
-    slot: r.one.productConfigurationSlot({
-      from: [r.collectionItemConfigurationSelection.slotId],
-      to: [r.productConfigurationSlot.id],
+      alias: "penWithInstalledParts",
     }),
   },
   refillTipStyle: {
@@ -935,7 +868,6 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   catalogSourceListing: {
-    choices: r.many.catalogSourceListingChoice(),
     images: r.many.catalogSourceImage(),
     maker: r.one.maker({
       from: [r.catalogSourceListing.makerId],
@@ -951,16 +883,6 @@ export const relations = defineRelations(tables, (r) => ({
     product: r.one.product({
       from: [r.productSourceListing.productId],
       to: [r.product.id],
-    }),
-  },
-  catalogSourceListingChoice: {
-    choice: r.one.productConfigurationChoice({
-      from: [r.catalogSourceListingChoice.choiceId],
-      to: [r.productConfigurationChoice.id],
-    }),
-    listing: r.one.catalogSourceListing({
-      from: [r.catalogSourceListingChoice.listingId],
-      to: [r.catalogSourceListing.id],
     }),
   },
   catalogSourceImage: {

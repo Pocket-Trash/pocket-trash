@@ -402,7 +402,7 @@ export async function syncCanonicalSagaCatalog(
   }
 
   await ensureNamedLookups(db, snapshot);
-  const newMaterialNames = await syncSagaMaterialsAndChoices(
+  const newMaterialNames = await syncSagaMaterials(
     db,
     identity.productId,
     snapshot.materialNames,
@@ -704,93 +704,36 @@ async function ensureNamedLookups(
 }
 
 /**
- * Assigns new Saga materials and exposes them in the material slot.
+ * Assigns newly observed materials directly to the Saga product.
  *
  * @param db - Canonical application database.
  * @param productId - Canonical Saga product identifier.
  * @param names - Normalized material names observed in the feed.
  * @returns Newly assigned material names.
- * @rejects When the material slot or a required persistence result is absent.
+ * @rejects When a material assignment cannot be persisted.
  */
-async function syncSagaMaterialsAndChoices(
+async function syncSagaMaterials(
   db: Database,
   productId: number,
   names: readonly string[],
 ): Promise<string[]> {
   if (names.length === 0) return [];
-  const [slot] = await db
-    .select({ id: schema.productConfigurationSlot.id })
-    .from(schema.productConfigurationSlot)
-    .innerJoin(
-      schema.configurationSlotKind,
-      eq(
-        schema.productConfigurationSlot.slotKindId,
-        schema.configurationSlotKind.id,
-      ),
-    )
-    .where(
-      and(
-        eq(schema.productConfigurationSlot.productId, productId),
-        eq(schema.configurationSlotKind.slug, "material"),
-      ),
-    )
-    .limit(1);
-  if (!slot) throw new Error("Canonical Saga material slot does not exist.");
   const materials = await db
     .select({ id: schema.material.id, name: schema.material.name })
     .from(schema.material)
     .where(
       inArray(sql`lower(${schema.material.name})`, names.map(normalizeName)),
     );
-  const existingAssignments = await db
-    .select({
-      id: schema.productMaterial.id,
-      materialId: schema.productMaterial.materialId,
-    })
-    .from(schema.productMaterial)
-    .where(eq(schema.productMaterial.productId, productId));
-  const assignmentByMaterial = new Map(
-    existingAssignments.map((row) => [row.materialId, row.id]),
-  );
-  const existingChoices = await db
-    .select({
-      position: schema.productConfigurationChoice.position,
-      productMaterialId: schema.productConfigurationChoice.productMaterialId,
-    })
-    .from(schema.productConfigurationChoice)
-    .where(eq(schema.productConfigurationChoice.slotId, slot.id));
-  const chosenAssignments = new Set(
-    existingChoices.flatMap((row) =>
-      row.productMaterialId === null ? [] : [row.productMaterialId],
-    ),
-  );
-  let nextPosition = nextChoicePosition(existingChoices);
   const created: string[] = [];
-
   for (const material of materials.sort((left, right) =>
     left.name.localeCompare(right.name),
   )) {
-    let assignmentId = assignmentByMaterial.get(material.id);
-    if (assignmentId === undefined) {
-      const [assignment] = await db
-        .insert(schema.productMaterial)
-        .values({ materialId: material.id, productId })
-        .returning({ id: schema.productMaterial.id });
-      if (!assignment) throw new Error("Failed to assign Saga material.");
-      assignmentId = assignment.id;
-      assignmentByMaterial.set(material.id, assignment.id);
-      created.push(material.name);
-    }
-    if (!chosenAssignments.has(assignmentId)) {
-      await db.insert(schema.productConfigurationChoice).values({
-        position: nextPosition,
-        productId,
-        productMaterialId: assignmentId,
-        slotId: slot.id,
-      });
-      chosenAssignments.add(assignmentId);
-      nextPosition += 1;
-    }
+    const [assignment] = await db
+      .insert(schema.productMaterial)
+      .values({ materialId: material.id, productId })
+      .onConflictDoNothing()
+      .returning({ id: schema.productMaterial.id });
+    if (assignment) created.push(material.name);
   }
   return created;
 }
@@ -802,32 +745,13 @@ async function syncSagaMaterialsAndChoices(
  * @param productId - Canonical Saga product identifier.
  * @param appearances - Distinct normalized appearances in source order.
  * @returns Created and capped appearance counts.
- * @rejects When lookups, the appearance slot, or persistence is unavailable.
+ * @rejects When lookups or persistence is unavailable.
  */
 async function syncSagaAppearances(
   db: Database,
   productId: number,
   appearances: readonly SagaCatalogAppearance[],
 ): Promise<SagaAppearanceSyncResult> {
-  const [slot] = await db
-    .select({ id: schema.productConfigurationSlot.id })
-    .from(schema.productConfigurationSlot)
-    .innerJoin(
-      schema.configurationSlotKind,
-      eq(
-        schema.productConfigurationSlot.slotKindId,
-        schema.configurationSlotKind.id,
-      ),
-    )
-    .where(
-      and(
-        eq(schema.productConfigurationSlot.productId, productId),
-        eq(schema.configurationSlotKind.slug, "appearance"),
-      ),
-    )
-    .limit(1);
-  if (!slot) throw new Error("Canonical Saga appearance slot does not exist.");
-
   const [
     finishRows,
     colorRows,
@@ -835,7 +759,6 @@ async function syncSagaAppearances(
     optionRows,
     finishLinks,
     colorLinks,
-    choiceRows,
   ] = await Promise.all([
     db
       .select({ id: schema.finish.id, name: schema.finish.name })
@@ -866,10 +789,6 @@ async function syncSagaAppearances(
         optionId: schema.finishOptionColor.finishOptionId,
       })
       .from(schema.finishOptionColor),
-    db
-      .select({ position: schema.productConfigurationChoice.position })
-      .from(schema.productConfigurationChoice)
-      .where(eq(schema.productConfigurationChoice.slotId, slot.id)),
   ]);
   const finishByName = lookupIdByName(finishRows);
   const colorByName = lookupIdByName(colorRows);
@@ -888,7 +807,6 @@ async function syncSagaAppearances(
     ),
   );
   let nextOptionPosition = nextChoicePosition(optionRows);
-  let nextConfigurationPosition = nextChoicePosition(choiceRows);
   let newAppearanceCount = 0;
   let cappedAppearanceCount = 0;
 
@@ -935,17 +853,10 @@ async function syncSagaAppearances(
             position,
           })),
         );
-      await tx.insert(schema.productConfigurationChoice).values({
-        finishOptionId: option.id,
-        position: nextConfigurationPosition,
-        productId,
-        slotId: slot.id,
-      });
     });
     existingSignatures.add(signature);
     newAppearanceCount += 1;
     nextOptionPosition += 1;
-    nextConfigurationPosition += 1;
   }
   return { cappedAppearanceCount, newAppearanceCount };
 }

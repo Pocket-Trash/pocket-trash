@@ -243,51 +243,6 @@ async function createTestDatabase(): Promise<{
     materialId: titanium.id,
     productId: product.id,
   });
-  const slotKinds = await db
-    .select({
-      id: schema.configurationSlotKind.id,
-      slug: schema.configurationSlotKind.slug,
-    })
-    .from(schema.configurationSlotKind);
-  const materialSlotKind = slotKinds.find((kind) => kind.slug === "material");
-  const appearanceSlotKind = slotKinds.find(
-    (kind) => kind.slug === "appearance",
-  );
-  if (!materialSlotKind || !appearanceSlotKind)
-    throw new Error("Failed to seed Saga configuration slot kinds.");
-  const [materialSlot, appearanceSlot] = await db
-    .insert(schema.productConfigurationSlot)
-    .values([
-      {
-        position: 0,
-        productId: product.id,
-        required: false,
-        slotKindId: materialSlotKind.id,
-      },
-      {
-        position: 1,
-        productId: product.id,
-        required: false,
-        slotKindId: appearanceSlotKind.id,
-      },
-    ])
-    .returning({
-      id: schema.productConfigurationSlot.id,
-      position: schema.productConfigurationSlot.position,
-    });
-  if (!materialSlot || !appearanceSlot)
-    throw new Error("Failed to seed Saga configuration slots.");
-  const [titaniumAssignment] = await db
-    .select({ id: schema.productMaterial.id })
-    .from(schema.productMaterial)
-    .where(eq(schema.productMaterial.productId, product.id));
-  if (!titaniumAssignment) throw new Error("Failed to seed material choice.");
-  await db.insert(schema.productConfigurationChoice).values({
-    position: 0,
-    productId: product.id,
-    productMaterialId: titaniumAssignment.id,
-    slotId: materialSlot.id,
-  });
   const [baselineFinish, baselinePattern] = await Promise.all([
     db
       .insert(schema.finish)
@@ -316,14 +271,6 @@ async function createTestDatabase(): Promise<{
       finishId: caramelPvd.id,
       finishOptionId: option.id,
       position: 0,
-    })),
-  );
-  await db.insert(schema.productConfigurationChoice).values(
-    baselineOptions.map((option) => ({
-      finishOptionId: option.id,
-      position: option.position,
-      productId: product.id,
-      slotId: appearanceSlot.id,
     })),
   );
   return { client, db };

@@ -41,7 +41,7 @@ function product(
     compatibleButtonId: null,
     compatibleButtonName: null,
     compatiblePens: [],
-    configurationSlots: [],
+    compatibleParts: [],
     createdAt: new Date(0),
     description: null,
     diameter: null,

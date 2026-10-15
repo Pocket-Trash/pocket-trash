@@ -16,7 +16,7 @@ const product: CatalogProduct = {
   compatibleButtonId: null,
   compatibleButtonName: null,
   compatiblePens: [],
-  configurationSlots: [],
+  compatibleParts: [],
   createdAt: new Date(0),
   description: null,
   diameter: null,
@@ -123,45 +123,7 @@ const products: CatalogProduct[] = [
   },
   {
     ...product,
-    configurationSlots: [
-      {
-        choices: [
-          {
-            availableWhen: [],
-            finishOptionId: null,
-            id: 4002,
-            label: "Aluminum body",
-            productMaterialId: 4002,
-          },
-          {
-            availableWhen: [],
-            finishOptionId: null,
-            id: 4003,
-            label: "Titanium body",
-            productMaterialId: 4003,
-          },
-        ],
-        id: 4001,
-        labelFallback: "Body material",
-        labelKey: "catalog.configurationSlots.material",
-        required: true,
-      },
-      {
-        choices: [
-          {
-            availableWhen: [[4002]],
-            finishOptionId: null,
-            id: 4005,
-            label: "Needle tip",
-            partProductId: 4004,
-          },
-        ],
-        id: 4004,
-        labelFallback: "Tip",
-        labelKey: "catalog.configurationSlots.tip",
-        required: true,
-      },
-    ],
+    compatibleParts: [],
     id: 4000,
     materials: [],
     name: "Configurable pen",
@@ -390,36 +352,14 @@ export const ConfigurablePen: Story = {
       }),
     ).toBeVisible();
 
-    const body = canvas.getByRole("combobox", {
-      name: /material|catalog\.configurationSlots\.material/iu,
-    });
-    await userEvent.click(body);
-    await userEvent.click(
-      await page.findByRole("option", { name: "Aluminum body" }),
-    );
-    const tip = canvas.getByRole("combobox", {
-      name: /^tip$|catalog\.configurationSlots\.tip/iu,
-    });
-    await userEvent.click(tip);
-    await userEvent.click(
-      await page.findByRole("option", { name: "Needle tip" }),
-    );
-
-    await userEvent.click(body);
-    await userEvent.click(
-      await page.findByRole("option", { name: "Titanium body" }),
-    );
-    await expect(tip).toHaveValue("Needle tip");
-    await expect(
-      canvas.getByText("Compatibility not recorded for this configuration"),
-    ).toBeVisible();
-
     const refill = canvas.getByRole("combobox", {
       name: /refill$|web\.pens\.collection\.refill/iu,
     });
     await userEvent.click(refill);
     const refillOptions = await page.findAllByRole("option");
-    await expect(refillOptions[0]).toHaveAccessibleName("Compatible refill");
+    await expect(refillOptions[0]).toHaveAccessibleName(
+      "Compatible refill Compatibility not recorded for this configuration",
+    );
     await userEvent.click(
       page.getByRole("option", { name: /compatible refill/iu }),
     );
