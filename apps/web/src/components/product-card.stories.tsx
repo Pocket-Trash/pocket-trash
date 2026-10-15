@@ -16,6 +16,7 @@ const product: CatalogProduct = {
   compatibleButtonId: null,
   compatibleButtonName: null,
   compatiblePens: [],
+  refillCompatibility: [],
   compatibleParts: [],
   createdAt: new Date("2026-01-01"),
   description: null,

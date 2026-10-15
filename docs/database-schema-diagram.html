@@ -1440,6 +1440,7 @@
                   "name text",
                   "slug text",
                   "is_part_or_accessory boolean",
+                  "include_in_trends boolean",
                   "image_url? text",
                   "image_alt? text",
                   "created_at timestamp with time zone",
@@ -1447,6 +1448,24 @@
             ],
             "id": "product_types",
             "name": "product_types",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "generation_id FK bigint",
+                  "product_type_id? FK bigint",
+                  "material_id? FK bigint",
+                  "material_specific_id? FK bigint",
+                  "is_specific_breakdown boolean",
+                  "rounded_item_count integer",
+                  "rounded_collector_count integer"
+            ],
+            "id": "public_collection_item_material_trend",
+            "name": "public_collection_item_material_trend",
             "status": "existing"
       },
       {
@@ -1469,9 +1488,44 @@
             ],
             "fields": [
                   "id PK bigint",
+                  "generation_id FK bigint",
+                  "product_type_id? FK bigint",
+                  "material_id? FK bigint",
+                  "material_specific_id? FK bigint",
+                  "maker_id FK bigint",
+                  "product_id? FK bigint",
+                  "rounded_item_count integer",
+                  "rounded_collector_count integer"
+            ],
+            "id": "public_collection_maker_product_trend",
+            "name": "public_collection_maker_product_trend",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "generation_id PK/FK bigint",
+                  "product_type_id PK/FK bigint",
+                  "rounded_item_count integer"
+            ],
+            "id": "public_part_accessory_product_type_trend",
+            "name": "public_part_accessory_product_type_trend",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
                   "active boolean",
                   "generated_at timestamp with time zone",
-                  "has_suppressed_values boolean"
+                  "has_suppressed_values boolean",
+                  "has_suppressed_part_accessory_values boolean",
+                  "has_suppressed_material_values boolean",
+                  "has_suppressed_maker_product_values boolean"
             ],
             "id": "public_trends_generation",
             "name": "public_trends_generation",
@@ -1484,7 +1538,6 @@
             "fields": [
                   "id PK bigint",
                   "pen_product_id FK bigint",
-                  "required_tip_product_id? FK bigint",
                   "target_group_id? FK bigint",
                   "target_refill_product_id? FK bigint",
                   "created_at timestamp with time zone",
@@ -2757,6 +2810,26 @@
             "listing_id → id"
       ],
       [
+            "public_collection_item_material_trend",
+            "public_trends_generation",
+            "generation_id → id"
+      ],
+      [
+            "public_collection_item_material_trend",
+            "product_types",
+            "product_type_id → id"
+      ],
+      [
+            "public_collection_item_material_trend",
+            "materials",
+            "material_id → id"
+      ],
+      [
+            "public_collection_item_material_trend",
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
+      ],
+      [
             "public_collection_item_product_type_trend",
             "public_trends_generation",
             "generation_id → id"
@@ -2767,14 +2840,49 @@
             "product_type_id → id"
       ],
       [
-            "refill_compatibility_assertion",
-            "product_detail_pen",
-            "pen_product_id → id"
+            "public_collection_maker_product_trend",
+            "public_trends_generation",
+            "generation_id → id"
+      ],
+      [
+            "public_collection_maker_product_trend",
+            "product_types",
+            "product_type_id → id"
+      ],
+      [
+            "public_collection_maker_product_trend",
+            "materials",
+            "material_id → id"
+      ],
+      [
+            "public_collection_maker_product_trend",
+            "makers",
+            "maker_id → id"
+      ],
+      [
+            "public_collection_maker_product_trend",
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
+      ],
+      [
+            "public_collection_maker_product_trend",
+            "product",
+            "product_id, maker_id → id, maker_id"
+      ],
+      [
+            "public_part_accessory_product_type_trend",
+            "public_trends_generation",
+            "generation_id → id"
+      ],
+      [
+            "public_part_accessory_product_type_trend",
+            "product_types",
+            "product_type_id → id"
       ],
       [
             "refill_compatibility_assertion",
-            "product_detail_pen_tip",
-            "required_tip_product_id → id"
+            "product_detail_pen",
+            "pen_product_id → id"
       ],
       [
             "refill_compatibility_assertion",

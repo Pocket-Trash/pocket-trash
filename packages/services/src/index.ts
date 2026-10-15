@@ -54,6 +54,7 @@ export type {
   CatalogProduct,
   CatalogProductType,
   CatalogProductTypeSummary,
+  CatalogRefillCompatibilityTarget,
   CatalogRefillOffering,
   CatalogService,
   CatalogTerminologyAlias,

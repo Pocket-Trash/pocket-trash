@@ -742,6 +742,8 @@ export type CatalogProduct = {
   compatibleParts: CatalogCompatiblePenPart[];
   /** Catalog Pens compatible with this refill model. */
   compatiblePens: CatalogCompatiblePen[];
+  /** Refill groups and individual refills accepted by this Pen. */
+  refillCompatibility: CatalogRefillCompatibilityTarget[];
   /**
    * Number of attached images.
    */
@@ -868,12 +870,16 @@ export type CatalogCompatiblePen = {
   id: number;
   /** Pen display name. */
   name: string;
-  /** Required tip display name, when compatibility depends on a tip. */
-  requiredTipName: string | null;
-  /** Required tip product identifier, when compatibility depends on a tip. */
-  requiredTipProductId?: number | null;
   /** Pen route slug. */
   slug: string;
+};
+
+/** One refill group or individual refill accepted by a Pen. */
+export type CatalogRefillCompatibilityTarget = {
+  /** Accepted refill group, or null for an individual refill. */
+  targetGroupId: number | null;
+  /** Accepted individual refill, or null for a refill group. */
+  targetRefillProductId: number | null;
 };
 
 /** One Pen-part product that can be installed on a Pen. */
@@ -898,8 +904,6 @@ export type CatalogPensAdminOptions = {
     id: number;
     /** Pen accepting the refill or group. */
     penProductId: number;
-    /** Optional Pen tip required by the relationship. */
-    requiredTipProductId: number | null;
     /** Accepted compatibility group. */
     targetGroupId: number | null;
     /** Accepted refill product. */
@@ -983,6 +987,8 @@ export type ProductWriteInput = {
   productTypeSlug: WritableCatalogProductType;
   /** Stable maker model required by refill products. */
   refillModel?: string | null;
+  /** Complete replacement refill compatibility set for a Pen. */
+  refillCompatibility?: CatalogRefillCompatibilityTarget[];
   /**
    * Administrative reason for the operation.
    */
@@ -1101,30 +1107,6 @@ export type PensAdminWriteInput =
       kind: "compatibility-membership-remove";
       /** Refill that owns the membership. */
       refillProductId: number;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Mutation discriminator. */
-      kind: "compatibility-assertion";
-      /** Pen product receiving the assertion. */
-      penProductId: number;
-      /** Optional required Pen tip. */
-      requiredTipProductId?: number | null;
-      /** Target compatibility group. */
-      targetGroupId?: number | null;
-      /** Target refill product. */
-      targetRefillProductId?: number | null;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Existing relationship to remove. */
-      assertionId: number;
-      /** Mutation discriminator. */
-      kind: "compatibility-assertion-remove";
-      /** Pen that owns the relationship. */
-      penProductId: number;
     };
 
 /**
@@ -1660,6 +1642,12 @@ export type CatalogService = {
    * @rejects When the database query or operation logging fails.
    */
   listMechanisms(): Promise<CatalogLookup[]>;
+  /**
+   * Lists canonical refill compatibility groups.
+   *
+   * @returns Matching compatibility-group lookups.
+   */
+  listRefillCompatibilityGroups(): Promise<CatalogLookup[]>;
   /**
    * Lists maker-scoped terminology aliases ordered by label.
    *
@@ -3012,45 +3000,7 @@ export function createCatalogService(
                 throw new Error("Compatibility membership does not exist.");
               return await complete(row);
             }
-            if (input.kind === "compatibility-assertion-remove") {
-              const [row] = await tx
-                .delete(schema.refillCompatibilityAssertion)
-                .where(
-                  and(
-                    eq(
-                      schema.refillCompatibilityAssertion.id,
-                      input.assertionId,
-                    ),
-                    eq(
-                      schema.refillCompatibilityAssertion.penProductId,
-                      input.penProductId,
-                    ),
-                  ),
-                )
-                .returning({ id: schema.refillCompatibilityAssertion.id });
-              if (!row)
-                throw new Error("Compatibility relationship does not exist.");
-              return await complete(row);
-            }
-            await assertProductHasType(tx, input.penProductId, ["pen"]);
-            if (
-              Number(input.targetGroupId != null) +
-                Number(input.targetRefillProductId != null) !==
-              1
-            )
-              throw new Error("Compatibility needs exactly one target.");
-            const [row] = await tx
-              .insert(schema.refillCompatibilityAssertion)
-              .values({
-                penProductId: input.penProductId,
-                requiredTipProductId: input.requiredTipProductId ?? null,
-                targetGroupId: input.targetGroupId ?? null,
-                targetRefillProductId: input.targetRefillProductId ?? null,
-              })
-              .returning({ id: schema.refillCompatibilityAssertion.id });
-            if (!row)
-              throw new Error("Failed to create compatibility assertion.");
-            return await complete(row);
+            throw new Error("Unsupported Pens catalog action.");
           }),
       );
     },
@@ -3678,6 +3628,7 @@ export function createCatalogService(
 
             await assertProductRelationships(tx, row.id, input);
             await insertProductSubtype(tx, row.id, input);
+            await replaceRefillCompatibility(tx, row.id, input);
             await replaceProductAliases(
               tx,
               row.id,
@@ -4751,6 +4702,34 @@ export function createCatalogService(
       );
     },
     /**
+     * Lists canonical refill compatibility groups.
+     *
+     * @returns Matching compatibility-group lookups.
+     */
+    async listRefillCompatibilityGroups() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listRefillCompatibilityGroups,
+        async () =>
+          await db
+            .select({
+              id: schema.refillCompatibilityGroup.id,
+              name: schema.catalogTerminologyConcept.canonicalLabelFallback,
+              slug: schema.catalogTerminologyConcept.key,
+            })
+            .from(schema.refillCompatibilityGroup)
+            .innerJoin(
+              schema.catalogTerminologyConcept,
+              eq(
+                schema.refillCompatibilityGroup.conceptId,
+                schema.catalogTerminologyConcept.id,
+              ),
+            )
+            .orderBy(
+              asc(schema.catalogTerminologyConcept.canonicalLabelFallback),
+            ),
+      );
+    },
+    /**
      * Lists lookups and direct relationships available to the Pens admin editor.
      *
      * @param actor - Authenticated catalog manager.
@@ -4817,8 +4796,6 @@ export function createCatalogService(
               .select({
                 id: schema.refillCompatibilityAssertion.id,
                 penProductId: schema.refillCompatibilityAssertion.penProductId,
-                requiredTipProductId:
-                  schema.refillCompatibilityAssertion.requiredTipProductId,
                 targetGroupId:
                   schema.refillCompatibilityAssertion.targetGroupId,
                 targetRefillProductId:
@@ -5854,6 +5831,7 @@ export function createCatalogService(
 
             await assertProductRelationships(tx, input.productId, input);
             await updateProductSubtype(tx, input.productId, input);
+            await replaceRefillCompatibility(tx, input.productId, input);
             if (input.aliases !== undefined)
               await replaceProductAliases(
                 tx,
@@ -8739,6 +8717,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     name: product.name,
     productTypeId: product.productTypeId,
     productTypeSlug: product.productTypeSlug,
+    refillCompatibility: product.refillCompatibility,
     refillModel: product.refillModel,
     refillOfferings: product.refillOfferings,
     slug: product.slug,
@@ -9804,6 +9783,7 @@ async function queryProducts(
       diameter: dimensionMeasurement(row.diameter, row.diameterUnit),
       compatibleParts: [],
       compatiblePens: [],
+      refillCompatibility: [],
       finishOptions: [],
       imageCount: 0,
       images: [],
@@ -10006,18 +9986,29 @@ async function loadPensCatalogDetails(
       tipStyle: offering.tipStyle,
     });
   }
+  const directCompatibility = await db
+    .select({
+      penProductId: schema.refillCompatibilityAssertion.penProductId,
+      targetGroupId: schema.refillCompatibilityAssertion.targetGroupId,
+      targetRefillProductId:
+        schema.refillCompatibilityAssertion.targetRefillProductId,
+    })
+    .from(schema.refillCompatibilityAssertion)
+    .where(
+      inArray(schema.refillCompatibilityAssertion.penProductId, productIds),
+    );
+  for (const assertion of directCompatibility)
+    productsById
+      .get(assertion.penProductId)
+      ?.refillCompatibility.push(assertion);
   if (!refillIds.length) return;
   const groupIds = [...new Set(memberships.map(({ groupId }) => groupId))];
   const penProduct = alias(schema.product, "compatible_pen_product");
-  const requiredTip = alias(schema.product, "compatible_required_tip");
   const assertions = await db
     .select({
       penProductId: schema.refillCompatibilityAssertion.penProductId,
       penName: penProduct.name,
       penSlug: penProduct.slug,
-      requiredTipName: requiredTip.name,
-      requiredTipProductId:
-        schema.refillCompatibilityAssertion.requiredTipProductId,
       targetGroupId: schema.refillCompatibilityAssertion.targetGroupId,
       targetRefillProductId:
         schema.refillCompatibilityAssertion.targetRefillProductId,
@@ -10026,13 +10017,6 @@ async function loadPensCatalogDetails(
     .innerJoin(
       penProduct,
       eq(schema.refillCompatibilityAssertion.penProductId, penProduct.id),
-    )
-    .leftJoin(
-      requiredTip,
-      eq(
-        schema.refillCompatibilityAssertion.requiredTipProductId,
-        requiredTip.id,
-      ),
     )
     .where(
       and(
@@ -10050,13 +10034,6 @@ async function loadPensCatalogDetails(
         ),
         eq(penProduct.approvalStatus, "approved"),
         eq(penProduct.isPrivate, false),
-        or(
-          isNull(schema.refillCompatibilityAssertion.requiredTipProductId),
-          and(
-            eq(requiredTip.approvalStatus, "approved"),
-            eq(requiredTip.isPrivate, false),
-          ),
-        ),
       ),
     );
   const groupsByRefill = new Map<number, Set<number>>();
@@ -10066,7 +10043,7 @@ async function loadPensCatalogDetails(
     groupsByRefill.set(membership.refillProductId, groups);
   }
   for (const refillId of refillIds) {
-    const compatible = new Map<string, CatalogCompatiblePen>();
+    const compatible = new Map<number, CatalogCompatiblePen>();
     const matching = assertions
       .filter(
         (assertion) =>
@@ -10080,13 +10057,10 @@ async function loadPensCatalogDetails(
           Number(a.targetRefillProductId === refillId),
       );
     for (const assertion of matching) {
-      const key = `${assertion.penProductId}:${assertion.requiredTipProductId ?? ""}`;
-      if (compatible.has(key)) continue;
-      compatible.set(key, {
+      if (compatible.has(assertion.penProductId)) continue;
+      compatible.set(assertion.penProductId, {
         id: assertion.penProductId,
         name: assertion.penName,
-        requiredTipName: assertion.requiredTipName,
-        requiredTipProductId: assertion.requiredTipProductId,
         slug: assertion.penSlug,
       });
     }
@@ -12529,6 +12503,68 @@ function assertPensProductFields(input: ProductWriteInput) {
   });
   if (new Set(normalizedAliases).size !== normalizedAliases.length)
     throw new Error("Duplicate product aliases are not allowed.");
+
+  const compatibility = input.refillCompatibility ?? [];
+  if (input.productTypeSlug !== "pen" && compatibility.length)
+    throw new Error("Only Pens may declare refill compatibility.");
+  const keys = compatibility.map(({ targetGroupId, targetRefillProductId }) => {
+    if ((targetGroupId === null) === (targetRefillProductId === null))
+      throw new Error("Refill compatibility must select exactly one target.");
+    return targetGroupId === null
+      ? `refill:${targetRefillProductId}`
+      : `group:${targetGroupId}`;
+  });
+  if (new Set(keys).size !== keys.length)
+    throw new Error("Duplicate refill compatibility is not allowed.");
+}
+
+/**
+ * Replaces a Pen's complete refill compatibility set.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Pen receiving the replacement set.
+ * @param input - Product write containing the complete compatibility set.
+ * @rejects When a selected compatibility target does not exist.
+ */
+async function replaceRefillCompatibility(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+) {
+  await tx
+    .delete(schema.refillCompatibilityAssertion)
+    .where(eq(schema.refillCompatibilityAssertion.penProductId, productId));
+  const compatibility = input.refillCompatibility ?? [];
+  if (!compatibility.length) return;
+
+  const groupIds = compatibility.flatMap(({ targetGroupId }) =>
+    targetGroupId === null ? [] : [targetGroupId],
+  );
+  const refillIds = compatibility.flatMap(({ targetRefillProductId }) =>
+    targetRefillProductId === null ? [] : [targetRefillProductId],
+  );
+  const [groups, refills] = await Promise.all([
+    groupIds.length
+      ? tx
+          .select({ id: schema.refillCompatibilityGroup.id })
+          .from(schema.refillCompatibilityGroup)
+          .where(inArray(schema.refillCompatibilityGroup.id, groupIds))
+      : Promise.resolve([]),
+    refillIds.length
+      ? tx
+          .select({ id: schema.productDetailRefill.id })
+          .from(schema.productDetailRefill)
+          .where(inArray(schema.productDetailRefill.id, refillIds))
+      : Promise.resolve([]),
+  ]);
+  if (groups.length !== groupIds.length || refills.length !== refillIds.length)
+    throw new Error("Refill compatibility target does not exist.");
+  await tx.insert(schema.refillCompatibilityAssertion).values(
+    compatibility.map((target) => ({
+      penProductId: productId,
+      ...target,
+    })),
+  );
 }
 
 /**

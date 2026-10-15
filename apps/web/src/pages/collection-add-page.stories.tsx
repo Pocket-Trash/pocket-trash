@@ -16,6 +16,7 @@ const product: CatalogProduct = {
   compatibleButtonId: null,
   compatibleButtonName: null,
   compatiblePens: [],
+  refillCompatibility: [],
   compatibleParts: [],
   createdAt: new Date(0),
   description: null,
@@ -138,11 +139,10 @@ const products: CatalogProduct[] = [
       {
         id: 4000,
         name: "Configurable pen",
-        requiredTipName: "Needle tip",
-        requiredTipProductId: 4004,
         slug: "configurable-pen",
       },
     ],
+    refillCompatibility: [],
     id: 5000,
     materials: [],
     name: "Compatible refill",
@@ -357,8 +357,9 @@ export const ConfigurablePen: Story = {
     });
     await userEvent.click(refill);
     const refillOptions = await page.findAllByRole("option");
-    await expect(refillOptions[0]).toHaveAccessibleName(
-      "Compatible refill Compatibility not recorded for this configuration",
+    await expect(refillOptions[0]).toHaveAccessibleName("Compatible refill");
+    await expect(refillOptions[1]).toHaveAccessibleName(
+      "Other refill Compatibility not recorded for this configuration",
     );
     await userEvent.click(
       page.getByRole("option", { name: /compatible refill/iu }),

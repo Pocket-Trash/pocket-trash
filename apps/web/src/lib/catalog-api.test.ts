@@ -252,6 +252,16 @@ describe("Pens catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        productTypeSlug: "pen",
+        refillCompatibility: [
+          { targetGroupId: 1001, targetRefillProductId: null },
+          { targetGroupId: null, targetRefillProductId: 1002 },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
         mechanismId: 1000,
         productTypeSlug: "pen-mechanism",
       }).success,
@@ -275,6 +285,16 @@ describe("Pens catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         productTypeSlug: "pen",
+        refillCompatibility: [
+          { targetGroupId: 1001, targetRefillProductId: null },
+          { targetGroupId: 1001, targetRefillProductId: null },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "pen",
         weight: { unit: "g", value: "20" },
       }).success,
     ).toBe(false);
@@ -282,26 +302,7 @@ describe("Pens catalog product validation", () => {
 });
 
 describe("Pens admin validation", () => {
-  it("accepts direct compatibility and requires exactly one target", () => {
-    const assertion = {
-      kind: "compatibility-assertion" as const,
-      penProductId: 1000,
-      targetRefillProductId: 1001,
-    };
-    expect(pensAdminWriteSchema.safeParse(assertion).success).toBe(true);
-    expect(
-      pensAdminWriteSchema.safeParse({
-        ...assertion,
-        targetGroupId: 1003,
-      }).success,
-    ).toBe(false);
-    expect(
-      pensAdminWriteSchema.safeParse({
-        assertionId: 1004,
-        kind: "compatibility-assertion-remove",
-        penProductId: 1000,
-      }).success,
-    ).toBe(true);
+  it("keeps group membership administration separate from Pen products", () => {
     expect(
       pensAdminWriteSchema.safeParse({
         kind: "compatibility-membership-remove",
@@ -309,6 +310,13 @@ describe("Pens admin validation", () => {
         refillProductId: 1001,
       }).success,
     ).toBe(true);
+    expect(
+      pensAdminWriteSchema.safeParse({
+        kind: "compatibility-assertion",
+        penProductId: 1000,
+        targetRefillProductId: 1001,
+      }).success,
+    ).toBe(false);
   });
 });
 

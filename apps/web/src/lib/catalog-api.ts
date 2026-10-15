@@ -386,6 +386,14 @@ export const productFormSchema = z
     bearing: optionalBearingSchema,
     buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
+    refillCompatibility: z
+      .array(
+        z.object({
+          targetGroupId: idSchema.nullable(),
+          targetRefillProductId: idSchema.nullable(),
+        }),
+      )
+      .default([]),
     description: optionalDescriptionSchema,
     diameter: dimensionMeasurementSchema,
     finishOptions: z.array(finishOptionSchema),
@@ -435,6 +443,7 @@ export const productFormSchema = z
         magnetLayout,
         mechanismId,
         productTypeSlug,
+        refillCompatibility,
         refillModel,
         spinDiameter,
         thickness,
@@ -491,6 +500,37 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: ["refillModel"],
+        });
+      }
+      if (productTypeSlug !== "pen" && refillCompatibility.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["refillCompatibility"],
+        });
+      }
+      const compatibilityKeys = refillCompatibility.flatMap(
+        ({ targetGroupId, targetRefillProductId }, index) => {
+          if ((targetGroupId === null) === (targetRefillProductId === null)) {
+            context.addIssue({
+              code: "custom",
+              message: "web.catalog.error.form",
+              path: ["refillCompatibility", index],
+            });
+            return [];
+          }
+          return [
+            targetGroupId === null
+              ? `refill:${targetRefillProductId}`
+              : `group:${targetGroupId}`,
+          ];
+        },
+      );
+      if (new Set(compatibilityKeys).size !== compatibilityKeys.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["refillCompatibility"],
         });
       }
       if (productTypeSlug === "pen-mechanism" && mechanismId === null) {
@@ -773,72 +813,46 @@ export const collectionDeletionSchema = productDeletionSchema
   });
 
 /** Structured Pens catalog mutation accepted from admin editors. */
-export const pensAdminWriteSchema = z
-  .discriminatedUnion("kind", [
-    z.object({
-      kind: z.literal("refill-tip-style"),
-      name: z.string().trim().min(1).max(80),
-      slug: z.string().trim().min(1).max(80),
-    }),
-    z.object({
-      kind: z.literal("refill-ink-color"),
-      name: z.string().trim().min(1).max(80),
-      slug: z.string().trim().min(1).max(80),
-    }),
-    z.object({
-      conceptId: idSchema,
-      kind: z.literal("compatibility-group"),
-    }),
-    z.object({
-      inkColorId: idSchema,
-      kind: z.literal("refill-offering"),
-      refillProductId: idSchema,
-      tipSize: z.string().trim().min(1).max(80),
-      tipStyleId: idSchema,
-    }),
-    z.object({
-      identifierKind: z.enum(["maker-code", "sku"]),
-      kind: z.literal("offering-identifier"),
-      makerId: idSchema,
-      offeringId: idSchema,
-      sourceValue: z.string().trim().min(1).max(200),
-    }),
-    z.object({
-      groupId: idSchema,
-      kind: z.literal("compatibility-membership"),
-      refillProductId: idSchema,
-    }),
-    z.object({
-      kind: z.literal("compatibility-membership-remove"),
-      membershipId: idSchema,
-      refillProductId: idSchema,
-    }),
-    z.object({
-      kind: z.literal("compatibility-assertion"),
-      penProductId: idSchema,
-      requiredTipProductId: idSchema.nullable().optional(),
-      targetGroupId: idSchema.nullable().optional(),
-      targetRefillProductId: idSchema.nullable().optional(),
-    }),
-    z.object({
-      assertionId: idSchema,
-      kind: z.literal("compatibility-assertion-remove"),
-      penProductId: idSchema,
-    }),
-  ])
-  .superRefine((input, context) => {
-    if (
-      input.kind === "compatibility-assertion" &&
-      Number(input.targetGroupId != null) +
-        Number(input.targetRefillProductId != null) !==
-        1
-    )
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["targetRefillProductId"],
-      });
-  });
+export const pensAdminWriteSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("refill-tip-style"),
+    name: z.string().trim().min(1).max(80),
+    slug: z.string().trim().min(1).max(80),
+  }),
+  z.object({
+    kind: z.literal("refill-ink-color"),
+    name: z.string().trim().min(1).max(80),
+    slug: z.string().trim().min(1).max(80),
+  }),
+  z.object({
+    conceptId: idSchema,
+    kind: z.literal("compatibility-group"),
+  }),
+  z.object({
+    inkColorId: idSchema,
+    kind: z.literal("refill-offering"),
+    refillProductId: idSchema,
+    tipSize: z.string().trim().min(1).max(80),
+    tipStyleId: idSchema,
+  }),
+  z.object({
+    identifierKind: z.enum(["maker-code", "sku"]),
+    kind: z.literal("offering-identifier"),
+    makerId: idSchema,
+    offeringId: idSchema,
+    sourceValue: z.string().trim().min(1).max(200),
+  }),
+  z.object({
+    groupId: idSchema,
+    kind: z.literal("compatibility-membership"),
+    refillProductId: idSchema,
+  }),
+  z.object({
+    kind: z.literal("compatibility-membership-remove"),
+    membershipId: idSchema,
+    refillProductId: idSchema,
+  }),
+]);
 
 /** Validates explicit acknowledgement of permanent collection-item deletion. */
 export const collectionItemDeletionSchema = productDeletionSchema
@@ -1072,6 +1086,8 @@ export type CatalogOptions = {
   makers: Awaited<ReturnType<typeof listMakers>>;
   /** Canonical Pen mechanism types. */
   mechanisms: CatalogLookup[];
+  /** Canonical refill compatibility groups. */
+  refillCompatibilityGroups?: CatalogLookup[];
   /** Structured Pens administration lookups, present only for managers. */
   pensAdminOptions?: CatalogPensAdminOptions;
   /**
@@ -1115,6 +1131,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       finishes,
       makers,
       mechanisms,
+      refillCompatibilityGroups,
       pensAdminOptions,
       magnetPresets,
       materials,
@@ -1130,6 +1147,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listFinishes(),
       listMakers(),
       s.db.catalog.listMechanisms(),
+      s.db.catalog.listRefillCompatibilityGroups(),
       actor && hasPermission(actor, "products.manage")
         ? s.db.catalog.listPensAdminOptions(actor)
         : Promise.resolve(undefined),
@@ -1148,6 +1166,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       finishes,
       makers,
       mechanisms,
+      refillCompatibilityGroups,
       pensAdminOptions,
       magnetPresets,
       materials,
@@ -2035,6 +2054,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
       refillModel: parsed.data.refillModel,
+      refillCompatibility: parsed.data.refillCompatibility,
       reason: parsed.data.reason,
       slug,
       specs: {
