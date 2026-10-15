@@ -3,10 +3,12 @@ import {
   bigint,
   boolean,
   check,
+  date,
   foreignKey,
   integer,
   pgTable,
   primaryKey,
+  text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -47,11 +49,76 @@ export const publicTrendsGeneration = pgTable(
     )
       .default(false)
       .notNull(),
+    /** Whether at least one lifecycle point was privacy-suppressed. */
+    hasSuppressedLifecycleValues: boolean("has_suppressed_lifecycle_values")
+      .default(false)
+      .notNull(),
   },
   (table) => [
     uniqueIndex("public_trends_generation_active_unique")
       .on(table.active)
       .where(sql`${table.active}`),
+  ],
+);
+
+/** Privacy-transformed acquisition or departure points for one filter scope. */
+export const publicCollectionLifecycleTrend = pgTable(
+  "public_collection_lifecycle_trend",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    generationId: bigint("generation_id", { mode: "number" })
+      .notNull()
+      .references(() => publicTrendsGeneration.id, { onDelete: "cascade" }),
+    bucketStart: date("bucket_start", { mode: "string" }).notNull(),
+    granularity: text("granularity", {
+      enum: ["day", "week", "month"],
+    }).notNull(),
+    eventType: text("event_type", {
+      enum: ["acquisition", "departure"],
+    }).notNull(),
+    /** Null for the all-product-types scope. */
+    productTypeId: bigint("product_type_id", { mode: "number" }).references(
+      () => productType.id,
+      { onDelete: "restrict" },
+    ),
+    /** Null for the all-makers scope. */
+    makerId: bigint("maker_id", { mode: "number" }).references(() => maker.id, {
+      onDelete: "restrict",
+    }),
+    /** Null for the all-materials scope. */
+    materialId: bigint("material_id", { mode: "number" }).references(
+      () => material.id,
+      { onDelete: "restrict" },
+    ),
+    /** Rounded event count, or null for a suppressed point. */
+    roundedCount: integer("rounded_count"),
+    /** Whether the point did not meet the contributor threshold. */
+    suppressed: boolean("suppressed").default(false).notNull(),
+  },
+  (table) => [
+    uniqueIndex("public_collection_lifecycle_trend_scope_unique").on(
+      table.generationId,
+      table.bucketStart,
+      table.granularity,
+      table.eventType,
+      sql`coalesce(${table.productTypeId}, 0)`,
+      sql`coalesce(${table.makerId}, 0)`,
+      sql`coalesce(${table.materialId}, 0)`,
+    ),
+    check(
+      "public_collection_lifecycle_trend_granularity_valid",
+      sql`${table.granularity} in ('day', 'week', 'month')`,
+    ),
+    check(
+      "public_collection_lifecycle_trend_event_type_valid",
+      sql`${table.eventType} in ('acquisition', 'departure')`,
+    ),
+    check(
+      "public_collection_lifecycle_trend_count_valid",
+      sql`(${table.suppressed} and ${table.roundedCount} is null) or (not ${table.suppressed} and ${table.roundedCount} > 0 and ${table.roundedCount} % 5 = 0)`,
+    ),
   ],
 );
 
@@ -81,7 +148,10 @@ export const publicCollectionMakerProductTrend = pgTable(
       .notNull()
       .references(() => maker.id, { onDelete: "restrict" }),
     /** Null for a maker aggregate row. */
-    productId: bigint("product_id", { mode: "number" }),
+    productId: bigint("product_id", { mode: "number" }).references(
+      () => product.id,
+      { onDelete: "restrict" },
+    ),
     /** Currently owned item count rounded to the nearest five. */
     roundedItemCount: integer("rounded_item_count").notNull(),
     /** Distinct collector count rounded to the nearest five. */
@@ -108,11 +178,6 @@ export const publicCollectionMakerProductTrend = pgTable(
       columns: [table.materialId, table.materialSpecificId],
       foreignColumns: [materialSpecific.materialId, materialSpecific.id],
       name: "public_collection_maker_product_trend_specific_parent_fk",
-    }).onDelete("restrict"),
-    foreignKey({
-      columns: [table.productId, table.makerId],
-      foreignColumns: [product.id, product.makerId],
-      name: "public_collection_maker_product_trend_product_maker_fk",
     }).onDelete("restrict"),
   ],
 );
@@ -232,3 +297,6 @@ export type PublicCollectionItemMaterialTrend =
 /** Stored privacy-safe maker or product Trend row. */
 export type PublicCollectionMakerProductTrend =
   typeof publicCollectionMakerProductTrend.$inferSelect;
+/** Stored privacy-transformed lifecycle point. */
+export type PublicCollectionLifecycleTrend =
+  typeof publicCollectionLifecycleTrend.$inferSelect;
