@@ -364,7 +364,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Compatible Tip",
         productTypeSlug: "pen-tip",
@@ -377,7 +379,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Compatible Pen",
         productTypeSlug: "pen",
@@ -394,7 +398,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: pen.name,
           productId: pen.id,
@@ -410,7 +418,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: pen.name,
           productId: pen.id,

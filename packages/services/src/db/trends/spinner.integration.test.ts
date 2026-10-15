@@ -82,10 +82,19 @@ describe("public Spinner Trends query", () => {
       const zirconium = materials.find(({ slug }) => slug === "zirconium");
       if (!titanium || !zirconium)
         throw new Error("Spinner fixture materials were not created.");
-      await db.insert(schema.productMaterial).values([
-        { materialId: titanium.id, productId: spinner.id },
-        { materialId: zirconium.id, productId: button.id },
-      ]);
+      const productMaterials = await db
+        .insert(schema.productMaterial)
+        .values([{ productId: spinner.id }, { productId: button.id }])
+        .returning({
+          id: schema.productMaterial.id,
+          productId: schema.productMaterial.productId,
+        });
+      await db.insert(schema.productMaterialComponent).values(
+        productMaterials.map(({ id, productId }) => ({
+          materialId: productId === spinner.id ? titanium.id : zirconium.id,
+          productMaterialId: id,
+        })),
+      );
 
       const trends = await createTrendsService(
         db as unknown as Database,

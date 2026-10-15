@@ -433,8 +433,15 @@ async function spinnerRows(
           eq(schema.product.id, schema.productMaterial.productId),
         )
         .leftJoin(
+          schema.productMaterialComponent,
+          eq(
+            schema.productMaterial.id,
+            schema.productMaterialComponent.productMaterialId,
+          ),
+        )
+        .leftJoin(
           schema.material,
-          eq(schema.productMaterial.materialId, schema.material.id),
+          eq(schema.productMaterialComponent.materialId, schema.material.id),
         )
         .where(
           and(
@@ -456,8 +463,15 @@ async function spinnerRows(
           eq(schema.product.id, schema.productMaterial.productId),
         )
         .leftJoin(
+          schema.productMaterialComponent,
+          eq(
+            schema.productMaterial.id,
+            schema.productMaterialComponent.productMaterialId,
+          ),
+        )
+        .leftJoin(
           schema.material,
-          eq(schema.productMaterial.materialId, schema.material.id),
+          eq(schema.productMaterialComponent.materialId, schema.material.id),
         )
         .where(
           and(
