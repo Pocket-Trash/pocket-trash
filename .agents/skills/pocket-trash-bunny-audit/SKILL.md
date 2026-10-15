@@ -1,6 +1,7 @@
 ---
 name: pocket-trash-bunny-audit
 description: Audit Pocket Trash Bunny services, billing, and usage.
+disable-model-invocation: true
 ---
 
 # Bunny Audit

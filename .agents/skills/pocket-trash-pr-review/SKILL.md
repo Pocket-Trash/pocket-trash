@@ -1,6 +1,7 @@
 ---
 name: pocket-trash-pr-review
 description: Review a Pocket Trash pull request and run repository checks.
+disable-model-invocation: true
 ---
 
 # PR Review
