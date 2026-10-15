@@ -1,5 +1,7 @@
 import type {
   PublicCollectionItemTrends,
+  PublicCollectionMaterialTrends,
+  PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
 } from "@package/services";
@@ -16,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import { filterCatalogTrends } from "@/lib/catalog-filters";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -42,22 +45,46 @@ type TrendsTranslationKey =
   | "web.trends.partsAndAccessoriesPrivacy"
   | "web.trends.partsAndAccessoriesStale"
   | "web.trends.partsAndAccessoriesSuppressed"
-  | "web.trends.partsAndAccessoriesSuppressedEmpty";
+  | "web.trends.partsAndAccessoriesSuppressedEmpty"
+  | "web.trends.material"
+  | "web.trends.materialSpecific"
+  | "web.trends.allMaterials"
+  | "web.trends.allMaterialSpecifics"
+  | "web.trends.generalMaterial"
+  | "web.trends.unspecifiedMaterial"
+  | "web.trends.catalogMaterials"
+  | "web.trends.catalogMaterialsChartLabel"
+  | "web.trends.collectionMaterials"
+  | "web.trends.collectionMaterialsChartLabel"
+  | "web.trends.collectorMaterials"
+  | "web.trends.collectorMaterialsChartLabel"
+  | "web.trends.materialsEmpty"
+  | "web.trends.materialsError"
+  | "web.trends.materialsPrivacy"
+  | "web.trends.materialsStale"
+  | "web.trends.materialsSuppressed"
+  | "web.trends.materialsSuppressedEmpty"
+  | "web.trends.viewProducts";
 
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
+  /** Exact approved public catalog-product material counts. */
+  catalogMaterialTrends: PublicMaterialTrend[];
+  /** Active privacy-safe material generation. */
+  collectionMaterialTrends: PublicCollectionMaterialTrends | null;
   /** Active privacy-safe collection-item generation. */
   collectionTrends: PublicCollectionItemTrends | null;
   /**
-   * Updates the stable product-type URL filter.
+   * Updates stable Trends URL filters.
    *
-   * @param productTypeId - Selected product-type ID, or undefined for all types.
+   * @param search - Next normalized Trends search state.
+   * @returns Completion after the parent accepts the state.
    */
-  onProductTypeChange: (productTypeId?: number) => void;
+  onSearchChange: (search: CatalogTrendsSearch) => void;
   /** Active privacy-safe Parts and Accessories generation. */
   partAccessoryTrends?: PublicPartAccessoryTrends | null;
-  /** Stable product-type identifier selected by the URL filter. */
-  selectedProductTypeId?: number;
+  /** Stable filters selected in URL search. */
+  search?: CatalogTrendsSearch;
   /** Exact public catalog-product counts in descending order. */
   trends: PublicProductTypeTrend[];
 };
@@ -69,10 +96,12 @@ export type TrendsPageProps = {
  * @returns The accessible public Trends page.
  */
 export function TrendsPage({
+  catalogMaterialTrends,
+  collectionMaterialTrends,
   collectionTrends,
-  onProductTypeChange,
+  onSearchChange,
   partAccessoryTrends = null,
-  selectedProductTypeId,
+  search = {},
   trends,
 }: TrendsPageProps) {
   const { locale } = useLocale();
@@ -87,10 +116,11 @@ export function TrendsPage({
     key: TrendsTranslationKey,
     values: Record<string, string | number> = {},
   ) => formatTranslation(key as TranslationKey, values, locale);
-  const visibleTrends = filterCatalogTrends(trends, selectedProductTypeId);
+  const { materialId, materialSpecificId, productTypeId } = search;
+  const visibleTrends = filterCatalogTrends(trends, productTypeId);
   const visibleCollectionTrends = filterCatalogTrends(
     collectionTrends?.values ?? [],
-    selectedProductTypeId,
+    productTypeId,
   );
   const collectionChartTrends =
     visibleCollectionTrends.length > 8
@@ -107,6 +137,27 @@ export function TrendsPage({
       : visibleCollectionTrends;
   const largestCollectionCount = Math.max(
     ...collectionChartTrends.map(({ count }) => count),
+    1,
+  );
+  const visiblePartAccessoryTrends = filterCatalogTrends(
+    partAccessoryTrends?.values ?? [],
+    productTypeId,
+  );
+  const partAccessoryChartTrends =
+    visiblePartAccessoryTrends.length > 8
+      ? [
+          ...visiblePartAccessoryTrends.slice(0, 8),
+          {
+            count: visiblePartAccessoryTrends
+              .slice(8)
+              .reduce((sum, trend) => sum + trend.count, 0),
+            productTypeId: 0,
+            productTypeName: t("web.trends.other"),
+          },
+        ]
+      : visiblePartAccessoryTrends;
+  const largestPartAccessoryCount = Math.max(
+    ...partAccessoryChartTrends.map(({ count }) => count),
     1,
   );
   const visibleCollectorTrends = visibleCollectionTrends.map((trend) => ({
@@ -131,27 +182,6 @@ export function TrendsPage({
     ...collectorChartTrends.map(({ count }) => count),
     1,
   );
-  const visiblePartAccessoryTrends = filterCatalogTrends(
-    partAccessoryTrends?.values ?? [],
-    selectedProductTypeId,
-  );
-  const partAccessoryChartTrends =
-    visiblePartAccessoryTrends.length > 8
-      ? [
-          ...visiblePartAccessoryTrends.slice(0, 8),
-          {
-            count: visiblePartAccessoryTrends
-              .slice(8)
-              .reduce((sum, trend) => sum + trend.count, 0),
-            productTypeId: 0,
-            productTypeName: t("web.trends.other"),
-          },
-        ]
-      : visiblePartAccessoryTrends;
-  const largestPartAccessoryCount = Math.max(
-    ...partAccessoryChartTrends.map(({ count }) => count),
-    1,
-  );
   const dateFormatter = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
   });
@@ -164,6 +194,66 @@ export function TrendsPage({
       ].map((trend) => [trend.productTypeId, trend.productTypeName]),
     ),
   ).sort((left, right) => left[1].localeCompare(right[1], locale));
+  const allMaterialValues = [
+    ...catalogMaterialTrends,
+    ...(collectionMaterialTrends?.itemValues ?? []),
+  ];
+  const materialOptions = Array.from(
+    new Map(
+      allMaterialValues.flatMap((value) =>
+        value.materialId !== null && value.materialName !== null
+          ? [[value.materialId, value.materialName] as const]
+          : [],
+      ),
+    ),
+  ).sort((left, right) => left[1].localeCompare(right[1], locale));
+  const materialSpecificOptions = Array.from(
+    new Map(
+      allMaterialValues.flatMap((value) =>
+        value.materialId === materialId &&
+        value.materialSpecificId !== null &&
+        value.materialSpecificName !== null
+          ? [[value.materialSpecificId, value.materialSpecificName] as const]
+          : [],
+      ),
+    ),
+  ).sort((left, right) => left[1].localeCompare(right[1], locale));
+  /**
+   * Returns the current stable URL-filtered material rows.
+   *
+   * @param values - Material rows across all supported scopes.
+   * @returns Rows matching the current URL filters.
+   */
+  const filterMaterials = (values: PublicMaterialTrend[]) =>
+    values
+      .filter(
+        (value) =>
+          value.productTypeId === (productTypeId ?? null) &&
+          value.isSpecificBreakdown === Boolean(materialId) &&
+          (materialSpecificId
+            ? value.materialSpecificId === materialSpecificId
+            : materialId
+              ? value.materialId === materialId
+              : value.materialSpecificId === null),
+      )
+      .sort((left, right) => right.count - left.count);
+  /**
+   * Resolves a general, specific, or Unspecified material label.
+   *
+   * @param value - Material row being rendered.
+   * @returns Localized label for the active material scope.
+   */
+  const materialLabel = (value: PublicMaterialTrend) =>
+    materialId
+      ? (value.materialSpecificName ?? t("web.trends.generalMaterial"))
+      : (value.materialName ?? t("web.trends.unspecifiedMaterial"));
+  const visibleCatalogMaterials = filterMaterials(catalogMaterialTrends);
+  const visibleCollectionMaterials = filterMaterials(
+    collectionMaterialTrends?.itemValues ?? [],
+  );
+  const visibleCollectorMaterials = filterMaterials(
+    collectionMaterialTrends?.collectorValues ?? [],
+  );
   return (
     <AppShell title={t("web.trends.title")}>
       <main className="space-y-6 p-4 md:p-6">
@@ -176,9 +266,14 @@ export function TrendsPage({
           </span>
           <Select
             onValueChange={(value) =>
-              onProductTypeChange(value === "all" ? undefined : Number(value))
+              onSearchChange({
+                ...search,
+                ...(value === "all"
+                  ? { productTypeId: undefined }
+                  : { productTypeId: Number(value) }),
+              })
             }
-            value={selectedProductTypeId?.toString() ?? "all"}
+            value={productTypeId?.toString() ?? "all"}
           >
             <SelectTrigger
               aria-labelledby="trends-product-type-label"
@@ -200,6 +295,73 @@ export function TrendsPage({
               ))}
             </SelectContent>
           </Select>
+          <span className="text-sm font-semibold" id="trends-material-label">
+            {t("web.trends.material")}
+          </span>
+          <Select
+            onValueChange={(value) =>
+              onSearchChange({
+                ...search,
+                materialId: value === "all" ? undefined : Number(value),
+                materialSpecificId: undefined,
+              })
+            }
+            value={materialId?.toString() ?? "all"}
+          >
+            <SelectTrigger
+              aria-labelledby="trends-material-label"
+              className="min-w-52"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {t("web.trends.allMaterials")}
+              </SelectItem>
+              {materialOptions.map(([id, name]) => (
+                <SelectItem key={id} value={id.toString()}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {materialId && materialSpecificOptions.length > 0 ? (
+            <>
+              <span
+                className="text-sm font-semibold"
+                id="trends-material-specific-label"
+              >
+                {t("web.trends.materialSpecific")}
+              </span>
+              <Select
+                onValueChange={(value) =>
+                  onSearchChange({
+                    ...search,
+                    materialSpecificId:
+                      value === "all" ? undefined : Number(value),
+                  })
+                }
+                value={materialSpecificId?.toString() ?? "all"}
+              >
+                <SelectTrigger
+                  aria-labelledby="trends-material-specific-label"
+                  className="min-w-52"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {t("web.trends.allMaterialSpecifics")}
+                  </SelectItem>
+                  {materialSpecificOptions.map(([id, name]) => (
+                    <SelectItem key={id} value={id.toString()}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          ) : null}
         </div>
 
         <h2 className="text-lg font-semibold">
@@ -263,6 +425,118 @@ export function TrendsPage({
             </details>
           </>
         )}
+
+        <section
+          aria-labelledby="catalog-material-trends-title"
+          className="space-y-4"
+        >
+          <h2
+            className="text-lg font-semibold"
+            id="catalog-material-trends-title"
+          >
+            {t("web.trends.catalogMaterials")}
+          </h2>
+          {visibleCatalogMaterials.length === 0 ? (
+            <p
+              className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+              role="status"
+            >
+              {t("web.trends.materialsEmpty")}
+            </p>
+          ) : (
+            <MaterialTrendVisualization
+              ariaLabel={t("web.trends.catalogMaterialsChartLabel")}
+              colorClass="bg-chart-1"
+              columnLabel={t("web.trends.material")}
+              countLabel={t("web.trends.catalogProducts")}
+              getLabel={materialLabel}
+              otherLabel={t("web.trends.other")}
+              values={visibleCatalogMaterials}
+              viewProductsLabel={t("web.trends.viewProducts")}
+            />
+          )}
+        </section>
+
+        <section
+          aria-labelledby="collection-material-trends-title"
+          className="space-y-4"
+        >
+          <div className="space-y-1">
+            <h2
+              className="text-lg font-semibold"
+              id="collection-material-trends-title"
+            >
+              {t("web.trends.collectionMaterials")}
+            </h2>
+            {collectionMaterialTrends ? (
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.lastUpdated", {
+                  date: dateFormatter.format(
+                    collectionMaterialTrends.generatedAt,
+                  ),
+                })}
+              </p>
+            ) : null}
+          </div>
+          {collectionMaterialTrends?.stale ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {t("web.trends.materialsStale")}
+            </p>
+          ) : null}
+          {!collectionMaterialTrends ? (
+            <p
+              className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+              role="alert"
+            >
+              {t("web.trends.materialsError")}
+            </p>
+          ) : visibleCollectionMaterials.length === 0 ? (
+            <p
+              className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+              role="status"
+            >
+              {t(
+                collectionMaterialTrends.hasSuppressedValues
+                  ? "web.trends.materialsSuppressedEmpty"
+                  : "web.trends.materialsEmpty",
+              )}
+            </p>
+          ) : (
+            <>
+              <MaterialTrendVisualization
+                ariaLabel={t("web.trends.collectionMaterialsChartLabel")}
+                colorClass="bg-chart-2"
+                columnLabel={t("web.trends.material")}
+                countLabel={t("web.trends.approximateItems")}
+                getLabel={materialLabel}
+                otherLabel={t("web.trends.other")}
+                values={visibleCollectionMaterials}
+                viewProductsLabel={t("web.trends.viewProducts")}
+              />
+              <h3 className="font-semibold">
+                {t("web.trends.collectorMaterials")}
+              </h3>
+              <MaterialTrendVisualization
+                ariaLabel={t("web.trends.collectorMaterialsChartLabel")}
+                colorClass="bg-chart-3"
+                columnLabel={t("web.trends.material")}
+                countLabel={t("web.trends.approximateCollectors")}
+                getLabel={materialLabel}
+                otherLabel={t("web.trends.other")}
+                values={visibleCollectorMaterials}
+                viewProductsLabel={t("web.trends.viewProducts")}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.materialsPrivacy")}
+              </p>
+              {collectionMaterialTrends.hasSuppressedValues ? (
+                <p className="text-xs text-muted-foreground" role="status">
+                  {t("web.trends.materialsSuppressed")}
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
 
         <section
           aria-labelledby="collection-item-trends-title"
@@ -549,6 +823,148 @@ export function TrendsPage({
         </section>
       </main>
     </AppShell>
+  );
+}
+
+/**
+ * Renders an accessible material bar chart and equivalent full table.
+ *
+ * @param props - Labels, values, and chart presentation.
+ * @returns Material chart and table.
+ */
+function MaterialTrendVisualization(props: {
+  /** Chart and table label. */
+  ariaLabel: string;
+  /** Bar color utility. */
+  colorClass: string;
+  /** Material-column label. */
+  columnLabel: string;
+  /** Count-column label. */
+  countLabel: string;
+  /**
+   * Resolves the current general or specific material label.
+   *
+   * @param value - Material row being rendered.
+   * @returns Localized row label.
+   */
+  getLabel: (value: PublicMaterialTrend) => string;
+  /** Localized Other label. */
+  otherLabel: string;
+  /** Ordered material values. */
+  values: PublicMaterialTrend[];
+  /** Localized products-link label. */
+  viewProductsLabel: string;
+}) {
+  const {
+    ariaLabel,
+    colorClass,
+    columnLabel,
+    countLabel,
+    getLabel,
+    otherLabel,
+    values,
+    viewProductsLabel,
+  } = props;
+  const overflow = values.slice(8);
+  const overflowSeed = overflow[0];
+  const chartValues = overflowSeed
+    ? [
+        ...values.slice(0, 8),
+        {
+          ...overflowSeed,
+          count: overflow.reduce((sum, value) => sum + value.count, 0),
+          materialId: -1,
+          materialName: otherLabel,
+          materialSlug: null,
+          materialSpecificId: null,
+          materialSpecificName: null,
+          materialSpecificSlug: null,
+        },
+      ]
+    : values;
+  const largestCount = Math.max(...chartValues.map(({ count }) => count), 1);
+  /**
+   * Returns a stable key for one scoped material row.
+   *
+   * @param value - Material row being rendered.
+   * @returns Stable React row key.
+   */
+  const rowKey = (value: PublicMaterialTrend) =>
+    `${value.productTypeId ?? "all"}:${value.materialId ?? "unspecified"}:${value.materialSpecificId ?? "general"}:${value.isSpecificBreakdown}`;
+  return (
+    <>
+      <ol
+        aria-label={ariaLabel}
+        className="space-y-3 rounded-md border border-border bg-card p-4"
+      >
+        {chartValues.map((value) => (
+          <li
+            className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
+            key={rowKey(value)}
+          >
+            <span className="truncate">
+              {value.materialId === -1 ? otherLabel : getLabel(value)}
+            </span>
+            <span aria-hidden="true" className="h-3 bg-muted">
+              <span
+                className={`block h-full ${colorClass}`}
+                style={{ width: `${(value.count / largestCount) * 100}%` }}
+              />
+            </span>
+            <span className="tabular-nums">{value.count}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full border-collapse text-sm">
+          <caption className="bg-card p-3 text-left font-semibold">
+            {ariaLabel}
+          </caption>
+          <thead className="border-y border-border bg-muted/50 text-left">
+            <tr>
+              <th className="px-3 py-2" scope="col">
+                {columnLabel}
+              </th>
+              <th className="px-3 py-2 text-right" scope="col">
+                {countLabel}
+              </th>
+              <th className="px-3 py-2 text-right" scope="col">
+                <span className="sr-only">{viewProductsLabel}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {values.map((value) => (
+              <tr
+                className="border-b border-border last:border-0"
+                key={rowKey(value)}
+              >
+                <th className="px-3 py-2 text-left font-normal" scope="row">
+                  {getLabel(value)}
+                </th>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {value.count}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {value.materialSlug ? (
+                    <a
+                      className="font-medium underline underline-offset-4"
+                      href={
+                        value.materialSpecificSlug
+                          ? `/materials/${value.materialSlug}/${value.materialSpecificSlug}`
+                          : `/materials/${value.materialSlug}`
+                      }
+                    >
+                      {viewProductsLabel}
+                    </a>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

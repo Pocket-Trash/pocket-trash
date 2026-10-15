@@ -216,6 +216,8 @@ export {
 export type {
   PublicCollectionItemProductTypeTrend,
   PublicCollectionItemTrends,
+  PublicCollectionMaterialTrends,
+  PublicMaterialTrend,
   PublicPartAccessoryProductTypeTrend,
   PublicPartAccessoryTrends,
   TrendsService,

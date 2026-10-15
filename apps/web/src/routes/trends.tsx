@@ -1,7 +1,9 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+  getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
+  getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
   listPublicProductTypeTrends,
 } from "@/lib/catalog-api";
@@ -26,13 +28,26 @@ export const Route = createFileRoute("/trends")({
    * @rejects When Trends cannot be loaded.
    */
   loader: async () => {
-    const [catalogTrends, collectionTrends, partAccessoryTrends] =
-      await Promise.all([
-        listPublicProductTypeTrends(),
-        getPublicCollectionItemTrends(),
-        getPublicPartAccessoryTrends(),
-      ]);
-    return { catalogTrends, collectionTrends, partAccessoryTrends };
+    const [
+      catalogTrends,
+      collectionTrends,
+      partAccessoryTrends,
+      catalogMaterialTrends,
+      collectionMaterialTrends,
+    ] = await Promise.all([
+      listPublicProductTypeTrends(),
+      getPublicCollectionItemTrends(),
+      getPublicPartAccessoryTrends(),
+      getPublicCatalogMaterialTrends(),
+      getPublicCollectionMaterialTrends(),
+    ]);
+    return {
+      catalogMaterialTrends,
+      catalogTrends,
+      collectionMaterialTrends,
+      collectionTrends,
+      partAccessoryTrends,
+    };
   },
   pendingComponent: TrendsPendingPage,
   /**
@@ -51,21 +66,28 @@ export const Route = createFileRoute("/trends")({
  */
 function TrendsRoute() {
   const navigate = useNavigate();
-  const { productTypeId } = Route.useSearch();
-  const { catalogTrends, collectionTrends, partAccessoryTrends } =
-    Route.useLoaderData();
+  const search = Route.useSearch();
+  const {
+    catalogMaterialTrends,
+    catalogTrends,
+    collectionMaterialTrends,
+    collectionTrends,
+    partAccessoryTrends,
+  } = Route.useLoaderData();
   return (
     <TrendsPage
+      catalogMaterialTrends={catalogMaterialTrends}
+      collectionMaterialTrends={collectionMaterialTrends}
       collectionTrends={collectionTrends}
-      onProductTypeChange={(nextProductTypeId) =>
+      onSearchChange={(nextSearch) =>
         void navigate({
           replace: true,
-          search: nextProductTypeId ? { productTypeId: nextProductTypeId } : {},
+          search: nextSearch,
           to: "/trends",
         })
       }
       partAccessoryTrends={partAccessoryTrends}
-      selectedProductTypeId={productTypeId}
+      search={search}
       trends={catalogTrends}
     />
   );

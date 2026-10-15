@@ -50,6 +50,20 @@ vi.mock("@pocket-trash/localizations", () => ({
           "Collection-item Trends are hidden until the privacy threshold is met.",
         "web.trends.collectors": "Collectors",
         "web.trends.collectorsChartLabel": "Collectors by product type",
+        "web.trends.catalogMaterials": "Catalog products by material",
+        "web.trends.catalogMaterialsChartLabel":
+          "Catalog products by material chart",
+        "web.trends.collectionMaterials": "Currently owned items by material",
+        "web.trends.collectionMaterialsChartLabel":
+          "Currently owned items by material chart",
+        "web.trends.collectorMaterials": "Collectors by material",
+        "web.trends.collectorMaterialsChartLabel":
+          "Collectors by material chart",
+        "web.trends.generalMaterial": "General",
+        "web.trends.material": "Material",
+        "web.trends.materialsPrivacy": "Material values are privacy safe.",
+        "web.trends.unspecifiedMaterial": "Unspecified",
+        "web.trends.viewProducts": "View products",
         "web.trends.other": "Other",
         "web.trends.partsAndAccessories": "Parts and Accessories",
         "web.trends.partsAndAccessoriesChartLabel":
@@ -105,6 +119,8 @@ describe("TrendsPage", () => {
   it("charts the eight largest types plus Other while preserving the exact collapsed table", () => {
     const html = renderToStaticMarkup(
       <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
         collectionTrends={{
           generatedAt: new Date("2026-10-14T00:00:00.000Z"),
           hasSuppressedValues: true,
@@ -115,7 +131,7 @@ describe("TrendsPage", () => {
             count: trend.count * 5,
           })),
         }}
-        onProductTypeChange={vi.fn()}
+        onSearchChange={vi.fn()}
         partAccessoryTrends={{
           generatedAt: new Date("2026-10-14T00:00:00.000Z"),
           hasSuppressedValues: false,
@@ -159,32 +175,38 @@ describe("TrendsPage", () => {
   it("distinguishes unavailable, suppressed, and empty collection states", () => {
     const unavailable = renderToStaticMarkup(
       <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
         collectionTrends={null}
-        onProductTypeChange={vi.fn()}
+        onSearchChange={vi.fn()}
         trends={[]}
       />,
     );
     const suppressed = renderToStaticMarkup(
       <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
         collectionTrends={{
           generatedAt: new Date("2026-10-14T00:00:00.000Z"),
           hasSuppressedValues: true,
           stale: false,
           values: [],
         }}
-        onProductTypeChange={vi.fn()}
+        onSearchChange={vi.fn()}
         trends={[]}
       />,
     );
     const empty = renderToStaticMarkup(
       <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
         collectionTrends={{
           generatedAt: new Date("2026-10-14T00:00:00.000Z"),
           hasSuppressedValues: false,
           stale: false,
           values: [],
         }}
-        onProductTypeChange={vi.fn()}
+        onSearchChange={vi.fn()}
         trends={[]}
       />,
     );
@@ -192,5 +214,40 @@ describe("TrendsPage", () => {
     expect(unavailable).toContain("unavailable right now");
     expect(suppressed).toContain("hidden until the privacy threshold is met");
     expect(empty).toContain("No collection items are available yet");
+  });
+
+  it("shows exact and privacy-safe multi-material counts without percentages", () => {
+    const material = {
+      isSpecificBreakdown: true,
+      materialId: 3000,
+      materialName: "Titanium",
+      materialSlug: "titanium",
+      materialSpecificId: 3001,
+      materialSpecificName: "6Al-4V",
+      materialSpecificSlug: "6al-4v",
+      productTypeId: null,
+    };
+    const html = renderToStaticMarkup(
+      <TrendsPage
+        catalogMaterialTrends={[{ ...material, count: 2 }]}
+        collectionMaterialTrends={{
+          collectorValues: [{ ...material, count: 5 }],
+          generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+          hasSuppressedValues: false,
+          itemValues: [{ ...material, count: 10 }],
+          stale: false,
+        }}
+        collectionTrends={null}
+        onSearchChange={vi.fn()}
+        search={{ materialId: 3000 }}
+        trends={[]}
+      />,
+    );
+
+    expect(html).toContain("Catalog products by material chart");
+    expect(html).toContain("Currently owned items by material chart");
+    expect(html).toContain("Collectors by material chart");
+    expect(html).toContain("6Al-4V");
+    expect(html).toContain("/materials/titanium/6al-4v");
   });
 });

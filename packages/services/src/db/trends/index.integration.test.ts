@@ -80,6 +80,62 @@ describe("public collection-item Trends", () => {
           roundedItemCount: 5,
         },
       ]);
+      const materialTrends = await createTrendsService(
+        db as unknown as Database,
+      ).getPublicCollectionMaterialTrends(generatedAt);
+      expect(materialTrends).toMatchObject({
+        hasSuppressedValues: true,
+        stale: false,
+      });
+      expect(
+        materialTrends?.itemValues.filter(
+          ({ isSpecificBreakdown, productTypeId }) =>
+            productTypeId === null && !isSpecificBreakdown,
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          count: 10,
+          materialName: "Steel",
+          materialSpecificName: null,
+        }),
+        expect.objectContaining({
+          count: 10,
+          materialName: "Titanium",
+          materialSpecificName: null,
+        }),
+      ]);
+      expect(materialTrends?.itemValues).toContainEqual(
+        expect.objectContaining({
+          count: 10,
+          isSpecificBreakdown: true,
+          materialName: "Titanium",
+          materialSpecificName: "6Al-4V",
+        }),
+      );
+      expect(
+        await createTrendsService(
+          db as unknown as Database,
+        ).getPublicCatalogMaterialTrends(),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            count: 1,
+            materialName: "Steel",
+            productTypeId: null,
+          }),
+          expect.objectContaining({
+            count: 1,
+            materialName: "Titanium",
+            materialSpecificName: "6Al-4V",
+            productTypeId: fixture.sliderTypeId,
+          }),
+          expect.objectContaining({
+            count: 1,
+            materialId: null,
+            productTypeId: null,
+          }),
+        ]),
+      );
       expect(
         await createTrendsService(
           db as unknown as Database,
@@ -205,18 +261,24 @@ async function createFixture(database: Database) {
     .insert(schema.product)
     .values([
       {
+        approvalStatus: "approved",
+        isPrivate: false,
         makerId: maker.id,
         name: "Private-source slider",
         productTypeId: sliderTypeId,
         slug: "private-source-slider",
       },
       {
+        approvalStatus: "approved",
+        isPrivate: false,
         makerId: maker.id,
         name: "Suppressed spinner",
         productTypeId: spinnerTypeId,
         slug: "suppressed-spinner",
       },
       {
+        approvalStatus: "approved",
+        isPrivate: false,
         makerId: maker.id,
         name: "Excluded plate",
         productTypeId: accessoryTypeId,
@@ -230,6 +292,28 @@ async function createFixture(database: Database) {
   const accessoryProductId = productIds.get("excluded-plate");
   if (!sliderProductId || !spinnerProductId || !accessoryProductId)
     throw new Error("Trend products were not created.");
+  const [steel, titanium] = await database
+    .insert(schema.material)
+    .values([
+      { name: "Steel", slug: "steel" },
+      { name: "Titanium", slug: "titanium" },
+    ])
+    .returning({ id: schema.material.id, slug: schema.material.slug });
+  if (!steel || !titanium) throw new Error("Trend materials were not created.");
+  const [titaniumSpecific] = await database
+    .insert(schema.materialSpecific)
+    .values({ materialId: titanium.id, name: "6Al-4V", slug: "6al-4v" })
+    .returning({ id: schema.materialSpecific.id });
+  if (!titaniumSpecific)
+    throw new Error("Trend material specific was not created.");
+  await database.insert(schema.productMaterial).values([
+    { materialId: steel.id, productId: sliderProductId },
+    {
+      materialId: titanium.id,
+      materialSpecificId: titaniumSpecific.id,
+      productId: sliderProductId,
+    },
+  ]);
 
   const owners = await database
     .insert(schema.user)
