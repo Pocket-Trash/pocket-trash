@@ -136,7 +136,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     );
     for (const materialName of fixture.materialNames) {
       await expect(
-        page.getByRole("link", { exact: true, name: materialName }),
+        page.getByRole("link", { exact: true, name: materialName }).first(),
       ).toBeVisible();
     }
     await page
