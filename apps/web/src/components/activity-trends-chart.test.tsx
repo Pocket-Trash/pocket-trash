@@ -1,95 +1,76 @@
-import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+/** @vitest-environment jsdom */
 
-/** Chart properties used by the Highcharts mock. */
-type TestChartProps = {
-  /** Declarative Highcharts children. */
-  children: ReactNode;
-};
-/** Line-series properties used by the Highcharts mock. */
-type TestLineSeriesProps = {
-  /** Timestamp and nullable count pairs. */
-  data: Array<[number, number | null]>;
-  /** Visible series name. */
-  name: string;
-};
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@highcharts/react", () => ({
-  /**
-   * Renders declarative chart children for the test.
-   *
-   * @param root0 - Chart children.
-   * @returns Stable chart test container.
-   */
-  Chart: ({ children }: TestChartProps) => <div>{children}</div>,
-  /**
-   * Omits tooltip configuration from static output.
-   *
-   * @returns No rendered content.
-   */
-  Tooltip: () => null,
+const { chartMock, destroyMock } = vi.hoisted(() => ({
+  chartMock: vi.fn(),
+  destroyMock: vi.fn(),
 }));
-vi.mock("@highcharts/react/modules/Accessibility", () => ({
-  /**
-   * Omits accessibility configuration from static output.
-   *
-   * @returns No rendered content.
-   */
-  Accessibility: () => null,
+
+vi.mock("highcharts/es-modules/masters/highcharts.src.js", () => ({
+  default: {
+    chart: chartMock.mockReturnValue({ destroy: destroyMock }),
+  },
 }));
-vi.mock("@highcharts/react/options", () => ({
-  /**
-   * Omits horizontal-axis configuration from static output.
-   *
-   * @returns No rendered content.
-   */
-  XAxis: () => null,
-  /**
-   * Omits vertical-axis configuration from static output.
-   *
-   * @returns No rendered content.
-   */
-  YAxis: () => null,
-}));
-vi.mock("@highcharts/react/series/Line", () => ({
-  /**
-   * Exposes line points without running Highcharts in JSDOM.
-   *
-   * @param root0 - Line-series name and data.
-   * @returns Stable series test marker.
-   */
-  LineSeries: ({ data, name }: TestLineSeriesProps) => (
-    <div data-points={JSON.stringify(data)} data-series={name} />
-  ),
-}));
+vi.mock(
+  "highcharts/es-modules/masters/modules/accessibility.src.js",
+  () => ({}),
+);
 
 import { ActivityTrendsChart } from "./activity-trends-chart";
 
 describe("ActivityTrendsChart", () => {
-  it("keeps suppressed collection points as chart and table gaps", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    container.remove();
+    vi.clearAllMocks();
+  });
+
+  it("keeps suppressed collection points as chart and table gaps", async () => {
     const first = new Date("2026-10-01T00:00:00.000Z");
     const second = new Date("2026-11-01T00:00:00.000Z");
-    const html = renderToStaticMarkup(
-      <ActivityTrendsChart
-        chartLabel="Records added over time"
-        dateLabel="Period starting"
-        locale="en-US"
-        series={[
-          {
-            name: "Added to Pocket Trash",
-            values: [
-              { bucketStart: first, count: 10 },
-              { bucketStart: second, count: null },
-            ],
-          },
-        ]}
-      />,
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    await act(() =>
+      root.render(
+        <ActivityTrendsChart
+          chartLabel="Records added over time"
+          dateLabel="Period starting"
+          locale="en-US"
+          series={[
+            {
+              name: "Added to Pocket Trash",
+              values: [
+                { bucketStart: first, count: 10 },
+                { bucketStart: second, count: null },
+              ],
+            },
+          ]}
+        />,
+      ),
     );
 
-    expect(html).toContain(`[${second.getTime()},null]`);
-    expect(html).toContain("Oct 1, 2026");
-    expect(html).toContain("Nov 1, 2026");
-    expect(html).toContain("—");
+    expect(chartMock.mock.calls[0]?.[1]).toMatchObject({
+      series: [
+        {
+          data: [
+            [first.getTime(), 10],
+            [second.getTime(), null],
+          ],
+          name: "Added to Pocket Trash",
+          type: "line",
+        },
+      ],
+    });
+    expect(container.textContent).toContain("Oct 1, 2026");
+    expect(container.textContent).toContain("Nov 1, 2026");
+    expect(container.textContent).toContain("—");
   });
 });

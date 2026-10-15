@@ -1,7 +1,6 @@
-import { Chart, Tooltip } from "@highcharts/react";
-import { Accessibility } from "@highcharts/react/modules/Accessibility";
-import { XAxis, YAxis } from "@highcharts/react/options";
-import { LineSeries } from "@highcharts/react/series/Line";
+import Highcharts from "highcharts/es-modules/masters/highcharts.src.js";
+import "highcharts/es-modules/masters/modules/accessibility.src.js";
+import { useEffect, useRef } from "react";
 
 /** One recorded-activity chart point. */
 type ActivityChartPoint = {
@@ -40,6 +39,7 @@ export function ActivityTrendsChart({
   /** One or more activity series. */
   series: ActivityChartSeries[];
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const bucketStarts = Array.from(
     new Map(
       series.flatMap(({ values }) =>
@@ -58,39 +58,41 @@ export function ActivityTrendsChart({
       ),
   );
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const chart = Highcharts.chart(containerRef.current, {
+      accessibility: {
+        description: chartLabel,
+        screenReaderSection: {
+          beforeChartFormat:
+            "<div>{typeDescription}</div><div>{chartLongdesc}</div>",
+        },
+      },
+      chart: { animation: false, height: 360, styledMode: true, type: "line" },
+      series: series.map(({ name, values }) => ({
+        data: values.map(({ bucketStart, count }) => [
+          bucketStart.getTime(),
+          count,
+        ]),
+        name,
+        type: "line",
+      })),
+      title: { text: chartLabel },
+      tooltip: { shared: true, xDateFormat: "%b %e, %Y" },
+      xAxis: { type: "datetime" },
+      yAxis: { allowDecimals: false, min: 0 },
+    });
+
+    return () => chart.destroy();
+  }, [chartLabel, series]);
+
   return (
     <div className="space-y-3">
-      <Chart
-        animation={false}
-        containerProps={{
-          className: "rounded-md border border-border bg-card",
-        }}
-        height={360}
-        styledMode
-        title={chartLabel}
-      >
-        <Accessibility
-          description={chartLabel}
-          screenReaderSection={{
-            beforeChartFormat:
-              "<div>{typeDescription}</div><div>{chartLongdesc}</div>",
-          }}
-        />
-        <XAxis type="datetime" />
-        <YAxis allowDecimals={false} min={0} />
-        <Tooltip shared xDateFormat="%b %e, %Y" />
-        {series.map(({ name, values }) => (
-          <LineSeries
-            data={values.map(({ bucketStart, count }) => [
-              bucketStart.getTime(),
-              count,
-            ])}
-            key={name}
-            name={name}
-            options={{ connectNulls: false }}
-          />
-        ))}
-      </Chart>
+      <div
+        className="rounded-md border border-border bg-card"
+        ref={containerRef}
+      />
 
       <details className="rounded-md border border-border bg-card">
         <summary className="cursor-pointer p-3 font-semibold">
