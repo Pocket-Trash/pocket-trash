@@ -49,7 +49,8 @@ type SidebarPath =
   | "/user/resources"
   | "/user/resources/trash"
   | "/user/settings"
-  | "/user/settings/beta-features";
+  | "/user/settings/beta-features"
+  | "/user/trends";
 
 /** One top-level sidebar destination and its optional active subroutes. */
 export type SidebarLink = {

@@ -4,6 +4,7 @@ import {
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
 import {
+  ChartNoAxesColumnIncreasing,
   Files,
   FlaskConical,
   Folder,
@@ -51,6 +52,11 @@ export function UserIndexPage({
       icon: Folder,
       label: t("web.navigation.collections"),
       to: "/user/collections" as const,
+    },
+    {
+      icon: ChartNoAxesColumnIncreasing,
+      label: t("web.trends.title"),
+      to: "/user/trends" as const,
     },
     {
       icon: Settings,

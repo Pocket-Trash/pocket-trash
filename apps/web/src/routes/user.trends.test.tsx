@@ -1,0 +1,56 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Owner-scoped current item lookup. */
+const getUserCollection = vi.hoisted(() => vi.fn());
+/** Owner-scoped collection-summary lookup. */
+const getUserCollections = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/catalog-api", () => ({
+  getUserCollection,
+  getUserCollections,
+}));
+vi.mock("@/pages/user-trends-page", () => ({
+  /**
+   * Renders the stable private Trends route marker.
+   *
+   * @returns Private Trends marker.
+   */
+  UserTrendsPage: () => <div>user-trends-page</div>,
+}));
+
+import { Route } from "./user.trends";
+
+describe("private user Trends route", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("loads only the authenticated user's collection APIs", async () => {
+    getUserCollection.mockResolvedValueOnce([{ collectionItemId: 1 }]);
+    getUserCollections.mockResolvedValueOnce([{ id: 10 }, { id: 11 }]);
+    const loader = Route.options.loader;
+    if (!loader) throw new Error("Private Trends route loader is missing.");
+
+    await expect(
+      (loader as (context: unknown) => Promise<unknown>)({}),
+    ).resolves.toEqual({
+      collectionCount: 2,
+      items: [{ collectionItemId: 1 }],
+    });
+    expect(getUserCollection).toHaveBeenCalledOnce();
+    expect(getUserCollections).toHaveBeenCalledOnce();
+  });
+
+  it("normalizes stable personal Trends URL filters", () => {
+    const validateSearch = Route.options.validateSearch;
+    if (!validateSearch)
+      throw new Error("Private Trends route search contract is missing.");
+
+    expect(
+      (validateSearch as (search: Record<string, unknown>) => unknown)({
+        makerId: "2",
+        materialId: "3",
+        productId: "4",
+        productTypeId: "1",
+      }),
+    ).toEqual({ makerId: 2, materialId: 3, productId: 4, productTypeId: 1 });
+  });
+});

@@ -1100,6 +1100,7 @@ function collectionFixture(
     ownerUserId: 1,
     productId: product.id,
     productSlug: product.slug,
+    productTypeId: product.productTypeId,
     productTypeName: product.productTypeName,
     productTypeSlug: product.productTypeSlug,
     productImages: [],

@@ -2185,6 +2185,10 @@ export type UserCollectionItem = {
    */
   productSlug: string;
   /**
+   * Product type identifier.
+   */
+  productTypeId: number;
+  /**
    * Product type name.
    */
   productTypeName: string;
@@ -11009,6 +11013,7 @@ async function queryOwnedItems(
       ownerUserId: schema.user.id,
       productId: schema.product.id,
       productSlug: schema.product.slug,
+      productTypeId: schema.productType.id,
       productTypeName: schema.productType.name,
       patternId: schema.pattern.id,
       patternName: schema.pattern.name,
@@ -11240,6 +11245,7 @@ async function queryOwnedItems(
       ownershipPeriods: [],
       productId: row.productId,
       productSlug: row.productSlug,
+      productTypeId: row.productTypeId,
       productTypeName: row.productTypeName,
       productTypeSlug: row.productTypeSlug
         ? catalogProductType(row.productTypeSlug)

@@ -1,0 +1,139 @@
+import type { UserCollectionItem } from "@package/services";
+import type { Meta, StoryObj } from "@storybook/tanstack-react";
+import { useState } from "react";
+import { expect, fn, within } from "storybook/test";
+import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
+import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
+import { UserTrendsPage } from "./user-trends-page";
+
+/** Personal Trends Storybook configuration. */
+const meta = {
+  beforeEach: mockStoryAuth,
+  component: UserTrendsPage,
+  decorators: [
+    (Story) => (
+      <StoryProviders>
+        <Story />
+      </StoryProviders>
+    ),
+  ],
+  parameters: { layout: "fullscreen" },
+  title: "Pages/User Trends",
+} satisfies Meta<typeof UserTrendsPage>;
+
+export default meta;
+/** Personal Trends story contract. */
+type Story = StoryObj<typeof meta>;
+
+/**
+ * Renders controlled personal Trends URL-filter state.
+ *
+ * @returns Populated personal Trends fixture.
+ */
+function UserTrendsFixture() {
+  const [search, setSearch] = useState<CatalogTrendsSearch>({});
+  return (
+    <UserTrendsPage
+      collectionCount={2}
+      items={items}
+      onSearchChange={setSearch}
+      search={search}
+    />
+  );
+}
+
+/** Populated private current-state collection Trends. */
+export const Populated: Story = {
+  args: { collectionCount: 2, items: [], onSearchChange: fn(), search: {} },
+  /**
+   * Renders the controlled populated fixture.
+   *
+   * @returns Populated personal Trends fixture.
+   */
+  render: () => <UserTrendsFixture />,
+  /**
+   * Verifies totals, complete tables, and catalog actions.
+   *
+   * @param context - Story interaction context.
+   * @param context.canvasElement - Rendered story canvas.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole("table")).toHaveLength(4);
+    await expect(canvas.getByText("10", { selector: "dd" })).toBeVisible();
+    await expect(
+      canvas.getAllByRole("link", {
+        name: /View products|web\.trends\.viewProducts/,
+      }).length,
+    ).toBeGreaterThan(0);
+  },
+};
+
+/** Empty private collection state. */
+export const Empty: Story = {
+  args: { collectionCount: 1, items: [], onSearchChange: fn(), search: {} },
+};
+
+/** Base private owned-item fixture. */
+const baseItem: UserCollectionItem = {
+  approvalStatus: "approved",
+  bearing: null,
+  bearingOverride: null,
+  canAdminister: false,
+  canEdit: true,
+  collectionId: 1,
+  collectionIsPrivate: true,
+  collectionItemId: 1,
+  collectionName: "Daily carry",
+  compatibleButtonId: null,
+  compatibleButtonName: null,
+  description: null,
+  descriptionOverride: null,
+  displayName: "Product 1",
+  effectiveSliderSetup: null,
+  finishOption: null,
+  imageCount: 0,
+  images: [],
+  includedInsert: null,
+  includedPlate: null,
+  installedButtonId: null,
+  installedInsertId: null,
+  installedOnSliderId: null,
+  installedPlateId: null,
+  isAdminPrivate: false,
+  isPrivate: true,
+  makerId: 100,
+  makerName: "Maker 1",
+  makerSlug: "maker-1",
+  makerUrl: null,
+  material: { id: 300, name: "Titanium", slug: "titanium", specific: null },
+  name: "Product 1",
+  ownerClerkId: "user_storybook",
+  ownerImageUrl: null,
+  ownerUserId: 1,
+  ownerUsername: "collector",
+  productId: 200,
+  productImages: [],
+  productSlug: "product-1",
+  productTypeId: 1,
+  productTypeName: "Slider",
+  productTypeSlug: "slider",
+  sourceProductFinishOptionId: null,
+};
+
+/** Ten distinct physical items exercise top-eight-plus-Other chart behavior. */
+const items = Array.from(
+  { length: 10 },
+  (_, index): UserCollectionItem => ({
+    ...baseItem,
+    collectionId: index < 5 ? 1 : 2,
+    collectionItemId: index + 1,
+    displayName: `Product ${index + 1}`,
+    makerId: 100 + index,
+    makerName: `Maker ${index + 1}`,
+    makerSlug: `maker-${index + 1}`,
+    name: `Product ${index + 1}`,
+    productId: 200 + index,
+    productSlug: `product-${index + 1}`,
+  }),
+);

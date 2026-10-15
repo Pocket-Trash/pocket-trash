@@ -52,6 +52,7 @@ describe("UserIndexPage", () => {
       "/user/account",
       "/user/resources",
       "/user/collections",
+      "/user/trends",
       "/user/settings",
       "/user/settings/beta-features",
       "/feedback",
