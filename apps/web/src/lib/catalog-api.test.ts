@@ -321,6 +321,27 @@ describe("Pens admin validation", () => {
 });
 
 describe("product source details", () => {
+  it("accepts unique compatible parts only for Pens", () => {
+    const pen = {
+      ...base,
+      compatiblePartProductIds: [1001, 1002],
+      productTypeSlug: "pen" as const,
+    };
+    expect(productFormSchema.safeParse(pen).success).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...pen,
+        compatiblePartProductIds: [1001, 1001],
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        compatiblePartProductIds: [1001],
+      }).success,
+    ).toBe(false);
+  });
+
   it("normalizes the maker URL and optional text", () => {
     const result = productFormSchema.parse({
       ...base,

@@ -911,6 +911,37 @@ describe("collection add form", () => {
 });
 
 describe("Pens catalog administration", () => {
+  it("renders grouped compatible Pen-part selection", () => {
+    const tip = productFixture(2001, "Fine Tip", "pen-tip");
+    const pen = {
+      ...productFixture(2000, "Test Pen", "pen"),
+      compatibleParts: [
+        {
+          id: tip.id,
+          name: tip.name,
+          productTypeName: tip.productTypeName,
+          productTypeSlug: tip.productTypeSlug,
+          slug: tip.slug,
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: pen,
+        options: {
+          ...emptyCatalogOptions,
+          relationshipProducts: [tip],
+        },
+        productTypeSlug: "pen",
+      }),
+    );
+
+    expect(html).toContain("Compatible parts");
+    expect(html).toContain("Pen tips");
+    expect(html).toContain("Fine Tip");
+    expect(html).toContain("Add product");
+  });
+
   it("renders typed product fields and structured admin actions", () => {
     const refill = {
       ...productFixture(2000, "Precise V5", "refill"),

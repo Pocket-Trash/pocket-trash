@@ -341,6 +341,67 @@ describe("public Pens catalog reads", () => {
         aliases: ["Pilot Precise V5"],
         refillModel: "PV5RRBLU",
       });
+
+      const tip = await service.createProduct({
+        actor,
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
+        name: "Compatible Tip",
+        productTypeSlug: "pen-tip",
+        slug: "compatible-tip",
+        specs: {},
+      });
+      const pen = await service.createProduct({
+        actor,
+        compatiblePartProductIds: [tip.id],
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
+        name: "Compatible Pen",
+        productTypeSlug: "pen",
+        slug: "compatible-pen",
+        specs: {},
+      });
+      expect(pen.compatibleParts).toEqual([
+        expect.objectContaining({ id: tip.id, productTypeSlug: "pen-tip" }),
+      ]);
+      await expect(
+        service.updateProduct({
+          actor,
+          compatiblePartProductIds: [],
+          finishOptions: [],
+          makerId: maker.id,
+          materialAssignments: [
+            { materialId: material.id, materialSpecificId: null },
+          ],
+          name: pen.name,
+          productId: pen.id,
+          productTypeSlug: "pen",
+          slug: pen.slug,
+          specs: {},
+        }),
+      ).resolves.toMatchObject({ compatibleParts: [] });
+      await expect(
+        service.updateProduct({
+          actor,
+          compatiblePartProductIds: [refill.id],
+          finishOptions: [],
+          makerId: maker.id,
+          materialAssignments: [
+            { materialId: material.id, materialSpecificId: null },
+          ],
+          name: pen.name,
+          productId: pen.id,
+          productTypeSlug: "pen",
+          slug: pen.slug,
+          specs: {},
+        }),
+      ).rejects.toThrow("Compatible parts must be visible Pen-part products.");
     } finally {
       await client.close();
     }
