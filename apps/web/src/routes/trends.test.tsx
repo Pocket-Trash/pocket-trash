@@ -16,6 +16,8 @@ const getPublicCollectionMaterialTrends = vi.hoisted(() => vi.fn());
 const getPublicPartAccessoryTrends = vi.hoisted(() => vi.fn());
 /** Provides coverage-qualified Slider Trends to the route loader. */
 const getPublicSliderTrends = vi.hoisted(() => vi.fn());
+/** Provides exact Pens and Refills Trends. */
+const getPublicPenRefillTrends = vi.hoisted(() => vi.fn());
 /** Provides coverage-qualified Spinner Trends to the route loader. */
 const getPublicSpinnerTrends = vi.hoisted(() => vi.fn());
 
@@ -27,6 +29,7 @@ vi.mock("@/lib/catalog-api", () => ({
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
   getPublicSliderTrends,
+  getPublicPenRefillTrends,
   getPublicSpinnerTrends,
   listPublicProductTypeTrends,
 }));
@@ -89,6 +92,7 @@ describe("Trends route", () => {
     getPublicCollectionItemTrends.mockResolvedValueOnce(collectionTrends);
     getPublicCollectionMakerProductTrends.mockResolvedValueOnce(null);
     getPublicPartAccessoryTrends.mockResolvedValueOnce(collectionTrends);
+    getPublicPenRefillTrends.mockResolvedValueOnce(null);
     getPublicCatalogMaterialTrends.mockResolvedValueOnce([]);
     getPublicCollectionMaterialTrends.mockResolvedValueOnce(null);
     getPublicSliderTrends.mockResolvedValueOnce(null);
@@ -112,6 +116,7 @@ describe("Trends route", () => {
       makerProductTrends: null,
       partAccessoryTrends: collectionTrends,
       sliderTrends: null,
+      penRefillTrends: null,
       spinnerTrends: null,
     });
     expect(getPublicActivityTrends).toHaveBeenCalledWith({ data: "year" });

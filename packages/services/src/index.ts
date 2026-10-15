@@ -109,6 +109,8 @@ export type {
   PublicMaterialTrend,
   PublicPartAccessoryProductTypeTrend,
   PublicPartAccessoryTrends,
+  PublicPenRefillTrends,
+  PublicPenRefillTrendValue,
   PublicProductTypeTrend,
   PublicSliderTrend,
   PublicSliderTrends,
