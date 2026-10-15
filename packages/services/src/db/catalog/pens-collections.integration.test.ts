@@ -20,7 +20,7 @@ const penProductTypes = [
 ] as const;
 
 describe("owned Pens and Pen parts", () => {
-  it("persists serials, physical configuration, refills, offerings, and images", async () => {
+  it("persists serials, installed parts, refills, offerings, and images", async () => {
     const client = new PGlite();
     const db = drizzle({
       client,
@@ -202,7 +202,7 @@ describe("owned Pens and Pen parts", () => {
         const id = await service.addPenProduct({
           actor,
           collectionId: partsCollection.id,
-          configurationSelections: [],
+          installedPenPartCollectionItemIds: [],
           customFinish: null,
           displayName: `Owned ${slug}`,
           finishOptionId: null,
@@ -215,72 +215,30 @@ describe("owned Pens and Pen parts", () => {
         });
         partItemIds.set(slug, id);
       }
-      const slotKinds = await db
-        .select({
-          id: schema.configurationSlotKind.id,
-          slug: schema.configurationSlotKind.slug,
-        })
-        .from(schema.configurationSlotKind)
-        .where(inArray(schema.configurationSlotKind.slug, ["material", "tip"]));
-      const slotKindId = new Map(slotKinds.map((kind) => [kind.slug, kind.id]));
-      const { choices, tipSlot } = await db.transaction(async (tx) => {
-        const slots = await tx
-          .insert(schema.productConfigurationSlot)
-          .values([
-            {
-              position: 0,
-              productId: penId,
-              required: true,
-              slotKindId: slotKindId.get("material")!,
-            },
-            {
-              position: 1,
-              productId: penId,
-              required: true,
-              slotKindId: slotKindId.get("tip")!,
-            },
-          ])
-          .returning({
-            id: schema.productConfigurationSlot.id,
-            position: schema.productConfigurationSlot.position,
-          });
-        const materialSlot = slots.find(({ position }) => position === 0);
-        const selectedTipSlot = slots.find(({ position }) => position === 1);
-        if (!materialSlot || !selectedTipSlot)
-          throw new Error("Slots missing.");
-        return {
-          choices: await tx
-            .insert(schema.productConfigurationChoice)
-            .values([
-              {
-                position: 0,
-                productId: penId,
-                productMaterialId: materialIdByProduct.get(penId)!,
-                slotId: materialSlot.id,
-              },
-              {
-                partProductId: tipId,
-                position: 0,
-                productId: penId,
-                slotId: selectedTipSlot.id,
-              },
-            ])
-            .returning({
-              id: schema.productConfigurationChoice.id,
-              slotId: schema.productConfigurationChoice.slotId,
-            }),
-          tipSlot: selectedTipSlot,
-        };
+      await db.insert(schema.penCompatiblePart).values({
+        partProductId: tipId,
+        penProductId: penId,
       });
+      await expect(
+        service.addPenProduct({
+          actor,
+          collectionId: pensCollection.id,
+          customFinish: null,
+          displayName: "Invalid Pen",
+          finishOptionId: null,
+          installedPenPartCollectionItemIds: [partItemIds.get("pen-clip")!],
+          installedRefillOfferingId: null,
+          installedRefillProductId: null,
+          materialAssignmentId: materialIdByProduct.get(penId)!,
+          productId: penId,
+          productTypeSlug: "pen",
+          serialNumber: null,
+        }),
+      ).rejects.toThrow("compatible and owned by you");
       const penItemId = await service.addPenProduct({
         actor,
         collectionId: pensCollection.id,
-        configurationSelections: choices.map((choice) => ({
-          choiceId: choice.id,
-          installedPartCollectionItemId:
-            choice.slotId === tipSlot.id ? partItemIds.get("pen-tip")! : null,
-          slotId: choice.slotId,
-        })),
+        installedPenPartCollectionItemIds: [partItemIds.get("pen-tip")!],
         customFinish: null,
         displayName: "Owned Pen",
         finishOptionId: null,
@@ -311,11 +269,7 @@ describe("owned Pens and Pen parts", () => {
       expect(
         items.find(({ collectionItemId }) => collectionItemId === penItemId),
       ).toMatchObject({
-        configurationSelections: expect.arrayContaining([
-          expect.objectContaining({
-            installedPartCollectionItemId: partItemIds.get("pen-tip"),
-          }),
-        ]),
+        installedPenPartCollectionItemIds: [partItemIds.get("pen-tip")],
         installedRefillOfferingId: offering.id,
         installedRefillProductId: refillId,
         productTypeSlug: "pen",

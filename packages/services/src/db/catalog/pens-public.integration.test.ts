@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("public Pens catalog reads", () => {
-  it("authors direct offerings, configuration rules, and compatibility", async () => {
+  it("loads direct compatible parts, offerings, and refill compatibility", async () => {
     const client = new PGlite();
     const db = drizzle({ client, relations: schema.relations });
 
@@ -121,13 +121,10 @@ describe("public Pens catalog reads", () => {
         .insert(schema.productMaterial)
         .values({ materialId: material.id, productId: penId })
         .returning({ id: schema.productMaterial.id });
-      const slotKinds = await db
-        .select({
-          id: schema.configurationSlotKind.id,
-          slug: schema.configurationSlotKind.slug,
-        })
-        .from(schema.configurationSlotKind)
-        .where(inArray(schema.configurationSlotKind.slug, ["material", "tip"]));
+      await db.insert(schema.penCompatiblePart).values({
+        partProductId: tipId,
+        penProductId: penId,
+      });
       const [tipStyle] = await db
         .insert(schema.refillTipStyle)
         .values({ name: "Author Needle", slug: "author-needle" })
@@ -156,72 +153,20 @@ describe("public Pens catalog reads", () => {
         createLogger({ app: "api", environment: "test" }),
       ).catalog;
       const actor = { clerkId: "pens-author", role: "admin" as const };
-      /**
-       * Resolves a seeded configuration slot kind identifier.
-       *
-       * @param slug - Canonical slot kind slug.
-       * @returns Seeded slot kind identifier.
-       * @throws When the requested slot kind fixture is absent.
-       */
-      const slotKindId = (slug: string) => {
-        const row = slotKinds.find((kind) => kind.slug === slug);
-        if (!row) throw new Error(`Missing slot kind ${slug}.`);
-        return row.id;
-      };
-
-      const materialSlot = await service.authorPensCatalog({
-        actor,
-        kind: "configuration-slot",
-        productId: penId,
-        required: false,
-        slotKindId: slotKindId("material"),
+      const [pen] = await service.listProducts("pen", actor);
+      expect(pen).toMatchObject({
+        compatibleParts: [
+          {
+            id: tipId,
+            name: "Author Tip",
+            productTypeSlug: "pen-tip",
+            slug: "author-tip",
+          },
+        ],
+        materials: [
+          expect.objectContaining({ assignmentId: productMaterial.id }),
+        ],
       });
-      const materialChoice = await service.authorPensCatalog({
-        actor,
-        kind: "configuration-choice",
-        productId: penId,
-        productMaterialId: productMaterial.id,
-        slotId: materialSlot.id,
-      });
-      await service.authorPensCatalog({
-        actor,
-        kind: "configuration-slot-required",
-        productId: penId,
-        required: true,
-        slotId: materialSlot.id,
-      });
-      const tipSlot = await service.authorPensCatalog({
-        actor,
-        kind: "configuration-slot",
-        productId: penId,
-        required: false,
-        slotKindId: slotKindId("tip"),
-      });
-      const tipChoice = await service.authorPensCatalog({
-        actor,
-        kind: "configuration-choice",
-        partProductId: tipId,
-        productId: penId,
-        slotId: tipSlot.id,
-      });
-      await expect(
-        service.authorPensCatalog({
-          actor,
-          kind: "configuration-rule",
-          productId: penId,
-          requiredChoiceIds: [tipChoice.id],
-          targetChoiceId: materialChoice.id,
-        }),
-      ).rejects.toThrow("only earlier choices");
-      await expect(
-        service.authorPensCatalog({
-          actor,
-          kind: "configuration-rule",
-          productId: penId,
-          requiredChoiceIds: [materialChoice.id],
-          targetChoiceId: tipChoice.id,
-        }),
-      ).resolves.toMatchObject({ id: expect.any(Number) });
 
       const offering = await service.authorPensCatalog({
         actor,

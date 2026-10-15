@@ -738,8 +738,8 @@ export type CatalogProduct = {
    * Configured finish choices with their colors and effects.
    */
   finishOptions: CatalogFinishOption[];
-  /** Ordered maker-supported configuration dimensions. */
-  configurationSlots: CatalogConfigurationSlot[];
+  /** Pen-part products that can be installed on this Pen. */
+  compatibleParts: CatalogCompatiblePenPart[];
   /** Catalog Pens compatible with this refill model. */
   compatiblePens: CatalogCompatiblePen[];
   /**
@@ -876,52 +876,18 @@ export type CatalogCompatiblePen = {
   slug: string;
 };
 
-/** One maker-supported choice in a product configuration slot. */
-export type CatalogConfigurationChoice = {
-  /** Alternative requirement sets; each inner list is an AND branch. */
-  availableWhen: number[][];
-  /** Finish option represented by this choice, when applicable. */
-  finishOptionId: number | null;
+/** One Pen-part product that can be installed on a Pen. */
+export type CatalogCompatiblePenPart = {
   /** Database identifier. */
   id: number;
-  /** Material or part display label, when applicable. */
-  label: string | null;
-  /** Part carrier identifier exposed to catalog managers. */
-  partProductId?: number | null;
-  /** Stable position within the parent slot. */
-  position?: number;
-  /** Product material carrier identifier exposed to catalog managers. */
-  productMaterialId?: number | null;
-};
-
-/** Saved owned-product selection for one configuration slot. */
-export type CollectionConfigurationSelection = {
-  /** Selected catalog choice. */
-  choiceId: number;
-  /** Same-owner physical part installed for the selected choice, when used. */
-  installedPartCollectionItemId: number | null;
-  /** Product configuration slot. */
-  slotId: number;
-};
-
-/** One ordered public product-configuration dimension. */
-export type CatalogConfigurationSlot = {
-  /** Choices ordered as authored. */
-  choices: CatalogConfigurationChoice[];
-  /** Database identifier. */
-  id: number;
-  /** English label used when localization is unavailable. */
-  labelFallback: string;
-  /** Localization key for the slot label. */
-  labelKey: string;
-  /** Whether the product requires a selection in this slot. */
-  required: boolean;
-  /** Stable dependency-order position. */
-  position?: number;
-  /** Reusable slot-kind identifier. */
-  slotKindId?: number;
-  /** Reusable slot-kind slug. */
-  slotKindSlug?: string;
+  /** Display name. */
+  name: string;
+  /** Product route slug. */
+  slug: string;
+  /** Human-readable part type. */
+  productTypeName: string;
+  /** Stable part type used to group compatible parts. */
+  productTypeSlug: CatalogProductType;
 };
 
 /** Lookup data required by the structured Pens catalog admin editor. */
@@ -963,8 +929,6 @@ export type CatalogPensAdminOptions = {
     /** Refill product owning the offering. */
     refillProductId: number;
   }>;
-  /** Reusable product-configuration slot kinds. */
-  slotKinds: CatalogLookup[];
   /** Refill tip styles. */
   tipStyles: CatalogLookup[];
 };
@@ -1089,58 +1053,6 @@ export type PensAdminWriteInput =
       conceptId: number;
       /** Mutation discriminator. */
       kind: "compatibility-group";
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Mutation discriminator. */
-      kind: "configuration-slot";
-      /** Product that owns the slot. */
-      productId: number;
-      /** Whether a choice is required. */
-      required: boolean;
-      /** Reusable slot kind. */
-      slotKindId: number;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Mutation discriminator. */
-      kind: "configuration-slot-required";
-      /** Product that owns the slot. */
-      productId: number;
-      /** Whether a choice is required. */
-      required: boolean;
-      /** Configuration slot to update. */
-      slotId: number;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Finish carrier, when the choice changes appearance. */
-      finishOptionId?: number | null;
-      /** Mutation discriminator. */
-      kind: "configuration-choice";
-      /** Part carrier, when the choice selects a component. */
-      partProductId?: number | null;
-      /** Product that owns the choice. */
-      productId: number;
-      /** Material carrier, when the choice selects a material. */
-      productMaterialId?: number | null;
-      /** Configuration slot that owns the choice. */
-      slotId: number;
-    }
-  | {
-      /** Authenticated administrative actor. */
-      actor: Actor;
-      /** Mutation discriminator. */
-      kind: "configuration-rule";
-      /** Product that owns the rule. */
-      productId: number;
-      /** Earlier choices required together. */
-      requiredChoiceIds: number[];
-      /** Choice made available by this rule. */
-      targetChoiceId: number;
     }
   | {
       /** Authenticated administrative actor. */
@@ -2063,8 +1975,8 @@ export type UserCollectionItem = {
    * Collection item identifier.
    */
   collectionItemId: number;
-  /** Saved selections for this owned product's configuration slots. */
-  configurationSelections?: CollectionConfigurationSelection[];
+  /** Same-owner physical Pen parts installed on this item. */
+  installedPenPartCollectionItemIds?: number[];
   /**
    * Display name.
    */
@@ -2348,9 +2260,9 @@ export type CollectionsService = {
     reason: string;
   }): Promise<CatalogApprovalStatus>;
   /**
-   * Adds one Pen or Pen-part product with its owned configuration snapshot.
+   * Adds one Pen or Pen-part product with its owned part snapshot.
    *
-   * @param input - Product, collection, serial, configuration, and optional installed refill.
+   * @param input - Product, collection, serial, installed parts, and optional refill.
    * @returns Identifier of the created collection item.
    * @rejects When the product type, configuration, ownership, persistence, auditing, or logging fails.
    */
@@ -2359,8 +2271,8 @@ export type CollectionsService = {
     actor: Actor;
     /** Collection identifier. */
     collectionId?: number | null;
-    /** Saved catalog choices and optional physical parts. */
-    configurationSelections: CollectionConfigurationSelection[];
+    /** Same-owner physical Pen parts installed on the new Pen. */
+    installedPenPartCollectionItemIds: number[];
     /** Optional custom finish snapshot. */
     customFinish: ProductWriteFinishOption | null;
     /** Optional description override. */
@@ -2843,8 +2755,8 @@ export type CollectionsService = {
      * Collection item identifier.
      */
     collectionItemId: number;
-    /** Replacement owned configuration, when editing a configurable product. */
-    configurationSelections?: CollectionConfigurationSelection[];
+    /** Replacement physical parts installed on an owned Pen. */
+    installedPenPartCollectionItemIds?: number[];
     /**
      * Custom finish.
      */
@@ -3026,179 +2938,6 @@ export function createCatalogService(
                 .returning({ id: schema.refillCompatibilityGroup.id });
               if (!row)
                 throw new Error("Failed to create compatibility group.");
-              return await complete(row);
-            }
-            if (input.kind === "configuration-slot") {
-              await assertProductHasType(tx, input.productId, ["pen"]);
-              const [last] = await tx
-                .select({ position: schema.productConfigurationSlot.position })
-                .from(schema.productConfigurationSlot)
-                .where(
-                  eq(
-                    schema.productConfigurationSlot.productId,
-                    input.productId,
-                  ),
-                )
-                .orderBy(desc(schema.productConfigurationSlot.position))
-                .limit(1);
-              const [row] = await tx
-                .insert(schema.productConfigurationSlot)
-                .values({
-                  position: (last?.position ?? -1) + 1,
-                  productId: input.productId,
-                  required: input.required,
-                  slotKindId: input.slotKindId,
-                })
-                .returning({ id: schema.productConfigurationSlot.id });
-              if (!row) throw new Error("Failed to create configuration slot.");
-              return await complete(row);
-            }
-            if (input.kind === "configuration-slot-required") {
-              await assertProductHasType(tx, input.productId, ["pen"]);
-              const [row] = await tx
-                .update(schema.productConfigurationSlot)
-                .set({ required: input.required, updatedAt: new Date() })
-                .where(
-                  and(
-                    eq(schema.productConfigurationSlot.id, input.slotId),
-                    eq(
-                      schema.productConfigurationSlot.productId,
-                      input.productId,
-                    ),
-                  ),
-                )
-                .returning({ id: schema.productConfigurationSlot.id });
-              if (!row) throw new Error("Configuration slot does not exist.");
-              return await complete(row);
-            }
-            if (input.kind === "configuration-choice") {
-              await assertProductHasType(tx, input.productId, ["pen"]);
-              if (
-                [
-                  input.productMaterialId,
-                  input.finishOptionId,
-                  input.partProductId,
-                ].filter((value) => value != null).length !== 1
-              )
-                throw new Error("A configuration choice needs one carrier.");
-              const [slot] = await tx
-                .select({ id: schema.productConfigurationSlot.id })
-                .from(schema.productConfigurationSlot)
-                .where(
-                  and(
-                    eq(schema.productConfigurationSlot.id, input.slotId),
-                    eq(
-                      schema.productConfigurationSlot.productId,
-                      input.productId,
-                    ),
-                  ),
-                )
-                .limit(1);
-              if (!slot) throw new Error("Configuration slot does not exist.");
-              const [last] = await tx
-                .select({
-                  position: schema.productConfigurationChoice.position,
-                })
-                .from(schema.productConfigurationChoice)
-                .where(
-                  eq(schema.productConfigurationChoice.slotId, input.slotId),
-                )
-                .orderBy(desc(schema.productConfigurationChoice.position))
-                .limit(1);
-              const [row] = await tx
-                .insert(schema.productConfigurationChoice)
-                .values({
-                  finishOptionId: input.finishOptionId ?? null,
-                  partProductId: input.partProductId ?? null,
-                  position: (last?.position ?? -1) + 1,
-                  productId: input.productId,
-                  productMaterialId: input.productMaterialId ?? null,
-                  slotId: input.slotId,
-                })
-                .returning({ id: schema.productConfigurationChoice.id });
-              if (!row)
-                throw new Error("Failed to create configuration choice.");
-              return await complete(row);
-            }
-            if (input.kind === "configuration-rule") {
-              if (
-                !input.requiredChoiceIds.length ||
-                new Set(input.requiredChoiceIds).size !==
-                  input.requiredChoiceIds.length
-              )
-                throw new Error(
-                  "Availability rules need distinct requirements.",
-                );
-              const choiceIds = [
-                input.targetChoiceId,
-                ...input.requiredChoiceIds,
-              ];
-              const choices = await tx
-                .select({
-                  id: schema.productConfigurationChoice.id,
-                  productId: schema.productConfigurationChoice.productId,
-                  slotPosition: schema.productConfigurationSlot.position,
-                })
-                .from(schema.productConfigurationChoice)
-                .innerJoin(
-                  schema.productConfigurationSlot,
-                  eq(
-                    schema.productConfigurationChoice.slotId,
-                    schema.productConfigurationSlot.id,
-                  ),
-                )
-                .where(
-                  inArray(schema.productConfigurationChoice.id, choiceIds),
-                );
-              const target = choices.find(
-                ({ id }) => id === input.targetChoiceId,
-              );
-              if (
-                !target ||
-                target.productId !== input.productId ||
-                input.requiredChoiceIds.some((id) => {
-                  const required = choices.find((choice) => choice.id === id);
-                  return (
-                    !required ||
-                    required.productId !== input.productId ||
-                    required.slotPosition >= target.slotPosition
-                  );
-                })
-              )
-                throw new Error(
-                  "Availability rules may require only earlier choices.",
-                );
-              const [last] = await tx
-                .select({
-                  position: schema.productConfigurationChoiceRule.position,
-                })
-                .from(schema.productConfigurationChoiceRule)
-                .where(
-                  eq(
-                    schema.productConfigurationChoiceRule.targetChoiceId,
-                    input.targetChoiceId,
-                  ),
-                )
-                .orderBy(desc(schema.productConfigurationChoiceRule.position))
-                .limit(1);
-              const [row] = await tx
-                .insert(schema.productConfigurationChoiceRule)
-                .values({
-                  position: (last?.position ?? -1) + 1,
-                  productId: input.productId,
-                  targetChoiceId: input.targetChoiceId,
-                })
-                .returning({ id: schema.productConfigurationChoiceRule.id });
-              if (!row) throw new Error("Failed to create availability rule.");
-              await tx
-                .insert(schema.productConfigurationChoiceRequirement)
-                .values(
-                  input.requiredChoiceIds.map((requiredChoiceId) => ({
-                    productId: input.productId,
-                    requiredChoiceId,
-                    ruleId: row.id,
-                  })),
-                );
               return await complete(row);
             }
             if (input.kind === "refill-offering") {
@@ -5025,7 +4764,6 @@ export function createCatalogService(
         loggerMessages.database.catalog.listPensAdminOptions,
         async () => {
           const [
-            slotKinds,
             tipStyles,
             inkColors,
             compatibilityGroups,
@@ -5034,14 +4772,6 @@ export function createCatalogService(
             compatibilityGroupConcepts,
             offeringRows,
           ] = await Promise.all([
-            db
-              .select({
-                id: schema.configurationSlotKind.id,
-                name: schema.configurationSlotKind.labelFallback,
-                slug: schema.configurationSlotKind.slug,
-              })
-              .from(schema.configurationSlotKind)
-              .orderBy(asc(schema.configurationSlotKind.labelFallback)),
             db
               .select({
                 id: schema.refillTipStyle.id,
@@ -5149,7 +4879,6 @@ export function createCatalogService(
               name: `${offering.refillModel} · ${offering.tipSize} · ${offering.tipStyle} · ${offering.inkColor}`,
               refillProductId: offering.refillProductId,
             })),
-            slotKinds,
             tipStyles,
           };
         },
@@ -6310,9 +6039,9 @@ export function createCollectionsService(
       );
     },
     /**
-     * Adds one Pen or Pen-part product with its configuration snapshot.
+     * Adds one Pen or Pen-part product with its installed-part snapshot.
      *
-     * @param input - Product, collection, serial, configuration, and actor.
+     * @param input - Product, collection, serial, installed parts, and actor.
      * @returns Identifier of the created collection item.
      * @rejects When validation, authorization, persistence, auditing, or logging fails.
      */
@@ -6406,12 +6135,12 @@ export function createCollectionsService(
                 productPenActuatorId: input.productId,
               });
             }
-            await replaceCollectionConfigurationSelections(tx, {
+            await replaceInstalledPenParts(tx, {
               collectionId: resolvedCollection.id,
               collectionItemId: item.id,
               ownerId: owner.id,
               productId: input.productId,
-              selections: input.configurationSelections,
+              partCollectionItemIds: input.installedPenPartCollectionItemIds,
             });
             await createCollectionFinishOption(tx, {
               collectionItemId: item.id,
@@ -6425,7 +6154,8 @@ export function createCollectionsService(
               actorUser: owner,
               after: {
                 collectionId: resolvedCollection.id,
-                configurationSelections: input.configurationSelections,
+                installedPenPartCollectionItemIds:
+                  input.installedPenPartCollectionItemIds,
                 description: normalizeOptionalDescription(input.description),
                 displayName: input.displayName.trim(),
                 id: item.id,
@@ -8177,14 +7907,13 @@ export function createCollectionsService(
                 const linkedPenParents = await tx
                   .select({
                     collectionItemId:
-                      schema.collectionItemConfigurationSelection
-                        .collectionItemId,
+                      schema.collectionItemInstalledPenPart.penCollectionItemId,
                   })
-                  .from(schema.collectionItemConfigurationSelection)
+                  .from(schema.collectionItemInstalledPenPart)
                   .where(
                     eq(
-                      schema.collectionItemConfigurationSelection
-                        .installedPartCollectionItemId,
+                      schema.collectionItemInstalledPenPart
+                        .partCollectionItemId,
                       input.collectionItemId,
                     ),
                   );
@@ -8194,14 +7923,13 @@ export function createCollectionsService(
                 const linkedPenParts = await tx
                   .select({
                     installedPartCollectionItemId:
-                      schema.collectionItemConfigurationSelection
-                        .installedPartCollectionItemId,
+                      schema.collectionItemInstalledPenPart
+                        .partCollectionItemId,
                   })
-                  .from(schema.collectionItemConfigurationSelection)
+                  .from(schema.collectionItemInstalledPenPart)
                   .where(
                     inArray(
-                      schema.collectionItemConfigurationSelection
-                        .collectionItemId,
+                      schema.collectionItemInstalledPenPart.penCollectionItemId,
                       [...linkedItemIds],
                     ),
                   );
@@ -8248,13 +7976,13 @@ export function createCollectionsService(
               })
               .where(eq(schema.collectionItem.id, input.collectionItemId));
 
-            if (input.configurationSelections !== undefined) {
-              await replaceCollectionConfigurationSelections(tx, {
+            if (input.installedPenPartCollectionItemIds !== undefined) {
+              await replaceInstalledPenParts(tx, {
                 collectionId: targetCollectionId,
                 collectionItemId: input.collectionItemId,
                 ownerId: item.ownerId,
                 productId,
-                selections: input.configurationSelections,
+                partCollectionItemIds: input.installedPenPartCollectionItemIds,
               });
             }
 
@@ -8619,8 +8347,11 @@ export function createCollectionsService(
                   ? item.installedPlateId
                   : (input.installedPlate?.collectionItemId ?? null),
               magnetConfiguration: normalizedMagnetConfiguration,
-              ...(input.configurationSelections !== undefined
-                ? { configurationSelections: input.configurationSelections }
+              ...(input.installedPenPartCollectionItemIds !== undefined
+                ? {
+                    installedPenPartCollectionItemIds:
+                      input.installedPenPartCollectionItemIds,
+                  }
                 : {}),
               installedRefillOfferingId:
                 input.installedRefillOfferingId === undefined
@@ -8976,7 +8707,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     buttonDiameter: product.buttonDiameter,
     compatibleButtonId: product.compatibleButtonId,
     compatiblePens: product.compatiblePens,
-    configurationSlots: product.configurationSlots,
+    compatibleParts: product.compatibleParts,
     description: product.description,
     diameter: product.diameter,
     finishOptions: product.finishOptions.map((option) => ({
@@ -9502,9 +9233,9 @@ function effectiveCollectionItemIsPrivate() {
          inner join collection_item parent on parent.id = assembly.id
         where assembly.installed_insert_id = ${schema.collectionItem.id}),
       (select parent.is_private
-         from collection_item_configuration_selection selection
-         inner join collection_item parent on parent.id = selection.collection_item_id
-        where selection.installed_part_collection_item_id = ${schema.collectionItem.id}),
+         from collection_item_installed_pen_part installation
+         inner join collection_item parent on parent.id = installation.pen_collection_item_id
+        where installation.part_collection_item_id = ${schema.collectionItem.id}),
       ${schema.collectionItem.isPrivate}
     )
   end`;
@@ -10071,8 +9802,8 @@ async function queryProducts(
       createdAt: row.createdAt,
       description: row.description,
       diameter: dimensionMeasurement(row.diameter, row.diameterUnit),
+      compatibleParts: [],
       compatiblePens: [],
-      configurationSlots: [],
       finishOptions: [],
       imageCount: 0,
       images: [],
@@ -10155,11 +9886,11 @@ async function queryProducts(
 }
 
 /**
- * Hydrates Pens aliases, configuration, refill offerings, and reverse compatibility.
+ * Hydrates Pens aliases, compatible parts, refill offerings, and reverse compatibility.
  *
  * @param db - Database used for Pens catalog reads.
  * @param products - Visible products receiving Pens-specific public details.
- * @param viewer - Optional viewer controlling part-choice visibility.
+ * @param viewer - Optional viewer controlling compatible-part visibility.
  * @rejects When any Pens catalog query fails.
  */
 async function loadPensCatalogDetails(
@@ -10172,205 +9903,99 @@ async function loadPensCatalogDetails(
   const refillIds = products
     .filter(({ productTypeSlug }) => productTypeSlug === "refill")
     .map(({ id }) => id);
-  const slots = await db
-    .select({
-      id: schema.productConfigurationSlot.id,
-      labelFallback: schema.configurationSlotKind.labelFallback,
-      labelKey: schema.configurationSlotKind.labelKey,
-      position: schema.productConfigurationSlot.position,
-      productId: schema.productConfigurationSlot.productId,
-      required: schema.productConfigurationSlot.required,
-      slotKindId: schema.configurationSlotKind.id,
-      slotKindSlug: schema.configurationSlotKind.slug,
-    })
-    .from(schema.productConfigurationSlot)
-    .innerJoin(
-      schema.configurationSlotKind,
-      eq(
-        schema.productConfigurationSlot.slotKindId,
-        schema.configurationSlotKind.id,
+  const partProduct = alias(schema.product, "compatible_part_product");
+  const partType = alias(schema.productType, "compatible_part_type");
+  const [aliases, compatibleParts, offerings, memberships] = await Promise.all([
+    db
+      .select({
+        label: schema.productAlias.label,
+        productId: schema.productAlias.productId,
+      })
+      .from(schema.productAlias)
+      .where(inArray(schema.productAlias.productId, productIds))
+      .orderBy(asc(schema.productAlias.label)),
+    db
+      .select({
+        approvalStatus: partProduct.approvalStatus,
+        isPrivate: partProduct.isPrivate,
+        name: partProduct.name,
+        ownerClerkId: partProduct.ownerClerkId,
+        partProductId: schema.penCompatiblePart.partProductId,
+        penProductId: schema.penCompatiblePart.penProductId,
+        productTypeName: partType.name,
+        productTypeSlug: partType.slug,
+        slug: partProduct.slug,
+      })
+      .from(schema.penCompatiblePart)
+      .innerJoin(
+        partProduct,
+        eq(schema.penCompatiblePart.partProductId, partProduct.id),
+      )
+      .innerJoin(partType, eq(partProduct.productTypeId, partType.id))
+      .where(inArray(schema.penCompatiblePart.penProductId, productIds))
+      .orderBy(
+        asc(schema.penCompatiblePart.penProductId),
+        asc(partType.name),
+        asc(partProduct.name),
       ),
-    )
-    .where(inArray(schema.productConfigurationSlot.productId, productIds))
-    .orderBy(
-      asc(schema.productConfigurationSlot.productId),
-      asc(schema.productConfigurationSlot.position),
-    );
-  const slotIds = slots.map(({ id }) => id);
-  const partProduct = alias(schema.product, "configuration_part_product");
-  const [aliases, choices, ruleRows, offerings, memberships] =
-    await Promise.all([
-      db
-        .select({
-          label: schema.productAlias.label,
-          productId: schema.productAlias.productId,
-        })
-        .from(schema.productAlias)
-        .where(inArray(schema.productAlias.productId, productIds))
-        .orderBy(asc(schema.productAlias.label)),
-      slotIds.length
-        ? db
-            .select({
-              finishOptionId: schema.productConfigurationChoice.finishOptionId,
-              id: schema.productConfigurationChoice.id,
-              materialName: schema.material.name,
-              materialSpecificName: schema.materialSpecific.name,
-              partApprovalStatus: partProduct.approvalStatus,
-              partIsPrivate: partProduct.isPrivate,
-              partName: partProduct.name,
-              partOwnerClerkId: partProduct.ownerClerkId,
-              partProductId: schema.productConfigurationChoice.partProductId,
-              position: schema.productConfigurationChoice.position,
-              productMaterialId:
-                schema.productConfigurationChoice.productMaterialId,
-              slotId: schema.productConfigurationChoice.slotId,
-            })
-            .from(schema.productConfigurationChoice)
-            .leftJoin(
-              schema.productMaterial,
-              eq(
-                schema.productConfigurationChoice.productMaterialId,
-                schema.productMaterial.id,
-              ),
-            )
-            .leftJoin(
-              schema.material,
-              eq(schema.productMaterial.materialId, schema.material.id),
-            )
-            .leftJoin(
-              schema.materialSpecific,
-              eq(
-                schema.productMaterial.materialSpecificId,
-                schema.materialSpecific.id,
-              ),
-            )
-            .leftJoin(
-              partProduct,
-              eq(
-                schema.productConfigurationChoice.partProductId,
-                partProduct.id,
-              ),
-            )
-            .where(inArray(schema.productConfigurationChoice.slotId, slotIds))
-            .orderBy(
-              asc(schema.productConfigurationChoice.slotId),
-              asc(schema.productConfigurationChoice.position),
-            )
-        : Promise.resolve([]),
-      slotIds.length
-        ? db
-            .select({
-              requiredChoiceId:
-                schema.productConfigurationChoiceRequirement.requiredChoiceId,
-              ruleId: schema.productConfigurationChoiceRule.id,
-              targetChoiceId:
-                schema.productConfigurationChoiceRule.targetChoiceId,
-            })
-            .from(schema.productConfigurationChoiceRule)
-            .leftJoin(
-              schema.productConfigurationChoiceRequirement,
-              eq(
-                schema.productConfigurationChoiceRule.id,
-                schema.productConfigurationChoiceRequirement.ruleId,
-              ),
-            )
-            .where(
-              inArray(
-                schema.productConfigurationChoiceRule.productId,
-                productIds,
-              ),
-            )
-            .orderBy(
-              asc(schema.productConfigurationChoiceRule.targetChoiceId),
-              asc(schema.productConfigurationChoiceRule.position),
-            )
-        : Promise.resolve([]),
-      refillIds.length
-        ? db
-            .select({
-              id: schema.refillOffering.id,
-              inkColor: schema.refillInkColor.name,
-              refillProductId: schema.refillOffering.refillProductId,
-              tipSize: schema.refillOffering.tipSize,
-              tipStyle: schema.refillTipStyle.name,
-            })
-            .from(schema.refillOffering)
-            .innerJoin(
-              schema.refillInkColor,
-              eq(schema.refillOffering.inkColorId, schema.refillInkColor.id),
-            )
-            .innerJoin(
-              schema.refillTipStyle,
-              eq(schema.refillOffering.tipStyleId, schema.refillTipStyle.id),
-            )
-            .where(inArray(schema.refillOffering.refillProductId, refillIds))
-            .orderBy(
-              asc(schema.refillOffering.tipSize),
-              asc(schema.refillInkColor.name),
-            )
-        : Promise.resolve([]),
-      refillIds.length
-        ? db
-            .select({
-              groupId: schema.refillCompatibilityGroupMembership.groupId,
-              refillProductId:
-                schema.refillCompatibilityGroupMembership.refillProductId,
-            })
-            .from(schema.refillCompatibilityGroupMembership)
-            .where(
-              inArray(
-                schema.refillCompatibilityGroupMembership.refillProductId,
-                refillIds,
-              ),
-            )
-        : Promise.resolve([]),
-    ]);
-  const requirements = new Map<number, Map<number, number[]>>();
-  for (const row of ruleRows) {
-    const rules = requirements.get(row.targetChoiceId) ?? new Map();
-    const choicesForRule = rules.get(row.ruleId) ?? [];
-    if (row.requiredChoiceId !== null)
-      choicesForRule.push(row.requiredChoiceId);
-    rules.set(row.ruleId, choicesForRule);
-    requirements.set(row.targetChoiceId, rules);
-  }
-  const choicesBySlot = new Map<number, CatalogConfigurationChoice[]>();
-  for (const choice of choices) {
-    if (
-      choice.partName !== null &&
-      !hasPermission(viewer, "products.manage") &&
-      !(choice.partApprovalStatus === "approved" && !choice.partIsPrivate) &&
-      choice.partOwnerClerkId !== viewer?.clerkId
-    )
-      continue;
-    const slotChoices = choicesBySlot.get(choice.slotId) ?? [];
-    slotChoices.push({
-      availableWhen: [...(requirements.get(choice.id)?.values() ?? [])],
-      finishOptionId: choice.finishOptionId,
-      id: choice.id,
-      label:
-        choice.materialSpecificName ?? choice.materialName ?? choice.partName,
-      partProductId: choice.partProductId,
-      position: choice.position,
-      productMaterialId: choice.productMaterialId,
-    });
-    choicesBySlot.set(choice.slotId, slotChoices);
-  }
+    refillIds.length
+      ? db
+          .select({
+            id: schema.refillOffering.id,
+            inkColor: schema.refillInkColor.name,
+            refillProductId: schema.refillOffering.refillProductId,
+            tipSize: schema.refillOffering.tipSize,
+            tipStyle: schema.refillTipStyle.name,
+          })
+          .from(schema.refillOffering)
+          .innerJoin(
+            schema.refillInkColor,
+            eq(schema.refillOffering.inkColorId, schema.refillInkColor.id),
+          )
+          .innerJoin(
+            schema.refillTipStyle,
+            eq(schema.refillOffering.tipStyleId, schema.refillTipStyle.id),
+          )
+          .where(inArray(schema.refillOffering.refillProductId, refillIds))
+          .orderBy(
+            asc(schema.refillOffering.tipSize),
+            asc(schema.refillInkColor.name),
+          )
+      : Promise.resolve([]),
+    refillIds.length
+      ? db
+          .select({
+            groupId: schema.refillCompatibilityGroupMembership.groupId,
+            refillProductId:
+              schema.refillCompatibilityGroupMembership.refillProductId,
+          })
+          .from(schema.refillCompatibilityGroupMembership)
+          .where(
+            inArray(
+              schema.refillCompatibilityGroupMembership.refillProductId,
+              refillIds,
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
   const productsById = new Map(
     products.map((product) => [product.id, product]),
   );
   for (const row of aliases)
     productsById.get(row.productId)?.aliases.push(row.label);
-  for (const slot of slots) {
-    productsById.get(slot.productId)?.configurationSlots.push({
-      choices: choicesBySlot.get(slot.id) ?? [],
-      id: slot.id,
-      labelFallback: slot.labelFallback,
-      labelKey: slot.labelKey,
-      position: slot.position,
-      required: slot.required,
-      slotKindId: slot.slotKindId,
-      slotKindSlug: slot.slotKindSlug,
+  for (const part of compatibleParts) {
+    if (
+      !hasPermission(viewer, "products.manage") &&
+      !(part.approvalStatus === "approved" && !part.isPrivate) &&
+      part.ownerClerkId !== viewer?.clerkId
+    )
+      continue;
+    productsById.get(part.penProductId)?.compatibleParts.push({
+      id: part.partProductId,
+      name: part.name,
+      productTypeName: part.productTypeName,
+      productTypeSlug: catalogProductType(part.productTypeSlug),
+      slug: part.slug,
     });
   }
   for (const offering of offerings) {
@@ -10855,7 +10480,7 @@ async function queryOwnedItems(
     (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
     (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
     (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id}),
-    (select collection_item_id from collection_item_configuration_selection where installed_part_collection_item_id = ${schema.collectionItem.id})
+    (select pen_collection_item_id from collection_item_installed_pen_part where part_collection_item_id = ${schema.collectionItem.id})
   )`;
   const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const conditions = options.includeDeparted
@@ -11180,7 +10805,7 @@ async function queryOwnedItems(
       collectionIsPrivate: row.collectionIsPrivate,
       collectionId: row.collectionId,
       collectionItemId: row.collectionItemId,
-      configurationSelections: [],
+      installedPenPartCollectionItemIds: [],
       collectionName: row.collectionName,
       displayName: row.displayName,
       description: row.descriptionOverride ?? row.productDescription,
@@ -11265,21 +10890,18 @@ async function queryOwnedItems(
   );
   if (items.length) {
     const itemIds = items.map(({ collectionItemId }) => collectionItemId);
-    const [selections, ownershipPeriods] = await Promise.all([
+    const [installedParts, ownershipPeriods] = await Promise.all([
       db
         .select({
-          choiceId: schema.collectionItemConfigurationSelection.choiceId,
-          collectionItemId:
-            schema.collectionItemConfigurationSelection.collectionItemId,
-          installedPartCollectionItemId:
-            schema.collectionItemConfigurationSelection
-              .installedPartCollectionItemId,
-          slotId: schema.collectionItemConfigurationSelection.slotId,
+          partCollectionItemId:
+            schema.collectionItemInstalledPenPart.partCollectionItemId,
+          penCollectionItemId:
+            schema.collectionItemInstalledPenPart.penCollectionItemId,
         })
-        .from(schema.collectionItemConfigurationSelection)
+        .from(schema.collectionItemInstalledPenPart)
         .where(
           inArray(
-            schema.collectionItemConfigurationSelection.collectionItemId,
+            schema.collectionItemInstalledPenPart.penCollectionItemId,
             itemIds,
           ),
         ),
@@ -11303,12 +10925,12 @@ async function queryOwnedItems(
     const itemsById = new Map(
       items.map((item) => [item.collectionItemId, item]),
     );
-    for (const selection of selections) {
-      itemsById.get(selection.collectionItemId)?.configurationSelections?.push({
-        choiceId: selection.choiceId,
-        installedPartCollectionItemId: selection.installedPartCollectionItemId,
-        slotId: selection.slotId,
-      });
+    for (const installedPart of installedParts) {
+      itemsById
+        .get(installedPart.penCollectionItemId)
+        ?.installedPenPartCollectionItemIds?.push(
+          installedPart.partCollectionItemId,
+        );
     }
     for (const period of ownershipPeriods) {
       const item = itemsById.get(period.collectionItemId);
@@ -12435,118 +12057,87 @@ async function listCatalogImageTrash(
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
- * Replaces one owned product's configuration selections after validating catalog and ownership boundaries.
+ * Replaces one owned Pen's installed parts after validating compatibility and ownership.
  *
  * @param tx - Active catalog transaction.
- * @param input - Parent product, owner, destination collection, and replacement selections.
- * @returns Completion after the replacement selections and installed-part moves are stored.
- * @rejects When a required slot is missing or a choice or physical part does not belong to the parent configuration.
+ * @param input - Parent product, owner, destination collection, and installed parts.
+ * @returns Completion after installed parts are moved and stored.
+ * @rejects When a part is duplicated, incompatible, unavailable, or belongs to another owner.
  */
-async function replaceCollectionConfigurationSelections(
+async function replaceInstalledPenParts(
   tx: CatalogTransaction,
   input: {
     /** Destination collection for any installed physical parts. */
     collectionId: number;
-    /** Owned parent item receiving the configuration. */
+    /** Owned Pen receiving the parts. */
     collectionItemId: number;
     /** Parent owner. */
     ownerId: number;
-    /** Catalog product whose slots are being selected. */
+    /** Catalog Pen product. */
     productId: number;
-    /** Replacement selections. */
-    selections: CollectionConfigurationSelection[];
+    /** Replacement owned Pen-part collection items. */
+    partCollectionItemIds: number[];
   },
 ): Promise<void> {
-  const slots = await tx
-    .select({
-      choiceId: schema.productConfigurationChoice.id,
-      partProductId: schema.productConfigurationChoice.partProductId,
-      required: schema.productConfigurationSlot.required,
-      slotId: schema.productConfigurationSlot.id,
-    })
-    .from(schema.productConfigurationSlot)
-    .leftJoin(
-      schema.productConfigurationChoice,
-      eq(
-        schema.productConfigurationSlot.id,
-        schema.productConfigurationChoice.slotId,
-      ),
-    )
-    .where(eq(schema.productConfigurationSlot.productId, input.productId));
-  const slotIds = new Set(slots.map(({ slotId }) => slotId));
-  const requiredSlotIds = new Set(
-    slots.filter(({ required }) => required).map(({ slotId }) => slotId),
-  );
-  const seenSlotIds = new Set<number>();
-  for (const selection of input.selections) {
-    if (seenSlotIds.has(selection.slotId)) {
-      throw new Error("A configuration slot may be selected only once.");
-    }
-    seenSlotIds.add(selection.slotId);
-    const choice = slots.find(
-      (candidate) =>
-        candidate.slotId === selection.slotId &&
-        candidate.choiceId === selection.choiceId,
-    );
-    if (!choice || !slotIds.has(selection.slotId)) {
-      throw new Error("Configuration choice does not belong to the product.");
-    }
-    if (selection.installedPartCollectionItemId !== null) {
-      if (choice.partProductId === null) {
-        throw new Error("Only Pen-part choices can use a physical item.");
-      }
-      const [part] = await tx
-        .select({
-          id: schema.collectionItem.id,
-          ownerId: schema.collectionItem.ownerId,
-          productId: sql<
-            number | null
-          >`collection_catalog_product(${schema.collectionItem.id})`.mapWith(
-            schema.product.id,
-          ),
-        })
-        .from(schema.collectionItem)
-        .where(
-          and(
-            eq(
-              schema.collectionItem.id,
-              selection.installedPartCollectionItemId,
+  const partIds = [...new Set(input.partCollectionItemIds)];
+  if (partIds.length !== input.partCollectionItemIds.length)
+    throw new Error("An installed Pen part may be selected only once.");
+  const [compatibleParts, parts] = await Promise.all([
+    tx
+      .select({ partProductId: schema.penCompatiblePart.partProductId })
+      .from(schema.penCompatiblePart)
+      .where(eq(schema.penCompatiblePart.penProductId, input.productId)),
+    partIds.length
+      ? tx
+          .select({
+            id: schema.collectionItem.id,
+            ownerId: schema.collectionItem.ownerId,
+            productId: sql<
+              number | null
+            >`collection_catalog_product(${schema.collectionItem.id})`.mapWith(
+              schema.product.id,
             ),
-            eq(schema.collectionItem.owned, true),
-          ),
-        )
-        .limit(1);
-      if (
-        !part ||
+          })
+          .from(schema.collectionItem)
+          .where(
+            and(
+              inArray(schema.collectionItem.id, partIds),
+              eq(schema.collectionItem.owned, true),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
+  const compatibleProductIds = new Set(
+    compatibleParts.map(({ partProductId }) => partProductId),
+  );
+  if (
+    parts.length !== partIds.length ||
+    parts.some(
+      (part) =>
         part.ownerId !== input.ownerId ||
-        part.productId !== choice.partProductId
-      ) {
-        throw new Error("Installed Pen part must match the choice and owner.");
-      }
-      await tx
-        .update(schema.collectionItem)
-        .set({ collectionId: input.collectionId, updatedAt: new Date() })
-        .where(eq(schema.collectionItem.id, part.id));
-    }
-  }
-  if ([...requiredSlotIds].some((slotId) => !seenSlotIds.has(slotId))) {
-    throw new Error("Every required configuration slot needs a selection.");
-  }
+        part.productId === null ||
+        !compatibleProductIds.has(part.productId),
+    )
+  )
+    throw new Error("Installed Pen parts must be compatible and owned by you.");
+  if (partIds.length)
+    await tx
+      .update(schema.collectionItem)
+      .set({ collectionId: input.collectionId, updatedAt: new Date() })
+      .where(inArray(schema.collectionItem.id, partIds));
   await tx
-    .delete(schema.collectionItemConfigurationSelection)
+    .delete(schema.collectionItemInstalledPenPart)
     .where(
       eq(
-        schema.collectionItemConfigurationSelection.collectionItemId,
+        schema.collectionItemInstalledPenPart.penCollectionItemId,
         input.collectionItemId,
       ),
     );
-  if (input.selections.length) {
-    await tx.insert(schema.collectionItemConfigurationSelection).values(
-      input.selections.map((selection) => ({
-        choiceId: selection.choiceId,
-        collectionItemId: input.collectionItemId,
-        installedPartCollectionItemId: selection.installedPartCollectionItemId,
-        slotId: selection.slotId,
+  if (partIds.length) {
+    await tx.insert(schema.collectionItemInstalledPenPart).values(
+      partIds.map((partCollectionItemId) => ({
+        partCollectionItemId,
+        penCollectionItemId: input.collectionItemId,
       })),
     );
   }
