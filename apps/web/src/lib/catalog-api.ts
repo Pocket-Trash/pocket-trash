@@ -25,6 +25,7 @@ import type {
   SliderMagnetPreset,
   TrendsProductTypeConfiguration,
   UserActivityTrends,
+  UserCollectionHistoryTrends,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -1355,6 +1356,18 @@ export const getUserActivityTrends = createServerFn({ method: "GET" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     return await s.db.trends.getUserActivityTrends(actor.clerkId, data);
+  });
+
+/** Returns exact effective-date collection history for the signed-in owner. */
+export const getUserCollectionHistoryTrends = createServerFn({ method: "GET" })
+  .validator(z.enum(activityTrendRanges))
+  .handler(async ({ data }): Promise<UserCollectionHistoryTrends> => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    return await s.db.trends.getUserCollectionHistoryTrends(
+      actor.clerkId,
+      data,
+    );
   });
 
 /** Returns active privacy-safe maker and product popularity. */

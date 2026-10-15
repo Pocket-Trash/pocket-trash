@@ -90,6 +90,32 @@ export type UserActivityTrendPoint = {
   count: number;
 };
 
+/** Exact private collection lifecycle history for one signed-in owner. */
+export type UserCollectionHistoryTrends = {
+  /** Acquisition dates entered by the owner. */
+  exactDateCount: number;
+  /** Acquisition dates imputed from Pocket Trash recording time. */
+  imputedDateCount: number;
+  /** Bucket size selected for the requested range. */
+  granularity: PublicActivityTrends["granularity"];
+  /** Stable selected range. */
+  range: ActivityTrendRange;
+  /** Chronological effective-date lifecycle buckets. */
+  values: UserCollectionHistoryTrendPoint[];
+};
+
+/** One effective-date lifecycle bucket. */
+export type UserCollectionHistoryTrendPoint = {
+  /** Acquisitions effective in this bucket. */
+  acquisitionCount: number;
+  /** UTC start of the bucket. */
+  bucketStart: Date;
+  /** Collection size at the end of the bucket. */
+  collectionCount: number;
+  /** Departures effective in this bucket. */
+  departureCount: number;
+};
+
 /**
  * Selects UTC boundaries and bucket size for one activity range.
  *
@@ -428,6 +454,136 @@ export function createTrendsService(
               ? row.bucketStart
               : new Date(row.bucketStart),
           count: Number(row.count),
+        })),
+      };
+    },
+
+    /**
+     * Reads exact effective-date collection history for one signed-in owner.
+     *
+     * @param actorClerkId - Authenticated owner Clerk identifier.
+     * @param range - Stable selected time range.
+     * @param now - Current time used to anchor the UTC boundary.
+     * @returns Exact collection size, acquisitions, departures, and date completeness.
+     */
+    async getUserCollectionHistoryTrends(
+      actorClerkId: string,
+      range: ActivityTrendRange,
+      now = new Date(),
+    ): Promise<UserCollectionHistoryTrends> {
+      const { granularity, start } = getActivityTrendRange(range, now);
+      const interval =
+        granularity === "day"
+          ? sql`interval '1 day'`
+          : granularity === "week"
+            ? sql`interval '1 week'`
+            : sql`interval '1 month'`;
+      const [result, [completeness]] = await Promise.all([
+        db.execute<{
+          /** Acquisitions effective in the bucket. */
+          acquisitionCount: number | string;
+          /** UTC start of the bucket. */
+          bucketStart: Date | string;
+          /** Collection size at the bucket cutoff. */
+          collectionCount: number | string;
+          /** Departures effective in the bucket. */
+          departureCount: number | string;
+        }>(sql`
+          with periods as (
+            select
+              collection_item_ownership_period.effective_start_date,
+              collection_item_ownership_period.effective_end_date
+            from collection_item_ownership_period
+            inner join collection_item on collection_item.id = collection_item_ownership_period.collection_item_id
+            inner join users on users.id = collection_item.owner_id
+            where users.clerk_id = ${actorClerkId}
+          ), bounds as (
+            select coalesce(
+              ${start ? sql`${start}::timestamp` : sql`null::timestamp`},
+              min(effective_start_date)::timestamp
+            ) as lower_bound
+            from periods
+          ), buckets as (
+            select generate_series(
+              date_trunc(${granularity}, lower_bound),
+              date_trunc(${granularity}, ${now}::timestamp),
+              ${interval}
+            ) as bucket_start
+            from bounds
+            where lower_bound is not null
+          )
+          select
+            buckets.bucket_start at time zone 'UTC' as "bucketStart",
+            count(*) filter (
+              where periods.effective_start_date >= greatest(
+                  buckets.bucket_start::date,
+                  ${start ? sql`${start}::date` : sql`buckets.bucket_start::date`}
+                )
+                and periods.effective_start_date < least(
+                  (buckets.bucket_start + ${interval})::date,
+                  ${now}::date + 1
+                )
+            )::integer as "acquisitionCount",
+            count(*) filter (
+              where periods.effective_end_date >= greatest(
+                  buckets.bucket_start::date,
+                  ${start ? sql`${start}::date` : sql`buckets.bucket_start::date`}
+                )
+                and periods.effective_end_date < least(
+                  (buckets.bucket_start + ${interval})::date,
+                  ${now}::date + 1
+                )
+            )::integer as "departureCount",
+            count(*) filter (
+              where periods.effective_start_date < least(
+                  (buckets.bucket_start + ${interval})::date,
+                  ${now}::date + 1
+                )
+                and (
+                  periods.effective_end_date is null
+                  or periods.effective_end_date >= least(
+                    (buckets.bucket_start + ${interval})::date,
+                    ${now}::date + 1
+                  )
+                )
+            )::integer as "collectionCount"
+          from buckets
+          left join periods on true
+          group by buckets.bucket_start
+          order by buckets.bucket_start
+        `),
+        db
+          .select({
+            exactDateCount: sql<number>`count(*) filter (where not ${schema.collectionItemOwnershipPeriod.startDateImputed})::integer`,
+            imputedDateCount: sql<number>`count(*) filter (where ${schema.collectionItemOwnershipPeriod.startDateImputed})::integer`,
+          })
+          .from(schema.collectionItemOwnershipPeriod)
+          .innerJoin(
+            schema.collectionItem,
+            eq(
+              schema.collectionItem.id,
+              schema.collectionItemOwnershipPeriod.collectionItemId,
+            ),
+          )
+          .innerJoin(
+            schema.user,
+            eq(schema.user.id, schema.collectionItem.ownerId),
+          )
+          .where(eq(schema.user.clerkId, actorClerkId)),
+      ]);
+      return {
+        exactDateCount: Number(completeness?.exactDateCount ?? 0),
+        granularity,
+        imputedDateCount: Number(completeness?.imputedDateCount ?? 0),
+        range,
+        values: result.rows.map((row) => ({
+          acquisitionCount: Number(row.acquisitionCount),
+          bucketStart:
+            row.bucketStart instanceof Date
+              ? row.bucketStart
+              : new Date(row.bucketStart),
+          collectionCount: Number(row.collectionCount),
+          departureCount: Number(row.departureCount),
         })),
       };
     },

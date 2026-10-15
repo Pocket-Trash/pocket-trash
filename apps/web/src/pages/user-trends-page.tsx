@@ -1,4 +1,8 @@
-import type { UserActivityTrends, UserCollectionItem } from "@package/services";
+import type {
+  UserActivityTrends,
+  UserCollectionHistoryTrends,
+  UserCollectionItem,
+} from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -28,6 +32,12 @@ type UserTrendsTranslationKey =
   | TranslationKey
   | "web.userTrends.collectionCount"
   | "web.userTrends.collectionSize"
+  | "web.userTrends.collectionHistory"
+  | "web.userTrends.collectionHistoryChartLabel"
+  | "web.userTrends.acquisitions"
+  | "web.userTrends.departures"
+  | "web.userTrends.exactAcquisitionDates"
+  | "web.userTrends.imputedAcquisitionDates"
   | "web.userTrends.communityComparison"
   | "web.userTrends.communityPercentage"
   | "web.userTrends.communityStale"
@@ -87,6 +97,13 @@ type UserTrendOptionIdentifier = (
 export function UserTrendsPage({
   activityTrends = { granularity: "month", range: "year", values: [] },
   collectionCount,
+  collectionHistoryTrends = {
+    exactDateCount: 0,
+    granularity: "month",
+    imputedDateCount: 0,
+    range: "year",
+    values: [],
+  },
   communityTrends,
   items,
   onSearchChange,
@@ -96,6 +113,8 @@ export function UserTrendsPage({
   activityTrends?: UserActivityTrends;
   /** Number of collections owned by the signed-in user. */
   collectionCount: number;
+  /** Exact effective-date lifecycle history for this owner. */
+  collectionHistoryTrends?: UserCollectionHistoryTrends;
   /** Active privacy-safe public generations, available only to the owner view. */
   communityTrends?: CommunityTrendsSource;
   /** Currently owned physical items visible only to their owner. */
@@ -310,6 +329,56 @@ export function UserTrendsPage({
             </p>
           </div>
         ) : null}
+
+        <section
+          aria-labelledby="user-collection-history-title"
+          className="space-y-4"
+        >
+          <div className="space-y-1">
+            <h2
+              className="text-lg font-semibold"
+              id="user-collection-history-title"
+            >
+              {t("web.userTrends.collectionHistory")}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {t("web.userTrends.exactAcquisitionDates", {
+                count: collectionHistoryTrends.exactDateCount,
+              })}{" "}
+              {t("web.userTrends.imputedAcquisitionDates", {
+                count: collectionHistoryTrends.imputedDateCount,
+              })}
+            </p>
+          </div>
+          <ActivityTrendsChart
+            chartLabel={t("web.userTrends.collectionHistoryChartLabel")}
+            dateLabel={t("web.trends.activityDate")}
+            locale={locale}
+            series={[
+              {
+                name: t("web.userTrends.collectionSize"),
+                values: collectionHistoryTrends.values.map((value) => ({
+                  bucketStart: value.bucketStart,
+                  count: value.collectionCount,
+                })),
+              },
+              {
+                name: t("web.userTrends.acquisitions"),
+                values: collectionHistoryTrends.values.map((value) => ({
+                  bucketStart: value.bucketStart,
+                  count: value.acquisitionCount,
+                })),
+              },
+              {
+                name: t("web.userTrends.departures"),
+                values: collectionHistoryTrends.values.map((value) => ({
+                  bucketStart: value.bucketStart,
+                  count: value.departureCount,
+                })),
+              },
+            ]}
+          />
+        </section>
 
         <section
           aria-labelledby="user-activity-trends-title"

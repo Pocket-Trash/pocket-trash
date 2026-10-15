@@ -203,6 +203,126 @@ describe("public collection-item Trends", () => {
     }
   }, 30_000);
 
+  it("recomputes owner history from effective dates and repeated ownership periods", async () => {
+    const client = new PGlite();
+    const db = drizzle({ client, relations: schema.relations });
+
+    try {
+      await migratePGliteDatabase(client);
+      const [owner, otherOwner] = await db
+        .insert(schema.user)
+        .values([
+          { clerkId: "history-owner", username: "history-owner" },
+          { clerkId: "other-history-owner", username: "other-history-owner" },
+        ])
+        .returning({ id: schema.user.id });
+      if (!owner || !otherOwner)
+        throw new Error("History owners were not created.");
+      const [collection, otherCollection] = await db
+        .insert(schema.userCollection)
+        .values([
+          {
+            name: "History collection",
+            normalizedName: "history collection",
+            ownerId: owner.id,
+          },
+          {
+            name: "Other history collection",
+            normalizedName: "other history collection",
+            ownerId: otherOwner.id,
+          },
+        ])
+        .returning({ id: schema.userCollection.id });
+      if (!collection || !otherCollection)
+        throw new Error("History collections were not created.");
+      const [reacquiredItem, imputedItem, otherItem] = await db
+        .insert(schema.collectionItem)
+        .values([
+          { collectionId: collection.id, ownerId: owner.id },
+          { collectionId: collection.id, ownerId: owner.id },
+          { collectionId: otherCollection.id, ownerId: otherOwner.id },
+        ])
+        .returning({ id: schema.collectionItem.id });
+      if (!reacquiredItem || !imputedItem || !otherItem)
+        throw new Error("History items were not created.");
+      const [firstPeriod] = await db
+        .insert(schema.collectionItemOwnershipPeriod)
+        .values([
+          {
+            collectionItemId: reacquiredItem.id,
+            effectiveEndDate: "2026-03-05",
+            effectiveStartDate: "2026-01-10",
+            endedRecordedAt: new Date("2026-03-06T00:00:00.000Z"),
+            entryReason: "purchase",
+            exitReason: "sale",
+            startedRecordedAt: new Date("2026-01-11T00:00:00.000Z"),
+          },
+          {
+            collectionItemId: reacquiredItem.id,
+            effectiveStartDate: "2026-05-01",
+            entryReason: "trade",
+            startedRecordedAt: new Date("2026-05-02T00:00:00.000Z"),
+          },
+          {
+            collectionItemId: imputedItem.id,
+            effectiveStartDate: "2026-02-01",
+            entryReason: "unknown",
+            startDateImputed: true,
+            startedRecordedAt: new Date("2026-02-01T12:00:00.000Z"),
+          },
+          {
+            collectionItemId: otherItem.id,
+            effectiveStartDate: "2026-01-01",
+            entryReason: "gift",
+          },
+        ])
+        .returning({ id: schema.collectionItemOwnershipPeriod.id });
+      if (!firstPeriod) throw new Error("History periods were not created.");
+
+      const service = createTrendsService(db as unknown as Database);
+      const now = new Date("2026-06-15T12:00:00.000Z");
+      await expect(
+        service.getUserCollectionHistoryTrends("history-owner", "all", now),
+      ).resolves.toEqual({
+        exactDateCount: 2,
+        granularity: "month",
+        imputedDateCount: 1,
+        range: "all",
+        values: [
+          historyPoint("2026-01-01", 1, 0, 1),
+          historyPoint("2026-02-01", 1, 0, 2),
+          historyPoint("2026-03-01", 0, 1, 1),
+          historyPoint("2026-04-01", 0, 0, 1),
+          historyPoint("2026-05-01", 1, 0, 2),
+          historyPoint("2026-06-01", 0, 0, 2),
+        ],
+      });
+      await expect(
+        service.getUserCollectionHistoryTrends("history-owner", "week", now),
+      ).resolves.toMatchObject({
+        granularity: "day",
+        range: "week",
+        values: Array.from({ length: 7 }, () =>
+          expect.objectContaining({ collectionCount: 2 }),
+        ),
+      });
+
+      await db
+        .update(schema.collectionItemOwnershipPeriod)
+        .set({ effectiveStartDate: "2025-12-10" })
+        .where(eq(schema.collectionItemOwnershipPeriod.id, firstPeriod.id));
+      const corrected = await service.getUserCollectionHistoryTrends(
+        "history-owner",
+        "all",
+        now,
+      );
+      expect(corrected.values[0]).toEqual(historyPoint("2025-12-01", 1, 0, 1));
+      expect(corrected.values[1]).toEqual(historyPoint("2026-01-01", 0, 0, 1));
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("atomically swaps generations and retains the active dataset after failure", async () => {
     const client = new PGlite();
     const db = drizzle({ client, relations: schema.relations });
@@ -279,6 +399,29 @@ describe("public collection-item Trends", () => {
     }
   }, 30_000);
 });
+
+/**
+ * Builds one expected monthly owner-history point.
+ *
+ * @param bucketStart - UTC month start.
+ * @param acquisitionCount - Acquisitions effective in the month.
+ * @param departureCount - Departures effective in the month.
+ * @param collectionCount - Collection size at month end.
+ * @returns Expected owner-history point.
+ */
+function historyPoint(
+  bucketStart: string,
+  acquisitionCount: number,
+  departureCount: number,
+  collectionCount: number,
+) {
+  return {
+    acquisitionCount,
+    bucketStart: new Date(`${bucketStart}T00:00:00.000Z`),
+    collectionCount,
+    departureCount,
+  };
+}
 
 /**
  * Creates five-owner publishable data, four-owner suppressed data, and an excluded accessory.

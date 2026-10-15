@@ -5,6 +5,7 @@ import {
   getPublicCollectionMaterialTrends,
   getUserActivityTrends,
   getUserCollection,
+  getUserCollectionHistoryTrends,
   getUserCollections,
 } from "@/lib/catalog-api";
 import { parseCatalogTrendsSearch } from "@/lib/catalog-filters";
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/user/trends")({
       items,
       collections,
       activityTrends,
+      collectionHistoryTrends,
       collectionItems,
       makerProducts,
       materials,
@@ -40,12 +42,14 @@ export const Route = createFileRoute("/user/trends")({
       getUserCollection(),
       getUserCollections(),
       getUserActivityTrends({ data: deps.range }),
+      getUserCollectionHistoryTrends({ data: deps.range }),
       getPublicCollectionItemTrends(),
       getPublicCollectionMakerProductTrends(),
       getPublicCollectionMaterialTrends(),
     ]);
     return {
       activityTrends,
+      collectionHistoryTrends,
       collectionCount: collections.length,
       communityTrends: { collectionItems, makerProducts, materials },
       items,
@@ -61,13 +65,19 @@ export const Route = createFileRoute("/user/trends")({
  */
 function UserTrendsRoute() {
   const navigate = useNavigate();
-  const { activityTrends, collectionCount, communityTrends, items } =
-    Route.useLoaderData();
+  const {
+    activityTrends,
+    collectionCount,
+    collectionHistoryTrends,
+    communityTrends,
+    items,
+  } = Route.useLoaderData();
   const search = Route.useSearch();
   return (
     <UserTrendsPage
       activityTrends={activityTrends}
       collectionCount={collectionCount}
+      collectionHistoryTrends={collectionHistoryTrends}
       communityTrends={communityTrends}
       items={items}
       onSearchChange={(nextSearch) =>
