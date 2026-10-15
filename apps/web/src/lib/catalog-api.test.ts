@@ -35,7 +35,7 @@ const base = {
   finishOptions: [],
   length: null,
   makerId: 1000,
-  makerProductUrl: "",
+  productLinks: [],
   magnetLayout: null,
   materialAssignments: [
     {
@@ -438,13 +438,17 @@ describe("product source details", () => {
     ).toBe(false);
   });
 
-  it("normalizes the maker URL and optional text", () => {
+  it("normalizes ordered product links and optional text", () => {
     const result = productFormSchema.parse({
       ...base,
       bearing: "  R188  ",
       description: "  **Fast**  ",
       finishOptions: validFinishOptions,
-      makerProductUrl: " https://maker.example/products/spinner/ ",
+      productLinks: [
+        " https://maker.example/products/spinner/ ",
+        "",
+        "https://shop.example/products/spinner",
+      ],
       spinDiameter: { unit: "mm", value: "52" },
     });
 
@@ -452,7 +456,10 @@ describe("product source details", () => {
       expect.objectContaining({
         bearing: "R188",
         description: "  **Fast**  ",
-        makerProductUrl: "https://maker.example/products/spinner",
+        productLinks: [
+          "https://maker.example/products/spinner",
+          "https://shop.example/products/spinner",
+        ],
         spinDiameter: { unit: "mm", value: "52" },
       }),
     );
@@ -502,12 +509,25 @@ describe("product source details", () => {
   it.each([
     "javascript:alert(1)",
     "ftp://maker.example/spinner",
-  ])("rejects the non-web maker URL %s", (makerProductUrl) => {
+  ])("rejects the non-web product URL %s", (productLink) => {
     expect(
       productFormSchema.safeParse({
         ...base,
         finishOptions: validFinishOptions,
-        makerProductUrl,
+        productLinks: [productLink],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects duplicate normalized product links", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: validFinishOptions,
+        productLinks: [
+          "https://maker.example/spinner/",
+          "https://maker.example/spinner",
+        ],
       }).success,
     ).toBe(false);
   });

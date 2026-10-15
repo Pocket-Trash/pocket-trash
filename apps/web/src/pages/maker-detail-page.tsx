@@ -190,6 +190,9 @@ function RelatedProducts({
                     })}
                     privateLabel={t("web.resources.moderation.privateBadge")}
                     product={product}
+                    productLinkLabel={t("web.action.visitProductPageFor", {
+                      name: product.name,
+                    })}
                   />
                 </div>
               ))}

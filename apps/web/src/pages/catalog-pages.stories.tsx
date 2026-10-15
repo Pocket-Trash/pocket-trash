@@ -73,8 +73,14 @@ const product: CatalogProduct = {
   makerId: 1000,
   makerName: "KAP EDC",
   makerSlug: "kap-edc",
-  makerProductUrl: "https://www.kapedc.com/products/katla",
-  makerProductUrlValid: true,
+  productLinks: [
+    {
+      id: 1000,
+      isValid: true,
+      position: 0,
+      url: "https://www.kapedc.com/products/katla",
+    },
+  ],
   makerUrl: "https://www.kapedc.com",
   magnetLayout: null,
   usesInserts: null,

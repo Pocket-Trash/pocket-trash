@@ -43,8 +43,7 @@ const product: CatalogProduct = {
   makerId: 1000,
   makerName: "KAP EDC",
   makerSlug: "kap-edc",
-  makerProductUrl: null,
-  makerProductUrlValid: true,
+  productLinks: [],
   makerUrl: "https://www.kapedc.com",
   magnetLayout: null,
   usesInserts: null,
@@ -106,6 +105,7 @@ const meta = {
     materialCountLabel: "Materials: 2",
     privateLabel: "Private",
     product,
+    productLinkLabel: "Visit the product page for Katla",
   },
   component: ProductCard,
   decorators: [
@@ -136,5 +136,28 @@ export const WithImage: Story = {
   args: {
     imageCountLabel: "Images: 1",
     product: { ...product, imageCount: 1, images: [image] },
+  },
+};
+
+/** Shows the first valid external product link without exposing invalid links. */
+export const WithProductLink: Story = {
+  args: {
+    product: {
+      ...product,
+      productLinks: [
+        {
+          id: 1000,
+          isValid: false,
+          position: 0,
+          url: "https://invalid.example/katla",
+        },
+        {
+          id: 1001,
+          isValid: true,
+          position: 1,
+          url: "https://www.kapedc.com/products/katla",
+        },
+      ],
+    },
   },
 };

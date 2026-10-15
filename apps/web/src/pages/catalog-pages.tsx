@@ -738,12 +738,23 @@ export function ProductDetailPage({
               {product.refillModel}
             </Detail>
           ) : null}
-          {product.makerProductUrl && product.makerProductUrlValid ? (
-            <Detail label={t("web.catalog.field.makerProductUrl")}>
-              <MakerLink
-                name={t("web.action.visitProductPage")}
-                url={product.makerProductUrl}
-              />
+          {product.productLinks.some(({ isValid }) => isValid) ? (
+            <Detail label={t("web.catalog.field.productLinks")}>
+              <ul className="grid gap-1">
+                {product.productLinks
+                  .filter(({ isValid }) => isValid)
+                  .map((link, index) => (
+                    <li key={link.id}>
+                      <MakerLink
+                        name={t("web.action.visitProductPageNumbered", {
+                          name: product.name,
+                          number: index + 1,
+                        })}
+                        url={link.url}
+                      />
+                    </li>
+                  ))}
+              </ul>
             </Detail>
           ) : null}
           <Detail label={t("web.catalog.field.materials")}>
@@ -1719,6 +1730,9 @@ export function ProductGrid({
                 })}
                 privateLabel={t("web.resources.moderation.privateBadge")}
                 product={product}
+                productLinkLabel={t("web.action.visitProductPageFor", {
+                  name: product.name,
+                })}
                 productTypeLabel={catalogTypeDisplayLabel(
                   {
                     activeTypeLabel: localizedProductTypeLabel(

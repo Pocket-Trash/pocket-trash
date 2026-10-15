@@ -500,7 +500,6 @@ type ProductEditorValue = Omit<
   | "description"
   | "diameter"
   | "length"
-  | "makerProductUrl"
   | "materialAssignments"
   | "spinDiameter"
   | "thickness"
@@ -512,8 +511,6 @@ type ProductEditorValue = Omit<
   bearing: string;
   /** Markdown description before blank normalization. */
   description: string;
-  /** Maker URL before blank normalization. */
-  makerProductUrl: string;
   /** Material combinations with editable optional weights. */
   materialAssignments: Array<
     Omit<ProductFormValue["materialAssignments"][number], "weight"> & {
@@ -956,7 +953,7 @@ export function ProductEditor({
     includedPlateProductId: initialProduct?.includedPlate?.id ?? null,
     length: initialProduct?.length ?? { unit: "mm", value: "" },
     makerId: initialProduct?.makerId ?? 0,
-    makerProductUrl: initialProduct?.makerProductUrl ?? "",
+    productLinks: initialProduct?.productLinks.map(({ url }) => url) ?? [],
     magnetConfiguration: initialProduct?.magnetConfiguration ?? null,
     magnetLayout:
       productTypeSlug === "slider-insert"
@@ -1229,25 +1226,102 @@ export function ProductEditor({
           </form.Subscribe>
         ) : null}
         {!quickCreate ? (
-          <form.Field name="makerProductUrl">
+          <form.Field name="productLinks">
             {(field) => (
-              <Field label={t("web.catalog.field.makerProductUrl")}>
-                <Input
-                  aria-label={t("web.catalog.field.makerProductUrl")}
-                  aria-describedby="maker-product-url-help"
-                  name={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  type="url"
-                  value={field.state.value}
-                />
+              <Field label={t("web.catalog.field.productLinks")}>
+                <div className="space-y-3">
+                  {field.state.value.map((url, index) => (
+                    <div className="space-y-2" key={index}>
+                      <Input
+                        aria-label={t("web.catalog.field.productLink", {
+                          number: index + 1,
+                        })}
+                        aria-describedby="product-links-help"
+                        name={`${field.name}.${index}`}
+                        onBlur={field.handleBlur}
+                        onChange={(event) =>
+                          field.handleChange(
+                            field.state.value.map((currentUrl, position) =>
+                              position === index
+                                ? event.target.value
+                                : currentUrl,
+                            ),
+                          )
+                        }
+                        type="url"
+                        value={url}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={index === 0}
+                          onClick={() => {
+                            const next = [...field.state.value];
+                            const previous = next[index - 1];
+                            if (previous === undefined) return;
+                            next[index - 1] = url;
+                            next[index] = previous;
+                            field.handleChange(next);
+                          }}
+                          type="button"
+                          variant="outline"
+                        >
+                          {t("web.action.moveProductLinkUp", {
+                            number: index + 1,
+                          })}
+                        </Button>
+                        <Button
+                          disabled={index === field.state.value.length - 1}
+                          onClick={() => {
+                            const next = [...field.state.value];
+                            const following = next[index + 1];
+                            if (following === undefined) return;
+                            next[index] = following;
+                            next[index + 1] = url;
+                            field.handleChange(next);
+                          }}
+                          type="button"
+                          variant="outline"
+                        >
+                          {t("web.action.moveProductLinkDown", {
+                            number: index + 1,
+                          })}
+                        </Button>
+                        <Button
+                          onClick={() =>
+                            field.handleChange(
+                              field.state.value.filter(
+                                (_, position) => position !== index,
+                              ),
+                            )
+                          }
+                          type="button"
+                          variant="outline"
+                        >
+                          {t("web.action.removeProductLink", {
+                            number: index + 1,
+                          })}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    className="w-fit"
+                    onClick={() =>
+                      field.handleChange([...field.state.value, ""])
+                    }
+                    type="button"
+                    variant="outline"
+                  >
+                    {t("web.action.addProductLink")}
+                  </Button>
+                </div>
                 <p
                   className="text-xs text-muted-foreground"
-                  id="maker-product-url-help"
+                  id="product-links-help"
                 >
-                  {t("web.catalog.help.makerProductUrl")}
+                  {t("web.catalog.help.productLinks")}
                 </p>
-                <FieldError error={serverErrors.makerProductUrl?.[0]} t={t} />
+                <FieldError error={serverErrors.productLinks?.[0]} t={t} />
               </Field>
             )}
           </form.Field>

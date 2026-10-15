@@ -14,6 +14,7 @@ import { cardImageUrl } from "@/lib/card-image";
  * @param props.materialCountLabel - Preformatted material count.
  * @param props.privateLabel - Label shown for a private product.
  * @param props.product - Catalog product to summarize.
+ * @param props.productLinkLabel - Accessible label for the first valid external product link.
  * @param props.productTypeLabel - Localized canonical or maker-preferred type label.
  * @param props.searchContext - Optional context explaining a non-name search match.
  * @returns The product summary card.
@@ -26,6 +27,7 @@ export function ProductCard({
   materialCountLabel,
   privateLabel,
   product,
+  productLinkLabel,
   productTypeLabel = product.productTypeName,
   searchContext,
 }: {
@@ -55,12 +57,15 @@ export function ProductCard({
    * Catalog product displayed by the card.
    */
   product: CatalogProduct;
+  /** Accessible label for the first valid external product link. */
+  productLinkLabel: string;
   /** Localized canonical or maker-preferred product-type label. */
   productTypeLabel?: string;
   /** Context explaining a type, alias, or owner search match. */
   searchContext?: string;
 }) {
   const image = product.images.find(({ deletedAt }) => !deletedAt);
+  const productLink = product.productLinks.find(({ isValid }) => isValid);
 
   return (
     <article className="flex h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-transform group-hover:-translate-y-0.5 group-hover:border-primary">
@@ -104,6 +109,13 @@ export function ProductCard({
           <span>{finishOptionCountLabel}</span>
           <span>{imageCountLabel}</span>
         </div>
+        {productLink ? (
+          <MakerLink
+            className="relative z-20 mt-3 text-xs"
+            name={productLinkLabel}
+            url={productLink.url}
+          />
+        ) : null}
       </div>
     </article>
   );
