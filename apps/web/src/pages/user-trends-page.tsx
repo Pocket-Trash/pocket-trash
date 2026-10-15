@@ -27,57 +27,6 @@ import {
 } from "@/lib/user-trends";
 import { useLocale } from "@/providers/locale-provider";
 
-/** Translation keys supplied by the companion localizations change. */
-type UserTrendsTranslationKey =
-  | TranslationKey
-  | "web.userTrends.collectionCount"
-  | "web.userTrends.collectionSize"
-  | "web.userTrends.collectionHistory"
-  | "web.userTrends.collectionHistoryChartLabel"
-  | "web.userTrends.acquisitions"
-  | "web.userTrends.departures"
-  | "web.userTrends.exactAcquisitionDates"
-  | "web.userTrends.imputedAcquisitionDates"
-  | "web.userTrends.communityComparison"
-  | "web.userTrends.communityPercentage"
-  | "web.userTrends.communityStale"
-  | "web.userTrends.communitySuppressed"
-  | "web.userTrends.communitySuppressedNote"
-  | "web.userTrends.communityUnavailable"
-  | "web.userTrends.comparisonDescription"
-  | "web.userTrends.description"
-  | "web.userTrends.empty"
-  | "web.userTrends.items"
-  | "web.userTrends.personalPercentage"
-  | "web.userTrends.privateNote"
-  | "web.userTrends.title"
-  | "web.trends.activity"
-  | "web.trends.activityChartLabel"
-  | "web.trends.activityDate"
-  | "web.trends.activityRange"
-  | "web.trends.addedToPocketTrash"
-  | "web.trends.allMakers"
-  | "web.trends.allMaterials"
-  | "web.trends.allMaterialSpecifics"
-  | "web.trends.allProducts"
-  | "web.trends.collectionItemsChartLabel"
-  | "web.trends.collectionMaterialsChartLabel"
-  | "web.trends.generalMaterial"
-  | "web.trends.lastUpdated"
-  | "web.trends.maker"
-  | "web.trends.makersChartLabel"
-  | "web.trends.material"
-  | "web.trends.materialSpecific"
-  | "web.trends.product"
-  | "web.trends.productsChartLabel"
-  | "web.trends.range30Days"
-  | "web.trends.range6Months"
-  | "web.trends.rangeAll"
-  | "web.trends.rangeWeek"
-  | "web.trends.rangeYear"
-  | "web.trends.unspecifiedMaterial"
-  | "web.trends.viewProducts";
-
 /**
  * Resolves one stable personal Trends filter option.
  *
@@ -138,9 +87,9 @@ export function UserTrendsPage({
    * @returns Localized private Trends copy.
    */
   const t = (
-    key: UserTrendsTranslationKey,
+    key: TranslationKey,
     values: Record<string, string | number> = {},
-  ) => formatTranslation(key as TranslationKey, values, locale);
+  ) => formatTranslation(key, values, locale);
   const trends = summarizeUserTrends(items, collectionCount, search);
   const community = communityTrends
     ? summarizeCommunityTrends(communityTrends, search, {
