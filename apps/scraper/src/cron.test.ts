@@ -75,19 +75,13 @@ describe("Railway scraper cron", () => {
         context: createContext(),
         env: createEnv(),
         logger: createNoopLogger(),
-        now: new Date("2026-07-16T12:00:00.000Z"),
+        now: new Date("2026-07-13T02:00:00.000Z"),
       }),
     ).resolves.toBeUndefined();
-    expect(runSourceProducerJob).toHaveBeenCalledTimes(5);
+    expect(runSourceProducerJob).toHaveBeenCalledTimes(4);
     expect(
       vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
-    ).toEqual([
-      "autmog",
-      "grimsmo-fjell",
-      "grimsmo-norseman",
-      "grimsmo-rask",
-      "grimsmo-saga",
-    ]);
+    ).toEqual(["autmog", "grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"]);
     expect(runQueueProcessorJob).toHaveBeenCalledOnce();
   });
 
@@ -104,7 +98,7 @@ describe("Railway scraper cron", () => {
       context: createContext(),
       env: createEnv(),
       logger,
-      now: new Date("2026-07-16T12:00:00.000Z"),
+      now: new Date("2026-07-13T02:00:00.000Z"),
     });
     await logger.flush();
 
@@ -127,13 +121,13 @@ describe("Railway scraper cron", () => {
     });
   });
 
-  it("runs every source at the shared hourly slot", async () => {
+  it("runs Saga at its independent weekly slot", async () => {
     expect(scraperSchedules).toEqual({
-      autmog: "*/30 * * * *",
+      autmog: "0 2 * * 1",
       "grimsmo-fjell": "0 * * * *",
       "grimsmo-norseman": "0 * * * *",
       "grimsmo-rask": "0 * * * *",
-      "grimsmo-saga": "*/30 * * * *",
+      "grimsmo-saga": "0 2 * * 4",
     });
     vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
     vi.mocked(runQueueProcessorJob).mockResolvedValue(undefined);
@@ -142,13 +136,12 @@ describe("Railway scraper cron", () => {
       context: createContext(),
       env: createEnv(),
       logger: createNoopLogger(),
-      now: new Date("2026-07-16T12:00:00.000Z"),
+      now: new Date("2026-07-16T02:00:00.000Z"),
     });
 
     expect(
       vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
     ).toEqual([
-      "autmog",
       "grimsmo-fjell",
       "grimsmo-norseman",
       "grimsmo-rask",
@@ -156,9 +149,8 @@ describe("Railway scraper cron", () => {
     ]);
   });
 
-  it("runs only Autmog and Saga at the half-hour slot", async () => {
+  it("runs Autmog at its independent weekly slot", async () => {
     const context = createContext();
-    vi.mocked(context.redis.get).mockResolvedValue("2026-07-16T12:00:00.000Z");
     vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
     vi.mocked(runQueueProcessorJob).mockResolvedValue(undefined);
 
@@ -166,12 +158,12 @@ describe("Railway scraper cron", () => {
       context,
       env: createEnv(),
       logger: createNoopLogger(),
-      now: new Date("2026-07-16T12:30:00.000Z"),
+      now: new Date("2026-07-13T02:00:00.000Z"),
     });
 
     expect(
       vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
-    ).toEqual(["autmog", "grimsmo-saga"]);
+    ).toEqual(["autmog", "grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"]);
   });
 
   it("establishes a baseline off the dispatcher tick and still processes the queue", async () => {
@@ -185,7 +177,7 @@ describe("Railway scraper cron", () => {
     expect(runSourceProducerJob).not.toHaveBeenCalled();
     expect(context.redis.set).toHaveBeenCalledWith(
       "scraper:cron:last-attempted-slot:autmog",
-      "2026-07-16T12:30:00.000Z",
+      "2026-07-13T02:00:00.000Z",
     );
     expect(runQueueProcessorJob).toHaveBeenCalledOnce();
   });
@@ -226,7 +218,7 @@ describe("Railway scraper cron", () => {
   ])("initializes %s on a delayed due tick", async (stored) => {
     const context = createContext();
     vi.mocked(context.redis.get).mockResolvedValue(stored);
-    const now = new Date("2026-07-16T12:02:37.000Z");
+    const now = new Date("2026-07-16T02:02:37.000Z");
     vi.mocked(runSourceProducerJob).mockImplementation(async () => {
       now.setUTCHours(15);
     });
@@ -236,11 +228,11 @@ describe("Railway scraper cron", () => {
       logger: createNoopLogger(),
       now,
     });
-    expect(runSourceProducerJob).toHaveBeenCalledTimes(5);
-    for (const args of vi.mocked(context.redis.set).mock.calls) {
-      expect(args).toHaveLength(2);
-      expect(args[1]).toBe("2026-07-16T12:00:00.000Z");
-    }
+    expect(runSourceProducerJob).toHaveBeenCalledTimes(4);
+    expect(context.redis.set).toHaveBeenCalledWith(
+      "scraper:cron:last-attempted-slot:grimsmo-saga",
+      "2026-07-16T02:00:00.000Z",
+    );
   });
 
   it.each([
@@ -273,8 +265,8 @@ describe("Railway scraper cron", () => {
   });
 
   it.each([
-    "2026-07-16T11:00:00.000Z",
-    "2026-07-15T08:00:00.000Z",
+    "2026-07-01T11:00:00.000Z",
+    "2026-06-15T08:00:00.000Z",
   ])("collapses missed slots after %s into one latest attempt", async (stored) => {
     const context = createContext();
     vi.mocked(context.redis.get).mockResolvedValue(stored);
@@ -287,7 +279,7 @@ describe("Railway scraper cron", () => {
     expect(runSourceProducerJob).toHaveBeenCalledTimes(5);
     expect(context.redis.set).toHaveBeenCalledWith(
       "scraper:cron:last-attempted-slot:autmog",
-      "2026-07-16T12:30:00.000Z",
+      "2026-07-13T02:00:00.000Z",
     );
   });
 
@@ -303,30 +295,30 @@ describe("Railway scraper cron", () => {
     });
     vi.mocked(runSourceProducerJob).mockImplementation(async ({ source }) => {
       expect(state.get(`scraper:cron:last-attempted-slot:${source}`)).toBe(
-        "2026-07-16T12:00:00.000Z",
+        "2026-07-13T02:00:00.000Z",
       );
       if (source === "autmog") throw new Error("producer failure");
     });
-    for (const time of ["12:00", "12:05"]) {
+    for (const time of ["02:00", "02:05"]) {
       await expect(
         runRailwayCronJob({
           context,
           env: createEnv(),
           logger: createNoopLogger(),
-          now: new Date(`2026-07-16T${time}:00.000Z`),
+          now: new Date(`2026-07-13T${time}:00.000Z`),
         }),
       ).resolves.toBeUndefined();
     }
-    expect(runSourceProducerJob).toHaveBeenCalledTimes(5);
+    expect(runSourceProducerJob).toHaveBeenCalledTimes(4);
     expect(runQueueProcessorJob).toHaveBeenCalledTimes(2);
     vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
     await runRailwayCronJob({
       context,
       env: createEnv(),
       logger: createNoopLogger(),
-      now: new Date("2026-07-16T13:00:00.000Z"),
+      now: new Date("2026-07-13T03:00:00.000Z"),
     });
-    expect(runSourceProducerJob).toHaveBeenCalledTimes(10);
+    expect(runSourceProducerJob).toHaveBeenCalledTimes(7);
   });
 
   it.each([
@@ -347,12 +339,7 @@ describe("Railway scraper cron", () => {
     ).resolves.toBeUndefined();
     expect(
       vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
-    ).toEqual([
-      "grimsmo-fjell",
-      "grimsmo-norseman",
-      "grimsmo-rask",
-      "grimsmo-saga",
-    ]);
+    ).toEqual(["grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"]);
     expect(runQueueProcessorJob).toHaveBeenCalledOnce();
   });
 });
