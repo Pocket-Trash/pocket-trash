@@ -697,7 +697,6 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   productDetailPenTip: {
-    assertions: r.many.refillCompatibilityAssertion(),
     collectionItems: r.many.collectionDetailPenTip(),
     part: r.one.productDetailPenPart({
       from: [r.productDetailPenTip.id],
@@ -917,10 +916,6 @@ export const relations = defineRelations(tables, (r) => ({
     pen: r.one.productDetailPen({
       from: [r.refillCompatibilityAssertion.penProductId],
       to: [r.productDetailPen.id],
-    }),
-    requiredTip: r.one.productDetailPenTip({
-      from: [r.refillCompatibilityAssertion.requiredTipProductId],
-      to: [r.productDetailPenTip.id],
     }),
     targetGroup: r.one.refillCompatibilityGroup({
       from: [r.refillCompatibilityAssertion.targetGroupId],

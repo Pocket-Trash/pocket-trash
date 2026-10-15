@@ -699,9 +699,6 @@ export const refillCompatibilityAssertion = pgTable(
     penProductId: bigint("pen_product_id", { mode: "number" })
       .notNull()
       .references(() => productDetailPen.id, { onDelete: "restrict" }),
-    requiredTipProductId: bigint("required_tip_product_id", {
-      mode: "number",
-    }).references(() => productDetailPenTip.id, { onDelete: "restrict" }),
     targetGroupId: bigint("target_group_id", { mode: "number" }).references(
       () => refillCompatibilityGroup.id,
       { onDelete: "restrict" },
@@ -713,25 +710,15 @@ export const refillCompatibilityAssertion = pgTable(
   },
   (table) => [
     unique("refill_compatibility_assertion_scope_unique")
-      .on(
-        table.penProductId,
-        table.requiredTipProductId,
-        table.targetGroupId,
-        table.targetRefillProductId,
-      )
+      .on(table.penProductId, table.targetGroupId, table.targetRefillProductId)
       .nullsNotDistinct(),
-    index("refill_compatibility_assertion_refill_tip_idx").on(
+    index("refill_compatibility_assertion_refill_idx").on(
       table.penProductId,
-      table.requiredTipProductId,
       table.targetRefillProductId,
     ),
-    index("refill_compatibility_assertion_group_tip_idx").on(
+    index("refill_compatibility_assertion_group_idx").on(
       table.penProductId,
-      table.requiredTipProductId,
       table.targetGroupId,
-    ),
-    index("refill_compatibility_assertion_required_tip_idx").on(
-      table.requiredTipProductId,
     ),
     index("refill_compatibility_assertion_target_group_idx").on(
       table.targetGroupId,

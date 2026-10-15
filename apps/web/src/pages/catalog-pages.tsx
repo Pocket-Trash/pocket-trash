@@ -895,7 +895,7 @@ export function ProductDetailPage({
             {product.compatiblePens.length ? (
               <ul className="grid gap-2 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
                 {product.compatiblePens.map((pen) => (
-                  <li key={`${pen.id}:${pen.requiredTipName ?? ""}`}>
+                  <li key={pen.id}>
                     <Link
                       className="text-primary underline-offset-4 hover:underline"
                       params={{ productSlug: pen.slug, productTypeSlug: "pen" }}
@@ -903,13 +903,6 @@ export function ProductDetailPage({
                     >
                       {pen.name}
                     </Link>
-                    {pen.requiredTipName ? (
-                      <p className="text-sm text-muted-foreground">
-                        {t("web.pens.refill.requiresTip" as TranslationKey, {
-                          tip: pen.requiredTipName,
-                        })}
-                      </p>
-                    ) : null}
                   </li>
                 ))}
               </ul>

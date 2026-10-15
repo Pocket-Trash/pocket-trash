@@ -176,14 +176,6 @@ describe("public Pens catalog reads", () => {
         tipSize: "0.5 mm",
         tipStyleId: tipStyle.id,
       });
-      await expect(
-        service.authorPensCatalog({
-          actor,
-          kind: "compatibility-assertion",
-          penProductId: penId,
-          targetRefillProductId: refillId,
-        }),
-      ).resolves.toMatchObject({ id: expect.any(Number) });
       const group = await service.authorPensCatalog({
         actor,
         conceptId: groupConcept.id,
@@ -195,29 +187,47 @@ describe("public Pens catalog reads", () => {
         kind: "compatibility-membership",
         refillProductId: refillId,
       });
-      const scopedCompatibility = await service.authorPensCatalog({
+      await service.updateProduct({
         actor,
-        kind: "compatibility-assertion",
-        penProductId: penId,
-        requiredTipProductId: tipId,
-        targetGroupId: group.id,
+        aliases: [],
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
+        name: "Author Pen",
+        productId: penId,
+        productTypeSlug: "pen",
+        refillCompatibility: [
+          { targetGroupId: null, targetRefillProductId: refillId },
+          { targetGroupId: group.id, targetRefillProductId: null },
+        ],
+        slug: "author-pen",
+        specs: {},
       });
       const authoredOptions = await service.listPensAdminOptions(actor);
       expect(authoredOptions.compatibilityAssertions).toContainEqual(
         expect.objectContaining({
-          id: scopedCompatibility.id,
-          requiredTipProductId: tipId,
           targetGroupId: group.id,
         }),
       );
       expect(authoredOptions.compatibilityMemberships).toContainEqual(
         expect.objectContaining({ id: membership.id, groupId: group.id }),
       );
-      await service.authorPensCatalog({
+      await service.updateProduct({
         actor,
-        assertionId: scopedCompatibility.id,
-        kind: "compatibility-assertion-remove",
-        penProductId: penId,
+        aliases: [],
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
+        name: "Author Pen",
+        productId: penId,
+        productTypeSlug: "pen",
+        refillCompatibility: [],
+        slug: "author-pen",
+        specs: {},
       });
       await service.authorPensCatalog({
         actor,
@@ -226,9 +236,7 @@ describe("public Pens catalog reads", () => {
         refillProductId: refillId,
       });
       const removedOptions = await service.listPensAdminOptions(actor);
-      expect(removedOptions.compatibilityAssertions).not.toContainEqual(
-        expect.objectContaining({ id: scopedCompatibility.id }),
-      );
+      expect(removedOptions.compatibilityAssertions).toEqual([]);
       expect(removedOptions.compatibilityMemberships).toEqual([]);
       await expect(
         db
@@ -511,7 +519,6 @@ describe("public Pens catalog reads", () => {
           });
         await transaction.insert(schema.refillCompatibilityAssertion).values({
           penProductId: penId,
-          requiredTipProductId: tipId,
           targetGroupId: group.id,
         });
       });
@@ -534,7 +541,6 @@ describe("public Pens catalog reads", () => {
         compatiblePens: [
           {
             name: "Compatible Pen",
-            requiredTipName: null,
             slug: "compatible-pen",
           },
         ],
@@ -547,7 +553,6 @@ describe("public Pens catalog reads", () => {
       expect(groupedRefill?.compatiblePens).toEqual([
         expect.objectContaining({
           name: "Compatible Pen",
-          requiredTipName: "Needle Tip",
           slug: "compatible-pen",
         }),
       ]);

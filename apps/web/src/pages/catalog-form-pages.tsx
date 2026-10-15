@@ -186,8 +186,6 @@ const pensAdminActions = [
   "offering-identifier",
   "compatibility-membership",
   "compatibility-membership-remove",
-  "compatibility-assertion",
-  "compatibility-assertion-remove",
   "refill-tip-style",
   "refill-ink-color",
   "compatibility-group",
@@ -224,15 +222,12 @@ export function PensAdminEditor({
   const [action, setAction] = React.useState<PensAdminAction>(
     product.productTypeSlug === "refill"
       ? "refill-offering"
-      : "compatibility-assertion",
+      : "compatibility-group",
   );
   const [primaryId, setPrimaryId] = React.useState("");
   const [secondaryId, setSecondaryId] = React.useState("");
   const [text, setText] = React.useState("");
   const [text2, setText2] = React.useState("");
-  const [targetKind, setTargetKind] = React.useState<"group" | "refill">(
-    "refill",
-  );
   const [message, setMessage] = React.useState<string | null>(null);
   if (!admin) return null;
 
@@ -244,27 +239,6 @@ export function PensAdminEditor({
         admin.compatibilityGroups.find((group) => group.id === groupId)?.name ??
         String(groupId),
     }));
-  const compatibilityAssertions = admin.compatibilityAssertions
-    .filter(({ penProductId }) => penProductId === product.id)
-    .map(
-      ({ id, requiredTipProductId, targetGroupId, targetRefillProductId }) => {
-        const target =
-          targetGroupId == null
-            ? options.relationshipProducts.find(
-                (candidate) => candidate.id === targetRefillProductId,
-              )?.name
-            : admin.compatibilityGroups.find(
-                (group) => group.id === targetGroupId,
-              )?.name;
-        const tip = options.relationshipProducts.find(
-          (candidate) => candidate.id === requiredTipProductId,
-        )?.name;
-        return {
-          id,
-          name: tip ? `${target ?? id} · ${tip}` : (target ?? String(id)),
-        };
-      },
-    );
 
   /**
    * Renders a labeled single-value select.
@@ -369,27 +343,13 @@ export function PensAdminEditor({
                   membershipId: id,
                   refillProductId: product.id,
                 }
-              : action === "compatibility-assertion"
-                ? {
+              : action === "compatibility-group"
+                ? { conceptId: id, kind: action }
+                : {
                     kind: action,
-                    penProductId: product.id,
-                    requiredTipProductId: id2 || null,
-                    targetGroupId: targetKind === "group" ? id : null,
-                    targetRefillProductId: targetKind === "refill" ? id : null,
-                  }
-                : action === "compatibility-assertion-remove"
-                  ? {
-                      assertionId: id,
-                      kind: action,
-                      penProductId: product.id,
-                    }
-                  : action === "compatibility-group"
-                    ? { conceptId: id, kind: action }
-                    : {
-                        kind: action,
-                        name: text,
-                        slug: text2,
-                      };
+                    name: text,
+                    slug: text2,
+                  };
     const result = await authorCatalogPensData({ data });
     if (!result.ok) {
       setMessage(result.formError);
@@ -452,46 +412,6 @@ export function PensAdminEditor({
             primaryId,
             setPrimaryId,
             compatibilityMemberships,
-          )
-        : null}
-      {action === "compatibility-assertion" ? (
-        <>
-          {select(
-            copy("targetTypeLabel"),
-            targetKind,
-            (value) => setTargetKind(value as "group" | "refill"),
-            [
-              { id: "refill", name: copy("targetType.refill") },
-              { id: "group", name: copy("targetType.group") },
-            ],
-          )}
-          {select(
-            copy("target"),
-            primaryId,
-            setPrimaryId,
-            targetKind === "group"
-              ? admin.compatibilityGroups
-              : options.relationshipProducts.filter(
-                  ({ productTypeSlug }) => productTypeSlug === "refill",
-                ),
-          )}
-          {select(
-            copy("requiredTip"),
-            secondaryId,
-            setSecondaryId,
-            options.relationshipProducts.filter(
-              ({ productTypeSlug }) => productTypeSlug === "pen-tip",
-            ),
-            false,
-          )}
-        </>
-      ) : null}
-      {action === "compatibility-assertion-remove"
-        ? select(
-            copy("compatibilityRelationship"),
-            primaryId,
-            setPrimaryId,
-            compatibilityAssertions,
           )
         : null}
       {action === "refill-tip-style" || action === "refill-ink-color" ? (
@@ -686,6 +606,7 @@ export function ProductEditor({
     name: initialProduct?.name ?? "",
     productId: initialProduct?.id ?? null,
     productTypeSlug,
+    refillCompatibility: initialProduct?.refillCompatibility ?? [],
     refillModel: initialProduct?.refillModel ?? null,
     spinDiameter: initialProduct?.spinDiameter ?? { unit: "mm", value: "" },
     thickness: initialProduct?.thickness ?? { unit: "mm", value: "" },
@@ -1147,6 +1068,86 @@ export function ProductEditor({
             </form.Field>
             <FieldError error={serverErrors.finishOptions?.[0]} t={t} />
           </>
+        ) : null}
+
+        {productTypeSlug === "pen" ? (
+          <form.Field mode="array" name="refillCompatibility">
+            {(field) => {
+              const groupOptions: ComboboxOption[] = (
+                options.refillCompatibilityGroups ?? []
+              ).map(({ id, name }) => ({
+                group: "groups",
+                id: `group:${id}`,
+                name,
+                selectionName: `${t("web.pens.admin.targetType.group" as TranslationKey)}: ${name}`,
+              }));
+              const refillOptions: ComboboxOption[] =
+                options.relationshipProducts
+                  .filter(({ productTypeSlug }) => productTypeSlug === "refill")
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(({ id, name }) => ({
+                    group: "refills",
+                    id: `refill:${id}`,
+                    name,
+                  }));
+              const items = [...groupOptions, ...refillOptions];
+              const selected = field.state.value.flatMap(
+                ({ targetGroupId, targetRefillProductId }) => {
+                  const id =
+                    targetGroupId === null
+                      ? `refill:${targetRefillProductId}`
+                      : `group:${targetGroupId}`;
+                  const option = items.find((candidate) => candidate.id === id);
+                  return option ? [option] : [];
+                },
+              );
+              const label = t(
+                "web.pens.field.compatibleRefills" as TranslationKey,
+              );
+              return (
+                <Field label={label}>
+                  <CatalogMultiCombobox
+                    ariaLabel={label}
+                    groups={[
+                      {
+                        id: "groups",
+                        label: t(
+                          "web.pens.admin.targetType.group" as TranslationKey,
+                        ),
+                      },
+                      {
+                        id: "refills",
+                        label: t(
+                          "web.pens.admin.targetType.refill" as TranslationKey,
+                        ),
+                      },
+                    ]}
+                    items={items}
+                    onValueChange={(value) =>
+                      field.handleChange(
+                        value.map(({ id }) => {
+                          const [kind, rawId] = String(id).split(":");
+                          return {
+                            targetGroupId:
+                              kind === "group" ? Number(rawId) : null,
+                            targetRefillProductId:
+                              kind === "refill" ? Number(rawId) : null,
+                          };
+                        }),
+                      )
+                    }
+                    placeholder={label}
+                    removeLabel={(name) => `${t("web.action.delete")} ${name}`}
+                    value={selected}
+                  />
+                  <FieldError
+                    error={serverErrors.refillCompatibility?.[0]}
+                    t={t}
+                  />
+                </Field>
+              );
+            }}
+          </form.Field>
         ) : null}
 
         {(productTypeSlug === "pen" ||
@@ -4004,23 +4005,11 @@ function PenCollectionFields({
       (item.privacyInheritedFromItemId === null ||
         item.privacyInheritedFromItemId === currentCollectionItemId),
   );
-  const selectedPartProductIds = new Set(
-    availableParts
-      .filter(({ collectionItemId }) =>
-        installedPartIds.includes(collectionItemId),
-      )
-      .map(({ productId }) => productId),
-  );
   const warning = t("web.pens.collection.notSupported" as TranslationKey);
   const refills = allProducts
     .filter(({ productTypeSlug }) => productTypeSlug === "refill")
     .map((refill) => ({
-      compatible: refill.compatiblePens.some(
-        (pen) =>
-          pen.id === product.id &&
-          (pen.requiredTipProductId == null ||
-            selectedPartProductIds.has(pen.requiredTipProductId)),
-      ),
+      compatible: refill.compatiblePens.some((pen) => pen.id === product.id),
       refill,
     }))
     .sort(

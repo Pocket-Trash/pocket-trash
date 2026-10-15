@@ -234,6 +234,7 @@ describe("finish option editor", () => {
       compatibleButtonId: null,
       compatibleButtonName: null,
       compatiblePens: [],
+      refillCompatibility: [],
       compatibleParts: [],
       createdAt: new Date(0),
       description: null,
@@ -946,8 +947,8 @@ describe("Pens catalog administration", () => {
     expect(productHtml).toContain("Pilot Precise V5 RT");
     expect(productHtml).not.toContain("web.catalog.field.materials");
     expect(adminHtml).toContain("refill-offering");
-    expect(adminHtml).toContain("compatibility-assertion");
-    expect(adminHtml).toContain("compatibility-assertion-remove");
+    expect(adminHtml).not.toContain("compatibility-assertion");
+    expect(adminHtml).not.toContain("compatibility-assertion-remove");
     expect(adminHtml).toContain("compatibility-membership-remove");
     expect(adminHtml).toContain("Needle");
     expect(adminHtml).toContain("Blue");
@@ -978,6 +979,7 @@ function productFixture(
     compatibleButtonId: null,
     compatibleButtonName: null,
     compatiblePens: [],
+    refillCompatibility: [],
     compatibleParts: [],
     createdAt: new Date(0),
     description: null,

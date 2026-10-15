@@ -280,6 +280,7 @@ const product: CatalogProduct = {
   compatibleButtonId: null,
   compatibleButtonName: null,
   compatiblePens: [],
+  refillCompatibility: [],
   compatibleParts: [],
   createdAt: new Date(0),
   description: null,
@@ -1098,10 +1099,10 @@ describe("ProductDetailPage", () => {
             {
               id: 2,
               name: "Test Pen",
-              requiredTipName: "Needle Tip",
               slug: "test-pen",
             },
           ],
+          refillCompatibility: [],
           name: "BXS-V5RT",
           productTypeName: "Refill",
           productTypeSlug: "refill",
@@ -1122,7 +1123,6 @@ describe("ProductDetailPage", () => {
     expect(html).toContain("Pilot Precise V5 RT");
     expect(html).toContain("0.5 mm · Needle · Blue");
     expect(html).toContain('href="/products/pen/test-pen"');
-    expect(html).toContain("Requires Needle Tip");
     expect(html).not.toContain("web.catalog.collectionsWithProduct");
   });
 });

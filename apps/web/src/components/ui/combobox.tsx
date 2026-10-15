@@ -15,8 +15,22 @@ export type ComboboxOption = {
    * Display label for the option.
    */
   name: string;
+  /** Optional popup group identifier. */
+  group?: string;
+  /** Optional selection-pill label when it differs from the option label. */
+  selectionName?: string;
   /** Accessible warning shown after the option label. */
   warning?: string;
+};
+
+/** One labeled group of catalog combobox options. */
+type ComboboxOptionGroup = {
+  /** Stable group identifier. */
+  id: string;
+  /** Options in the group. */
+  items?: ComboboxOption[];
+  /** Visible and accessible group label. */
+  label: string;
 };
 
 /**
@@ -140,6 +154,7 @@ export function CatalogMultiCombobox({
   filter,
   inputValue,
   items,
+  groups,
   onInputValueChange,
   onValueChange,
   placeholder,
@@ -172,6 +187,8 @@ export function CatalogMultiCombobox({
    * Options available for selection.
    */
   items: ComboboxOption[];
+  /** Optional ordered groups for the popup. */
+  groups?: ComboboxOptionGroup[];
   /**
    * Reports controlled combobox search-text changes.
    *
@@ -213,7 +230,14 @@ export function CatalogMultiCombobox({
         inputValue={inputValue}
         isItemEqualToValue={(item, selected) => item.id === selected.id}
         itemToStringLabel={(item) => item.name}
-        items={items}
+        items={
+          groups
+            ? groups.map((group) => ({
+                ...group,
+                items: items.filter((item) => item.group === group.id),
+              }))
+            : items
+        }
         multiple
         onInputValueChange={onInputValueChange}
         onOpenChange={setOpen}
@@ -225,10 +249,17 @@ export function CatalogMultiCombobox({
         value={value}
       >
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
-        <ComboboxOptions
-          emptyLabel={emptyLabel ?? placeholder}
-          placeholder={placeholder}
-        />
+        {groups ? (
+          <ComboboxGroupedOptions
+            emptyLabel={emptyLabel ?? placeholder}
+            placeholder={placeholder}
+          />
+        ) : (
+          <ComboboxOptions
+            emptyLabel={emptyLabel ?? placeholder}
+            placeholder={placeholder}
+          />
+        )}
       </ComboboxPrimitive.Root>
       {value.length ? (
         <div className="flex flex-wrap gap-1.5">
@@ -350,6 +381,63 @@ function ComboboxOptions({
 }
 
 /**
+ * Renders an accessible, grouped catalog option list.
+ *
+ * @param props - Grouped option-list properties.
+ * @param props.emptyLabel - Message shown when no option matches.
+ * @param props.placeholder - Fallback empty-state message.
+ * @returns The grouped popup option list.
+ */
+function ComboboxGroupedOptions({
+  placeholder,
+  emptyLabel = placeholder,
+}: {
+  /** Message shown when no option matches. */
+  emptyLabel?: string;
+  /** Fallback empty-state message. */
+  placeholder: string;
+}) {
+  return (
+    <ComboboxPrimitive.Portal>
+      <ComboboxPrimitive.Positioner className="z-50" sideOffset={4}>
+        <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+          <ComboboxPrimitive.Empty className="px-3 py-2 text-sm text-muted-foreground">
+            {emptyLabel}
+          </ComboboxPrimitive.Empty>
+          <ComboboxPrimitive.List>
+            {(group: ComboboxOptionGroup) => (
+              <ComboboxPrimitive.Group
+                className="border-b border-border pb-1 last:border-b-0 last:pb-0"
+                items={group.items}
+                key={group.id}
+              >
+                <ComboboxPrimitive.GroupLabel className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                  {group.label}
+                </ComboboxPrimitive.GroupLabel>
+                <ComboboxPrimitive.Collection>
+                  {(item: ComboboxOption) => (
+                    <ComboboxPrimitive.Item
+                      className="flex cursor-default items-center justify-between rounded-sm px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                      key={item.id}
+                      value={item}
+                    >
+                      <span>{item.name}</span>
+                      <ComboboxPrimitive.ItemIndicator>
+                        <Check aria-hidden="true" className="size-4" />
+                      </ComboboxPrimitive.ItemIndicator>
+                    </ComboboxPrimitive.Item>
+                  )}
+                </ComboboxPrimitive.Collection>
+              </ComboboxPrimitive.Group>
+            )}
+          </ComboboxPrimitive.List>
+        </ComboboxPrimitive.Popup>
+      </ComboboxPrimitive.Positioner>
+    </ComboboxPrimitive.Portal>
+  );
+}
+
+/**
  * Renders one selected combobox option with a removal control.
  *
  * @param props - Selection pill properties.
@@ -393,12 +481,12 @@ function SelectionPill({
     <span
       className={`inline-flex w-fit items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs ${className}`}
     >
-      {value.name}
+      {value.selectionName ?? value.name}
       <button
         aria-label={
           typeof removeLabel === "function"
-            ? removeLabel(value.name)
-            : `${removeLabel}: ${value.name}`
+            ? removeLabel(value.selectionName ?? value.name)
+            : `${removeLabel}: ${value.selectionName ?? value.name}`
         }
         className="rounded-full p-0.5 outline-none hover:bg-background/60 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
         disabled={disabled}

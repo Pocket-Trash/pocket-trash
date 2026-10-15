@@ -41,6 +41,7 @@ function product(
     compatibleButtonId: null,
     compatibleButtonName: null,
     compatiblePens: [],
+    refillCompatibility: [],
     compatibleParts: [],
     createdAt: new Date(0),
     description: null,

@@ -93,6 +93,8 @@ export const loggerMessages = {
       listFinishes: "database.catalog.listFinishes",
       listPatterns: "database.catalog.listPatterns",
       listMechanisms: "database.catalog.listMechanisms",
+      listRefillCompatibilityGroups:
+        "database.catalog.listRefillCompatibilityGroups",
       listPensAdminOptions: "database.catalog.listPensAdminOptions",
       listSliderMagnetPresets: "database.catalog.listSliderMagnetPresets",
       setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
