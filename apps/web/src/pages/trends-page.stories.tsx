@@ -1,5 +1,6 @@
 import type {
   PublicCollectionItemTrends,
+  PublicPartAccessoryTrends,
   PublicProductTypeTrend,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
@@ -37,6 +38,25 @@ const collectionTrends: PublicCollectionItemTrends = {
     collectorCount: trend.count * 5,
     count: trend.count * 5,
   })),
+};
+
+/** Enabled Parts and Accessories Trends used by the public chart story. */
+const partAccessoryTrends: PublicPartAccessoryTrends = {
+  generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+  hasSuppressedValues: false,
+  stale: false,
+  values: [
+    {
+      count: 15,
+      productTypeId: 2000,
+      productTypeName: "Slider Plate",
+    },
+    {
+      count: 5,
+      productTypeId: 2001,
+      productTypeName: "Spinner Button",
+    },
+  ],
 };
 
 /** Trends page Storybook configuration. */
@@ -117,6 +137,16 @@ export const Populated: Story = {
     await expect(
       canvas.getAllByRole("rowheader", { name: "Spinner" }),
     ).toHaveLength(2);
+  },
+};
+
+/** Public Trends with enabled Parts and Accessories. */
+export const PartsAndAccessories: Story = {
+  args: {
+    collectionTrends,
+    onProductTypeChange: fn(),
+    partAccessoryTrends,
+    trends,
   },
 };
 

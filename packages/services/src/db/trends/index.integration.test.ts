@@ -44,6 +44,22 @@ describe("public collection-item Trends", () => {
           },
         ],
       });
+      await expect(
+        createTrendsService(
+          db as unknown as Database,
+        ).getPublicPartAccessoryTrends(generatedAt),
+      ).resolves.toEqual({
+        generatedAt,
+        hasSuppressedValues: false,
+        stale: false,
+        values: [
+          {
+            count: 5,
+            productTypeId: fixture.accessoryTypeId,
+            productTypeName: "Slider Plate",
+          },
+        ],
+      });
       const stored = await db
         .select()
         .from(schema.publicCollectionItemProductTypeTrend);
@@ -53,6 +69,15 @@ describe("public collection-item Trends", () => {
           productTypeId: fixture.sliderTypeId,
           roundedCollectorCount: 5,
           roundedItemCount: 10,
+        },
+      ]);
+      await expect(
+        db.select().from(schema.publicPartAccessoryProductTypeTrend),
+      ).resolves.toEqual([
+        {
+          generationId: expect.any(Number),
+          productTypeId: fixture.accessoryTypeId,
+          roundedItemCount: 5,
         },
       ]);
       expect(
@@ -162,6 +187,7 @@ async function createFixture(database: Database) {
       { name: "Slider", slug: "slider" },
       { name: "Spinner", slug: "spinner" },
       {
+        includeInTrends: true,
         isPartOrAccessory: true,
         name: "Slider Plate",
         slug: "slider-plate",
@@ -325,7 +351,7 @@ async function createFixture(database: Database) {
       ),
     );
   expect(storedAccessory).toHaveLength(5);
-  return { sliderProductId, sliderTypeId };
+  return { accessoryTypeId, sliderProductId, sliderTypeId };
 }
 
 /**

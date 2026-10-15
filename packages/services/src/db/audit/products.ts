@@ -134,6 +134,10 @@ export const productAudit = {
     "products.product_type.classification_changed",
     "products.product_type",
   ),
+  productTypeTrendsInclusionChanged: definition(
+    "products.product_type.trends_inclusion_changed",
+    "products.product_type",
+  ),
   productUpdated: definition("products.product.updated", "products.product"),
   productVisibilityChanged: definition(
     "products.product.visibility_changed",

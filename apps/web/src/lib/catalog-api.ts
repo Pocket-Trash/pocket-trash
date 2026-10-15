@@ -15,8 +15,10 @@ import type {
   PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterialSummary,
+  PublicPartAccessoryTrends,
   PublicProductTypeTrend,
   SliderMagnetPreset,
+  TrendsProductTypeConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -1332,6 +1334,49 @@ export const getPublicCollectionItemTrends = createServerFn({
   const { s } = await import("@/lib/services");
   return await s.db.trends.getPublicCollectionItemTrends();
 });
+
+/**
+ * Returns enabled Parts and Accessories from the active public generation.
+ *
+ * @returns Active generation, or `null` before the first successful refresh.
+ * @rejects When service loading or the Trends query fails.
+ */
+export const getPublicPartAccessoryTrends = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<PublicPartAccessoryTrends | null> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicPartAccessoryTrends();
+});
+
+/** Lists administrator-facing product-type Trends configuration. */
+export const listTrendsProductTypeConfigurations = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<TrendsProductTypeConfiguration[]> => {
+  await requirePermission("products.manage");
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listTrendsProductTypeConfigurations();
+});
+
+/** Updates a secondary product type's public Trends inclusion state. */
+export const setProductTypeTrendsInclusion = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        includeInTrends: z.boolean(),
+        productTypeId: idSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }): Promise<TrendsProductTypeConfiguration> => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    const saved = await s.db.catalog.setProductTypeTrendsInclusion({
+      actor,
+      ...data,
+    });
+    await s.db.trends.refreshPublicCollectionItemTrends();
+    return saved;
+  });
 
 /** Updates a product type's Parts and Accessories classification. */
 export const setProductTypePartOrAccessory = createServerFn({ method: "POST" })

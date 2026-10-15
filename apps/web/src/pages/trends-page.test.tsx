@@ -48,6 +48,9 @@ vi.mock("@pocket-trash/localizations", () => ({
         "web.trends.collectionItemsSuppressedEmpty":
           "Collection-item Trends are hidden until the privacy threshold is met.",
         "web.trends.other": "Other",
+        "web.trends.partsAndAccessories": "Parts and Accessories",
+        "web.trends.partsAndAccessoriesChartLabel":
+          "Currently owned Parts and Accessories by product type",
       }[key] ?? key
     );
   },
@@ -110,6 +113,18 @@ describe("TrendsPage", () => {
           })),
         }}
         onProductTypeChange={vi.fn()}
+        partAccessoryTrends={{
+          generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+          hasSuppressedValues: false,
+          stale: false,
+          values: [
+            {
+              count: 5,
+              productTypeId: 2000,
+              productTypeName: "Slider Plate",
+            },
+          ],
+        }}
         trends={trends}
       />,
     );
@@ -132,6 +147,8 @@ describe("TrendsPage", () => {
     expect(table).toContain(">1</td>");
     expect(html).toContain("Currently owned items by product type");
     expect(html).toContain("Some product types are hidden");
+    expect(html).toContain("Parts and Accessories");
+    expect(html).toContain("Slider Plate");
   });
 
   it("distinguishes unavailable, suppressed, and empty collection states", () => {

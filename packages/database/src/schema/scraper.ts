@@ -420,6 +420,8 @@ export const productType = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     isPartOrAccessory: boolean("is_part_or_accessory").default(false).notNull(),
+    /** Whether this secondary type is published in public Trends. */
+    includeInTrends: boolean("include_in_trends").default(false).notNull(),
     imageUrl: text("image_url"),
     imageAlt: text("image_alt"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })

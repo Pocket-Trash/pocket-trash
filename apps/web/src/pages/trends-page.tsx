@@ -1,5 +1,6 @@
 import type {
   PublicCollectionItemTrends,
+  PublicPartAccessoryTrends,
   PublicProductTypeTrend,
 } from "@package/services";
 import {
@@ -30,7 +31,15 @@ type TrendsTranslationKey =
   | "web.trends.collectionItemsStale"
   | "web.trends.collectionItemsSuppressed"
   | "web.trends.collectionItemsSuppressedEmpty"
-  | "web.trends.lastUpdated";
+  | "web.trends.lastUpdated"
+  | "web.trends.partsAndAccessories"
+  | "web.trends.partsAndAccessoriesChartLabel"
+  | "web.trends.partsAndAccessoriesEmpty"
+  | "web.trends.partsAndAccessoriesError"
+  | "web.trends.partsAndAccessoriesPrivacy"
+  | "web.trends.partsAndAccessoriesStale"
+  | "web.trends.partsAndAccessoriesSuppressed"
+  | "web.trends.partsAndAccessoriesSuppressedEmpty";
 
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
@@ -42,6 +51,8 @@ export type TrendsPageProps = {
    * @param productTypeId - Selected product-type ID, or undefined for all types.
    */
   onProductTypeChange: (productTypeId?: number) => void;
+  /** Active privacy-safe Parts and Accessories generation. */
+  partAccessoryTrends?: PublicPartAccessoryTrends | null;
   /** Stable product-type identifier selected by the URL filter. */
   selectedProductTypeId?: number;
   /** Exact public catalog-product counts in descending order. */
@@ -57,6 +68,7 @@ export type TrendsPageProps = {
 export function TrendsPage({
   collectionTrends,
   onProductTypeChange,
+  partAccessoryTrends = null,
   selectedProductTypeId,
   trends,
 }: TrendsPageProps) {
@@ -94,15 +106,37 @@ export function TrendsPage({
     ...collectionChartTrends.map(({ count }) => count),
     1,
   );
+  const visiblePartAccessoryTrends = filterCatalogTrends(
+    partAccessoryTrends?.values ?? [],
+    selectedProductTypeId,
+  );
+  const partAccessoryChartTrends =
+    visiblePartAccessoryTrends.length > 8
+      ? [
+          ...visiblePartAccessoryTrends.slice(0, 8),
+          {
+            count: visiblePartAccessoryTrends
+              .slice(8)
+              .reduce((sum, trend) => sum + trend.count, 0),
+            productTypeId: 0,
+            productTypeName: t("web.trends.other"),
+          },
+        ]
+      : visiblePartAccessoryTrends;
+  const largestPartAccessoryCount = Math.max(
+    ...partAccessoryChartTrends.map(({ count }) => count),
+    1,
+  );
   const dateFormatter = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
   });
   const productTypeOptions = Array.from(
     new Map(
-      [...trends, ...(collectionTrends?.values ?? [])].map((trend) => [
-        trend.productTypeId,
-        trend.productTypeName,
-      ]),
+      [
+        ...trends,
+        ...(collectionTrends?.values ?? []),
+        ...(partAccessoryTrends?.values ?? []),
+      ].map((trend) => [trend.productTypeId, trend.productTypeName]),
     ),
   ).sort((left, right) => left[1].localeCompare(right[1], locale));
   return (
@@ -312,6 +346,119 @@ export function TrendsPage({
               {collectionTrends.hasSuppressedValues ? (
                 <p className="text-xs text-muted-foreground" role="status">
                   {t("web.trends.collectionItemsSuppressed")}
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="part-accessory-trends-title"
+          className="space-y-4"
+        >
+          <div className="space-y-1">
+            <h2
+              className="text-lg font-semibold"
+              id="part-accessory-trends-title"
+            >
+              {t("web.trends.partsAndAccessories")}
+            </h2>
+            {partAccessoryTrends ? (
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.lastUpdated", {
+                  date: dateFormatter.format(partAccessoryTrends.generatedAt),
+                })}
+              </p>
+            ) : null}
+          </div>
+          {partAccessoryTrends?.stale ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {t("web.trends.partsAndAccessoriesStale")}
+            </p>
+          ) : null}
+          {!partAccessoryTrends ? (
+            <p
+              className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+              role="alert"
+            >
+              {t("web.trends.partsAndAccessoriesError")}
+            </p>
+          ) : visiblePartAccessoryTrends.length === 0 ? (
+            <p
+              className="rounded-md border border-border bg-card p-6 text-sm text-muted-foreground"
+              role="status"
+            >
+              {t(
+                partAccessoryTrends.hasSuppressedValues
+                  ? "web.trends.partsAndAccessoriesSuppressedEmpty"
+                  : "web.trends.partsAndAccessoriesEmpty",
+              )}
+            </p>
+          ) : (
+            <>
+              <ol
+                aria-label={t("web.trends.partsAndAccessoriesChartLabel")}
+                className="space-y-3 rounded-md border border-border bg-card p-4"
+              >
+                {partAccessoryChartTrends.map((trend) => (
+                  <li
+                    className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
+                    key={trend.productTypeId}
+                  >
+                    <span className="truncate">{trend.productTypeName}</span>
+                    <span aria-hidden="true" className="h-3 bg-muted">
+                      <span
+                        className="block h-full bg-chart-3"
+                        style={{
+                          width: `${(trend.count / largestPartAccessoryCount) * 100}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="tabular-nums">{trend.count}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full border-collapse text-sm">
+                  <caption className="bg-card p-3 text-left font-semibold">
+                    {t("web.trends.partsAndAccessoriesChartLabel")}
+                  </caption>
+                  <thead className="border-y border-border bg-muted/50 text-left">
+                    <tr>
+                      <th className="px-3 py-2" scope="col">
+                        {t("web.trends.productType")}
+                      </th>
+                      <th className="px-3 py-2 text-right" scope="col">
+                        {t("web.trends.approximateItems")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visiblePartAccessoryTrends.map((trend) => (
+                      <tr
+                        className="border-b border-border last:border-0"
+                        key={trend.productTypeId}
+                      >
+                        <th
+                          className="px-3 py-2 text-left font-normal"
+                          scope="row"
+                        >
+                          {trend.productTypeName}
+                        </th>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {trend.count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.partsAndAccessoriesPrivacy")}
+              </p>
+              {partAccessoryTrends.hasSuppressedValues ? (
+                <p className="text-xs text-muted-foreground" role="status">
+                  {t("web.trends.partsAndAccessoriesSuppressed")}
                 </p>
               ) : null}
             </>

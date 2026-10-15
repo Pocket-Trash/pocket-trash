@@ -156,6 +156,7 @@ export type {
   SliderMagnetConfiguration,
   SliderMagnetLayout,
   SliderMagnetPreset,
+  TrendsProductTypeConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
@@ -215,6 +216,8 @@ export {
 export type {
   PublicCollectionItemProductTypeTrend,
   PublicCollectionItemTrends,
+  PublicPartAccessoryProductTypeTrend,
+  PublicPartAccessoryTrends,
   TrendsService,
 } from "./trends/index.js";
 export {
