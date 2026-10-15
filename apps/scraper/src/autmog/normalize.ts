@@ -214,7 +214,7 @@ function getSize(value: string): string | null {
  * @returns The normalized category, or `null`.
  */
 function getCategory(value: string): string | null {
-  if (/\bpen\s+trays?\b|\bclip\s+add-on\b/i.test(value)) {
+  if (/\bpen\s+(?:clips?|trays?)\b|\bclip\s+add-on\b/i.test(value)) {
     return null;
   }
 
