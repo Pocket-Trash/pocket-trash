@@ -1,11 +1,8 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "752a353c-2fa1-423c-bbe2-be724a49c785",
-  "prevIds": [
-    "350777e3-d3eb-42b7-8004-950f031018cc",
-    "ea895eeb-e362-4a01-a2b1-f0ae43a40f87"
-  ],
+  "id": "7b12a0dd-2113-4fb0-b768-4baf8fe94b37",
+  "prevIds": ["f238a51b-191d-4054-b058-79848929d4dc"],
   "ddl": [
     {
       "values": ["global", "admin", "user"],
@@ -321,12 +318,6 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "catalog_source_listing_choice",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
       "name": "catalog_terminology_concept",
       "entityType": "tables",
       "schema": "public"
@@ -369,13 +360,13 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "collection_item_configuration_selection",
+      "name": "collection_item_installed_pen_part",
       "entityType": "tables",
       "schema": "public"
     },
     {
       "isRlsEnabled": false,
-      "name": "configuration_slot_kind",
+      "name": "pen_compatible_part",
       "entityType": "tables",
       "schema": "public"
     },
@@ -394,30 +385,6 @@
     {
       "isRlsEnabled": false,
       "name": "product_alias",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "product_configuration_choice",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "product_configuration_choice_requirement",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "product_configuration_choice_rule",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "product_configuration_slot",
       "entityType": "tables",
       "schema": "public"
     },
@@ -700,6 +667,12 @@
     {
       "isRlsEnabled": false,
       "name": "public_collection_item_product_type_trend",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "public_collection_maker_product_trend",
       "entityType": "tables",
       "schema": "public"
     },
@@ -6400,32 +6373,6 @@
       "dimensions": 0,
       "default": null,
       "generated": null,
-      "identity": null,
-      "name": "listing_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "catalog_source_listing_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "choice_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "catalog_source_listing_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
       "identity": {
         "type": "always",
         "name": "catalog_terminology_concept_id_seq",
@@ -6878,10 +6825,10 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "collection_item_id",
+      "name": "pen_collection_item_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "collection_item_installed_pen_part"
     },
     {
       "type": "bigint",
@@ -6891,36 +6838,10 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "slot_id",
+      "name": "part_collection_item_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "choice_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "collection_item_configuration_selection"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "installed_part_collection_item_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "collection_item_installed_pen_part"
     },
     {
       "type": "timestamp with time zone",
@@ -6933,7 +6854,7 @@
       "name": "created_at",
       "entityType": "columns",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "collection_item_installed_pen_part"
     },
     {
       "type": "timestamp with time zone",
@@ -6946,7 +6867,7 @@
       "name": "updated_at",
       "entityType": "columns",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "collection_item_installed_pen_part"
     },
     {
       "type": "bigint",
@@ -6955,59 +6876,24 @@
       "dimensions": 0,
       "default": null,
       "generated": null,
-      "identity": {
-        "type": "always",
-        "name": "configuration_slot_kind_id_seq",
-        "increment": "1",
-        "startWith": "1000",
-        "minValue": "1",
-        "maxValue": "9223372036854775807",
-        "cache": 1,
-        "cycle": false
-      },
-      "name": "id",
+      "identity": null,
+      "name": "pen_product_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "configuration_slot_kind"
+      "table": "pen_compatible_part"
     },
     {
-      "type": "text",
+      "type": "bigint",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "slug",
+      "name": "part_product_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "configuration_slot_kind"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "label_key",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "configuration_slot_kind"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "label_fallback",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "configuration_slot_kind"
+      "table": "pen_compatible_part"
     },
     {
       "type": "timestamp with time zone",
@@ -7020,7 +6906,7 @@
       "name": "created_at",
       "entityType": "columns",
       "schema": "public",
-      "table": "configuration_slot_kind"
+      "table": "pen_compatible_part"
     },
     {
       "type": "timestamp with time zone",
@@ -7033,7 +6919,7 @@
       "name": "updated_at",
       "entityType": "columns",
       "schema": "public",
-      "table": "configuration_slot_kind"
+      "table": "pen_compatible_part"
     },
     {
       "type": "bigint",
@@ -7212,358 +7098,6 @@
       "entityType": "columns",
       "schema": "public",
       "table": "product_alias"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": {
-        "type": "always",
-        "name": "product_configuration_choice_id_seq",
-        "increment": "1",
-        "startWith": "1000",
-        "minValue": "1",
-        "maxValue": "9223372036854775807",
-        "cache": 1,
-        "cycle": false
-      },
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "product_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "slot_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "position",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "product_material_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "finish_option_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "part_product_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "rule_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "product_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "required_choice_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": {
-        "type": "always",
-        "name": "product_configuration_choice_rule_id_seq",
-        "increment": "1",
-        "startWith": "1000",
-        "minValue": "1",
-        "maxValue": "9223372036854775807",
-        "cache": 1,
-        "cycle": false
-      },
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "product_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "target_choice_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "position",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": {
-        "type": "always",
-        "name": "product_configuration_slot_id_seq",
-        "increment": "1",
-        "startWith": "1000",
-        "minValue": "1",
-        "maxValue": "9223372036854775807",
-        "cache": 1,
-        "cycle": false
-      },
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "product_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "slot_kind_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "position",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "name": "required",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "product_configuration_slot"
     },
     {
       "type": "bigint",
@@ -7986,19 +7520,6 @@
       "generated": null,
       "identity": null,
       "name": "pen_product_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "refill_compatibility_assertion"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "required_tip_product_id",
       "entityType": "columns",
       "schema": "public",
       "table": "refill_compatibility_assertion"
@@ -13117,6 +12638,132 @@
       "dimensions": 0,
       "default": null,
       "generated": null,
+      "identity": {
+        "type": "always",
+        "name": "public_collection_maker_product_trend_id_seq",
+        "increment": "1",
+        "startWith": "1000",
+        "minValue": "1",
+        "maxValue": "9223372036854775807",
+        "cache": 1,
+        "cycle": false
+      },
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "generation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "product_type_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "material_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "material_specific_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "maker_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "product_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "rounded_item_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "rounded_collector_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
       "identity": null,
       "name": "generation_id",
       "entityType": "columns",
@@ -13232,6 +12879,19 @@
       "generated": null,
       "identity": null,
       "name": "has_suppressed_material_values",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "public_trends_generation"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "has_suppressed_maker_product_values",
       "entityType": "columns",
       "schema": "public",
       "table": "public_trends_generation"
@@ -15407,27 +15067,6 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "choice_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "catalog_source_listing_choice_choice_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "catalog_source_listing_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
           "value": "product_pen_id",
           "isExpression": false,
           "asc": true,
@@ -15596,7 +15235,7 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "choice_id",
+          "value": "part_product_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -15608,31 +15247,10 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "collection_item_configuration_selection_choice_idx",
+      "name": "pen_compatible_part_part_idx",
       "entityType": "indexes",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "installed_part_collection_item_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "collection_item_configuration_selection_installed_part_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "pen_compatible_part"
     },
     {
       "nameExplicit": true,
@@ -15722,111 +15340,6 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "product_material_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "product_configuration_choice_material_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "finish_option_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "product_configuration_choice_finish_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "part_product_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "product_configuration_choice_part_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "required_choice_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "product_configuration_choice_requirement_choice_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "slot_kind_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "product_configuration_slot_kind_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
           "value": "mechanism_id",
           "isExpression": false,
           "asc": true,
@@ -15897,13 +15410,6 @@
           "opclass": null
         },
         {
-          "value": "required_tip_product_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
           "value": "target_refill_product_id",
           "isExpression": false,
           "asc": true,
@@ -15916,7 +15422,7 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "refill_compatibility_assertion_refill_tip_idx",
+      "name": "refill_compatibility_assertion_refill_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "refill_compatibility_assertion"
@@ -15926,13 +15432,6 @@
       "columns": [
         {
           "value": "pen_product_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "required_tip_product_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -15951,28 +15450,7 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "refill_compatibility_assertion_group_tip_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "refill_compatibility_assertion"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "required_tip_product_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "refill_compatibility_assertion_required_tip_idx",
+      "name": "refill_compatibility_assertion_group_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "refill_compatibility_assertion"
@@ -17542,6 +17020,62 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "generation_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "coalesce(\"product_type_id\", 0)",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "coalesce(\"material_id\", 0)",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "coalesce(\"material_specific_id\", 0)",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "maker_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "coalesce(\"product_id\", 0)",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "public_collection_maker_product_trend_scope_unique",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "active",
           "isExpression": false,
           "asc": true,
@@ -18535,32 +18069,6 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["listing_id"],
-      "schemaTo": "public",
-      "tableTo": "catalog_source_listing",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "catalog_source_listing_choice_zRYFwX34Xu0o_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "catalog_source_listing_choice"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["choice_id"],
-      "schemaTo": "public",
-      "tableTo": "product_configuration_choice",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "catalog_source_listing_choice_jJCqZEwCNXfR_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "catalog_source_listing_choice"
-    },
-    {
-      "nameExplicit": false,
       "columns": ["id"],
       "schemaTo": "public",
       "tableTo": "collection_item",
@@ -18746,42 +18254,55 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["collection_item_id"],
+      "columns": ["pen_collection_item_id"],
       "schemaTo": "public",
-      "tableTo": "collection_item",
+      "tableTo": "collection_detail_pen",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "collection_item_configuration_selection_aMOeDvihAApI_fkey",
+      "name": "collection_item_installed_pen_part_CGi8wslt5s3T_fkey",
       "entityType": "fks",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "collection_item_installed_pen_part"
     },
     {
       "nameExplicit": false,
-      "columns": ["installed_part_collection_item_id"],
+      "columns": ["part_collection_item_id"],
       "schemaTo": "public",
       "tableTo": "collection_item",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "RESTRICT",
-      "name": "collection_item_configuration_selection_uOLvLO1zziWb_fkey",
+      "name": "collection_item_installed_pen_part_LKaIkal5vM31_fkey",
       "entityType": "fks",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "collection_item_installed_pen_part"
     },
     {
-      "nameExplicit": true,
-      "columns": ["choice_id", "slot_id"],
+      "nameExplicit": false,
+      "columns": ["pen_product_id"],
       "schemaTo": "public",
-      "tableTo": "product_configuration_choice",
-      "columnsTo": ["id", "slot_id"],
+      "tableTo": "product_detail_pen",
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "collection_item_configuration_selection_choice_slot_fk",
+      "onDelete": "CASCADE",
+      "name": "pen_compatible_part_pen_product_id_product_detail_pen_id_fkey",
       "entityType": "fks",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "pen_compatible_part"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["part_product_id"],
+      "schemaTo": "public",
+      "tableTo": "product_detail_pen_part",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "pen_compatible_part_rISxx5oKy7nM_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "pen_compatible_part"
     },
     {
       "nameExplicit": false,
@@ -18847,123 +18368,6 @@
       "entityType": "fks",
       "schema": "public",
       "table": "product_alias"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["part_product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_detail_pen_part",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "product_configuration_choice_IYuhiYRQiuIE_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["slot_id", "product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_configuration_slot",
-      "columnsTo": ["id", "product_id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "product_configuration_choice_slot_product_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["product_material_id", "product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_material",
-      "columnsTo": ["id", "product_id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "product_configuration_choice_material_product_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["finish_option_id", "product_id"],
-      "schemaTo": "public",
-      "tableTo": "finish_option",
-      "columnsTo": ["id", "product_id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "product_configuration_choice_finish_product_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["rule_id", "product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_configuration_choice_rule",
-      "columnsTo": ["id", "product_id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "product_configuration_choice_requirement_rule_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["required_choice_id", "product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_configuration_choice",
-      "columnsTo": ["id", "product_id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "product_configuration_choice_requirement_choice_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["target_choice_id", "product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_configuration_choice",
-      "columnsTo": ["id", "product_id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "product_configuration_choice_rule_target_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["product_id"],
-      "schemaTo": "public",
-      "tableTo": "product",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "product_configuration_slot_product_id_product_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["slot_kind_id"],
-      "schemaTo": "public",
-      "tableTo": "configuration_slot_kind",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "product_configuration_slot_EzUs81IwNNXU_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "product_configuration_slot"
     },
     {
       "nameExplicit": false,
@@ -19195,19 +18599,6 @@
       "onUpdate": "NO ACTION",
       "onDelete": "RESTRICT",
       "name": "refill_compatibility_assertion_dBwQXsNns32G_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "refill_compatibility_assertion"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["required_tip_product_id"],
-      "schemaTo": "public",
-      "tableTo": "product_detail_pen_tip",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "name": "refill_compatibility_assertion_3E47qd1G38S0_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "refill_compatibility_assertion"
@@ -19857,6 +19248,84 @@
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "name": "public_collection_maker_product_trend_otjwJFErhfam_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["product_type_id"],
+      "schemaTo": "public",
+      "tableTo": "product_types",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "public_collection_maker_product_trend_gxE454wl2oaY_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["material_id"],
+      "schemaTo": "public",
+      "tableTo": "materials",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "public_collection_maker_product_trend_OkqzohKKpjpU_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["maker_id"],
+      "schemaTo": "public",
+      "tableTo": "makers",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "public_collection_maker_product_trend_maker_id_makers_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": true,
+      "columns": ["material_id", "material_specific_id"],
+      "schemaTo": "public",
+      "tableTo": "material_specific",
+      "columnsTo": ["material_id", "id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "public_collection_maker_product_trend_specific_parent_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": true,
+      "columns": ["product_id", "maker_id"],
+      "schemaTo": "public",
+      "tableTo": "product",
+      "columnsTo": ["id", "maker_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "public_collection_maker_product_trend_product_maker_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["generation_id"],
+      "schemaTo": "public",
+      "tableTo": "public_trends_generation",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
       "name": "public_part_accessory_product_type_trend_NpiaO5DL99qC_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -19939,20 +19408,20 @@
       "table": "feedback_votes"
     },
     {
-      "columns": ["listing_id", "choice_id"],
+      "columns": ["pen_collection_item_id", "part_collection_item_id"],
       "nameExplicit": false,
-      "name": "catalog_source_listing_choice_pkey",
+      "name": "collection_item_installed_pen_part_pkey",
       "entityType": "pks",
       "schema": "public",
-      "table": "catalog_source_listing_choice"
+      "table": "collection_item_installed_pen_part"
     },
     {
-      "columns": ["collection_item_id", "slot_id"],
+      "columns": ["pen_product_id", "part_product_id"],
       "nameExplicit": false,
-      "name": "collection_item_configuration_selection_pkey",
+      "name": "pen_compatible_part_pkey",
       "entityType": "pks",
       "schema": "public",
-      "table": "collection_item_configuration_selection"
+      "table": "pen_compatible_part"
     },
     {
       "columns": ["part_product_id", "concept_id"],
@@ -19961,14 +19430,6 @@
       "entityType": "pks",
       "schema": "public",
       "table": "pen_part_role_assignment"
-    },
-    {
-      "columns": ["rule_id", "required_choice_id"],
-      "nameExplicit": false,
-      "name": "product_configuration_choice_requirement_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "product_configuration_choice_requirement"
     },
     {
       "columns": ["resource_id", "category_id"],
@@ -20403,14 +19864,6 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "configuration_slot_kind_pkey",
-      "schema": "public",
-      "table": "configuration_slot_kind",
-      "entityType": "pks"
-    },
-    {
       "columns": ["product_id"],
       "nameExplicit": false,
       "name": "pen_nose_profile_assignment_pkey",
@@ -20424,30 +19877,6 @@
       "name": "product_alias_pkey",
       "schema": "public",
       "table": "product_alias",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "product_configuration_choice_pkey",
-      "schema": "public",
-      "table": "product_configuration_choice",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "product_configuration_choice_rule_pkey",
-      "schema": "public",
-      "table": "product_configuration_choice_rule",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "product_configuration_slot_pkey",
-      "schema": "public",
-      "table": "product_configuration_slot",
       "entityType": "pks"
     },
     {
@@ -20797,6 +20226,14 @@
     {
       "columns": ["id"],
       "nameExplicit": false,
+      "name": "public_collection_maker_product_trend_pkey",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
       "name": "public_trends_generation_pkey",
       "schema": "public",
       "table": "public_trends_generation",
@@ -21091,12 +20528,12 @@
     },
     {
       "nameExplicit": true,
-      "columns": ["slug"],
+      "columns": ["part_collection_item_id"],
       "nullsNotDistinct": false,
-      "name": "configuration_slot_kind_slug_unique",
+      "name": "collection_item_installed_pen_part_part_unique",
       "entityType": "uniques",
       "schema": "public",
-      "table": "configuration_slot_kind"
+      "table": "collection_item_installed_pen_part"
     },
     {
       "nameExplicit": true,
@@ -21106,96 +20543,6 @@
       "entityType": "uniques",
       "schema": "public",
       "table": "product_alias"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["slot_id", "position"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_slot_position_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["id", "slot_id", "product_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_id_slot_product_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["id", "slot_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_id_slot_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["id", "product_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_id_product_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["target_choice_id", "position"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_rule_target_position_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["id", "target_choice_id", "product_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_rule_id_target_product_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["id", "product_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_choice_rule_id_product_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["product_id", "slot_kind_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_slot_product_kind_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["product_id", "position"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_slot_product_position_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_slot"
-    },
-    {
-      "nameExplicit": true,
-      "columns": ["id", "product_id"],
-      "nullsNotDistinct": false,
-      "name": "product_configuration_slot_id_product_unique",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "product_configuration_slot"
     },
     {
       "nameExplicit": true,
@@ -21210,7 +20557,6 @@
       "nameExplicit": true,
       "columns": [
         "pen_product_id",
-        "required_tip_product_id",
         "target_group_id",
         "target_refill_product_id"
       ],
@@ -22280,11 +21626,11 @@
       "table": "collection_detail_pen"
     },
     {
-      "value": "char_length(trim(\"slug\")) between 1 and 80",
-      "name": "configuration_slot_kind_slug_valid",
+      "value": "\"pen_product_id\" <> \"part_product_id\"",
+      "name": "pen_compatible_part_distinct",
       "entityType": "checks",
       "schema": "public",
-      "table": "configuration_slot_kind"
+      "table": "pen_compatible_part"
     },
     {
       "value": "\"namespace\" = 'pen-nose-profile'",
@@ -22313,41 +21659,6 @@
       "entityType": "checks",
       "schema": "public",
       "table": "product_alias"
-    },
-    {
-      "value": "num_nonnulls(\"product_material_id\", \"finish_option_id\", \"part_product_id\") = 1",
-      "name": "product_configuration_choice_carrier_valid",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "value": "\"part_product_id\" is null or \"part_product_id\" <> \"product_id\"",
-      "name": "product_configuration_choice_part_distinct",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "value": "\"position\" >= 0",
-      "name": "product_configuration_choice_position_valid",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "product_configuration_choice"
-    },
-    {
-      "value": "\"position\" >= 0",
-      "name": "product_configuration_choice_rule_position_valid",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "product_configuration_choice_rule"
-    },
-    {
-      "value": "\"position\" >= 0",
-      "name": "product_configuration_slot_position_valid",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "product_configuration_slot"
     },
     {
       "value": "char_length(trim(\"model\")) between 1 and 200",
@@ -22544,6 +21855,20 @@
       "entityType": "checks",
       "schema": "public",
       "table": "public_collection_item_product_type_trend"
+    },
+    {
+      "value": "\"rounded_item_count\" > 0 and \"rounded_item_count\" % 5 = 0 and \"rounded_collector_count\" > 0 and \"rounded_collector_count\" % 5 = 0",
+      "name": "public_collection_maker_product_trend_count_valid",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
+    },
+    {
+      "value": "\"material_specific_id\" is null or \"material_id\" is not null",
+      "name": "public_collection_maker_product_trend_material_scope_valid",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "public_collection_maker_product_trend"
     },
     {
       "value": "\"rounded_item_count\" > 0 and \"rounded_item_count\" % 5 = 0",
