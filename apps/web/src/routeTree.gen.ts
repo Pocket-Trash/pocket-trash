@@ -19,6 +19,7 @@ import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
+import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as UserRouteImport } from './routes/user'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
@@ -134,6 +135,11 @@ const ResourcesRoute = ResourcesRouteImport.update({
 const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
   id: '/terms-of-service',
   path: '/terms-of-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrendsRoute = TrendsRouteImport.update({
+  id: '/trends',
+  path: '/trends',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserRoute = UserRouteImport.update({
@@ -493,6 +499,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/trends': typeof TrendsRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/admin/audit': typeof AdminAuditRouteWithChildren
@@ -568,6 +575,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/privacy': typeof PrivacyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/trends': typeof TrendsRoute
   '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
@@ -646,6 +654,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/trends': typeof TrendsRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/admin/audit': typeof AdminAuditRouteWithChildren
@@ -726,6 +735,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/resources'
     | '/terms-of-service'
+    | '/trends'
     | '/user'
     | '/admin/account-erasure'
     | '/admin/audit'
@@ -801,6 +811,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/privacy'
     | '/terms-of-service'
+    | '/trends'
     | '/admin/account-erasure'
     | '/admin/audit'
     | '/admin/slider-magnet-presets'
@@ -878,6 +889,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/resources'
     | '/terms-of-service'
+    | '/trends'
     | '/user'
     | '/admin/account-erasure'
     | '/admin/audit'
@@ -957,6 +969,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ResourcesRoute: typeof ResourcesRouteWithChildren
   TermsOfServiceRoute: typeof TermsOfServiceRoute
+  TrendsRoute: typeof TrendsRoute
   UserRoute: typeof UserRouteWithChildren
   ChangelogSlugRoute: typeof ChangelogSlugRoute
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
@@ -1051,6 +1064,13 @@ declare module '@tanstack/react-router' {
       path: '/terms-of-service'
       fullPath: '/terms-of-service'
       preLoaderRoute: typeof TermsOfServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trends': {
+      id: '/trends'
+      path: '/trends'
+      fullPath: '/trends'
+      preLoaderRoute: typeof TrendsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user': {
@@ -1663,6 +1683,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ResourcesRoute: ResourcesRouteWithChildren,
   TermsOfServiceRoute: TermsOfServiceRoute,
+  TrendsRoute: TrendsRoute,
   UserRoute: UserRouteWithChildren,
   ChangelogSlugRoute: ChangelogSlugRoute,
   CollectionsUserIdRoute: CollectionsUserIdRoute,

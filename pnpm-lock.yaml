@@ -258,8 +258,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.32.1
-        version: 0.32.1
+        specifier: ^0.33.0
+        version: 0.33.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.2)(zod@4.4.3)
@@ -284,6 +284,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      highcharts:
+        specifier: ^13.1.1
+        version: 13.1.1
       lucide-react:
         specifier: ^1.23.0
         version: 1.48.0(react@19.3.0)
@@ -2936,8 +2939,8 @@ packages:
     resolution: {integrity: sha512-exsGMzhPx35xdgvqFsLBb2PXeV7rt7OW4iBx1HDKSN4F7a+Yi3gNWdrD8R9JXqD6AkTqbIechh43UEXcTLh50w==}
     engines: {node: '>=22.20.0 <23'}
 
-  '@pocket-trash/localizations@0.32.1':
-    resolution: {integrity: sha512-WCnAcrxwVsQJ3aL83wchXDUVghNu8gKt31LDWo0l7gT8LGBIHwDE1f+ztNOZQhUop+xkwPsSBBnrjH9oYbgqiA==}
+  '@pocket-trash/localizations@0.33.0':
+    resolution: {integrity: sha512-Cdbat8KF8vGSlBqm9KrPLH8GlKIkoVbC+cnKvNQghVbbxpf3I1dn2PDzo4uCzd/HWMVEJVFTZiETcSv32JZi0w==}
     engines: {node: '>=22.20.0 <23'}
 
   '@polka/url@1.0.0-next.29':
@@ -5555,6 +5558,17 @@ packages:
 
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
+
+  highcharts@13.1.1:
+    resolution: {integrity: sha512-k/smhxCgaqHDsuy9ZCWs8FJNTPrbzc8BmMA4M/8f9JMwv9HgmNZjulyWwZ9q9ly6AzHpskL9mhlW8vgsSqnstg==}
+    peerDependencies:
+      jspdf: ^4.1.0
+      svg2pdf.js: ^2.7.0
+    peerDependenciesMeta:
+      jspdf:
+        optional: true
+      svg2pdf.js:
+        optional: true
 
   hoist-non-react-statics@3.3.2:
     resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
@@ -9882,7 +9896,7 @@ snapshots:
 
   '@pocket-trash/localizations@0.31.0': {}
 
-  '@pocket-trash/localizations@0.32.1': {}
+  '@pocket-trash/localizations@0.33.0': {}
 
   '@polka/url@1.0.0-next.29': {}
 
@@ -10752,7 +10766,7 @@ snapshots:
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.1.0
+      '@types/node': 26.6.4
       pg-protocol: 1.16.0
       pg-types: 2.2.0
 
@@ -12751,6 +12765,8 @@ snapshots:
   hermes-parser@0.25.1:
     dependencies:
       hermes-estree: 0.25.1
+
+  highcharts@13.1.1: {}
 
   hoist-non-react-statics@3.3.2:
     dependencies:
