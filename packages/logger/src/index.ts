@@ -1,5 +1,17 @@
+import { serializeAxiomEvent } from "./axiom.js";
 import { loggerValues } from "./constants/logger.js";
 
+export type {
+  AxiomManagementFetch,
+  AxiomManagementResponse,
+  AxiomMapFieldConfig,
+} from "./axiom.js";
+export {
+  axiomMapFields,
+  checkAxiomMapFields,
+  ensureAxiomMapFields,
+  serializeAxiomEvent,
+} from "./axiom.js";
 export { loggerMessages, loggerValues } from "./constants/logger.js";
 
 /** Numeric severity thresholds for supported log levels. */
@@ -864,7 +876,7 @@ export function createAxiomTransport(
     async log(event) {
       const fetcher = config.fetch ?? getGlobalFetch();
       const domain = config.edgeDomain ?? "api.axiom.co";
-      const eventForIngest = omitConsoleOptions(event);
+      const eventForIngest = serializeAxiomEvent(event);
       const response = await fetcher(
         `https://${domain}/v1/datasets/${encodeURIComponent(
           config.dataset,

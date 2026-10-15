@@ -24,22 +24,24 @@ Use one dataset per environment:
 
 Keep routing and deployment dimensions as ordinary top-level fields:
 `app`, `environment`, `deploymentTarget`, `deploymentId`, `level`,
-`message`, `timestamp`, `operation`, `outcome`, and `durationMs`.
+`message`, and `timestamp`. Operation names, outcomes, and durations remain
+inside `attributes` with other variable application fields.
 
 Configure `attributes`, `context`, `error`, and `rawPayload` as Axiom map
 fields. This keeps arbitrary nested keys queryable without consuming a dataset
 field for each key.
 
-Run the setup once for each dataset:
+Check configuration without changing it:
 
 ```sh
-AXIOM_DATASET=development AXIOM_TOKEN=<token> pnpm logger:axiom:map-fields
-AXIOM_DATASET=preview AXIOM_TOKEN=<token> pnpm logger:axiom:map-fields
-AXIOM_DATASET=production AXIOM_TOKEN=<token> pnpm logger:axiom:map-fields
+AXIOM_DATASET=development AXIOM_MANAGEMENT_TOKEN=<token> pnpm logger:axiom:map-fields check
 ```
 
-The command uses `AXIOM_EDGE_DOMAIN` when set and otherwise uses
-`api.axiom.co`. To configure Axiom manually, create map fields with those four
+Create only missing fields and verify the result with `ensure` instead of
+`check`. Dataset management always uses `api.axiom.co`; `AXIOM_EDGE_DOMAIN`
+remains limited to ingest and query traffic. Deploy workflows ensure the
+matching development, preview, or production dataset before deploying an
+application. To configure Axiom manually, create map fields with those four
 exact names in each dataset's field settings.
 
 ## Infisical Placement
@@ -52,8 +54,10 @@ settings in the matching Infisical application path:
 - API worker: `/apps/api`
 - Scraper: `/apps/scraper`
 
-The Axiom token in each path needs ingest access to that environment's dataset.
-Only give query access to the dedicated live-test token.
+The Axiom token in each application path needs ingest access to that
+environment's dataset. Only give query access to the dedicated live-test token.
+Keep `AXIOM_MANAGEMENT_TOKEN` in the tooling paths below; never copy it into an
+application runtime.
 
 Additional operational paths:
 
@@ -105,6 +109,7 @@ For a local run, `/tools/logger-axiom-test` must provide the logger variables
 listed in [Environment Variables](./environment-variables.md), including:
 
 - `AXIOM_DATASET=development`
+- a dedicated Axiom management token for map-field checks
 - `LOG_LEVEL=trace`
 - an Axiom token with ingest and query access
 - the log-proxy client key
@@ -113,6 +118,22 @@ The test fails if its expected dataset or trace level is not configured. It
 emits direct and proxied events, queries Axiom, and verifies severity,
 deployment metadata, client identity preservation, structured context,
 operation metadata, and redaction.
+
+## Existing Field Cleanup
+
+Configuring map fields affects only later events. To reduce an existing
+dataset's field count, first deploy the corrected logger and verify map queries.
+Then list the dataset fields and build an explicit candidate list that excludes
+the seven top-level logger fields, the four map fields, and Axiom system fields.
+Review saved queries, dashboards, monitors, alerts, and virtual fields for every
+candidate before using Axiom's delete-fields UI or API.
+
+Delete reviewed fields in development and preview first, wait for the
+asynchronous deletion and schema vacuum, and recheck queries and monitors.
+Production deletion requires separate user approval. Never wildcard-delete,
+trim events, delete/recreate a dataset, or automate field deletion in a deploy.
+Field deletion irreversibly removes historical query access and does not reduce
+stored event data.
 
 [Logger Live](../.github/workflows/logger-live.yml) runs the same check for
 same-repository pull requests that touch logger-relevant files and by manual

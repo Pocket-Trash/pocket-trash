@@ -33,6 +33,11 @@ and the scraper on Railway.
 Use the same path names in every Infisical environment that needs them. Values
 remain environment-specific.
 
+`AXIOM_MANAGEMENT_TOKEN` belongs only in `/tools/logger-axiom-test` and
+`tools/github/secrets`. Give it dataset map-field management permission without
+placing it in any application runtime path. Runtime `AXIOM_TOKEN` values remain
+limited to ingest, plus query access where the logger live test requires it.
+
 ## Cross-Runtime Constraints
 
 ### Erasure subject secret
