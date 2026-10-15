@@ -81,6 +81,7 @@ const product: CatalogProduct = {
   materials: [
     {
       assignmentId: 1000,
+      weight: { unit: "g", value: "42" },
       materials: [
         { specific: null, id: 1000, name: "Titanium", slug: "titanium" },
       ],

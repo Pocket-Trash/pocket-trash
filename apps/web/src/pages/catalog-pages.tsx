@@ -581,7 +581,7 @@ export function ProductDetailPage({
   switch (product.productTypeSlug) {
     case "spinner":
       specs = [
-        ["web.archive.spec.weight", product.weight],
+        ["web.catalog.field.defaultWeight", product.weight],
         ["web.archive.spec.length", product.length],
         ["web.catalog.field.width", product.width],
         ["web.catalog.field.thickness", product.thickness],
@@ -592,7 +592,7 @@ export function ProductDetailPage({
       break;
     case "spinner-button":
       specs = [
-        ["web.archive.spec.weight", product.weight],
+        ["web.catalog.field.defaultWeight", product.weight],
         ["web.archive.spec.diameter", product.diameter],
         ["web.catalog.field.thickness", product.thickness],
       ];
@@ -601,7 +601,7 @@ export function ProductDetailPage({
     case "slider-insert":
     case "slider-plate":
       specs = [
-        ["web.archive.spec.weight", product.weight],
+        ["web.catalog.field.defaultWeight", product.weight],
         ["web.archive.spec.length", product.length],
         ["web.catalog.field.width", product.width],
         ["web.catalog.field.thickness", product.thickness],
@@ -755,6 +755,26 @@ export function ProductDetailPage({
               ))}
             </ul>
           </Detail>
+          {product.materials.some(({ weight }) => weight !== null) ? (
+            <Detail label={t("web.catalog.materialWeights.title")}>
+              <ul className="grid gap-1">
+                {product.materials.map((assignment) =>
+                  assignment.weight ? (
+                    <li key={assignment.assignmentId}>
+                      <MaterialCombinationLinks
+                        materials={assignment.materials}
+                      />
+                      {`: ${formatMeasurement(
+                        assignment.weight,
+                        measurementSystem,
+                        locale,
+                      )}`}
+                    </li>
+                  ) : null,
+                )}
+              </ul>
+            </Detail>
+          ) : null}
           {product.finishOptions.length ? (
             <Detail label={t("web.catalog.field.finishOptions")}>
               <ul className="grid gap-1">

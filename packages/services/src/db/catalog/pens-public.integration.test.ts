@@ -168,6 +168,7 @@ describe("public Pens catalog reads", () => {
             slug: "author-tip",
           },
         ],
+        weight: null,
         materials: [
           expect.objectContaining({ assignmentId: productMaterial.id }),
         ],
@@ -199,6 +200,7 @@ describe("public Pens catalog reads", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -229,6 +231,7 @@ describe("public Pens catalog reads", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -310,6 +313,7 @@ describe("public Pens catalog reads", () => {
           makerId: maker.id,
           materialAssignments: [
             {
+              weight: null,
               materials: [
                 { materialId: material.id, materialSpecificId: null },
               ],
@@ -328,6 +332,7 @@ describe("public Pens catalog reads", () => {
           makerId: maker.id,
           materialAssignments: [
             {
+              weight: null,
               materials: [
                 { materialId: material.id, materialSpecificId: null },
               ],
@@ -365,6 +370,7 @@ describe("public Pens catalog reads", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -380,6 +386,7 @@ describe("public Pens catalog reads", () => {
         makerId: maker.id,
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: material.id, materialSpecificId: null }],
           },
         ],
@@ -399,6 +406,7 @@ describe("public Pens catalog reads", () => {
           makerId: maker.id,
           materialAssignments: [
             {
+              weight: null,
               materials: [
                 { materialId: material.id, materialSpecificId: null },
               ],
@@ -419,6 +427,7 @@ describe("public Pens catalog reads", () => {
           makerId: maker.id,
           materialAssignments: [
             {
+              weight: null,
               materials: [
                 { materialId: material.id, materialSpecificId: null },
               ],

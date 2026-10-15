@@ -1060,6 +1060,7 @@ describe("catalog lookup writes", () => {
         makerProductUrl: " https://maker.example/spinner/ ",
         materialAssignments: [
           {
+            weight: null,
             materials: [{ materialId: 1000, materialSpecificId: null }],
           },
         ],
@@ -1203,7 +1204,10 @@ describe("catalog lookup writes", () => {
       makerId: 100,
       makerProductUrl,
       materialAssignments: [
-        { materials: [{ materialId: 1000, materialSpecificId: null }] },
+        {
+          weight: null,
+          materials: [{ materialId: 1000, materialSpecificId: null }],
+        },
       ],
       name: "Catla edited",
       productId: 900,

@@ -350,6 +350,7 @@ describe("product deletion", () => {
           materialAssignments: [
             {
               assignmentId: productMaterial.id,
+              weight: null,
               materials: [
                 { materialId: material.id, materialSpecificId: null },
               ],

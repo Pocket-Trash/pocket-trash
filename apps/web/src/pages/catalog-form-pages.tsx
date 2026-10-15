@@ -72,6 +72,7 @@ import {
   filterButtonsByDiameter,
   finishOptionLabel,
   materialCombinationLabel,
+  positiveDecimalSchema,
 } from "@/lib/catalog";
 import {
   addCollectionProduct,
@@ -500,6 +501,7 @@ type ProductEditorValue = Omit<
   | "diameter"
   | "length"
   | "makerProductUrl"
+  | "materialAssignments"
   | "spinDiameter"
   | "thickness"
   | "thicknessWithButton"
@@ -512,6 +514,13 @@ type ProductEditorValue = Omit<
   description: string;
   /** Maker URL before blank normalization. */
   makerProductUrl: string;
+  /** Material combinations with editable optional weights. */
+  materialAssignments: Array<
+    Omit<ProductFormValue["materialAssignments"][number], "weight"> & {
+      /** Optional assignment weight before blank normalization. */
+      weight: EditableWeightMeasurement;
+    }
+  >;
   /** Button diameter text and independently selected unit. */
   buttonDiameter: EditableDimensionMeasurement;
   /** Diameter text and independently selected unit. */
@@ -568,7 +577,10 @@ export function MaterialAssignmentsEditor({
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [draft, setDraft] = React.useState<
     ProductEditorValue["materialAssignments"][number]
-  >({ materials: [{ materialId: 0, materialSpecificId: null }] });
+  >({
+    materials: [{ materialId: 0, materialSpecificId: null }],
+    weight: { unit: "g", value: "" },
+  });
 
   /**
    * Opens a new or existing material combination.
@@ -584,6 +596,7 @@ export function MaterialAssignmentsEditor({
               materialId: 0,
               materialSpecificId: null,
             })),
+            weight: { unit: "g", value: "" } as const,
           }
         : value[index];
     if (!assignment) return;
@@ -679,6 +692,7 @@ export function MaterialAssignmentsEditor({
             ),
           }));
           setDraft((current) => ({
+            ...current,
             materials: [
               ...current.materials.filter(({ materialId }) => materialId !== 0),
               { materialId: material.id, materialSpecificId: null },
@@ -706,6 +720,7 @@ export function MaterialAssignmentsEditor({
                   items={options.materials}
                   onValueChange={(material) =>
                     setDraft((current) => ({
+                      ...current,
                       materials: current.materials.map((row, i) =>
                         i === index
                           ? {
@@ -730,6 +745,7 @@ export function MaterialAssignmentsEditor({
                   )}
                   onValueChange={(specific) =>
                     setDraft((current) => ({
+                      ...current,
                       materials: current.materials.map((row, i) =>
                         i === index
                           ? {
@@ -755,6 +771,7 @@ export function MaterialAssignmentsEditor({
                   aria-label={t("web.action.close")}
                   onClick={() =>
                     setDraft((current) => ({
+                      ...current,
                       materials: current.materials.filter(
                         (_, i) => i !== index,
                       ),
@@ -770,6 +787,7 @@ export function MaterialAssignmentsEditor({
             <Button
               onClick={() =>
                 setDraft((current) => ({
+                  ...current,
                   materials: [
                     ...current.materials,
                     { materialId: 0, materialSpecificId: null },
@@ -877,6 +895,14 @@ export function ProductEditor({
     Record<string, string[] | undefined>
   >({});
   const [formError, setFormError] = React.useState<string | null>(null);
+  const supportsMaterialWeights =
+    productTypeSlug === "spinner" ||
+    productTypeSlug === "spinner-button" ||
+    productTypeSlug === "slider";
+  const [showMaterialWeights, setShowMaterialWeights] = React.useState(
+    () =>
+      initialProduct?.materials.some(({ weight }) => weight !== null) ?? false,
+  );
   const [magnetConfigurationNotice, setMagnetConfigurationNotice] =
     React.useState(false);
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
@@ -940,17 +966,19 @@ export function ProductEditor({
           : null,
     mechanismId: initialProduct?.mechanismId ?? null,
     materialAssignments:
-      initialProduct?.materials.map(({ materials }) => ({
+      initialProduct?.materials.map(({ materials, weight }) => ({
         materials: materials.map(({ id, specific }) => ({
           materialId: id,
           materialSpecificId: specific?.id ?? null,
         })),
+        weight: weight ?? { unit: "g", value: "" },
       })) ??
       (productTypeSlug === "refill"
         ? []
         : [
             {
               materials: [{ materialId: 0, materialSpecificId: null }],
+              weight: { unit: "g", value: "" },
             },
           ]),
     name: initialProduct?.name ?? "",
@@ -1295,6 +1323,85 @@ export function ProductEditor({
                   t={t}
                   value={field.state.value}
                 />
+                {supportsMaterialWeights ? (
+                  <div className="grid gap-3">
+                    <Button
+                      aria-pressed={showMaterialWeights}
+                      className="w-fit"
+                      onClick={() => setShowMaterialWeights((shown) => !shown)}
+                      type="button"
+                      variant="outline"
+                    >
+                      {t("web.catalog.materialWeights.title")}
+                    </Button>
+                    {showMaterialWeights ? (
+                      <div className="grid gap-3">
+                        {field.state.value.map((assignment, index) => {
+                          const label = materialCombinationLabel(
+                            assignment.materials.map(
+                              ({ materialId, materialSpecificId }) => {
+                                const material = options.materials.find(
+                                  ({ id }) => id === materialId,
+                                );
+                                const specific = (
+                                  options.materialSpecifics ?? []
+                                ).find(({ id }) => id === materialSpecificId);
+                                return {
+                                  name:
+                                    material?.name ??
+                                    t("web.catalog.selectMaterial"),
+                                  specific: specific
+                                    ? { name: specific.name }
+                                    : null,
+                                };
+                              },
+                            ),
+                          );
+                          const weightLabel = t(
+                            "web.catalog.materialWeights.field",
+                            { material: label },
+                          );
+                          return (
+                            <Field key={index} label={weightLabel}>
+                              <MeasurementInput
+                                kind="weight"
+                                label={weightLabel}
+                                onChange={(weight) =>
+                                  field.handleChange(
+                                    field.state.value.map((current, i) =>
+                                      i === index
+                                        ? {
+                                            ...current,
+                                            weight:
+                                              weight as EditableWeightMeasurement,
+                                          }
+                                        : current,
+                                    ),
+                                  )
+                                }
+                                unitLabel={t(
+                                  "web.catalog.field.measurementUnit",
+                                  { field: weightLabel },
+                                )}
+                                value={assignment.weight}
+                              />
+                              <FieldError
+                                error={
+                                  positiveDecimalSchema.safeParse(
+                                    assignment.weight.value,
+                                  ).success
+                                    ? undefined
+                                    : "web.catalog.error.positive"
+                                }
+                                t={t}
+                              />
+                            </Field>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <FieldError
                   error={serverErrors.materialAssignments?.[0]}
                   t={t}
@@ -1525,7 +1632,7 @@ export function ProductEditor({
             spinDiameter: "web.catalog.field.spinDiameter",
             thickness: "web.catalog.field.thickness",
             thicknessWithButton: "web.catalog.field.thicknessWithButton",
-            weight: "web.archive.spec.weight",
+            weight: "web.catalog.field.defaultWeight",
             width: "web.catalog.field.width",
           } as const;
           return (

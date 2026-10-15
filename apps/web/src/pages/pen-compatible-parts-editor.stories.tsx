@@ -53,6 +53,7 @@ function product(
     materials: [
       {
         assignmentId: 1000 + id,
+        weight: null,
         materials: [
           {
             id: 1000,

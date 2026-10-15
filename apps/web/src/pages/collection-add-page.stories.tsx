@@ -47,6 +47,7 @@ const product: CatalogProduct = {
   materials: [
     {
       assignmentId: 1001,
+      weight: null,
       materials: [{ specific: null, id: 1001, name: "Bronze", slug: "bronze" }],
     },
   ],
@@ -93,6 +94,7 @@ const products: CatalogProduct[] = [
             ...product.materials,
             {
               assignmentId: 1016,
+              weight: null,
               materials: [
                 {
                   id: 1016,

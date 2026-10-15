@@ -265,6 +265,7 @@ describe("finish option editor", () => {
       materials: [
         {
           assignmentId: 1000,
+          weight: null,
           materials: [
             { specific: null, id: 1000, name: "Bronze", slug: "bronze" },
           ],
@@ -632,6 +633,26 @@ describe("product form conditional fields", () => {
     expect(html).not.toContain('aria-label="Images"');
     expect(html).not.toContain('aria-label="Length"');
   });
+
+  it("shows saved material weights separately from the default weight", () => {
+    const product = productFixture(1020, "Weighted spinner", "spinner");
+    product.weight = { unit: "g", value: "96" };
+    product.materials[0]!.weight = { unit: "g", value: "42" };
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: product,
+        options: {
+          ...emptyCatalogOptions,
+          materials: [{ id: 1021, name: "Bronze", slug: "bronze" }],
+        },
+        productTypeSlug: "spinner",
+      }),
+    );
+
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-label="Weight for Bronze"');
+    expect(html).toContain('aria-label="Default weight"');
+  });
 });
 
 describe("collection edit conditional fields", () => {
@@ -841,6 +862,7 @@ describe("collection add form", () => {
         ...base.materials,
         {
           assignmentId: 1016,
+          weight: null,
           materials: [
             {
               id: 1016,
@@ -1135,6 +1157,7 @@ function productFixture(
     materials: [
       {
         assignmentId: id + 1,
+        weight: null,
         materials: [
           {
             specific: null,

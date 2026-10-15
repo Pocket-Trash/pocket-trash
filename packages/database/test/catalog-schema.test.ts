@@ -53,7 +53,12 @@ describe("catalog schema", () => {
     expect(productMaterial.columns.map(({ name }) => name)).toEqual([
       "id",
       "product_id",
+      "weight_value",
+      "weight_unit",
     ]);
+    expect(productMaterial.checks.map(({ name }) => name)).toContain(
+      "product_material_weight_consistent",
+    );
     expect(
       productMaterialComponent.uniqueConstraints.map(({ name }) => name),
     ).toContain("product_material_component_unique");
