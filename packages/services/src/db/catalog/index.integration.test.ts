@@ -15,6 +15,111 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("catalog product persistence", () => {
+  it("round-trips material combinations and preserves assignment identity across reorder", async () => {
+    const client = new PGlite();
+    const db = drizzle({ client, relations: schema.relations });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      await migratePglite(drizzle({ client }), { migrationsFolder });
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Combination Maker", slug: "combination-maker" })
+        .returning({ id: schema.maker.id });
+      await db
+        .insert(schema.productType)
+        .values({ name: "Spinner", slug: "spinner" });
+      const materials = await db
+        .insert(schema.material)
+        .values([
+          { name: "Mokume", slug: "mokume" },
+          { name: "Titanium", slug: "titanium" },
+          { name: "Zirconium", slug: "zirconium" },
+        ])
+        .returning({
+          id: schema.material.id,
+          name: schema.material.name,
+          slug: schema.material.slug,
+        });
+      await db.insert(schema.user).values({ clerkId: "combination-owner" });
+      if (!maker) throw new Error("Combination maker was not created.");
+      const bySlug = new Map(materials.map((row) => [row.slug, row]));
+      const mokume = bySlug.get("mokume");
+      const titanium = bySlug.get("titanium");
+      const zirconium = bySlug.get("zirconium");
+      if (!mokume || !titanium || !zirconium)
+        throw new Error("Combination materials were not created.");
+
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const actor = { clerkId: "combination-owner", role: "user" as const };
+      const created = await service.createProduct({
+        actor,
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          {
+            materials: [{ materialId: titanium.id, materialSpecificId: null }],
+          },
+          {
+            materials: [
+              { materialId: zirconium.id, materialSpecificId: null },
+              { materialId: mokume.id, materialSpecificId: null },
+            ],
+          },
+        ],
+        name: "Material spinner",
+        productTypeSlug: "spinner",
+        slug: "material-spinner",
+        specs: { bearing: "R188" },
+      });
+      const combined = created.materials.find(
+        ({ materials: components }) => components.length === 2,
+      );
+      expect(combined).toEqual({
+        assignmentId: expect.any(Number),
+        materials: [
+          { ...mokume, specific: null },
+          { ...zirconium, specific: null },
+        ],
+      });
+      if (!combined) throw new Error("Combined assignment was not hydrated.");
+
+      const updated = await service.updateProduct({
+        actor,
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          {
+            materials: [
+              { materialId: mokume.id, materialSpecificId: null },
+              { materialId: zirconium.id, materialSpecificId: null },
+            ],
+          },
+          {
+            materials: [{ materialId: titanium.id, materialSpecificId: null }],
+          },
+        ],
+        name: created.name,
+        productId: created.id,
+        productTypeSlug: "spinner",
+        slug: created.slug,
+        specs: { bearing: "R188" },
+      });
+      expect(
+        updated.materials.find(
+          ({ materials: components }) => components.length === 2,
+        )?.assignmentId,
+      ).toBe(combined.assignmentId);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("classifies product types through an audited administrator update", async () => {
     const client = new PGlite();
     const db = drizzle({ client: client, relations: schema.relations });
@@ -327,7 +432,9 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         makerProductUrl: "https://maker.example/spinner/",
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Spinner",
         productTypeSlug: "spinner",
@@ -454,7 +561,9 @@ describe("catalog product persistence", () => {
         makerId: maker.id,
         makerProductUrl: "https://maker.example/spinner/",
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Edited spinner",
         productId: created.id,
@@ -619,7 +728,9 @@ describe("catalog product persistence", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Matched Plates",
         productTypeSlug: "slider-plate",
@@ -632,7 +743,9 @@ describe("catalog product persistence", () => {
         magnetLayout: "2x4",
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Cassette Insert",
         productTypeSlug: "slider-insert",
@@ -646,7 +759,9 @@ describe("catalog product persistence", () => {
         includedPlateProductId: plate.id,
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Rail Slider",
         productTypeSlug: "slider",
@@ -693,7 +808,9 @@ describe("catalog product persistence", () => {
         magnetLayout: "2x2",
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Body Slider",
         productTypeSlug: "slider",
@@ -709,7 +826,11 @@ describe("catalog product persistence", () => {
           magnetLayout: "2x3",
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: "Duplicate Insert Layout",
           productTypeSlug: "slider",
@@ -773,7 +894,11 @@ describe("catalog product persistence", () => {
             finishOptions: [],
             makerId: maker.id,
             materialAssignments: [
-              { materialId: material.id, materialSpecificId: null },
+              {
+                materials: [
+                  { materialId: material.id, materialSpecificId: null },
+                ],
+              },
             ],
             name,
             productTypeSlug: "spinner",
@@ -826,7 +951,9 @@ describe("catalog product persistence", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: beta.name,
         productId: beta.id,

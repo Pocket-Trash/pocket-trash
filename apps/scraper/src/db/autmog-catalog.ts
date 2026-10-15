@@ -558,8 +558,15 @@ async function loadExistingState(
 
   const [materials, appearances, noses, compatibility] = await Promise.all([
     db
-      .select({ materialId: schema.productMaterial.materialId })
+      .select({ materialId: schema.productMaterialComponent.materialId })
       .from(schema.productMaterial)
+      .innerJoin(
+        schema.productMaterialComponent,
+        eq(
+          schema.productMaterialComponent.productMaterialId,
+          schema.productMaterial.id,
+        ),
+      )
       .where(eq(schema.productMaterial.productId, listing.productId)),
     db
       .select({
@@ -719,11 +726,20 @@ async function replaceSourceOwnedFacts(
     .delete(schema.productMaterial)
     .where(eq(schema.productMaterial.productId, productId));
 
-  await tx
+  const assignments = await tx
     .insert(schema.productMaterial)
-    .values(
-      lookups.materialIds.map((materialId) => ({ materialId, productId })),
-    );
+    .values(lookups.materialIds.map(() => ({ productId })))
+    .returning({ id: schema.productMaterial.id });
+  if (assignments.length !== lookups.materialIds.length)
+    throw new Error("Failed to create Autmog material assignments.");
+  await tx.insert(schema.productMaterialComponent).values(
+    assignments.map(({ id }, index) => {
+      const materialId = lookups.materialIds[index];
+      if (materialId === undefined)
+        throw new Error("Failed to match Autmog material assignment.");
+      return { materialId, productMaterialId: id };
+    }),
+  );
   const [appearance] = await tx
     .insert(schema.finishOption)
     .values({ patternId: lookups.patternId, position: 0, productId })

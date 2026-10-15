@@ -79,9 +79,15 @@ describe("collection-item approval", () => {
         .values({ name: "Titanium", slug: "titanium" })
         .returning();
       if (!material) throw new Error("Material missing.");
-      await db
+      const [productMaterial] = await db
         .insert(schema.productMaterial)
-        .values({ productId: product.id, materialId: material.id });
+        .values({ productId: product.id })
+        .returning({ id: schema.productMaterial.id });
+      if (!productMaterial) throw new Error("Product material missing.");
+      await db.insert(schema.productMaterialComponent).values({
+        materialId: material.id,
+        productMaterialId: productMaterial.id,
+      });
       const [item] = await db
         .insert(schema.collectionItem)
         .values({

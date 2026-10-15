@@ -39,6 +39,11 @@ export async function collectionItemDeletionState(
       ids.map((id) => sql`${id}`),
       sql`, `,
     )}) order by id for update`);
+  await tx.execute(sql`select id from collection_item_material
+    where collection_item_id in (${sql.join(
+      ids.map((id) => sql`${id}`),
+      sql`, `,
+    )}) order by id for update`);
   const result = await tx.execute<{
     /** Allowlisted JSON state of one item. */
     state: AuditJsonObject;
@@ -46,7 +51,14 @@ export async function collectionItemDeletionState(
     select jsonb_build_object(
       'id', item.id, 'collectionId', item.collection_id,
       'displayName', item.display_name, 'description', item.description,
-      'materialId', item.material_id, 'owned', item.owned,
+      'materials', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'materialId', material.material_id,
+          'materialSpecificId', material.material_specific_id
+        ) order by material.id)
+        from collection_item_material material
+        where material.collection_item_id = item.id), '[]'),
+      'owned', item.owned,
       'purchasedAt', item.purchased_at, 'soldAt', item.sold_at,
       'approvalStatus', item.approval_status,
       'approvalDecisionReason', item.approval_decision_reason,

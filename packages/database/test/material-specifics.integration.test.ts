@@ -69,13 +69,20 @@ describe("material-specific constraints", () => {
       INSERT INTO product (maker_id, product_type_id, name, slug)
         SELECT 1000, id, 'Bar Cell Mini', 'bar-cell-mini'
         FROM product_types WHERE slug = 'spinner';
-      INSERT INTO product_material (product_id, material_id, material_specific_id)
-        VALUES (1000, 1000, NULL), (1000, 1000, 1000);
+      INSERT INTO product_material (product_id) VALUES (1000), (1000);
+      INSERT INTO product_material_component
+        (product_material_id, material_id, material_specific_id)
+        VALUES (1000, 1000, NULL), (1001, 1000, 1000);
     `);
-    for (const pair of ["1000, NULL", "1000, 1000", "1001, 1000"]) {
+    for (const component of [
+      "1000, 1000, NULL",
+      "1001, 1000, 1000",
+      "1000, 1001, 1000",
+    ]) {
       await expect(
-        database.exec(`INSERT INTO product_material
-        (product_id, material_id, material_specific_id) VALUES (1000, ${pair})`),
+        database.exec(`INSERT INTO product_material_component
+        (product_material_id, material_id, material_specific_id)
+        VALUES (${component})`),
       ).rejects.toThrow(/unique|foreign key/iu);
     }
     await database.exec(`
@@ -84,16 +91,21 @@ describe("material-specific constraints", () => {
         VALUES (1000, 'Materials', 'materials');
     `);
     await expect(
-      database.exec(`INSERT INTO collection_item
-      (owner_id, collection_id, material_specific_id) VALUES (1000, 1000, 1000)`),
-    ).rejects.toThrow(/specific_requires_material/iu);
-    await database.exec(`INSERT INTO collection_item
-      (owner_id, collection_id, material_id, material_specific_id)
-      VALUES (1000, 1000, 1000, 1000);
-      DELETE FROM product_material WHERE material_specific_id = 1000;`);
+      database.exec(`INSERT INTO collection_item (owner_id, collection_id)
+      VALUES (1000, 1000);
+      INSERT INTO collection_item_material
+      (collection_item_id, material_id, material_specific_id)
+      VALUES (1000, 1001, 1000)`),
+    ).rejects.toThrow(/foreign key/iu);
+    await database.exec(`INSERT INTO collection_item (owner_id, collection_id)
+      VALUES (1000, 1000);
+      INSERT INTO collection_item_material
+      (collection_item_id, material_id, material_specific_id)
+      VALUES (1001, 1000, 1000);
+      DELETE FROM product_material WHERE id = 1001;`);
     await expect(
       database.query(`SELECT material_specific_id::int AS specific
-      FROM collection_item`),
+      FROM collection_item_material`),
     ).resolves.toMatchObject({ rows: [{ specific: 1000 }] });
   });
 

@@ -62,7 +62,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserPageShell } from "@/components/user-page-shell";
-import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
+import {
+  filterButtonsByDiameter,
+  finishOptionLabel,
+  materialCombinationLabel,
+} from "@/lib/catalog";
 import {
   addCollectionProduct,
   authorCatalogPensData,
@@ -519,6 +523,253 @@ type ProductEditorValue = Omit<
   width: EditableDimensionMeasurement;
 };
 
+/** Properties for the product material-combination editor. */
+type MaterialAssignmentsEditorProps = {
+  /**
+   * Updates product material combinations.
+   *
+   * @param value - Next complete combination list.
+   */
+  onChange(value: ProductEditorValue["materialAssignments"]): void;
+  /** Updates shared lookup choices when a material is created. */
+  onOptionsChange: React.Dispatch<React.SetStateAction<CatalogOptions>>;
+  /** Available canonical material choices. */
+  options: CatalogOptions;
+  /** Whether the product type accepts only one assignment. */
+  singleAssignment: boolean;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current product material combinations. */
+  value: ProductEditorValue["materialAssignments"];
+};
+
+/**
+ * Edits each material combination in a focused modal.
+ *
+ * @param props - Controlled material editor properties.
+ * @returns Material assignment summaries and their modal editor.
+ */
+export function MaterialAssignmentsEditor({
+  onChange,
+  onOptionsChange,
+  options,
+  singleAssignment,
+  t,
+  value,
+}: MaterialAssignmentsEditorProps) {
+  const dialog = React.useRef<HTMLDialogElement>(null);
+  const titleId = React.useId();
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+  const [draft, setDraft] = React.useState<
+    ProductEditorValue["materialAssignments"][number]
+  >({ materials: [{ materialId: 0, materialSpecificId: null }] });
+
+  /**
+   * Opens a new or existing material combination.
+   *
+   * @param index - Existing assignment index, or null for a new assignment.
+   */
+  const open = (index: number | null) => {
+    const assignment =
+      index === null
+        ? { materials: [{ materialId: 0, materialSpecificId: null }] }
+        : value[index];
+    if (!assignment) return;
+    setEditingIndex(index);
+    setDraft(structuredClone(assignment));
+    dialog.current?.showModal();
+  };
+  /**
+   * Resolves one stored combination to its current display label.
+   *
+   * @param assignment - Stored material identifier pairs.
+   * @returns Current human-readable combination label.
+   */
+  const label = (
+    assignment: ProductEditorValue["materialAssignments"][number],
+  ) =>
+    materialCombinationLabel(
+      assignment.materials.map(({ materialId, materialSpecificId }) => {
+        const material = options.materials.find(({ id }) => id === materialId);
+        const specific = (options.materialSpecifics ?? []).find(
+          ({ id }) => id === materialSpecificId,
+        );
+        return {
+          name: material?.name ?? t("web.catalog.selectMaterial"),
+          specific: specific ? { name: specific.name } : null,
+        };
+      }),
+    );
+
+  return (
+    <>
+      {value.map((assignment, index) => (
+        <div className="flex items-center gap-2" key={index}>
+          <span className="min-w-0 flex-1 wrap-anywhere">
+            {label(assignment)}
+          </span>
+          <Button onClick={() => open(index)} type="button" variant="outline">
+            {t("web.action.edit")}
+          </Button>
+          <Button
+            aria-label={t("web.action.close")}
+            onClick={() => onChange(value.filter((_, i) => i !== index))}
+            type="button"
+            variant="outline"
+          >
+            <X />
+          </Button>
+        </div>
+      ))}
+      <Button
+        disabled={singleAssignment && value.length > 0}
+        onClick={() => open(null)}
+        type="button"
+        variant="outline"
+      >
+        {t("web.catalog.selectMaterials")}
+      </Button>
+      <LookupDialog
+        kind="material"
+        t={t}
+        onCreated={(material) => {
+          onOptionsChange((current) => ({
+            ...current,
+            materials: [...current.materials, material].sort((a, b) =>
+              a.name.localeCompare(b.name),
+            ),
+          }));
+          setDraft((current) => ({
+            materials: [
+              ...current.materials.filter(({ materialId }) => materialId !== 0),
+              { materialId: material.id, materialSpecificId: null },
+            ],
+          }));
+        }}
+      />
+      <dialog
+        aria-labelledby={titleId}
+        className="m-auto w-[min(40rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
+        ref={dialog}
+      >
+        <div className="grid gap-4 p-6">
+          <h2 className="text-lg font-semibold" id={titleId}>
+            {t("web.catalog.field.materials")}
+          </h2>
+          {draft.materials.map((selection, index) => (
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" key={index}>
+              <CatalogCombobox
+                ariaLabel={t("web.catalog.field.materials")}
+                items={options.materials}
+                onValueChange={(material) =>
+                  setDraft((current) => ({
+                    materials: current.materials.map((row, i) =>
+                      i === index
+                        ? {
+                            materialId: Number(material?.id ?? 0),
+                            materialSpecificId: null,
+                          }
+                        : row,
+                    ),
+                  }))
+                }
+                placeholder={t("web.catalog.selectMaterial")}
+                value={
+                  options.materials.find(
+                    ({ id }) => id === selection.materialId,
+                  ) ?? null
+                }
+              />
+              <CatalogCombobox
+                ariaLabel={t("web.materials.specific.optional")}
+                items={(options.materialSpecifics ?? []).filter(
+                  ({ materialId }) => materialId === selection.materialId,
+                )}
+                onValueChange={(specific) =>
+                  setDraft((current) => ({
+                    materials: current.materials.map((row, i) =>
+                      i === index
+                        ? {
+                            ...row,
+                            materialSpecificId: specific
+                              ? Number(specific.id)
+                              : null,
+                          }
+                        : row,
+                    ),
+                  }))
+                }
+                placeholder={t("web.materials.specific.general")}
+                removeLabel={t("web.action.close")}
+                showSelectedPill
+                value={
+                  (options.materialSpecifics ?? []).find(
+                    ({ id }) => id === selection.materialSpecificId,
+                  ) ?? null
+                }
+              />
+              <Button
+                aria-label={t("web.action.close")}
+                onClick={() =>
+                  setDraft((current) => ({
+                    materials: current.materials.filter((_, i) => i !== index),
+                  }))
+                }
+                type="button"
+                variant="outline"
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+          <Button
+            onClick={() =>
+              setDraft((current) => ({
+                materials: [
+                  ...current.materials,
+                  { materialId: 0, materialSpecificId: null },
+                ],
+              }))
+            }
+            type="button"
+            variant="outline"
+          >
+            {t("web.catalog.selectMaterial")}
+          </Button>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => dialog.current?.close()}
+              type="button"
+              variant="outline"
+            >
+              {t("action.cancel")}
+            </Button>
+            <Button
+              disabled={
+                draft.materials.length === 0 ||
+                draft.materials.some(({ materialId }) => materialId === 0)
+              }
+              onClick={() => {
+                onChange(
+                  editingIndex === null
+                    ? [...value, draft]
+                    : value.map((assignment, index) =>
+                        index === editingIndex ? draft : assignment,
+                      ),
+                );
+                dialog.current?.close();
+              }}
+              type="button"
+            >
+              {t("action.save")}
+            </Button>
+          </div>
+        </div>
+      </dialog>
+    </>
+  );
+}
+
 /**
  * Renders the product fields shared by add and edit flows.
  *
@@ -636,13 +887,19 @@ export function ProductEditor({
           : null,
     mechanismId: initialProduct?.mechanismId ?? null,
     materialAssignments:
-      initialProduct?.materials.map(({ id, specific }) => ({
-        materialId: id,
-        materialSpecificId: specific?.id ?? null,
+      initialProduct?.materials.map(({ materials }) => ({
+        materials: materials.map(({ id, specific }) => ({
+          materialId: id,
+          materialSpecificId: specific?.id ?? null,
+        })),
       })) ??
       (productTypeSlug === "refill"
         ? []
-        : [{ materialId: 0, materialSpecificId: null }]),
+        : [
+            {
+              materials: [{ materialId: 0, materialSpecificId: null }],
+            },
+          ]),
     name: initialProduct?.name ?? "",
     productId: initialProduct?.id ?? null,
     productTypeSlug,
@@ -977,116 +1234,13 @@ export function ProductEditor({
           <form.Field name="materialAssignments">
             {(field) => (
               <Field label={t("web.catalog.field.materials")}>
-                {field.state.value.map((selection, index) => (
-                  <div
-                    className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-                    key={index}
-                  >
-                    <CatalogCombobox
-                      ariaLabel={t("web.catalog.field.materials")}
-                      items={options.materials}
-                      value={
-                        options.materials.find(
-                          ({ id }) => id === selection.materialId,
-                        ) ?? null
-                      }
-                      placeholder={t("web.catalog.selectMaterial")}
-                      onValueChange={(value) =>
-                        field.handleChange(
-                          field.state.value.map((row, i) =>
-                            i === index
-                              ? {
-                                  materialId: Number(value?.id ?? 0),
-                                  materialSpecificId: null,
-                                }
-                              : row,
-                          ),
-                        )
-                      }
-                    />
-                    <CatalogCombobox
-                      ariaLabel={t("web.materials.specific.optional")}
-                      items={(options.materialSpecifics ?? []).filter(
-                        ({ materialId }) => materialId === selection.materialId,
-                      )}
-                      value={
-                        (options.materialSpecifics ?? []).find(
-                          ({ id }) => id === selection.materialSpecificId,
-                        ) ?? null
-                      }
-                      placeholder={t("web.materials.specific.general")}
-                      removeLabel={t("web.action.close")}
-                      showSelectedPill
-                      onValueChange={(value) =>
-                        field.handleChange(
-                          field.state.value.map((row, i) =>
-                            i === index
-                              ? {
-                                  ...row,
-                                  materialSpecificId: value
-                                    ? Number(value.id)
-                                    : null,
-                                }
-                              : row,
-                          ),
-                        )
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      aria-label={t("web.action.close")}
-                      onClick={() =>
-                        field.handleChange(
-                          field.state.value.filter((_, i) => i !== index),
-                        )
-                      }
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={
-                    productTypeSlug === "slider-insert" &&
-                    field.state.value.length > 0
-                  }
-                  onClick={() =>
-                    field.handleChange([
-                      ...field.state.value,
-                      { materialId: 0, materialSpecificId: null },
-                    ])
-                  }
-                >
-                  {t("web.catalog.selectMaterial")}
-                </Button>
-                <LookupDialog
-                  kind="material"
+                <MaterialAssignmentsEditor
+                  onChange={field.handleChange}
+                  onOptionsChange={setOptions}
+                  options={options}
+                  singleAssignment={productTypeSlug === "slider-insert"}
                   t={t}
-                  onCreated={(material) => {
-                    setOptions((current) => ({
-                      ...current,
-                      materials: [...current.materials, material].sort((a, b) =>
-                        a.name.localeCompare(b.name),
-                      ),
-                    }));
-                    const selection = {
-                      materialId: material.id,
-                      materialSpecificId: null,
-                    };
-                    field.handleChange(
-                      productTypeSlug === "slider-insert"
-                        ? [selection]
-                        : [
-                            ...field.state.value.filter(
-                              ({ materialId }) => materialId !== 0,
-                            ),
-                            selection,
-                          ],
-                    );
-                  }}
+                  value={field.state.value}
                 />
                 <FieldError
                   error={serverErrors.materialAssignments?.[0]}
@@ -4379,25 +4533,32 @@ function PenCollectionFields({
  * Resolves a stored canonical pair to a current offer or a retained selector choice.
  *
  * @param product - Product's current offered assignments.
- * @param material - Item's stored canonical general and optional specific.
+ * @param materials - Item's stored canonical material combination.
  * @returns Current assignment choice, retained choice, or null for no material.
  */
 function collectionMaterialChoice(
   product: CatalogProduct | undefined,
-  material: UserCollectionItem["material"] | undefined,
+  materials: UserCollectionItem["materials"] | undefined,
 ): CatalogLookup | null {
-  if (!material) return null;
+  if (!materials?.length) return null;
+  /**
+   * Builds an order-independent identity for stored material components.
+   *
+   * @param components - Material components to identify.
+   * @returns Stable sorted component identity.
+   */
+  const signature = (components: UserCollectionItem["materials"]) =>
+    components
+      .map(({ id, specific }) => `${id}:${specific?.id ?? "general"}`)
+      .sort()
+      .join("|");
   const assignment = product?.materials.find(
-    ({ id, specific }) =>
-      id === material.id &&
-      (specific?.id ?? null) === (material.specific?.id ?? null),
+    (candidate) => signature(candidate.materials) === signature(materials),
   );
   return {
     id: assignment?.assignmentId ?? -1,
-    slug: material.slug,
-    name: material.specific
-      ? `${material.name}: ${material.specific.name}`
-      : material.name,
+    slug: materials[0]?.slug ?? "",
+    name: materialCombinationLabel(materials),
   };
 }
 
@@ -4482,10 +4643,8 @@ export function CollectionProductFields({
             ...(material?.id === -1 ? [material] : []),
             ...product.materials.map((assignment) => ({
               id: assignment.assignmentId,
-              slug: assignment.slug,
-              name: assignment.specific
-                ? `${assignment.name}: ${assignment.specific.name}`
-                : assignment.name,
+              slug: assignment.materials[0]?.slug ?? "",
+              name: materialCombinationLabel(assignment.materials),
             })),
           ]}
           onValueChange={(value) =>
@@ -4497,7 +4656,7 @@ export function CollectionProductFields({
                     slug:
                       product.materials.find(
                         ({ assignmentId }) => assignmentId === value.id,
-                      )?.slug ??
+                      )?.materials[0]?.slug ??
                       material?.slug ??
                       "",
                   }
@@ -4651,7 +4810,7 @@ export function CollectionEditPage({
     values?: Readonly<Record<string, unknown>>;
   } | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
-    collectionMaterialChoice(product, item.material),
+    collectionMaterialChoice(product, item.materials),
   );
   const [finish, setFinish] = React.useState<ComboboxOption | null>(() =>
     item.finishOption
@@ -4681,7 +4840,7 @@ export function CollectionEditPage({
     React.useState<CatalogLookup | null>(
       collectionMaterialChoice(
         buttonProducts.find(({ id }) => id === initialButton?.productId),
-        initialButton?.material,
+        initialButton?.materials,
       ),
     );
   const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
@@ -4882,7 +5041,7 @@ export function CollectionEditPage({
                       buttonProducts.find(
                         ({ id }) => id === selected?.productId,
                       ),
-                      selected?.material,
+                      selected?.materials,
                     ),
                   );
                   setButtonFinish(

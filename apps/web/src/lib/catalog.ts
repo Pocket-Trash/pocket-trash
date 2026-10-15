@@ -55,6 +55,28 @@ export function sortMaterials<
 }
 
 /**
+ * Builds an order-preserving label for one material combination.
+ *
+ * @param materials - General or specific material components to label.
+ * @returns Component labels joined with a plus sign.
+ */
+export function materialCombinationLabel(
+  materials: readonly {
+    /** General material name. */
+    name: string;
+    /** Optional specific alloy or grade. */
+    specific?: {
+      /** Specific alloy or grade name. */
+      name: string;
+    } | null;
+  }[],
+): string {
+  return materials
+    .map(({ name, specific }) => specific?.name ?? name)
+    .join(" + ");
+}
+
+/**
  * Returns name-sorted buttons matching the requested diameter, or all buttons when it is empty.
  *
  * @param buttons - Buttons to filter and sort.

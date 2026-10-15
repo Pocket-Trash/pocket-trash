@@ -239,9 +239,14 @@ async function createTestDatabase(): Promise<{
     .returning({ id: schema.material.id, name: schema.material.name });
   const titanium = materials.find((material) => material.name === "Titanium");
   if (!titanium) throw new Error("Failed to seed Saga material.");
-  await db.insert(schema.productMaterial).values({
+  const [productMaterial] = await db
+    .insert(schema.productMaterial)
+    .values({ productId: product.id })
+    .returning({ id: schema.productMaterial.id });
+  if (!productMaterial) throw new Error("Failed to seed product material.");
+  await db.insert(schema.productMaterialComponent).values({
     materialId: titanium.id,
-    productId: product.id,
+    productMaterialId: productMaterial.id,
   });
   const [baselineFinish, baselinePattern] = await Promise.all([
     db

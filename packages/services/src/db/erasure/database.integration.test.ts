@@ -512,8 +512,12 @@ async function seedInventory(client: PGlite) {
       'user_to_erase', 'Preserved product', 'preserved-product', true,
       'moderated', now(), 'user_to_erase'
     );
-    insert into product_material (product_id, material_id) values (
-      (select id from product where slug = 'preserved-product'),
+    insert into product_material (product_id) values (
+      (select id from product where slug = 'preserved-product')
+    );
+    insert into product_material_component (product_material_id, material_id) values (
+      (select id from product_material where product_id =
+        (select id from product where slug = 'preserved-product')),
       (select id from materials where slug = 'metal')
     );
     insert into product_image (

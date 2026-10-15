@@ -81,10 +81,9 @@ const product: CatalogProduct = {
   materials: [
     {
       assignmentId: 1000,
-      specific: null,
-      id: 1000,
-      name: "Titanium",
-      slug: "titanium",
+      materials: [
+        { specific: null, id: 1000, name: "Titanium", slug: "titanium" },
+      ],
     },
   ],
   name: "Katla",
@@ -203,7 +202,7 @@ const item: UserCollectionItem = {
   makerName: product.makerName,
   makerSlug: product.makerSlug,
   makerUrl: product.makerUrl,
-  material: product.materials[0] ?? null,
+  materials: product.materials[0]?.materials ?? [],
   name: product.name,
   ownerClerkId: "user_storybook",
   ownerImageUrl: null,

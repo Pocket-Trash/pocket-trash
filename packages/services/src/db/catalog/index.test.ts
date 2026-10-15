@@ -570,10 +570,18 @@ describe("collection catalog writes", () => {
           table: schema.collectionItem,
           value: {
             collectionId: 900,
-            materialId: 1201,
-            materialSpecificId: null,
             ownerId: 1000,
           },
+        },
+        {
+          table: schema.collectionItemMaterial,
+          value: [
+            {
+              collectionItemId: 2000,
+              materialId: 1201,
+              materialSpecificId: null,
+            },
+          ],
         },
         {
           table: schema.collectionDetailSpinnerButton,
@@ -594,10 +602,18 @@ describe("collection catalog writes", () => {
           value: {
             collectionId: 900,
             displayName: "My spinner",
-            materialId: 1101,
-            materialSpecificId: null,
             ownerId: 1000,
           },
+        },
+        {
+          table: schema.collectionItemMaterial,
+          value: [
+            {
+              collectionItemId: 2001,
+              materialId: 1101,
+              materialSpecificId: null,
+            },
+          ],
         },
         {
           table: schema.collectionDetailSpinner,
@@ -645,10 +661,18 @@ describe("collection catalog writes", () => {
         value: {
           collectionId: 900,
           displayName: "My spinner",
-          materialId: 1101,
-          materialSpecificId: null,
           ownerId: 1000,
         },
+      },
+      {
+        table: schema.collectionItemMaterial,
+        value: [
+          {
+            collectionItemId: 2001,
+            materialId: 1101,
+            materialSpecificId: null,
+          },
+        ],
       },
       {
         table: schema.collectionItemOwnershipPeriod,
@@ -792,7 +816,7 @@ describe("collection catalog writes", () => {
   });
 
   it("updates spinner and installed button snapshots in one transaction", async () => {
-    const { db, service, updates } = setup(
+    const { db, service, updates, writes } = setup(
       [],
       [
         [
@@ -804,6 +828,7 @@ describe("collection catalog writes", () => {
             spinnerProductId: 1100,
           },
         ],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 900 }],
         [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 2000, productId: 1200 }],
@@ -833,16 +858,32 @@ describe("collection catalog writes", () => {
     expect(updates).toEqual(
       expect.arrayContaining([
         {
-          table: schema.collectionItem,
-          value: { materialId: 1101, materialSpecificId: null },
-        },
-        {
-          table: schema.collectionItem,
-          value: { materialId: 1201, materialSpecificId: null },
-        },
-        {
           table: schema.collectionDetailSpinner,
           value: { installedButtonId: 2000 },
+        },
+      ]),
+    );
+    expect(writes).toEqual(
+      expect.arrayContaining([
+        {
+          table: schema.collectionItemMaterial,
+          value: [
+            {
+              collectionItemId: 2001,
+              materialId: 1101,
+              materialSpecificId: null,
+            },
+          ],
+        },
+        {
+          table: schema.collectionItemMaterial,
+          value: [
+            {
+              collectionItemId: 2000,
+              materialId: 1201,
+              materialSpecificId: null,
+            },
+          ],
         },
       ]),
     );
@@ -861,12 +902,11 @@ describe("collection catalog writes", () => {
             spinnerProductId: 1100,
           },
         ],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 900 }],
         [{ materialId: 1101, materialSpecificId: null }],
-        [{ id: 3100 }],
         [{ id: 2000, productId: 1200 }],
         [{ materialId: 1201, materialSpecificId: null }],
-        [{ id: 3200 }],
       ],
       new Error("Query failed", {
         cause: {
@@ -913,10 +953,11 @@ describe("collection catalog writes", () => {
             spinnerProductId: 1100,
           },
         ],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 901 }],
         [{ id: 2002 }],
+        [],
         [{ materialId: 1101, materialSpecificId: null }],
-        [{ id: 3100 }],
       ],
     );
 
@@ -988,7 +1029,7 @@ describe("collection catalog writes", () => {
 describe("catalog lookup writes", () => {
   it("creates product source details as valid", async () => {
     const { db, writes } = setup(
-      [[{ id: 900 }], [{ id: 5000 }]],
+      [[{ id: 900 }], [{ id: 4000 }], [{ id: 5000 }]],
       [[{ id: 1000 }]],
     );
     const service = createCatalogService(
@@ -1017,7 +1058,11 @@ describe("catalog lookup writes", () => {
         ],
         makerId: 100,
         makerProductUrl: " https://maker.example/spinner/ ",
-        materialAssignments: [{ materialId: 1000, materialSpecificId: null }],
+        materialAssignments: [
+          {
+            materials: [{ materialId: 1000, materialSpecificId: null }],
+          },
+        ],
         name: "Catla",
         productTypeSlug: "spinner",
         slug: "catla",
@@ -1136,6 +1181,7 @@ describe("catalog lookup writes", () => {
             ownerClerkId: "user-secret",
           },
         ],
+        [{ id: 4000, materialId: 1000, materialSpecificId: null }],
       ],
     );
     const service = createCatalogService(
@@ -1156,7 +1202,9 @@ describe("catalog lookup writes", () => {
       ],
       makerId: 100,
       makerProductUrl,
-      materialAssignments: [{ materialId: 1000, materialSpecificId: null }],
+      materialAssignments: [
+        { materials: [{ materialId: 1000, materialSpecificId: null }] },
+      ],
       name: "Catla edited",
       productId: 900,
       productTypeSlug: "spinner",

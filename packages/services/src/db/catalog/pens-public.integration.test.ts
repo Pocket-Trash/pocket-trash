@@ -119,8 +119,13 @@ describe("public Pens catalog reads", () => {
       );
       const [productMaterial] = await db
         .insert(schema.productMaterial)
-        .values({ materialId: material.id, productId: penId })
+        .values({ productId: penId })
         .returning({ id: schema.productMaterial.id });
+      if (!productMaterial) throw new Error("Product material missing.");
+      await db.insert(schema.productMaterialComponent).values({
+        materialId: material.id,
+        productMaterialId: productMaterial.id,
+      });
       await db.insert(schema.penCompatiblePart).values({
         partProductId: tipId,
         penProductId: penId,
@@ -300,7 +305,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: "Click Mechanism",
           productTypeSlug: "pen-mechanism",
@@ -314,7 +323,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           mechanismId: mechanism.id,
           name: "Click Mechanism",

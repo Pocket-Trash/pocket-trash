@@ -32,6 +32,7 @@ import {
   productDetailSpinnerButton,
   productImage,
   productMaterial,
+  productMaterialComponent,
   productType,
   type SliderMagnetConfigurationValue,
   sliderMagnetPreset,
@@ -58,6 +59,75 @@ export const seedOwnerClerkId = "user_3FrjTtIKHL0ptK6jeljcf5kCM7J";
 
 /** Clerk user that owns deterministic development and preview slider fixtures. */
 export const sliderFixtureOwnerClerkId = "user_3JRUuhMIDwBBiLyc4smN8pAtGS9";
+
+/**
+ * Returns an existing single-material assignment or creates it.
+ *
+ * @param db - Database receiving the seed assignment.
+ * @param input - Product and canonical material pair.
+ * @returns Stable product material assignment identifier.
+ * @rejects When the assignment cannot be loaded or created.
+ */
+async function ensureSingleMaterialAssignment(
+  db: ReturnType<typeof createDb>,
+  input: {
+    /** General material identifier. */
+    materialId: number;
+    /** Optional alloy or grade identifier. */
+    materialSpecificId: number | null;
+    /** Product receiving the assignment. */
+    productId: number;
+  },
+): Promise<number> {
+  const rows = await db
+    .select({
+      assignmentId: productMaterial.id,
+      materialId: productMaterialComponent.materialId,
+      materialSpecificId: productMaterialComponent.materialSpecificId,
+    })
+    .from(productMaterial)
+    .innerJoin(
+      productMaterialComponent,
+      eq(productMaterialComponent.productMaterialId, productMaterial.id),
+    )
+    .where(eq(productMaterial.productId, input.productId));
+  const componentsByAssignment = new Map<
+    number,
+    {
+      /** General material identifier. */
+      materialId: number;
+      /** Optional alloy or grade identifier. */
+      materialSpecificId: number | null;
+    }[]
+  >();
+  for (const row of rows) {
+    const components = componentsByAssignment.get(row.assignmentId) ?? [];
+    components.push({
+      materialId: row.materialId,
+      materialSpecificId: row.materialSpecificId,
+    });
+    componentsByAssignment.set(row.assignmentId, components);
+  }
+  const existing = [...componentsByAssignment].find(
+    ([, components]) =>
+      components.length === 1 &&
+      components[0]?.materialId === input.materialId &&
+      components[0].materialSpecificId === input.materialSpecificId,
+  );
+  if (existing) return existing[0];
+
+  const [assignment] = await db
+    .insert(productMaterial)
+    .values({ productId: input.productId })
+    .returning({ id: productMaterial.id });
+  if (!assignment) throw new Error("Failed to seed product material.");
+  await db.insert(productMaterialComponent).values({
+    materialId: input.materialId,
+    materialSpecificId: input.materialSpecificId,
+    productMaterialId: assignment.id,
+  });
+  return assignment.id;
+}
 
 /**
  * Non-default preferences required by seeded users.
@@ -847,14 +917,11 @@ export async function seedKapedcProducts(
         : null;
       if (pair.specificSlug && !specific)
         throw new Error(`Seed specific ${pair.specificSlug} is missing.`);
-      await db
-        .insert(productMaterial)
-        .values({
-          materialId,
-          materialSpecificId: specific?.id ?? null,
-          productId: seededProduct.id,
-        })
-        .onConflictDoNothing();
+      await ensureSingleMaterialAssignment(db, {
+        materialId,
+        materialSpecificId: specific?.id ?? null,
+        productId: seededProduct.id,
+      });
     }
 
     seeded.push({ product: value, productId: seededProduct.id });
@@ -1404,10 +1471,11 @@ export async function seedSliderFixtures(
         });
     }
 
-    await db
-      .insert(productMaterial)
-      .values({ materialId: titanium.id, productId: seededProduct.id })
-      .onConflictDoNothing();
+    await ensureSingleMaterialAssignment(db, {
+      materialId: titanium.id,
+      materialSpecificId: null,
+      productId: seededProduct.id,
+    });
     if (fixtureProduct.type === "slider-insert") continue;
     const patternId = fixtureProduct.pattern
       ? patternsBySlug.get(fixtureProduct.pattern)

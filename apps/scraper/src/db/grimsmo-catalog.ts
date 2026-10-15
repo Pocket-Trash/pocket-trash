@@ -144,10 +144,18 @@ export async function syncCanonicalSagaMaterials(
       ? []
       : await db
           .select({
-            materialId: schema.productMaterial.materialId,
-            materialSpecificId: schema.productMaterial.materialSpecificId,
+            materialId: schema.productMaterialComponent.materialId,
+            materialSpecificId:
+              schema.productMaterialComponent.materialSpecificId,
           })
           .from(schema.productMaterial)
+          .innerJoin(
+            schema.productMaterialComponent,
+            eq(
+              schema.productMaterialComponent.productMaterialId,
+              schema.productMaterial.id,
+            ),
+          )
           .where(eq(schema.productMaterial.productId, saga.productId));
   const existingKeys = new Set(
     existing.map((assignment) =>
@@ -165,16 +173,24 @@ export async function syncCanonicalSagaMaterials(
   );
 
   if (!dryRun && newMaterials.length > 0) {
-    await db
+    const assignments = await db
       .insert(schema.productMaterial)
-      .values(
-        newMaterials.map((material) => ({
+      .values(newMaterials.map(() => ({ productId: saga.productId })))
+      .returning({ id: schema.productMaterial.id });
+    if (assignments.length !== newMaterials.length)
+      throw new Error("Failed to create Saga material assignments.");
+    await db.insert(schema.productMaterialComponent).values(
+      assignments.map(({ id }, index) => {
+        const material = newMaterials[index];
+        if (!material)
+          throw new Error("Failed to match Saga material assignment.");
+        return {
           materialId: material.materialId,
           materialSpecificId: material.materialSpecificId,
-          productId: saga.productId,
-        })),
-      )
-      .onConflictDoNothing();
+          productMaterialId: id,
+        };
+      }),
+    );
   }
 
   const newKeys = new Set(
@@ -724,16 +740,42 @@ async function syncSagaMaterials(
     .where(
       inArray(sql`lower(${schema.material.name})`, names.map(normalizeName)),
     );
+  const existingAssignments = await db
+    .select({
+      id: schema.productMaterial.id,
+      materialId: schema.productMaterialComponent.materialId,
+    })
+    .from(schema.productMaterial)
+    .innerJoin(
+      schema.productMaterialComponent,
+      eq(
+        schema.productMaterialComponent.productMaterialId,
+        schema.productMaterial.id,
+      ),
+    )
+    .where(eq(schema.productMaterial.productId, productId));
+  const assignmentByMaterial = new Map(
+    existingAssignments.map((row) => [row.materialId, row.id]),
+  );
   const created: string[] = [];
   for (const material of materials.sort((left, right) =>
     left.name.localeCompare(right.name),
   )) {
-    const [assignment] = await db
-      .insert(schema.productMaterial)
-      .values({ materialId: material.id, productId })
-      .onConflictDoNothing()
-      .returning({ id: schema.productMaterial.id });
-    if (assignment) created.push(material.name);
+    let assignmentId = assignmentByMaterial.get(material.id);
+    if (assignmentId === undefined) {
+      const [assignment] = await db
+        .insert(schema.productMaterial)
+        .values({ productId })
+        .returning({ id: schema.productMaterial.id });
+      if (!assignment) throw new Error("Failed to assign Saga material.");
+      await db.insert(schema.productMaterialComponent).values({
+        materialId: material.id,
+        productMaterialId: assignment.id,
+      });
+      assignmentId = assignment.id;
+      assignmentByMaterial.set(material.id, assignment.id);
+      created.push(material.name);
+    }
   }
   return created;
 }
@@ -1037,8 +1079,15 @@ async function loadAssignedMaterialNames(
     .select({ name: schema.material.name })
     .from(schema.productMaterial)
     .innerJoin(
+      schema.productMaterialComponent,
+      eq(
+        schema.productMaterialComponent.productMaterialId,
+        schema.productMaterial.id,
+      ),
+    )
+    .innerJoin(
       schema.material,
-      eq(schema.productMaterial.materialId, schema.material.id),
+      eq(schema.productMaterialComponent.materialId, schema.material.id),
     )
     .where(eq(schema.productMaterial.productId, productId));
   return new Set(rows.map((row) => normalizeName(row.name)));

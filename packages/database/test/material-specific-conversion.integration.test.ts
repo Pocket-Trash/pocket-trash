@@ -46,7 +46,7 @@ it("converts populated M390 without merging generic assignments or changing imag
   await migrate(db, { migrationsFolder });
   await expect(
     database.query(`SELECT material_id::int, material_specific_id::int
-    FROM product_material ORDER BY material_specific_id NULLS FIRST`),
+    FROM product_material_component ORDER BY material_specific_id NULLS FIRST`),
   ).resolves.toMatchObject({
     rows: [
       { material_id: 1000, material_specific_id: null },
@@ -55,7 +55,7 @@ it("converts populated M390 without merging generic assignments or changing imag
   });
   await expect(
     database.query(`SELECT material_id::int, material_specific_id::int
-    FROM collection_item`),
+    FROM collection_item_material`),
   ).resolves.toMatchObject({
     rows: [{ material_id: 1000, material_specific_id: 1000 }],
   });

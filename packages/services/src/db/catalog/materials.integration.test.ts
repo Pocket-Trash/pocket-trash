@@ -91,10 +91,14 @@ describe("public material directory", () => {
       await db
         .insert(schema.productDetailSpinner)
         .values(products.map(({ id }) => ({ id })));
-      await db.insert(schema.productMaterial).values(
-        products.map(({ id }) => ({
+      const productMaterials = await db
+        .insert(schema.productMaterial)
+        .values(products.map(({ id }) => ({ productId: id })))
+        .returning({ id: schema.productMaterial.id });
+      await db.insert(schema.productMaterialComponent).values(
+        productMaterials.map(({ id }) => ({
           materialId: aluminum.id,
-          productId: id,
+          productMaterialId: id,
         })),
       );
 
@@ -131,7 +135,6 @@ describe("public material directory", () => {
             approvalStatus: "approved",
             collectionId: collections[0].id,
             isPrivate: false,
-            materialId: steel.id,
             ownerId: owner.id,
             owned: true,
           },
@@ -139,7 +142,6 @@ describe("public material directory", () => {
             approvalStatus: "approved",
             collectionId: collections[0].id,
             isPrivate: false,
-            materialId: steel.id,
             ownerId: owner.id,
             owned: false,
             soldAt: new Date(),
@@ -148,7 +150,6 @@ describe("public material directory", () => {
             approvalStatus: "approved",
             collectionId: collections[1].id,
             isPrivate: false,
-            materialId: steel.id,
             ownerId: owner.id,
             owned: true,
           },
@@ -156,7 +157,6 @@ describe("public material directory", () => {
             approvalStatus: "pending",
             collectionId: collections[0].id,
             isPrivate: false,
-            materialId: steel.id,
             ownerId: owner.id,
             owned: true,
           },
@@ -164,12 +164,17 @@ describe("public material directory", () => {
             approvalStatus: "approved",
             collectionId: collections[0].id,
             isPrivate: false,
-            materialId: steel.id,
             ownerId: owner.id,
             owned: true,
           },
         ])
         .returning();
+      await db.insert(schema.collectionItemMaterial).values(
+        items.map(({ id }) => ({
+          collectionItemId: id,
+          materialId: steel.id,
+        })),
+      );
       await db.insert(schema.collectionDetailSpinner).values(
         items.map(({ id }, index) => ({
           id,
@@ -269,32 +274,28 @@ describe("public material directory", () => {
         .returning();
       if (!alpha || !beta || !empty || !hidden || !retained)
         throw new Error("Missing specific fixtures.");
-      await db.insert(schema.productMaterial).values([
-        {
-          productId: products[0].id,
+      const specificProductMaterials = await db
+        .insert(schema.productMaterial)
+        .values([
+          { productId: products[0].id },
+          { productId: products[0].id },
+          { productId: products[1]?.id ?? 0 },
+          { productId: products[2]?.id ?? 0 },
+        ])
+        .returning({ id: schema.productMaterial.id });
+      await db.insert(schema.productMaterialComponent).values(
+        [alpha, beta, hidden, hidden].map((specific, index) => ({
           materialId: aluminum.id,
-          materialSpecificId: alpha.id,
-        },
-        {
-          productId: products[0].id,
-          materialId: aluminum.id,
-          materialSpecificId: beta.id,
-        },
-        {
-          productId: products[1]?.id ?? 0,
-          materialId: aluminum.id,
-          materialSpecificId: hidden.id,
-        },
-        {
-          productId: products[2]?.id ?? 0,
-          materialId: aluminum.id,
-          materialSpecificId: hidden.id,
-        },
-      ]);
+          materialSpecificId: specific.id,
+          productMaterialId: specificProductMaterials[index]!.id,
+        })),
+      );
       await db
-        .update(schema.collectionItem)
+        .update(schema.collectionItemMaterial)
         .set({ materialSpecificId: retained.id })
-        .where(eq(schema.collectionItem.id, items[0]?.id ?? 0));
+        .where(
+          eq(schema.collectionItemMaterial.collectionItemId, items[0]?.id ?? 0),
+        );
       await db.insert(schema.materialImage).values([
         {
           contentType: "image/webp",
@@ -393,7 +394,7 @@ describe("public material directory", () => {
       ).toBe(1);
       expect(
         (await service.getPublicMaterial("steel", "retained"))
-          ?.collectionItems[0]?.material?.specific?.id,
+          ?.collectionItems[0]?.materials[0]?.specific?.id,
       ).toBe(retained.id);
       await expect(
         service.getPublicMaterial("steel", "alpha"),
@@ -418,12 +419,7 @@ describe("public material directory", () => {
       ).toBe("alpha-1.webp");
       await db
         .delete(schema.productMaterial)
-        .where(
-          and(
-            eq(schema.productMaterial.materialId, aluminum.id),
-            eq(schema.productMaterial.materialSpecificId, alpha.id),
-          ),
-        );
+        .where(eq(schema.productMaterial.id, specificProductMaterials[0]!.id));
       expect(
         (await service.listPublicMaterials()).find(
           ({ id }) => id === aluminum.id,
@@ -514,8 +510,6 @@ describe("public material directory", () => {
           Array.from({ length: 5 }, (_, index) => ({
             ownerId: owner.id,
             collectionId: collection.id,
-            materialId: material.id,
-            materialSpecificId: index === 0 || index === 3 ? null : specific.id,
             approvalStatus: "approved" as const,
             owned: true,
             isPrivate: index === 1 || index === 3,
@@ -525,6 +519,13 @@ describe("public material directory", () => {
           })),
         )
         .returning();
+      await db.insert(schema.collectionItemMaterial).values(
+        items.map(({ id }, index) => ({
+          collectionItemId: id,
+          materialId: material.id,
+          materialSpecificId: index === 0 || index === 3 ? null : specific.id,
+        })),
+      );
       const [
         publicParent,
         ownedPlate,

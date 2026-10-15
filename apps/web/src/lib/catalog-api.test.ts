@@ -37,7 +37,9 @@ const base = {
   makerId: 1000,
   makerProductUrl: "",
   magnetLayout: null,
-  materialAssignments: [{ materialId: 1000, materialSpecificId: null }],
+  materialAssignments: [
+    { materials: [{ materialId: 1000, materialSpecificId: null }] },
+  ],
   name: "Spinner",
   productId: null,
   productTypeSlug: "spinner" as const,
@@ -200,6 +202,38 @@ describe("product appearance options", () => {
   });
 
   it("rejects duplicate components and duplicate options", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        materialAssignments: [
+          {
+            materials: [
+              { materialId: 1000, materialSpecificId: null },
+              { materialId: 1000, materialSpecificId: null },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        materialAssignments: [
+          {
+            materials: [
+              { materialId: 1000, materialSpecificId: null },
+              { materialId: 2000, materialSpecificId: null },
+            ],
+          },
+          {
+            materials: [
+              { materialId: 2000, materialSpecificId: null },
+              { materialId: 1000, materialSpecificId: null },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
     expect(
       productFormSchema.safeParse({
         ...base,
@@ -573,8 +607,12 @@ describe("slider catalog product validation", () => {
         ...base,
         magnetLayout: "2x4",
         materialAssignments: [
-          { materialId: 1000, materialSpecificId: null },
-          { materialId: 2000, materialSpecificId: null },
+          {
+            materials: [{ materialId: 1000, materialSpecificId: null }],
+          },
+          {
+            materials: [{ materialId: 2000, materialSpecificId: null }],
+          },
         ],
         productTypeSlug: "slider-insert",
       }).success,

@@ -15,6 +15,12 @@ describe("catalog schema", () => {
     );
     const product = getTableConfig(schema.product);
     const productMaterial = getTableConfig(schema.productMaterial);
+    const productMaterialComponent = getTableConfig(
+      schema.productMaterialComponent,
+    );
+    const collectionItemMaterial = getTableConfig(
+      schema.collectionItemMaterial,
+    );
     const material = getTableConfig(schema.material);
     const materialImage = getTableConfig(schema.materialImage);
     const maker = getTableConfig(schema.maker);
@@ -44,11 +50,42 @@ describe("catalog schema", () => {
       "updated_at",
     ]);
     expect(schema.productMaterial.id.primary).toBe(true);
-    expect(productMaterial.uniqueConstraints.map(({ name }) => name)).toContain(
-      "product_material_assignment_unique",
+    expect(productMaterial.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "product_id",
+    ]);
+    expect(
+      productMaterialComponent.uniqueConstraints.map(({ name }) => name),
+    ).toContain("product_material_component_unique");
+    expect(
+      productMaterialComponent.indexes.map(({ config }) => config.name),
+    ).toEqual(
+      expect.arrayContaining([
+        "product_material_component_assignment_id_idx",
+        "product_material_component_material_id_idx",
+      ]),
     );
-    expect(productMaterial.indexes.map(({ config }) => config.name)).toContain(
-      "product_material_material_id_idx",
+    expect(
+      productMaterialComponent.foreignKeys.map(({ reference }) =>
+        reference().columns.map(({ name }) => name),
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        ["product_material_id"],
+        ["material_id"],
+        ["material_id", "material_specific_id"],
+      ]),
+    );
+    expect(
+      collectionItemMaterial.uniqueConstraints.map(({ name }) => name),
+    ).toContain("collection_item_material_unique");
+    expect(
+      collectionItemMaterial.indexes.map(({ config }) => config.name),
+    ).toEqual(
+      expect.arrayContaining([
+        "collection_item_material_item_id_idx",
+        "collection_item_material_material_id_idx",
+      ]),
     );
     expect(
       material.columns.find(({ name }) => name === "description")?.notNull,
@@ -96,10 +133,9 @@ describe("catalog schema", () => {
         "pattern_slug_unique",
       ]),
     );
-    expect(
-      collectionItem.columns.find(({ name }) => name === "material_id")
-        ?.notNull,
-    ).toBe(false);
+    expect(collectionItem.columns.map(({ name }) => name)).not.toEqual(
+      expect.arrayContaining(["material_id", "material_specific_id"]),
+    );
     expect(maker.columns.find(({ name }) => name === "root_url")?.notNull).toBe(
       false,
     );
@@ -124,9 +160,6 @@ describe("catalog schema", () => {
       collectionItem.columns.find(({ name }) => name === "description")
         ?.notNull,
     ).toBe(false);
-    expect(collectionItem.indexes.map(({ config }) => config.name)).toContain(
-      "collection_item_material_public_idx",
-    );
     expect(
       product.columns.find(({ name }) => name === "maker_product_url_valid")
         ?.hasDefault,

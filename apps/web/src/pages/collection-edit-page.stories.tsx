@@ -10,7 +10,6 @@ import { CollectionEditPage } from "./catalog-form-pages";
 
 /** Material shared by the slider assembly story fixtures. */
 const material = {
-  assignmentId: 1000,
   specific: null,
   id: 1000,
   name: "Titanium",
@@ -63,7 +62,7 @@ function product(
     makerProductUrlValid: true,
     makerUrl: null,
     magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
-    materials: [material],
+    materials: [{ assignmentId: 1000, materials: [material] }],
     name,
     refillModel: null,
     refillOfferings: [],
@@ -139,7 +138,7 @@ function item(
     makerName: catalogProduct.makerName,
     makerSlug: catalogProduct.makerSlug,
     makerUrl: null,
-    material,
+    materials: [material],
     name: catalogProduct.name,
     ownerClerkId: "user_storybook",
     ownerUserId: 1000,

@@ -34,7 +34,7 @@ import { CollectionGallery } from "@/components/collection-gallery";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
-import { MaterialLink } from "@/components/material-link";
+import { MaterialCombinationLinks } from "@/components/material-link";
 import { PaginatedCards } from "@/components/paginated-cards";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
@@ -748,9 +748,9 @@ export function ProductDetailPage({
           ) : null}
           <Detail label={t("web.catalog.field.materials")}>
             <ul className="flex flex-wrap gap-x-3 gap-y-1">
-              {product.materials.map((material) => (
-                <li key={material.assignmentId}>
-                  <MaterialLink material={material} />
+              {product.materials.map((assignment) => (
+                <li key={assignment.assignmentId}>
+                  <MaterialCombinationLinks materials={assignment.materials} />
                 </li>
               ))}
             </ul>
@@ -1555,9 +1555,9 @@ export function CollectionPage({
                     )}
                   </p>
                 ) : null}
-                {item.material ? (
+                {item.materials.length ? (
                   <p className="mt-3 text-xs text-muted-foreground">
-                    <MaterialLink material={item.material} />
+                    <MaterialCombinationLinks materials={item.materials} />
                   </p>
                 ) : null}
                 {item.finishOption ? (
@@ -2010,9 +2010,9 @@ export function CollectionItemDetailPage({
               {item.serialNumber}
             </Detail>
           ) : null}
-          {item.material ? (
+          {item.materials.length ? (
             <Detail label={t("web.catalog.field.materials")}>
-              <MaterialLink material={item.material} />
+              <MaterialCombinationLinks materials={item.materials} />
             </Detail>
           ) : null}
           {item.finishOption ? (
@@ -2025,9 +2025,11 @@ export function CollectionItemDetailPage({
               {installedButton ? (
                 <div className="grid gap-1">
                   <span>{installedButton.displayName}</span>
-                  {installedButton.material ? (
+                  {installedButton.materials.length ? (
                     <span className="text-sm text-muted-foreground">
-                      <MaterialLink material={installedButton.material} />
+                      <MaterialCombinationLinks
+                        materials={installedButton.materials}
+                      />
                     </span>
                   ) : null}
                   {installedButton.finishOption ? (

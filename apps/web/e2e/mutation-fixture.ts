@@ -166,10 +166,16 @@ export async function createMutationFixture({
     await transaction
       .insert(schema.productDetailSpinnerButton)
       .values({ id: button.id });
-    await transaction.insert(schema.productMaterial).values([
-      { materialId: material.id, productId: spinner.id },
-      { materialId: material.id, productId: button.id },
-    ]);
+    const productMaterials = await transaction
+      .insert(schema.productMaterial)
+      .values([{ productId: spinner.id }, { productId: button.id }])
+      .returning({ id: schema.productMaterial.id });
+    await transaction.insert(schema.productMaterialComponent).values(
+      productMaterials.map(({ id }) => ({
+        materialId: material.id,
+        productMaterialId: id,
+      })),
+    );
     const finishOptions = await transaction
       .insert(schema.finishOption)
       .values([

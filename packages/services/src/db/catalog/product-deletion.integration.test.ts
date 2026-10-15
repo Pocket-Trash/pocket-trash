@@ -102,9 +102,15 @@ describe("product deletion", () => {
           { id: spinner.id, bearing: "R188", compatibleButtonId: button.id },
           { id: oversized.id },
         ]);
-      await db
+      const [productMaterial] = await db
         .insert(schema.productMaterial)
-        .values({ productId: spinner.id, materialId: material.id });
+        .values({ productId: spinner.id })
+        .returning({ id: schema.productMaterial.id });
+      if (!productMaterial) throw new Error("Product material missing.");
+      await db.insert(schema.productMaterialComponent).values({
+        materialId: material.id,
+        productMaterialId: productMaterial.id,
+      });
       const [option] = await db
         .insert(schema.finishOption)
         .values({ productId: spinner.id, position: 0 })
@@ -342,7 +348,12 @@ describe("product deletion", () => {
           description: "Catalog description",
           bearing: "R188",
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              assignmentId: productMaterial.id,
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           finishOptions: [{ id: option.id, finishIds: [finish.id] }],
           images: expect.any(Array),

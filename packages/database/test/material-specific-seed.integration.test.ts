@@ -31,8 +31,9 @@ it("seeds canonical M390 and preserves both Bar Cell Mini offers and their IDs o
   expect(await db.select().from(schema.materialSpecific)).toEqual(specifics);
   const rows =
     await client.query(`SELECT m.slug, s.slug AS specific FROM product_material a
-    JOIN product p ON p.id = a.product_id JOIN materials m ON m.id = a.material_id
-    LEFT JOIN material_specific s ON s.id = a.material_specific_id
+    JOIN product_material_component c ON c.product_material_id = a.id
+    JOIN product p ON p.id = a.product_id JOIN materials m ON m.id = c.material_id
+    LEFT JOIN material_specific s ON s.id = c.material_specific_id
     WHERE p.slug = 'bar-cell-mini' AND m.slug = 'stainless-steel' ORDER BY s.slug NULLS FIRST`);
   expect(rows.rows).toEqual([
     { slug: "stainless-steel", specific: null },

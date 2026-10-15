@@ -135,7 +135,6 @@ describe("owned Pens and Pen parts", () => {
         .insert(schema.productMaterial)
         .values(
           penProductTypes.map((slug) => ({
-            materialId: material.id,
             productId: productId.get(slug)!,
           })),
         )
@@ -143,6 +142,12 @@ describe("owned Pens and Pen parts", () => {
           id: schema.productMaterial.id,
           productId: schema.productMaterial.productId,
         });
+      await db.insert(schema.productMaterialComponent).values(
+        materialAssignments.map(({ id }) => ({
+          materialId: material.id,
+          productMaterialId: id,
+        })),
+      );
       const materialIdByProduct = new Map(
         materialAssignments.map((assignment) => [
           assignment.productId,
