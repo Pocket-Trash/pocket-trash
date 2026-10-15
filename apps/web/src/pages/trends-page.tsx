@@ -1,4 +1,5 @@
 import type {
+  PublicActivityTrends,
   PublicCollectionItemTrends,
   PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
@@ -11,6 +12,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { ActivityTrendsChart } from "@/components/activity-trends-chart";
 import { AppShell } from "@/components/app-shell";
 import { CatalogTrendsChart } from "@/components/catalog-trends-chart";
 import { TrendVisualization } from "@/components/trend-visualization";
@@ -80,10 +82,24 @@ type TrendsTranslationKey =
   | "web.trends.makerProductsPrivacy"
   | "web.trends.makerProductsStale"
   | "web.trends.makerProductsSuppressed"
-  | "web.trends.viewProducts";
+  | "web.trends.viewProducts"
+  | "web.trends.activity"
+  | "web.trends.activityChartLabel"
+  | "web.trends.activityDate"
+  | "web.trends.activityPrivacy"
+  | "web.trends.activityRange"
+  | "web.trends.addedToPocketTrash"
+  | "web.trends.catalogRecordsAdded"
+  | "web.trends.range30Days"
+  | "web.trends.range6Months"
+  | "web.trends.rangeAll"
+  | "web.trends.rangeWeek"
+  | "web.trends.rangeYear";
 
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
+  /** Exact catalog and privacy-safe app-wide record creation activity. */
+  activityTrends?: PublicActivityTrends;
   /** Exact approved public catalog-product material counts. */
   catalogMaterialTrends: PublicMaterialTrend[];
   /** Active privacy-safe material generation. */
@@ -114,6 +130,7 @@ export type TrendsPageProps = {
  * @returns The accessible public Trends page.
  */
 export function TrendsPage({
+  activityTrends = { granularity: "month", range: "year", values: [] },
   catalogMaterialTrends,
   collectionMaterialTrends,
   collectionTrends,
@@ -486,6 +503,76 @@ export function TrendsPage({
             </SelectContent>
           </Select>
         </div>
+
+        <section aria-labelledby="activity-trends-title" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold" id="activity-trends-title">
+              {t("web.trends.activity")}
+            </h2>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold" id="activity-range-label">
+                {t("web.trends.activityRange")}
+              </span>
+              <Select
+                onValueChange={(range) =>
+                  onSearchChange({
+                    ...search,
+                    range: range as CatalogTrendsSearch["range"],
+                  })
+                }
+                value={search.range ?? "year"}
+              >
+                <SelectTrigger
+                  aria-labelledby="activity-range-label"
+                  className="min-w-40"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="week">
+                    {t("web.trends.rangeWeek")}
+                  </SelectItem>
+                  <SelectItem value="30-days">
+                    {t("web.trends.range30Days")}
+                  </SelectItem>
+                  <SelectItem value="6-months">
+                    {t("web.trends.range6Months")}
+                  </SelectItem>
+                  <SelectItem value="year">
+                    {t("web.trends.rangeYear")}
+                  </SelectItem>
+                  <SelectItem value="all">
+                    {t("web.trends.rangeAll")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <ActivityTrendsChart
+            chartLabel={t("web.trends.activityChartLabel")}
+            dateLabel={t("web.trends.activityDate")}
+            locale={locale}
+            series={[
+              {
+                name: t("web.trends.catalogRecordsAdded"),
+                values: activityTrends.values.map((value) => ({
+                  bucketStart: value.bucketStart,
+                  count: value.catalogCount,
+                })),
+              },
+              {
+                name: t("web.trends.addedToPocketTrash"),
+                values: activityTrends.values.map((value) => ({
+                  bucketStart: value.bucketStart,
+                  count: value.collectionCount,
+                })),
+              },
+            ]}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("web.trends.activityPrivacy")}
+          </p>
+        </section>
 
         <h2 className="text-lg font-semibold">
           {t("web.trends.catalogProducts")}

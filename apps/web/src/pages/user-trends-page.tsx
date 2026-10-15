@@ -1,8 +1,9 @@
-import type { UserCollectionItem } from "@package/services";
+import type { UserActivityTrends, UserCollectionItem } from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { ActivityTrendsChart } from "@/components/activity-trends-chart";
 import { CompositionComparison } from "@/components/composition-comparison";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
@@ -40,6 +41,11 @@ type UserTrendsTranslationKey =
   | "web.userTrends.personalPercentage"
   | "web.userTrends.privateNote"
   | "web.userTrends.title"
+  | "web.trends.activity"
+  | "web.trends.activityChartLabel"
+  | "web.trends.activityDate"
+  | "web.trends.activityRange"
+  | "web.trends.addedToPocketTrash"
   | "web.trends.allMakers"
   | "web.trends.allMaterials"
   | "web.trends.allMaterialSpecifics"
@@ -54,6 +60,11 @@ type UserTrendsTranslationKey =
   | "web.trends.materialSpecific"
   | "web.trends.product"
   | "web.trends.productsChartLabel"
+  | "web.trends.range30Days"
+  | "web.trends.range6Months"
+  | "web.trends.rangeAll"
+  | "web.trends.rangeWeek"
+  | "web.trends.rangeYear"
   | "web.trends.unspecifiedMaterial"
   | "web.trends.viewProducts";
 
@@ -74,12 +85,15 @@ type UserTrendOptionIdentifier = (
  * @returns Private, accessible personal Trends page.
  */
 export function UserTrendsPage({
+  activityTrends = { granularity: "month", range: "year", values: [] },
   collectionCount,
   communityTrends,
   items,
   onSearchChange,
   search,
 }: {
+  /** Exact owner-scoped collection-item creation activity. */
+  activityTrends?: UserActivityTrends;
   /** Number of collections owned by the signed-in user. */
   collectionCount: number;
   /** Active privacy-safe public generations, available only to the owner view. */
@@ -296,6 +310,65 @@ export function UserTrendsPage({
             </p>
           </div>
         ) : null}
+
+        <section
+          aria-labelledby="user-activity-trends-title"
+          className="space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2
+              className="text-lg font-semibold"
+              id="user-activity-trends-title"
+            >
+              {t("web.trends.activity")}
+            </h2>
+            <Select
+              onValueChange={(range) =>
+                onSearchChange({
+                  ...search,
+                  range: range as CatalogTrendsSearch["range"],
+                })
+              }
+              value={search.range ?? "year"}
+            >
+              <SelectTrigger
+                aria-label={t("web.trends.activityRange")}
+                className="w-44"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">
+                  {t("web.trends.rangeWeek")}
+                </SelectItem>
+                <SelectItem value="30-days">
+                  {t("web.trends.range30Days")}
+                </SelectItem>
+                <SelectItem value="6-months">
+                  {t("web.trends.range6Months")}
+                </SelectItem>
+                <SelectItem value="year">
+                  {t("web.trends.rangeYear")}
+                </SelectItem>
+                <SelectItem value="all">{t("web.trends.rangeAll")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <ActivityTrendsChart
+            chartLabel={t("web.trends.activityChartLabel")}
+            dateLabel={t("web.trends.activityDate")}
+            locale={locale}
+            series={[
+              {
+                name: t("web.trends.addedToPocketTrash"),
+                values: activityTrends.values.map((value) => ({
+                  bucketStart: value.bucketStart,
+                  count: value.count,
+                })),
+              },
+            ]}
+          />
+        </section>
 
         {visualizations.map((visualization) => {
           const comparison = visualization.community

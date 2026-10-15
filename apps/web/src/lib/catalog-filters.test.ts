@@ -107,13 +107,20 @@ describe("catalog filters", () => {
         materialId: "12",
         materialSpecificId: "13",
         productTypeId: "14",
+        range: "6-months",
       }),
-    ).toEqual({ materialId: 12, materialSpecificId: 13, productTypeId: 14 });
+    ).toEqual({
+      materialId: 12,
+      materialSpecificId: 13,
+      productTypeId: 14,
+      range: "6-months",
+    });
     expect(
       parseCatalogTrendsSearch({
         materialId: 0,
         materialSpecificId: 13,
         productTypeId: -1,
+        range: "forever",
       }),
     ).toEqual({});
   });

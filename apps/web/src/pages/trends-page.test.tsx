@@ -227,7 +227,11 @@ describe("TrendsPage", () => {
       /<div data-chart="pie-drilldown"[\s\S]*?<\/div>/,
     )?.[0];
     const details = html.match(/<details[\s\S]*?<\/details>/)?.[0];
-    const table = html.match(/<table[\s\S]*?<\/table>/)?.[0];
+    const table = html
+      .match(/<table[\s\S]*?<\/table>/g)
+      ?.find((candidate) =>
+        candidate.includes("Catalog products by product type"),
+      );
 
     expect(chart).toContain('data-chart="pie-drilldown"');
     expect(chart).toContain("Other");

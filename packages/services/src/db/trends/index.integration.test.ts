@@ -181,6 +181,23 @@ describe("public collection-item Trends", () => {
           new Date(generatedAt.getTime() + PUBLIC_TRENDS_STALE_MS + 1),
         ),
       ).toMatchObject({ stale: true });
+      const activityNow = new Date("2030-01-01T00:00:00.000Z");
+      const activity = await createTrendsService(
+        db as unknown as Database,
+      ).getPublicActivityTrends("all", activityNow);
+      expect(activity).toMatchObject({ granularity: "month", range: "all" });
+      expect(activity.values).toContainEqual(
+        expect.objectContaining({ catalogCount: 3, collectionCount: 20 }),
+      );
+      await expect(
+        createTrendsService(db as unknown as Database).getUserActivityTrends(
+          "owner-0",
+          "all",
+          activityNow,
+        ),
+      ).resolves.toMatchObject({
+        values: [expect.objectContaining({ count: 5 })],
+      });
     } finally {
       await client.close();
     }

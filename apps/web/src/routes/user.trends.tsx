@@ -3,6 +3,7 @@ import {
   getPublicCollectionItemTrends,
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
+  getUserActivityTrends,
   getUserCollection,
   getUserCollections,
 } from "@/lib/catalog-api";
@@ -13,20 +14,38 @@ import { UserTrendsPage } from "@/pages/user-trends-page";
 export const Route = createFileRoute("/user/trends")({
   validateSearch: parseCatalogTrendsSearch,
   /**
+   * Reloads private activity when the URL-backed range changes.
+   *
+   * @param context - Route dependency context.
+   * @param context.search - Validated Trends URL state.
+   * @returns Selected activity range.
+   */
+  loaderDeps: ({ search }) => ({ range: search.range ?? "year" }),
+  /**
    * Loads owner-scoped current items and collection summaries.
    *
+   * @param root0 - Route loader context.
+   * @param root0.deps - Validated activity range.
    * @returns Owner-scoped items and exact collection count.
    */
-  loader: async () => {
-    const [items, collections, collectionItems, makerProducts, materials] =
-      await Promise.all([
-        getUserCollection(),
-        getUserCollections(),
-        getPublicCollectionItemTrends(),
-        getPublicCollectionMakerProductTrends(),
-        getPublicCollectionMaterialTrends(),
-      ]);
+  loader: async ({ deps }) => {
+    const [
+      items,
+      collections,
+      activityTrends,
+      collectionItems,
+      makerProducts,
+      materials,
+    ] = await Promise.all([
+      getUserCollection(),
+      getUserCollections(),
+      getUserActivityTrends({ data: deps.range }),
+      getPublicCollectionItemTrends(),
+      getPublicCollectionMakerProductTrends(),
+      getPublicCollectionMaterialTrends(),
+    ]);
     return {
+      activityTrends,
       collectionCount: collections.length,
       communityTrends: { collectionItems, makerProducts, materials },
       items,
@@ -42,10 +61,12 @@ export const Route = createFileRoute("/user/trends")({
  */
 function UserTrendsRoute() {
   const navigate = useNavigate();
-  const { collectionCount, communityTrends, items } = Route.useLoaderData();
+  const { activityTrends, collectionCount, communityTrends, items } =
+    Route.useLoaderData();
   const search = Route.useSearch();
   return (
     <UserTrendsPage
+      activityTrends={activityTrends}
       collectionCount={collectionCount}
       communityTrends={communityTrends}
       items={items}
