@@ -1,4 +1,7 @@
-import type { PublicProductTypeTrend } from "@package/services";
+import type {
+  PublicProductTypeTrend,
+  PublicSpinnerTrends,
+} from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { TrendsPage } from "./trends-page";
@@ -28,12 +31,13 @@ vi.mock("@/components/catalog-trends-chart", () => ({
 
 vi.mock("@pocket-trash/localizations", () => ({
   /**
-   * Supplies pending localization copy to the stacked application test.
+   * Supplies deterministic localization copy to the page test.
    *
    * @param key - Localization key.
+   * @param values - Named interpolation values.
    * @returns English copy or the unchanged key.
    */
-  formatTranslation: (key: string) => {
+  formatTranslation: (key: string, values: Record<string, string> = {}) => {
     return (
       {
         "web.trends.approximateCollectors": "Approximate collectors",
@@ -82,6 +86,14 @@ vi.mock("@pocket-trash/localizations", () => ({
         "web.trends.partsAndAccessories": "Parts and Accessories",
         "web.trends.partsAndAccessoriesChartLabel":
           "Currently owned Parts and Accessories by product type",
+        "web.trends.coverage": `${values.coverage}% coverage`,
+        "web.trends.exactValues": "Exact values",
+        "web.trends.spinnerDescription": "Spinner details",
+        "web.trends.spinnerPrivacy": "Collection counts are privacy safe.",
+        "web.trends.spinnerSuppressed": "Some values are hidden.",
+        "web.trends.spinnerTitle": "Spinner details",
+        "web.trends.suppressed": "Suppressed",
+        "web.trends.value": "Value",
       }[key] ?? key
     );
   },
@@ -129,7 +141,61 @@ const trends: PublicProductTypeTrend[] = Array.from(
   }),
 );
 
+/** Coverage-qualified Spinner Trends used by product-type drill-down tests. */
+const spinnerTrends: PublicSpinnerTrends = {
+  catalogProductCount: 10,
+  productTypeId: 1000,
+  trends: [
+    {
+      coveragePercent: 80,
+      hasSuppressedCollectionValues: true,
+      metric: "maker",
+      unit: null,
+      values: [
+        {
+          catalogCount: 8,
+          collectionCount: null,
+          key: "42",
+          label: "Example Maker",
+          numericValue: null,
+        },
+      ],
+    },
+  ],
+};
+
 describe("TrendsPage", () => {
+  it("shows Spinner details only for the selected Spinner product type", () => {
+    const selected = renderToStaticMarkup(
+      <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
+        collectionTrends={null}
+        onSearchChange={vi.fn()}
+        search={{ productTypeId: 1000 }}
+        spinnerTrends={spinnerTrends}
+        trends={trends}
+      />,
+    );
+    const unselected = renderToStaticMarkup(
+      <TrendsPage
+        catalogMaterialTrends={[]}
+        collectionMaterialTrends={null}
+        collectionTrends={null}
+        onSearchChange={vi.fn()}
+        spinnerTrends={spinnerTrends}
+        trends={trends}
+      />,
+    );
+
+    expect(selected).toContain("80% coverage");
+    expect(selected).toContain("Example Maker");
+    expect(selected).toContain("Some values are hidden.");
+    expect(selected).toContain("<summary");
+    expect(selected).not.toContain("<details open");
+    expect(unselected).not.toContain("Example Maker");
+  });
+
   it("keeps stable maker filters, ranks products by collectors, and preserves all table rows", () => {
     const productValues = Array.from({ length: 10 }, (_, index) => ({
       collectorCount: (10 - index) * 5,

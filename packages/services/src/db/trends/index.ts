@@ -1,13 +1,28 @@
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { asc, desc, eq, sql } from "drizzle-orm";
+import {
+  PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
+  PUBLIC_TRENDS_ROUNDING_INCREMENT,
+  PUBLIC_TRENDS_STALE_MS,
+} from "./constants.js";
+import { getPublicSpinnerTrends as loadPublicSpinnerTrends } from "./spinner.js";
 
-/** Minimum distinct owners required before a collection-derived value is public. */
-export const PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD = 5;
-/** Collection-derived public counts are rounded to this increment. */
-export const PUBLIC_TRENDS_ROUNDING_INCREMENT = 5;
-/** Age after which the active public generation is marked stale. */
-export const PUBLIC_TRENDS_STALE_MS = 36 * 60 * 60 * 1000;
+export {
+  PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
+  PUBLIC_TRENDS_ROUNDING_INCREMENT,
+  PUBLIC_TRENDS_STALE_MS,
+} from "./constants.js";
+export type {
+  PublicSpinnerTrend,
+  PublicSpinnerTrends,
+  PublicSpinnerTrendValue,
+  SpinnerTrendMetricId,
+} from "./spinner.js";
+export {
+  SPINNER_TRENDS_COVERAGE_THRESHOLD,
+  spinnerTrendMetricIds,
+} from "./spinner.js";
 
 /** Stable time ranges offered by recorded-activity Trends. */
 export const activityTrendRanges = [
@@ -258,6 +273,16 @@ export function createTrendsService(
   hooks: PublicTrendsRefreshHooks = {},
 ) {
   return {
+    /**
+     * Reads coverage-qualified Spinner characteristics with privacy-safe item counts.
+     *
+     * @returns Public Spinner Trends, or null when the Spinner type is absent.
+     * @rejects When a database query fails.
+     */
+    async getPublicSpinnerTrends() {
+      return await loadPublicSpinnerTrends(db);
+    },
+
     /**
      * Reads exact catalog and privacy-safe collection record creation activity.
      *

@@ -224,6 +224,10 @@ export type {
   PublicMaterialTrend,
   PublicPartAccessoryProductTypeTrend,
   PublicPartAccessoryTrends,
+  PublicSpinnerTrend,
+  PublicSpinnerTrends,
+  PublicSpinnerTrendValue,
+  SpinnerTrendMetricId,
   TrendsService,
   UserActivityTrendPoint,
   UserActivityTrends,
@@ -235,6 +239,8 @@ export {
   PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,
+  SPINNER_TRENDS_COVERAGE_THRESHOLD,
+  spinnerTrendMetricIds,
 } from "./trends/index.js";
 export type {
   UpsertUserSettingsInput,
