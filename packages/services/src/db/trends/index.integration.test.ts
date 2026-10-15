@@ -182,6 +182,76 @@ describe("public collection-item Trends", () => {
         ),
       ).toMatchObject({ stale: true });
       const activityNow = new Date("2030-01-01T00:00:00.000Z");
+      const lifecycle = await createTrendsService(
+        db as unknown as Database,
+      ).getPublicCollectionLifecycleTrends(
+        "all",
+        { productTypeId: fixture.sliderTypeId },
+        activityNow,
+      );
+      expect(lifecycle).toMatchObject({
+        generatedAt,
+        granularity: "month",
+        hasSuppressedValues: false,
+        range: "all",
+        stale: true,
+        values: [
+          {
+            acquisitionCount: 10,
+            bucketStart: new Date("2026-01-01T00:00:00.000Z"),
+            departureCount: 5,
+          },
+        ],
+      });
+      await expect(
+        createTrendsService(
+          db as unknown as Database,
+        ).getPublicCollectionLifecycleTrends(
+          "week",
+          { productTypeId: fixture.sliderTypeId },
+          new Date("2026-01-20T00:00:00.000Z"),
+        ),
+      ).resolves.toMatchObject({
+        granularity: "day",
+        range: "week",
+        values: [
+          expect.objectContaining({
+            acquisitionCount: 10,
+            bucketStart: new Date("2026-01-15T00:00:00.000Z"),
+            departureCount: 0,
+          }),
+        ],
+      });
+      await expect(
+        createTrendsService(
+          db as unknown as Database,
+        ).getPublicCollectionLifecycleTrends(
+          "all",
+          { productTypeId: fixture.spinnerTypeId },
+          activityNow,
+        ),
+      ).resolves.toMatchObject({
+        hasSuppressedValues: true,
+        values: [
+          expect.objectContaining({
+            acquisitionCount: null,
+          }),
+        ],
+      });
+      expect(
+        await db.select().from(schema.publicCollectionLifecycleTrend),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            roundedCount: null,
+            suppressed: true,
+          }),
+          expect.objectContaining({
+            roundedCount: 10,
+            suppressed: false,
+          }),
+        ]),
+      );
       const activity = await createTrendsService(
         db as unknown as Database,
       ).getPublicActivityTrends("all", activityNow);
@@ -372,6 +442,13 @@ describe("public collection-item Trends", () => {
       expect(
         await service.getPublicCollectionItemTrends(secondGeneratedAt),
       ).toMatchObject({ generatedAt: secondGeneratedAt });
+      expect(
+        await service.getPublicCollectionLifecycleTrends(
+          "all",
+          {},
+          secondGeneratedAt,
+        ),
+      ).toMatchObject({ generatedAt: secondGeneratedAt });
 
       const failing = createTrendsService(db as unknown as Database, {
         /**
@@ -392,8 +469,109 @@ describe("public collection-item Trends", () => {
         await service.getPublicCollectionItemTrends(secondGeneratedAt),
       ).toMatchObject({ generatedAt: secondGeneratedAt });
       expect(
+        await service.getPublicCollectionLifecycleTrends(
+          "all",
+          {},
+          secondGeneratedAt,
+        ),
+      ).toMatchObject({ generatedAt: secondGeneratedAt });
+      expect(
         await db.select().from(schema.publicTrendsGeneration),
       ).toHaveLength(2);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("rebuilds lifecycle history from current catalog truth after corrections and erasure", async () => {
+    const client = new PGlite();
+    const db = drizzle({ client, relations: schema.relations });
+
+    try {
+      await migratePGliteDatabase(client);
+      const fixture = await createFixture(db as unknown as Database);
+      const service = createTrendsService(db as unknown as Database);
+      await service.refreshPublicCollectionItemTrends(
+        new Date("2026-10-14T00:00:00.000Z"),
+      );
+      await expect(
+        service.getPublicCollectionLifecycleTrends("all", {
+          makerId: fixture.makerId,
+          materialId: fixture.titaniumMaterialId,
+          productTypeId: fixture.sliderTypeId,
+        }),
+      ).resolves.toMatchObject({
+        values: [expect.objectContaining({ acquisitionCount: 10 })],
+      });
+
+      const [correctedMaker] = await db
+        .insert(schema.maker)
+        .values({ name: "Corrected Maker", slug: "corrected-maker" })
+        .returning({ id: schema.maker.id });
+      if (!correctedMaker) throw new Error("Corrected maker was not created.");
+      await db
+        .update(schema.product)
+        .set({
+          makerId: correctedMaker.id,
+          productTypeId: fixture.spinnerTypeId,
+        })
+        .where(eq(schema.product.id, fixture.sliderProductId));
+      await db
+        .delete(schema.productMaterial)
+        .where(
+          eq(schema.productMaterial.materialId, fixture.titaniumMaterialId),
+        );
+      await db
+        .update(schema.productType)
+        .set({ includeInTrends: false })
+        .where(eq(schema.productType.id, fixture.accessoryTypeId));
+      await service.refreshPublicCollectionItemTrends(
+        new Date("2026-10-15T00:00:00.000Z"),
+      );
+      await expect(
+        service.getPublicCollectionLifecycleTrends("all", {
+          materialId: fixture.titaniumMaterialId,
+        }),
+      ).resolves.toMatchObject({ values: [] });
+      await expect(
+        service.getPublicCollectionLifecycleTrends("all", {
+          productTypeId: fixture.accessoryTypeId,
+        }),
+      ).resolves.toMatchObject({ values: [] });
+      await expect(
+        service.getPublicCollectionLifecycleTrends("all", {
+          productTypeId: fixture.sliderTypeId,
+        }),
+      ).resolves.toMatchObject({ values: [] });
+      await expect(
+        service.getPublicCollectionLifecycleTrends("all", {
+          makerId: correctedMaker.id,
+          productTypeId: fixture.spinnerTypeId,
+        }),
+      ).resolves.toMatchObject({
+        values: [expect.objectContaining({ acquisitionCount: 10 })],
+      });
+
+      const erasedOwnerId = fixture.ownerIds[0];
+      if (!erasedOwnerId) throw new Error("Erasure fixture owner is missing.");
+      await db.delete(schema.user).where(eq(schema.user.id, erasedOwnerId));
+      await service.refreshPublicCollectionItemTrends(
+        new Date("2026-10-16T00:00:00.000Z"),
+      );
+      await expect(
+        service.getPublicCollectionLifecycleTrends("all", {
+          makerId: correctedMaker.id,
+          productTypeId: fixture.spinnerTypeId,
+        }),
+      ).resolves.toMatchObject({
+        hasSuppressedValues: true,
+        values: [
+          expect.objectContaining({
+            acquisitionCount: null,
+            departureCount: null,
+          }),
+        ],
+      });
     } finally {
       await client.close();
     }
@@ -626,6 +804,26 @@ async function createFixture(database: Database) {
           : [],
       ),
     );
+  const closedOwners = new Set<number>();
+  await database.insert(schema.collectionItemOwnershipPeriod).values(
+    insertedItems.map((item, index) => {
+      const spec = itemSpecs[index];
+      if (!spec) throw new Error("Ownership fixture item was not created.");
+      const closes =
+        spec.kind === "slider" && !closedOwners.has(spec.item.ownerId);
+      if (closes) closedOwners.add(spec.item.ownerId);
+      return {
+        collectionItemId: item.id,
+        effectiveEndDate: closes ? "2026-01-31" : null,
+        effectiveStartDate: "2026-01-15",
+        endedRecordedAt: closes ? new Date("2026-02-01T00:00:00.000Z") : null,
+        entryReason: "unknown" as const,
+        exitReason: closes ? ("other" as const) : null,
+        startDateImputed: index === 0,
+        startedRecordedAt: new Date("2026-01-15T00:00:00.000Z"),
+      };
+    }),
+  );
   await database
     .insert(schema.collectionDetailSpinner)
     .values(
@@ -656,8 +854,11 @@ async function createFixture(database: Database) {
   expect(storedAccessory).toHaveLength(5);
   return {
     accessoryTypeId,
+    makerId: maker.id,
+    ownerIds: owners.map(({ id }) => id),
     sliderProductId,
     sliderTypeId,
+    spinnerTypeId,
     titaniumMaterialId: titanium.id,
     titaniumSpecificId: titaniumSpecific.id,
   };
