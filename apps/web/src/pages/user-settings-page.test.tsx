@@ -70,7 +70,7 @@ describe("UserSettingsPage", () => {
     expect(html).toContain("Imperial");
     expect(html).toContain('aria-label="Display currency"');
     expect(html).toContain('href="/user/settings/beta-features"');
-    expect(html).toContain("web.settings.publicTrendsLabel");
+    expect(html).toContain("Publish Trends");
     expect(html).toContain("Private");
   });
 });
