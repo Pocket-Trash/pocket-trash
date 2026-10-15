@@ -14,7 +14,6 @@ import {
   CollectionProductFields,
   collectionEditSubmissionMode,
   collectionProductTypeSupportsSerial,
-  configurationChoiceIsAvailable,
   FinishOptionsEditor,
   PensAdminEditor,
   ProductEditor,
@@ -90,19 +89,6 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 describe("owned Pen collection rules", () => {
-  it("keeps unmet choices selectable while recomputing positive rules", () => {
-    expect(configurationChoiceIsAvailable([], new Set())).toBe(true);
-    expect(configurationChoiceIsAvailable([[1, 2], [3]], new Set([1]))).toBe(
-      false,
-    );
-    expect(configurationChoiceIsAvailable([[1, 2], [3]], new Set([1, 2]))).toBe(
-      true,
-    );
-    expect(configurationChoiceIsAvailable([[1, 2], [3]], new Set([3]))).toBe(
-      true,
-    );
-  });
-
   it("offers serial numbers for approved serializable product types", () => {
     expect(collectionProductTypeSupportsSerial("pen")).toBe(true);
     expect(collectionProductTypeSupportsSerial("pen-tip")).toBe(true);
@@ -248,7 +234,7 @@ describe("finish option editor", () => {
       compatibleButtonId: null,
       compatibleButtonName: null,
       compatiblePens: [],
-      configurationSlots: [],
+      compatibleParts: [],
       createdAt: new Date(0),
       description: null,
       diameter: null,
@@ -941,7 +927,6 @@ describe("Pens catalog administration", () => {
         compatibilityMemberships: [],
         inkColors: [{ id: 1000, name: "Blue", slug: "blue" }],
         offerings: [],
-        slotKinds: [{ id: 1002, name: "Material", slug: "material" }],
         tipStyles: [{ id: 1003, name: "Needle", slug: "needle" }],
       },
       relationshipProducts: [refill],
@@ -993,7 +978,7 @@ function productFixture(
     compatibleButtonId: null,
     compatibleButtonName: null,
     compatiblePens: [],
-    configurationSlots: [],
+    compatibleParts: [],
     createdAt: new Date(0),
     description: null,
     diameter: null,

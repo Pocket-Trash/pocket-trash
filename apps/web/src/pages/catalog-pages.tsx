@@ -558,32 +558,6 @@ type ProductTypeNavigationSearch = {
 };
 
 /**
- * Resolves a configuration choice to its public display label.
- *
- * @param product - Product containing the choice and finish options.
- * @param choice - Configuration choice to label, or `undefined` for stale rule data.
- * @param t - Active catalog translation formatter.
- * @returns Material, part, or appearance label for the choice.
- */
-function configurationChoiceLabel(
-  product: CatalogProduct,
-  choice:
-    | CatalogProduct["configurationSlots"][number]["choices"][number]
-    | undefined,
-  t: ReturnType<typeof useCatalogCopy>,
-) {
-  if (!choice)
-    return t("web.pens.configuration.unknownChoice" as TranslationKey);
-  if (choice.label) return choice.label;
-  const finish = product.finishOptions.find(
-    ({ id }) => id === choice.finishOptionId,
-  );
-  return finish
-    ? localizedFinishLabel(finish, t)
-    : t("web.pens.configuration.unknownChoice" as TranslationKey);
-}
-
-/**
  * Renders a catalog product and its matching collection items.
  *
  * @param props - Product detail data and related collection items.
@@ -633,6 +607,15 @@ export function ProductDetailPage({
         ["web.catalog.field.thickness", product.thickness],
       ];
       break;
+  }
+  const compatiblePartsByType = new Map<
+    CatalogProductType,
+    CatalogProduct["compatibleParts"]
+  >();
+  for (const part of product.compatibleParts) {
+    const parts = compatiblePartsByType.get(part.productTypeSlug) ?? [];
+    parts.push(part);
+    compatiblePartsByType.set(part.productTypeSlug, parts);
   }
 
   return (
@@ -857,73 +840,36 @@ export function ProductDetailPage({
             ) : null,
           )}
         </dl>
-        {product.configurationSlots.length ? (
+        {product.compatibleParts.length ? (
           <section className="grid gap-4">
             <h2 className="text-lg font-semibold">
-              {t("web.pens.configuration.heading" as TranslationKey)}
+              {t("web.pens.compatibleParts.heading" as TranslationKey)}
             </h2>
             <div className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
-              {product.configurationSlots.map((slot) => {
-                const slotLabel = t(slot.labelKey as TranslationKey);
-                return (
-                  <div className="grid content-start gap-2" key={slot.id}>
-                    <h3 className="font-semibold">
-                      {slotLabel === slot.labelKey
-                        ? slot.labelFallback
-                        : slotLabel}
-                      {slot.required ? (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {t(
-                            "web.pens.configuration.required" as TranslationKey,
-                          )}
-                        </span>
-                      ) : null}
-                    </h3>
-                    <ul className="grid gap-2 text-sm">
-                      {slot.choices.map((choice) => {
-                        const label = configurationChoiceLabel(
-                          product,
-                          choice,
-                          t,
-                        );
-                        return (
-                          <li key={choice.id}>
-                            <span>{label}</span>
-                            {choice.availableWhen.length ? (
-                              <p className="text-muted-foreground">
-                                {t(
-                                  "web.pens.configuration.availableWhen" as TranslationKey,
-                                  {
-                                    requirements: choice.availableWhen
-                                      .map((branch) =>
-                                        branch
-                                          .map((requiredId) =>
-                                            configurationChoiceLabel(
-                                              product,
-                                              product.configurationSlots
-                                                .flatMap(
-                                                  ({ choices }) => choices,
-                                                )
-                                                .find(
-                                                  ({ id }) => id === requiredId,
-                                                ),
-                                              t,
-                                            ),
-                                          )
-                                          .join(" + "),
-                                      )
-                                      .join(" / "),
-                                  },
-                                )}
-                              </p>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                );
-              })}
+              {[...compatiblePartsByType.values()].map((parts) => (
+                <div
+                  className="grid content-start gap-2"
+                  key={parts[0]?.productTypeSlug}
+                >
+                  <h3 className="font-semibold">{parts[0]?.productTypeName}</h3>
+                  <ul className="grid gap-2 text-sm">
+                    {parts.map((part) => (
+                      <li key={part.id}>
+                        <Link
+                          className="text-primary underline-offset-4 hover:underline"
+                          params={{
+                            productSlug: part.slug,
+                            productTypeSlug: part.productTypeSlug,
+                          }}
+                          to="/products/$productTypeSlug/$productSlug"
+                        >
+                          {part.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </section>
         ) : null}
@@ -1919,6 +1865,7 @@ function approvalStatusLabel(
  * @param props - Collection item data, live catalog product, and installed components, when present.
  * @param props.installedButton - Installed spinner button, when present.
  * @param props.installedInsert - Installed slider insert, when present.
+ * @param props.installedPenParts - Installed Pen parts.
  * @param props.installedPlate - Installed slider plate, when present.
  * @param props.installedRefill - Installed Pen refill model, when present.
  * @param props.item - Collection item to display.
@@ -1928,6 +1875,7 @@ function approvalStatusLabel(
 export function CollectionItemDetailPage({
   installedButton = null,
   installedInsert = null,
+  installedPenParts = [],
   installedPlate = null,
   installedRefill = null,
   item,
@@ -1937,6 +1885,8 @@ export function CollectionItemDetailPage({
   installedButton?: UserCollectionItem | null;
   /** Installed slider insert, when present. */
   installedInsert?: UserCollectionItem | null;
+  /** Installed Pen parts. */
+  installedPenParts?: UserCollectionItem[];
   /** Installed slider plate, when present. */
   installedPlate?: UserCollectionItem | null;
   /** Installed Pen refill model, when present. */
@@ -2116,19 +2066,17 @@ export function CollectionItemDetailPage({
               </div>
             </Detail>
           ) : null}
-          {product?.configurationSlots.map((slot) => {
-            const saved = item.configurationSelections?.find(
-              ({ slotId }) => slotId === slot.id,
-            );
-            const choice = slot.choices.find(
-              ({ id }) => id === saved?.choiceId,
-            );
-            return choice ? (
-              <Detail key={slot.id} label={t(slot.labelKey as TranslationKey)}>
-                {choice.label ?? slot.labelFallback}
-              </Detail>
-            ) : null;
-          })}
+          {installedPenParts.length ? (
+            <Detail
+              label={t("web.pens.collection.installedParts" as TranslationKey)}
+            >
+              <ul className="grid gap-1">
+                {installedPenParts.map((part) => (
+                  <li key={part.collectionItemId}>{part.displayName}</li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
           {item.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.relationship.plates")}>
               {product?.includedPlate ? (

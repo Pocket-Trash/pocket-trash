@@ -282,24 +282,6 @@ describe("Pens catalog product validation", () => {
 });
 
 describe("Pens admin validation", () => {
-  it("requires one carrier and distinct availability requirements", () => {
-    expect(
-      pensAdminWriteSchema.safeParse({
-        kind: "configuration-choice",
-        productId: 1000,
-        slotId: 1001,
-      }).success,
-    ).toBe(false);
-    expect(
-      pensAdminWriteSchema.safeParse({
-        kind: "configuration-rule",
-        productId: 1000,
-        requiredChoiceIds: [1001, 1001],
-        targetChoiceId: 1002,
-      }).success,
-    ).toBe(false);
-  });
-
   it("accepts direct compatibility and requires exactly one target", () => {
     const assertion = {
       kind: "compatibility-assertion" as const,

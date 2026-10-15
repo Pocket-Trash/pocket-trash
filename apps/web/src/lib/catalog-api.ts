@@ -787,32 +787,6 @@ export const pensAdminWriteSchema = z
       kind: z.literal("compatibility-group"),
     }),
     z.object({
-      kind: z.literal("configuration-slot"),
-      productId: idSchema,
-      required: z.boolean(),
-      slotKindId: idSchema,
-    }),
-    z.object({
-      kind: z.literal("configuration-slot-required"),
-      productId: idSchema,
-      required: z.boolean(),
-      slotId: idSchema,
-    }),
-    z.object({
-      finishOptionId: idSchema.nullable().optional(),
-      kind: z.literal("configuration-choice"),
-      partProductId: idSchema.nullable().optional(),
-      productId: idSchema,
-      productMaterialId: idSchema.nullable().optional(),
-      slotId: idSchema,
-    }),
-    z.object({
-      kind: z.literal("configuration-rule"),
-      productId: idSchema,
-      requiredChoiceIds: z.array(idSchema).min(1),
-      targetChoiceId: idSchema,
-    }),
-    z.object({
       inkColorId: idSchema,
       kind: z.literal("refill-offering"),
       refillProductId: idSchema,
@@ -850,28 +824,6 @@ export const pensAdminWriteSchema = z
     }),
   ])
   .superRefine((input, context) => {
-    if (
-      input.kind === "configuration-choice" &&
-      [
-        input.finishOptionId,
-        input.partProductId,
-        input.productMaterialId,
-      ].filter((value) => value != null).length !== 1
-    )
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["slotId"],
-      });
-    if (
-      input.kind === "configuration-rule" &&
-      new Set(input.requiredChoiceIds).size !== input.requiredChoiceIds.length
-    )
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["requiredChoiceIds"],
-      });
     if (
       input.kind === "compatibility-assertion" &&
       Number(input.targetGroupId != null) +
@@ -947,15 +899,7 @@ const collectionAddSchema = z
     }),
     productId: idSchema,
     productTypeSlug: collectionProductTypeSchema,
-    configurationSelections: z
-      .array(
-        z.object({
-          choiceId: idSchema,
-          installedPartCollectionItemId: idSchema.nullable(),
-          slotId: idSchema,
-        }),
-      )
-      .default([]),
+    installedPenPartCollectionItemIds: z.array(idSchema).default([]),
     installedRefillOfferingId: idSchema.nullable().default(null),
     installedRefillProductId: idSchema.nullable().default(null),
     serialNumber: z
@@ -1036,15 +980,7 @@ const collectionEditSchema = z
     bearing: optionalBearingSchema,
     collectionId: idSchema.optional(),
     collectionItemId: idSchema,
-    configurationSelections: z
-      .array(
-        z.object({
-          choiceId: idSchema,
-          installedPartCollectionItemId: idSchema.nullable(),
-          slotId: idSchema,
-        }),
-      )
-      .optional(),
+    installedPenPartCollectionItemIds: z.array(idSchema).optional(),
     customFinish: finishOptionSchema.nullable(),
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
@@ -2168,7 +2104,8 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         collectionItemId = await s.db.collections.addPenProduct({
           actor,
           collectionId: parsed.data.collectionId,
-          configurationSelections: parsed.data.configurationSelections,
+          installedPenPartCollectionItemIds:
+            parsed.data.installedPenPartCollectionItemIds,
           customFinish: parsed.data.customFinish
             ? toFinishWriteOption(parsed.data.customFinish)
             : null,
@@ -2349,6 +2286,16 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
           })
         : null,
     ]);
+    const installedPenParts = await Promise.all(
+      (item.installedPenPartCollectionItemIds ?? []).map((collectionItemId) =>
+        s.db.collections.getPublicItem({
+          collectionId: data.collectionId,
+          collectionItemId,
+          ownerUserId: data.userId,
+          viewer,
+        }),
+      ),
+    );
     const product = (
       await s.db.catalog.listProducts(item.productTypeSlug, viewer)
     ).find(({ id }) => id === item.productId);
@@ -2367,6 +2314,11 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
       installedPlate: installedPlate
         ? await signCollectionItem(installedPlate)
         : null,
+      installedPenParts: await Promise.all(
+        installedPenParts
+          .filter((part): part is NonNullable<typeof part> => part !== null)
+          .map(signCollectionItem),
+      ),
       installedRefill: installedRefill
         ? ((await signCatalogProducts([installedRefill]))[0] ?? null)
         : null,
@@ -2735,7 +2687,8 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
       await s.db.collections.updateItem({
         actor,
         ...parsed.data,
-        configurationSelections: parsed.data.configurationSelections,
+        installedPenPartCollectionItemIds:
+          parsed.data.installedPenPartCollectionItemIds,
         customFinish: parsed.data.customFinish
           ? toFinishWriteOption(parsed.data.customFinish)
           : null,

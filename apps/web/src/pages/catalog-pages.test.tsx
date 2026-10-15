@@ -280,7 +280,7 @@ const product: CatalogProduct = {
   compatibleButtonId: null,
   compatibleButtonName: null,
   compatiblePens: [],
-  configurationSlots: [],
+  compatibleParts: [],
   createdAt: new Date(0),
   description: null,
   diameter: null,
@@ -951,49 +951,19 @@ describe("ProductsPage", () => {
 });
 
 describe("ProductDetailPage", () => {
-  it("renders released Pen configuration copy", () => {
+  it("groups and links compatible Pen parts without configuration copy", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage
         collectionItems={[]}
         product={{
           ...product,
-          configurationSlots: [
+          compatibleParts: [
             {
-              choices: [
-                {
-                  availableWhen: [],
-                  finishOptionId: null,
-                  id: 101,
-                  label: "Titanium",
-                  position: 0,
-                  productMaterialId: 101,
-                },
-              ],
-              id: 100,
-              labelFallback: "Material",
-              labelKey: "catalog.configurationSlots.material",
-              position: 0,
-              required: true,
-              slotKindId: 100,
-              slotKindSlug: "material",
-            },
-            {
-              choices: [
-                {
-                  availableWhen: [[101]],
-                  finishOptionId: null,
-                  id: 201,
-                  label: "Caramel PVD",
-                  position: 0,
-                },
-              ],
-              id: 200,
-              labelFallback: "Appearance",
-              labelKey: "catalog.configurationSlots.appearance",
-              position: 1,
-              required: true,
-              slotKindId: 200,
-              slotKindSlug: "appearance",
+              id: 101,
+              name: "Saga Logo Tip",
+              productTypeName: "Pen tip",
+              productTypeSlug: "pen-tip",
+              slug: "saga-logo-tip",
             },
           ],
           productTypeId: 4,
@@ -1003,10 +973,9 @@ describe("ProductDetailPage", () => {
       />,
     );
 
-    expect(html).toContain(">Configuration<");
-    expect(html).toContain(">Required<");
-    expect(html).toContain("Available when Titanium");
-    expect(html).not.toContain("web.pens.configuration.");
+    expect(html).toContain("Saga Logo Tip");
+    expect(html).toContain("saga-logo-tip");
+    expect(html).not.toContain(">Configuration<");
   });
 
   it("shows the slider layout and derived click count", () => {
