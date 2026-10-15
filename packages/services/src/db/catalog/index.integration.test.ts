@@ -115,6 +115,35 @@ describe("catalog product persistence", () => {
           ({ materials: components }) => components.length === 2,
         )?.assignmentId,
       ).toBe(combined.assignmentId);
+      await expect(
+        service.updateProduct({
+          actor,
+          finishOptions: [],
+          makerId: maker.id,
+          materialAssignments: [
+            {
+              materials: [
+                { materialId: mokume.id, materialSpecificId: null },
+                { materialId: mokume.id, materialSpecificId: null },
+              ],
+            },
+          ],
+          name: created.name,
+          productId: created.id,
+          productTypeSlug: "spinner",
+          slug: created.slug,
+          specs: { bearing: "R188" },
+        }),
+      ).rejects.toThrow("web.materials.validation.duplicateAssignment");
+      await expect(
+        service.getProduct("spinner", created.slug, actor),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          materials: expect.arrayContaining([
+            expect.objectContaining({ assignmentId: combined.assignmentId }),
+          ]),
+        }),
+      );
     } finally {
       await client.close();
     }

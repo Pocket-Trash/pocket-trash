@@ -382,6 +382,30 @@ export const finishOptionSchema = z
   });
 
 /**
+ * Builds the order-independent identity of a material combination.
+ *
+ * @param combination - Canonical material pairs to identify.
+ * @returns Stable sorted combination identity.
+ */
+export function materialCombinationSignature(combination: {
+  /** Canonical material pairs in the combination. */
+  materials: readonly {
+    /** General material identifier. */
+    materialId: number;
+    /** Optional alloy or grade identifier. */
+    materialSpecificId: number | null;
+  }[];
+}) {
+  return combination.materials
+    .map(
+      ({ materialId, materialSpecificId }) =>
+        `${materialId}:${materialSpecificId ?? "general"}`,
+    )
+    .sort()
+    .join("|");
+}
+
+/**
  * Schema that validates product form values and product-type-specific specifications.
  */
 export const productFormSchema = z
@@ -717,8 +741,8 @@ export const productFormSchema = z
           path: ["finishOptions"],
         });
       }
-      const materialCombinations = materialAssignments.map(({ materials }) => {
-        const pairs = materials.map(
+      const materialCombinations = materialAssignments.map((assignment) => {
+        const pairs = assignment.materials.map(
           ({ materialId, materialSpecificId }) =>
             `${materialId}:${materialSpecificId ?? "general"}`,
         );
@@ -728,7 +752,7 @@ export const productFormSchema = z
             message: "web.materials.validation.duplicateAssignment",
             path: ["materialAssignments"],
           });
-        return pairs.sort().join("|");
+        return materialCombinationSignature(assignment);
       });
       if (new Set(materialCombinations).size !== materialCombinations.length)
         context.addIssue({

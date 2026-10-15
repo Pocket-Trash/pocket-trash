@@ -28,6 +28,8 @@ export type MutationFixture = {
   materialId: number;
   /** Material name created for browser selection. */
   materialName: string;
+  /** Individual material names contained in the combined spinner offer. */
+  materialNames: [string, string];
   /** Bunny object path created for this run. */
   objectPath: string;
   /** Spinner product identifier created for downstream collection tests. */
@@ -76,6 +78,7 @@ export async function createMutationFixture({
   ];
   const finishName = `${runId} finish`;
   const materialName = `${runId} material`;
+  const secondaryMaterialName = `${runId} secondary material`;
   const spinnerProductName = `${runId} spinner`;
   const spinnerProductSlug = `${runId}-spinner`;
   const bytes = new TextEncoder().encode(runId);
@@ -118,15 +121,22 @@ export async function createMutationFixture({
       .insert(schema.maker)
       .values({ name: runId, slug: runId })
       .returning({ id: schema.maker.id });
-    const [material] = await transaction
+    const materials = await transaction
       .insert(schema.material)
-      .values({ name: materialName, slug: `${runId}-material` })
+      .values([
+        { name: materialName, slug: `${runId}-material` },
+        {
+          name: secondaryMaterialName,
+          slug: `${runId}-secondary-material`,
+        },
+      ])
       .returning({ id: schema.material.id });
+    const [material, secondaryMaterial] = materials;
     const [finish] = await transaction
       .insert(schema.finish)
       .values({ name: finishName, slug: `${runId}-finish` })
       .returning({ id: schema.finish.id });
-    if (!maker || !material || !finish) {
+    if (!maker || !material || !secondaryMaterial || !finish) {
       throw new Error("Failed to seed E2E lookups.");
     }
 
@@ -169,13 +179,22 @@ export async function createMutationFixture({
     const productMaterials = await transaction
       .insert(schema.productMaterial)
       .values([{ productId: spinner.id }, { productId: button.id }])
-      .returning({ id: schema.productMaterial.id });
-    await transaction.insert(schema.productMaterialComponent).values(
-      productMaterials.map(({ id }) => ({
+      .returning({
+        id: schema.productMaterial.id,
+        productId: schema.productMaterial.productId,
+      });
+    await transaction.insert(schema.productMaterialComponent).values([
+      ...productMaterials.map(({ id }) => ({
         materialId: material.id,
         productMaterialId: id,
       })),
-    );
+      ...productMaterials
+        .filter(({ productId }) => productId === spinner.id)
+        .map(({ id }) => ({
+          materialId: secondaryMaterial.id,
+          productMaterialId: id,
+        })),
+    ]);
     const finishOptions = await transaction
       .insert(schema.finishOption)
       .values([
@@ -215,7 +234,7 @@ export async function createMutationFixture({
       createdProductTypeIds: createdProductTypes.map(({ id }) => id),
       finishId: finish.id,
       makerId: maker.id,
-      materialId: material.id,
+      materialIds: [material.id, secondaryMaterial.id] as [number, number],
       spinnerProductId: spinner.id,
     };
   });
@@ -240,8 +259,9 @@ export async function createMutationFixture({
     collectionId: databaseFixture.collectionId,
     collectionNames,
     finishName,
-    materialId: databaseFixture.materialId,
-    materialName,
+    materialId: databaseFixture.materialIds[0],
+    materialName: `${materialName} + ${secondaryMaterialName}`,
+    materialNames: [materialName, secondaryMaterialName],
     objectPath,
     spinnerProductId: databaseFixture.spinnerProductId,
     spinnerProductName,
@@ -321,8 +341,8 @@ type DatabaseFixture = {
   finishId: number;
   /** Maker identifier. */
   makerId: number;
-  /** Material identifier. */
-  materialId: number;
+  /** Material identifiers. */
+  materialIds: [number, number];
   /** Spinner product identifier. */
   spinnerProductId: number;
 };
@@ -369,7 +389,7 @@ async function cleanupDatabaseFixture(
       .returning({ id: schema.product.id });
     const deletedMaterials = await transaction
       .delete(schema.material)
-      .where(eq(schema.material.id, fixture.materialId))
+      .where(inArray(schema.material.id, fixture.materialIds))
       .returning({ id: schema.material.id });
     const deletedFinishes = await transaction
       .delete(schema.finish)
@@ -389,7 +409,7 @@ async function cleanupDatabaseFixture(
     return {
       catalogDeleted:
         deletedProducts.length === 2 &&
-        deletedMaterials.length === 1 &&
+        deletedMaterials.length === fixture.materialIds.length &&
         deletedFinishes.length === 1 &&
         deletedMakers.length === 1 &&
         deletedProductTypes.length === fixture.createdProductTypeIds.length,

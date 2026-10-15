@@ -61,6 +61,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { UserPageShell } from "@/components/user-page-shell";
 import {
   filterButtonsByDiameter,
@@ -82,6 +88,7 @@ import {
   deleteUserCollection,
   type EditableCatalogProductType,
   finishOptionSchema,
+  materialCombinationSignature,
   type ProductFormInput,
   type ProductFormValue,
   productFormSchema,
@@ -557,8 +564,7 @@ export function MaterialAssignmentsEditor({
   t,
   value,
 }: MaterialAssignmentsEditorProps) {
-  const dialog = React.useRef<HTMLDialogElement>(null);
-  const titleId = React.useId();
+  const [isOpen, setIsOpen] = React.useState(false);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [draft, setDraft] = React.useState<
     ProductEditorValue["materialAssignments"][number]
@@ -568,16 +574,22 @@ export function MaterialAssignmentsEditor({
    * Opens a new or existing material combination.
    *
    * @param index - Existing assignment index, or null for a new assignment.
+   * @param componentCount - Number of empty component rows for a new assignment.
    */
-  const open = (index: number | null) => {
+  const open = (index: number | null, componentCount = 1) => {
     const assignment =
       index === null
-        ? { materials: [{ materialId: 0, materialSpecificId: null }] }
+        ? {
+            materials: Array.from({ length: componentCount }, () => ({
+              materialId: 0,
+              materialSpecificId: null,
+            })),
+          }
         : value[index];
     if (!assignment) return;
     setEditingIndex(index);
     setDraft(structuredClone(assignment));
-    dialog.current?.showModal();
+    setIsOpen(true);
   };
   /**
    * Resolves one stored combination to its current display label.
@@ -600,6 +612,25 @@ export function MaterialAssignmentsEditor({
         };
       }),
     );
+  const componentSignatures = draft.materials
+    .filter(({ materialId }) => materialId !== 0)
+    .map(
+      ({ materialId, materialSpecificId }) =>
+        `${materialId}:${materialSpecificId ?? "general"}`,
+    );
+  const hasDuplicateComponent =
+    new Set(componentSignatures).size !== componentSignatures.length;
+  const hasDuplicateAssignment = value.some(
+    (assignment, index) =>
+      index !== editingIndex &&
+      materialCombinationSignature(assignment) ===
+        materialCombinationSignature(draft),
+  );
+  const hasInvalidDraft =
+    draft.materials.length === 0 ||
+    draft.materials.some(({ materialId }) => materialId === 0) ||
+    hasDuplicateComponent ||
+    hasDuplicateAssignment;
 
   return (
     <>
@@ -627,6 +658,14 @@ export function MaterialAssignmentsEditor({
         type="button"
         variant="outline"
       >
+        {t("web.catalog.selectMaterial")}
+      </Button>
+      <Button
+        disabled={singleAssignment && value.length > 0}
+        onClick={() => open(null, 2)}
+        type="button"
+        variant="outline"
+      >
         {t("web.catalog.selectMaterials")}
       </Button>
       <LookupDialog
@@ -647,125 +686,130 @@ export function MaterialAssignmentsEditor({
           }));
         }}
       />
-      <dialog
-        aria-labelledby={titleId}
-        className="m-auto w-[min(40rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
-        ref={dialog}
-      >
-        <div className="grid gap-4 p-6">
-          <h2 className="text-lg font-semibold" id={titleId}>
-            {t("web.catalog.field.materials")}
-          </h2>
-          {draft.materials.map((selection, index) => (
-            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" key={index}>
-              <CatalogCombobox
-                ariaLabel={t("web.catalog.field.materials")}
-                items={options.materials}
-                onValueChange={(material) =>
-                  setDraft((current) => ({
-                    materials: current.materials.map((row, i) =>
-                      i === index
-                        ? {
-                            materialId: Number(material?.id ?? 0),
-                            materialSpecificId: null,
-                          }
-                        : row,
-                    ),
-                  }))
-                }
-                placeholder={t("web.catalog.selectMaterial")}
-                value={
-                  options.materials.find(
-                    ({ id }) => id === selection.materialId,
-                  ) ?? null
-                }
-              />
-              <CatalogCombobox
-                ariaLabel={t("web.materials.specific.optional")}
-                items={(options.materialSpecifics ?? []).filter(
-                  ({ materialId }) => materialId === selection.materialId,
-                )}
-                onValueChange={(specific) =>
-                  setDraft((current) => ({
-                    materials: current.materials.map((row, i) =>
-                      i === index
-                        ? {
-                            ...row,
-                            materialSpecificId: specific
-                              ? Number(specific.id)
-                              : null,
-                          }
-                        : row,
-                    ),
-                  }))
-                }
-                placeholder={t("web.materials.specific.general")}
-                removeLabel={t("web.action.close")}
-                showSelectedPill
-                value={
-                  (options.materialSpecifics ?? []).find(
-                    ({ id }) => id === selection.materialSpecificId,
-                  ) ?? null
-                }
-              />
-              <Button
-                aria-label={t("web.action.close")}
-                onClick={() =>
-                  setDraft((current) => ({
-                    materials: current.materials.filter((_, i) => i !== index),
-                  }))
-                }
-                type="button"
-                variant="outline"
+      <Sheet onOpenChange={setIsOpen} open={isOpen}>
+        <SheetContent className="sm:w-[40rem] sm:max-w-[90vw]">
+          <SheetHeader>
+            <SheetTitle>{t("web.catalog.field.materials")}</SheetTitle>
+          </SheetHeader>
+          <div className="grid min-h-0 gap-4 overflow-y-auto p-6">
+            {draft.materials.map((selection, index) => (
+              <div
+                className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                key={index}
               >
-                <X />
-              </Button>
-            </div>
-          ))}
-          <Button
-            onClick={() =>
-              setDraft((current) => ({
-                materials: [
-                  ...current.materials,
-                  { materialId: 0, materialSpecificId: null },
-                ],
-              }))
-            }
-            type="button"
-            variant="outline"
-          >
-            {t("web.catalog.selectMaterial")}
-          </Button>
-          <div className="flex justify-end gap-2">
+                <CatalogCombobox
+                  ariaLabel={t("web.catalog.field.materials")}
+                  items={options.materials}
+                  onValueChange={(material) =>
+                    setDraft((current) => ({
+                      materials: current.materials.map((row, i) =>
+                        i === index
+                          ? {
+                              materialId: Number(material?.id ?? 0),
+                              materialSpecificId: null,
+                            }
+                          : row,
+                      ),
+                    }))
+                  }
+                  placeholder={t("web.catalog.selectMaterial")}
+                  value={
+                    options.materials.find(
+                      ({ id }) => id === selection.materialId,
+                    ) ?? null
+                  }
+                />
+                <CatalogCombobox
+                  ariaLabel={t("web.materials.specific.optional")}
+                  items={(options.materialSpecifics ?? []).filter(
+                    ({ materialId }) => materialId === selection.materialId,
+                  )}
+                  onValueChange={(specific) =>
+                    setDraft((current) => ({
+                      materials: current.materials.map((row, i) =>
+                        i === index
+                          ? {
+                              ...row,
+                              materialSpecificId: specific
+                                ? Number(specific.id)
+                                : null,
+                            }
+                          : row,
+                      ),
+                    }))
+                  }
+                  placeholder={t("web.materials.specific.general")}
+                  removeLabel={t("web.action.close")}
+                  showSelectedPill
+                  value={
+                    (options.materialSpecifics ?? []).find(
+                      ({ id }) => id === selection.materialSpecificId,
+                    ) ?? null
+                  }
+                />
+                <Button
+                  aria-label={t("web.action.close")}
+                  onClick={() =>
+                    setDraft((current) => ({
+                      materials: current.materials.filter(
+                        (_, i) => i !== index,
+                      ),
+                    }))
+                  }
+                  type="button"
+                  variant="outline"
+                >
+                  <X />
+                </Button>
+              </div>
+            ))}
             <Button
-              onClick={() => dialog.current?.close()}
+              onClick={() =>
+                setDraft((current) => ({
+                  materials: [
+                    ...current.materials,
+                    { materialId: 0, materialSpecificId: null },
+                  ],
+                }))
+              }
               type="button"
               variant="outline"
             >
-              {t("action.cancel")}
+              {t("web.catalog.selectMaterial")}
             </Button>
-            <Button
-              disabled={
-                draft.materials.length === 0 ||
-                draft.materials.some(({ materialId }) => materialId === 0)
-              }
-              onClick={() => {
-                onChange(
-                  editingIndex === null
-                    ? [...value, draft]
-                    : value.map((assignment, index) =>
-                        index === editingIndex ? draft : assignment,
-                      ),
-                );
-                dialog.current?.close();
-              }}
-              type="button"
-            >
-              {t("action.save")}
-            </Button>
+            {hasDuplicateComponent || hasDuplicateAssignment ? (
+              <p className="text-sm text-destructive" role="alert">
+                {t("web.materials.validation.duplicateAssignment")}
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={() => setIsOpen(false)}
+                type="button"
+                variant="outline"
+              >
+                {t("action.cancel")}
+              </Button>
+              <Button
+                disabled={hasInvalidDraft}
+                onClick={() => {
+                  onChange(
+                    editingIndex === null
+                      ? [...value, draft]
+                      : value.map((assignment, index) =>
+                          index === editingIndex ? draft : assignment,
+                        ),
+                  );
+                  setIsOpen(false);
+                }}
+                type="button"
+              >
+                {t("action.save")}
+              </Button>
+            </div>
           </div>
-        </div>
-      </dialog>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

@@ -113,6 +113,33 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     buttonFinishOptionId: null,
     buttonCustomFinish: null,
   });
+  const genericAssignment = product.materials.find(
+    ({ materials }) => !materials[0]?.specific,
+  )!;
+  await services.collections.updateItem({
+    actor,
+    collectionItemId: item.spinnerItemId,
+    customFinish: null,
+    displayName: "Generic steel",
+    finishOptionId: null,
+    materialAssignmentId: genericAssignment.assignmentId,
+  });
+  expect(
+    (await services.collections.getOwnedItem(actor, item.spinnerItemId))
+      ?.materials,
+  ).toHaveLength(1);
+  await services.collections.updateItem({
+    actor,
+    collectionItemId: item.spinnerItemId,
+    customFinish: null,
+    displayName: "My M390",
+    finishOptionId: null,
+    materialAssignmentId: assignment.assignmentId,
+  });
+  expect(
+    (await services.collections.getOwnedItem(actor, item.spinnerItemId))
+      ?.materials,
+  ).toHaveLength(2);
   await services.catalog.updateProduct({
     ...input,
     productId: product.id,

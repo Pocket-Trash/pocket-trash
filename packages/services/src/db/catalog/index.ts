@@ -499,7 +499,7 @@ export type ProductMaterialComponent = CatalogLookup & {
 export type ProductMaterialAssignment = {
   /** Stable product-material assignment identifier. */
   assignmentId: number;
-  /** Canonical components sorted by display name. */
+  /** Canonical components in stable query order. */
   materials: ProductMaterialComponent[];
 };
 

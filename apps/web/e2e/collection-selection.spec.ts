@@ -29,6 +29,11 @@ test("@mutation collection selection and linked-item moves use the public UI", a
 
     await page.goto(productUrl);
     await waitForHydration(page);
+    for (const materialName of fixture.materialNames) {
+      await expect(
+        page.getByRole("link", { exact: true, name: materialName }),
+      ).toBeVisible();
+    }
     await page.getByRole("link", { name: "Add to collection" }).click();
     await expect(page).toHaveURL(addToCollectionUrl);
     await expect(page.locator("main input").first()).toHaveValue(
@@ -129,6 +134,11 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     await expect(page.locator('span[aria-current="page"]')).toHaveText(
       fixture.spinnerProductName,
     );
+    for (const materialName of fixture.materialNames) {
+      await expect(
+        page.getByRole("link", { exact: true, name: materialName }),
+      ).toBeVisible();
+    }
     await page
       .getByRole("link", { name: "Edit" })
       .and(page.locator('a[href^="/collections/edit/"]'))
