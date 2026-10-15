@@ -71,7 +71,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     await selectOption(page, "Materials", fixture.materialName);
     await selectOption(page, "Finish", fixture.finishName);
     await selectOption(page, "Button", fixture.buttonProductName);
-    await selectOption(page, "Materials", fixture.materialName, 1);
+    await selectOption(page, "Materials", fixture.materialNames[0], 1);
     await selectOption(page, "Finish", fixture.finishName, 1);
     await page.getByRole("button", { name: "Add to collection" }).click();
     await expect(page).toHaveURL(/\/user\/collections\/\d+$/u);
