@@ -21,6 +21,7 @@ export const storySettings: UserSettingsState = {
     currencyCode: "USD",
     locale: "en-US",
     measurementSystem: "metric",
+    publishTrends: false,
     theme: "light",
   },
 };

@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "publish_trends" boolean DEFAULT false NOT NULL;

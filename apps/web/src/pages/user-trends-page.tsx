@@ -8,6 +8,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { ActivityTrendsChart } from "@/components/activity-trends-chart";
+import { AppShell } from "@/components/app-shell";
 import { CompositionComparison } from "@/components/composition-comparison";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
@@ -112,6 +113,7 @@ export function UserTrendsPage({
   communityTrends,
   items,
   onSearchChange,
+  publicUsername,
   search,
 }: {
   /** Exact owner-scoped collection-item creation activity. */
@@ -131,6 +133,8 @@ export function UserTrendsPage({
    * @returns Completion after the parent accepts the state.
    */
   onSearchChange: (search: CatalogTrendsSearch) => void;
+  /** Public profile username, or omitted for the private owner view. */
+  publicUsername?: string;
   /** Normalized URL filter state. */
   search: CatalogTrendsSearch;
 }) {
@@ -218,7 +222,138 @@ export function UserTrendsPage({
     },
   ];
 
-  return (
+  const publicContent = (
+    <main className="space-y-6 p-4 md:p-6">
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-border bg-card p-4">
+          <dt className="text-sm text-muted-foreground">
+            {t("web.userTrends.collectionSize")}
+          </dt>
+          <dd className="text-2xl font-semibold tabular-nums">
+            {trends.itemCount}
+          </dd>
+        </div>
+        <div className="rounded-md border border-border bg-card p-4">
+          <dt className="text-sm text-muted-foreground">
+            {t("web.userTrends.collectionCount")}
+          </dt>
+          <dd className="text-2xl font-semibold tabular-nums">
+            {trends.collectionCount}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <TrendFilter
+          id="user-trends-product-type"
+          label={t("web.trends.productType")}
+          onChange={(value) =>
+            onSearchChange({
+              ...search,
+              makerId: undefined,
+              productId: undefined,
+              productTypeId: value,
+            })
+          }
+          options={productTypes}
+          placeholder={t("web.trends.allProductTypes")}
+          value={search.productTypeId}
+        />
+        <TrendFilter
+          id="user-trends-material"
+          label={t("web.trends.material")}
+          onChange={(value) =>
+            onSearchChange({
+              ...search,
+              makerId: undefined,
+              materialId: value,
+              materialSpecificId: undefined,
+              productId: undefined,
+            })
+          }
+          options={materials}
+          placeholder={t("web.trends.allMaterials")}
+          value={search.materialId}
+        />
+        {search.materialId && materialSpecifics.length ? (
+          <TrendFilter
+            id="user-trends-material-specific"
+            label={t("web.trends.materialSpecific")}
+            onChange={(value) =>
+              onSearchChange({
+                ...search,
+                makerId: undefined,
+                materialSpecificId: value,
+                productId: undefined,
+              })
+            }
+            options={materialSpecifics}
+            placeholder={t("web.trends.allMaterialSpecifics")}
+            value={search.materialSpecificId}
+          />
+        ) : null}
+        <TrendFilter
+          id="user-trends-maker"
+          label={t("web.trends.maker")}
+          onChange={(value) =>
+            onSearchChange({
+              ...search,
+              makerId: value,
+              productId: undefined,
+            })
+          }
+          options={makers}
+          placeholder={t("web.trends.allMakers")}
+          value={search.makerId}
+        />
+        <TrendFilter
+          id="user-trends-product"
+          label={t("web.trends.product")}
+          onChange={(value) => onSearchChange({ ...search, productId: value })}
+          options={products}
+          placeholder={t("web.trends.allProducts")}
+          value={search.productId}
+        />
+      </div>
+
+      {visualizations.map((visualization) => (
+        <section
+          aria-labelledby={`user-trends-${visualization.id}-title`}
+          className="space-y-4"
+          key={visualization.id}
+        >
+          <h2
+            className="text-lg font-semibold"
+            id={`user-trends-${visualization.id}-title`}
+          >
+            {visualization.title}
+          </h2>
+          <TrendVisualization
+            ariaLabel={visualization.title}
+            colorClass={visualization.colorClass}
+            countLabel={t("web.userTrends.items")}
+            emptyState={emptyState}
+            labelColumn={visualization.label}
+            otherLabel={t("web.trends.other")}
+            values={visualization.values.map((value) => ({
+              ...value,
+              key: value.id,
+            }))}
+            viewProductsLabel={t("web.trends.viewProducts")}
+          />
+        </section>
+      ))}
+    </main>
+  );
+
+  return publicUsername ? (
+    <AppShell
+      meta={t("web.userTrends.description")}
+      title={`${publicUsername} · ${t("web.userTrends.title")}`}
+    >
+      {publicContent}
+    </AppShell>
+  ) : (
     <UserPageShell
       meta={t("web.userTrends.description")}
       section="trends"

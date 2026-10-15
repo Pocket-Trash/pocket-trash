@@ -82,6 +82,7 @@ import { Route as UserCollectionsCollectionIdRouteImport } from './routes/user.c
 import { Route as UserCollectionsAddRouteImport } from './routes/user.collections_.add'
 import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
+import { Route as UsersUsernameTrendsRouteImport } from './routes/users.$username.trends'
 import { Route as AdminMakersMakerIdEditRouteImport } from './routes/admin.makers.$makerId.edit'
 import { Route as AdminMaterialsMaterialIdEditRouteImport } from './routes/admin.materials.$materialId.edit'
 import { Route as CollectionsUserIdCollectionIdCollectionItemIdRouteImport } from './routes/collections_.$userId.$collectionId_.$collectionItemId'
@@ -464,6 +465,11 @@ const UserSettingsBetaFeaturesRoute =
     path: '/settings/beta-features',
     getParentRoute: () => UserRoute,
   } as any)
+const UsersUsernameTrendsRoute = UsersUsernameTrendsRouteImport.update({
+  id: '/users/$username/trends',
+  path: '/users/$username/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminMakersMakerIdEditRoute = AdminMakersMakerIdEditRouteImport.update({
   id: '/makers/$makerId/edit',
   path: '/makers/$makerId/edit',
@@ -568,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/users/$username/trends': typeof UsersUsernameTrendsRoute
   '/admin/config/': typeof AdminConfigIndexRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
   '/admin/makers/': typeof AdminMakersIndexRoute
@@ -645,6 +652,7 @@ export interface FileRoutesByTo {
   '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/users/$username/trends': typeof UsersUsernameTrendsRoute
   '/admin/config': typeof AdminConfigIndexRoute
   '/admin/feedback': typeof AdminFeedbackIndexRoute
   '/admin/makers': typeof AdminMakersIndexRoute
@@ -727,6 +735,7 @@ export interface FileRoutesById {
   '/user/collections_/add': typeof UserCollectionsAddRoute
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/users/$username/trends': typeof UsersUsernameTrendsRoute
   '/admin/config/': typeof AdminConfigIndexRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
   '/admin/makers/': typeof AdminMakersIndexRoute
@@ -810,6 +819,7 @@ export interface FileRouteTypes {
     | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/users/$username/trends'
     | '/admin/config/'
     | '/admin/feedback/'
     | '/admin/makers/'
@@ -887,6 +897,7 @@ export interface FileRouteTypes {
     | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/users/$username/trends'
     | '/admin/config'
     | '/admin/feedback'
     | '/admin/makers'
@@ -968,6 +979,7 @@ export interface FileRouteTypes {
     | '/user/collections_/add'
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
+    | '/users/$username/trends'
     | '/admin/config/'
     | '/admin/feedback/'
     | '/admin/makers/'
@@ -1014,6 +1026,7 @@ export interface RootRouteChildren {
   CollectionsUserIdCollectionIdRoute: typeof CollectionsUserIdCollectionIdRoute
   MaterialsMaterialSlugMaterialSpecificSlugRoute: typeof MaterialsMaterialSlugMaterialSpecificSlugRoute
   ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRoute
+  UsersUsernameTrendsRoute: typeof UsersUsernameTrendsRoute
   CollectionsUserIdCollectionIdCollectionItemIdRoute: typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   ProductsProductTypeSlugProductSlugEditRoute: typeof ProductsProductTypeSlugProductSlugEditRoute
 }
@@ -1531,6 +1544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
+    '/users/$username/trends': {
+      id: '/users/$username/trends'
+      path: '/users/$username/trends'
+      fullPath: '/users/$username/trends'
+      preLoaderRoute: typeof UsersUsernameTrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/makers/$makerId/edit': {
       id: '/admin/makers/$makerId/edit'
       path: '/makers/$makerId/edit'
@@ -1748,6 +1768,7 @@ const rootRouteChildren: RootRouteChildren = {
     MaterialsMaterialSlugMaterialSpecificSlugRoute,
   ProductsProductTypeSlugProductSlugRoute:
     ProductsProductTypeSlugProductSlugRoute,
+  UsersUsernameTrendsRoute: UsersUsernameTrendsRoute,
   CollectionsUserIdCollectionIdCollectionItemIdRoute:
     CollectionsUserIdCollectionIdCollectionItemIdRoute,
   ProductsProductTypeSlugProductSlugEditRoute:

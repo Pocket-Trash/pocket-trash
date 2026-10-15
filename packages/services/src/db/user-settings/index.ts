@@ -29,6 +29,8 @@ export type UpsertUserSettingsInput = {
   currencyCode: CurrencyCode;
   /** App-wide system used for secondary measurement displays. */
   measurementSystem: MeasurementSystem;
+  /** Whether privacy-filtered personal Trends are publicly available. */
+  publishTrends: boolean;
   /**
    * Explicit locale, or `null` to use negotiated preferences.
    */
@@ -113,6 +115,7 @@ export const defaultUserSettings: UpsertUserSettingsInput = {
   currencyCode: "USD",
   locale: null,
   measurementSystem: "metric",
+  publishTrends: false,
   theme: "system",
 };
 
@@ -174,6 +177,7 @@ export function createUserSettingsService(
               currencyCode: schema.userSettings.currencyCode,
               locale: schema.userSettings.locale,
               measurementSystem: schema.userSettings.measurementSystem,
+              publishTrends: schema.userSettings.publishTrends,
               theme: schema.userSettings.theme,
               userId: schema.userSettings.userId,
             })

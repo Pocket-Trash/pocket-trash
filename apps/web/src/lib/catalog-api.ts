@@ -2401,6 +2401,25 @@ export const getPublicCollectionOwner = createServerFn({ method: "GET" })
   });
 
 /**
+ * Loads a published personal Trends profile by exact username.
+ *
+ * @returns Privacy-filtered public owner data, or `null` for absent and private profiles.
+ * @rejects If validation, service loading, viewer lookup, or the owner query fails.
+ */
+export const getPublishedUserTrends = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ username: z.string().trim().min(1).max(256) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    return (
+      (await s.db.collections.listOwners(await getResourceViewer())).find(
+        (owner) => owner.publishTrends && owner.username === data.username,
+      ) ?? null
+    );
+  });
+
+/**
  * Loads a public collection item and its optional installed components.
  *
  * @returns The item and installed components, with signed images when configured, or `null` when unavailable.

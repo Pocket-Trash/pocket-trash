@@ -42,6 +42,7 @@ export const defaultUserSettings: UserSettingsPreferences = {
   currencyCode: "USD",
   locale: null,
   measurementSystem: "metric",
+  publishTrends: false,
   theme: "system",
 };
 
@@ -126,6 +127,13 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
     patch.theme = value.theme;
   }
 
+  if ("publishTrends" in value) {
+    if (typeof value.publishTrends !== "boolean") {
+      throw new Error(formatTranslation("web.error.userSettingsObject"));
+    }
+    patch.publishTrends = value.publishTrends;
+  }
+
   if ("locale" in value) {
     if (value.locale !== null && !isSupportedLocale(value.locale)) {
       throw new Error(formatTranslation("web.error.invalidLocale"));
@@ -168,6 +176,8 @@ function toUserSettingsPreferences(settings: {
   currencyCode: CurrencyCode;
   /** App-wide measurement display system. */
   measurementSystem: MeasurementSystem;
+  /** Whether privacy-filtered personal Trends are public. */
+  publishTrends: boolean;
   /** Stored locale preference, or automatic selection when absent. */
   locale?: LocalePreference | null;
   /** Preferred light, dark, or system theme. */
@@ -177,6 +187,7 @@ function toUserSettingsPreferences(settings: {
     currencyCode: settings.currencyCode,
     locale: settings.locale ? resolveLocale(settings.locale) : null,
     measurementSystem: settings.measurementSystem,
+    publishTrends: settings.publishTrends,
     theme: settings.theme,
   };
 }

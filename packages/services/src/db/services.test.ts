@@ -230,6 +230,7 @@ describe("database service logging", () => {
       currencyCode: "CAD",
       measurementSystem: "metric",
       locale: null,
+      publishTrends: false,
       theme: "dark",
       userId: 1000,
     };
@@ -270,6 +271,7 @@ describe("database service logging", () => {
     const settings = {
       currencyCode: "USD",
       measurementSystem: "metric",
+      publishTrends: false,
       theme: "system",
     } as const;
     const userSettings: UserSettings = {
@@ -296,7 +298,12 @@ describe("database service logging", () => {
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.upsertForClerkId,
       outcome: "success",
-      settingKeys: ["currencyCode", "measurementSystem", "theme"],
+      settingKeys: [
+        "currencyCode",
+        "measurementSystem",
+        "publishTrends",
+        "theme",
+      ],
       settings,
     });
     expect(JSON.stringify(events)).not.toContain(clerkId);
@@ -310,6 +317,7 @@ describe("database service logging", () => {
       currencyCode: "CAD",
       measurementSystem: "metric",
       locale: null,
+      publishTrends: false,
       theme: "dark",
       userId: 1000,
     };
@@ -369,6 +377,7 @@ describe("database service logging", () => {
       currencyCode: "USD",
       measurementSystem: "metric",
       locale: null,
+      publishTrends: false,
       theme: "light",
       userId: user.id,
     };
@@ -417,6 +426,7 @@ describe("database service logging", () => {
       currencyCode: "USD",
       measurementSystem: "metric",
       locale: null,
+      publishTrends: false,
       theme: "system",
       userId: user.id,
     };
@@ -451,6 +461,7 @@ describe("database service logging", () => {
       currencyCode: "CAD",
       measurementSystem: "metric",
       locale: null,
+      publishTrends: false,
       theme: "light",
       userId: 1000,
     };
@@ -498,6 +509,7 @@ describe("database service logging", () => {
       currencyCode: "USD",
       measurementSystem: "metric",
       locale: "en",
+      publishTrends: false,
       theme: "system",
       userId: 1000,
     };

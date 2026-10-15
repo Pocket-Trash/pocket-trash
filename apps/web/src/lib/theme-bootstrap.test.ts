@@ -12,6 +12,7 @@ const defaultSettingsState: UserSettingsState = {
     currencyCode: "USD",
     measurementSystem: "metric",
     locale: null,
+    publishTrends: false,
     theme: "system",
   },
 };

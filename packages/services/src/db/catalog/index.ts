@@ -2133,6 +2133,8 @@ export type PublicCollectionOwner = {
    * Visible collection items owned by the user.
    */
   items: UserCollectionItem[];
+  /** Whether the owner publishes privacy-filtered personal Trends. */
+  publishTrends: boolean;
   /**
    * User identifier.
    */
@@ -7317,8 +7319,13 @@ export function createCollectionsService(
           imageUrl: schema.user.imageUrl,
           userId: schema.user.id,
           username: schema.user.username,
+          publishTrends: schema.userSettings.publishTrends,
         })
         .from(schema.user)
+        .leftJoin(
+          schema.userSettings,
+          eq(schema.userSettings.userId, schema.user.id),
+        )
         .where(inArray(schema.user.id, ownerIds));
       return owners
         .map((owner) => {
@@ -7332,6 +7339,7 @@ export function createCollectionsService(
             itemCount: ownerItems.length,
             items: ownerItems,
             imageUrl: owner.imageUrl,
+            publishTrends: owner.publishTrends ?? false,
             userId: owner.userId,
             username: owner.username ?? owner.clerkId,
           };
