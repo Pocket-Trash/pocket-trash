@@ -117,4 +117,4 @@ operation metadata, and redaction.
 [Logger Live](../.github/workflows/logger-live.yml) runs the same check for
 same-repository pull requests that touch logger-relevant files and by manual
 workflow dispatch. CI expects the `preview` dataset and reads its secrets from
-`/shared`.
+`/shared`, including `LOG_PROXY_CLIENT_KEY`.

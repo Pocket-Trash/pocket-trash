@@ -22,8 +22,10 @@ these values to GitHub repository secrets:
 Store workflow runtime values in `tools/github/secrets` with normalized names in
 each Infisical environment. Use `preview` for pull request, cleanup, refresh,
 logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
-Logger Live and preview infrastructure cleanup fetch their Axiom and Bunny
-Storage values from `/shared` in the `preview` environment.
+Logger Live fetches `AXIOM_DATASET`, `AXIOM_TOKEN`, and
+`LOG_PROXY_CLIENT_KEY` only from `/shared` in the `preview` environment.
+Preview infrastructure cleanup fetches its Bunny Storage values from the same
+path.
 
 | Value | Preview | Prod |
 | --- | --- | --- |
@@ -34,7 +36,6 @@ Storage values from `/shared` in the `preview` environment.
 | `BUNNY_PULL_ZONE_ID` | Required for complete erasure | Required for complete erasure |
 | `CLERK_SECRET_KEY` | Required | Required |
 | `DISCORD_GITHUB_WEBHOOK_URL` | Required | - |
-| `LOG_PROXY_CLIENT_KEY` | Required | - |
 | `NEON_API_KEY` | Required | Required |
 | `NEON_DATABASE_NAME` | Required | Required |
 | `NEON_DATABASE_USER` | Required | Required |
