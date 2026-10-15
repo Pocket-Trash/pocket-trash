@@ -108,6 +108,14 @@ describe("api worker", () => {
     const processAuditDue = vi
       .spyOn(runtime.services.db.audit, "processDue")
       .mockResolvedValueOnce(false);
+    const refreshTrends = vi
+      .spyOn(runtime.services.db.trends, "refreshPublicCollectionItemTrends")
+      .mockResolvedValueOnce({
+        generatedAt: new Date(0),
+        hasSuppressedValues: false,
+        stale: false,
+        values: [],
+      });
     if (fails) cleanup.mockRejectedValueOnce(new Error("private SQL payload"));
     else cleanup.mockResolvedValueOnce(0);
     const flush = vi.spyOn(runtime.logger, "flush");
@@ -133,8 +141,71 @@ describe("api worker", () => {
     expect(cleanup).toHaveBeenCalledOnce();
     expect(processDue).toHaveBeenCalledOnce();
     expect(processAuditDue).toHaveBeenCalledOnce();
+    expect(refreshTrends).not.toHaveBeenCalled();
     expect(purge).toHaveBeenCalledOnce();
     expect(flush).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { erasureProcessed: false, scheduledTime: 0 },
+    { erasureProcessed: true, scheduledTime: 3_600_000 },
+  ])("refreshes public Trends after nightly or erasure work (%o)", async ({
+    erasureProcessed,
+    scheduledTime,
+  }) => {
+    const bindings = {
+      APP_ENV: "production",
+      CLERK_SECRET_KEY: "test-secret",
+      DATABASE_URL: "postgresql://user:password@localhost/test",
+      BUNNY_STORAGE_ACCESS_KEY: "test",
+      BUNNY_CDN_BASE_URL: "https://cdn.test",
+      BUNNY_STORAGE_ENDPOINT: "https://storage.test",
+      BUNNY_STORAGE_ZONE_NAME: "test",
+      BUNNY_RESOURCE_FOLDER_PREFIX: "resources/files",
+      BUNNY_IMAGE_FOLDER_PREFIX: "images",
+    };
+    const runtime = serviceFactories.createApiServices(bindings, {
+      storage: true,
+    });
+    vi.spyOn(runtime.services.db.audit, "processDue").mockResolvedValue(false);
+    vi.spyOn(runtime.services.db.erasure, "processDue")
+      .mockResolvedValueOnce(erasureProcessed)
+      .mockResolvedValue(false);
+    vi.spyOn(
+      runtime.services.db.erasure,
+      "purgeExpiredReceipts",
+    ).mockResolvedValue(0);
+    vi.spyOn(runtime.services.storage, "cleanupExpired").mockResolvedValue(0);
+    const refresh = vi
+      .spyOn(runtime.services.db.trends, "refreshPublicCollectionItemTrends")
+      .mockResolvedValue({
+        generatedAt: new Date(scheduledTime),
+        hasSuppressedValues: false,
+        stale: false,
+        values: [],
+      });
+    vi.spyOn(serviceFactories, "createApiServices").mockReturnValueOnce(
+      runtime,
+    );
+    const tasks: Promise<unknown>[] = [];
+
+    await handleWorkerScheduled(
+      { cron: "15 * * * *", scheduledTime } as ScheduledController,
+      bindings,
+      {
+        /**
+         * Captures scheduled background work.
+         *
+         * @param task - Scheduled promise.
+         */
+        waitUntil(task: Promise<unknown>) {
+          tasks.push(task);
+        },
+      } as ExecutionContext,
+    );
+    await Promise.all(tasks);
+
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it("does not schedule expired-session cleanup outside production", async () => {
