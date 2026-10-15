@@ -96,6 +96,30 @@ describe("canonical Autmog catalog synchronization", () => {
         productId: created.productId,
         updated: false,
       });
+      const [sourceLink] = await db
+        .select({ id: schema.productLink.id })
+        .from(schema.productLink)
+        .where(eq(schema.productLink.productId, productId));
+      if (!sourceLink) throw new Error("Expected scraper-owned product link.");
+      const [matchingManualLink, retainedManualLink] = await db
+        .insert(schema.productLink)
+        .values([
+          {
+            isValid: false,
+            position: 1,
+            productId,
+            url: "https://www.autmog.com/products/updated-autmog-pen",
+          },
+          {
+            isValid: false,
+            position: 2,
+            productId,
+            url: "https://stockist.example/autmog-pen",
+          },
+        ])
+        .returning({ id: schema.productLink.id });
+      if (!matchingManualLink || !retainedManualLink)
+        throw new Error("Expected manual product links.");
 
       const changed = normalizeAutmogProduct(
         createProduct({
@@ -134,10 +158,35 @@ describe("canonical Autmog catalog synchronization", () => {
       expect(product).toMatchObject({
         approvalStatus: "approved",
         isPrivate: true,
-        makerProductUrl: "https://www.autmog.com/products/updated-autmog-pen",
         name: "Updated Autmog Pen",
         ownerClerkId: "user_owner",
       });
+      await expect(
+        db
+          .select({
+            id: schema.productLink.id,
+            isValid: schema.productLink.isValid,
+            position: schema.productLink.position,
+            url: schema.productLink.url,
+          })
+          .from(schema.productLink)
+          .where(eq(schema.productLink.productId, productId))
+          .orderBy(schema.productLink.position),
+      ).resolves.toEqual([
+        {
+          id: matchingManualLink.id,
+          isValid: true,
+          position: 0,
+          url: "https://www.autmog.com/products/updated-autmog-pen",
+        },
+        {
+          id: retainedManualLink.id,
+          isValid: false,
+          position: 1,
+          url: "https://stockist.example/autmog-pen",
+        },
+      ]);
+      expect(matchingManualLink.id).not.toBe(sourceLink.id);
       await expect(countRows(db, schema.productMaterial)).resolves.toBe(2);
       await expect(
         countRows(db, schema.refillCompatibilityAssertion),
