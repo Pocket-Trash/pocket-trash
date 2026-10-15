@@ -21,6 +21,7 @@ event="$(emit_ci_log info "ci.database.preview.branch.created" "$(jq -n \
   '{branchName: $branch_name, branchId: $branch_id, databaseUrl: $database_url}')")"
 
 jq -e '
+  (keys | sort) == ["app", "attributes", "environment", "level", "message", "timestamp"] and
   .app == "ci" and
   .environment == "github-actions" and
   .level == "info" and

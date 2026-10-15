@@ -23,13 +23,15 @@ Store workflow runtime values in `tools/github/secrets` with normalized names in
 each Infisical environment. Use `preview` for pull request, cleanup, refresh,
 logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 Logger Live fetches `AXIOM_DATASET`, `AXIOM_TOKEN`, and
-`LOG_PROXY_CLIENT_KEY` only from `/shared` in the `preview` environment.
+`LOG_PROXY_CLIENT_KEY` from `/shared` and `AXIOM_MANAGEMENT_TOKEN` from
+`tools/github/secrets` in the `preview` environment.
 Preview infrastructure cleanup fetches its Bunny Storage values from the same
 path.
 
 | Value | Preview | Prod |
 | --- | --- | --- |
 | `AXIOM_EDGE_DOMAIN` | Optional | Optional |
+| `AXIOM_MANAGEMENT_TOKEN` | Required | Required |
 | `ASSET_FOLDER_PREFIX` | Required | Required |
 | `BUNNY_API_KEY` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_CDN_TOKEN_KEY` | Required for complete erasure | Required for complete erasure |
