@@ -75,8 +75,34 @@ const product: CatalogProduct = {
 const products: CatalogProduct[] = [
   ...Array.from({ length: 13 }, (_, index) => ({
     ...product,
+    finishOptions:
+      index === 1
+        ? [
+            ...product.finishOptions,
+            {
+              colorEffect: null,
+              colors: [],
+              finishes: [{ id: 1014, name: "Blasted", slug: "blasted" }],
+              id: 1015,
+              pattern: null,
+            },
+          ]
+        : product.finishOptions,
     id: 1000 + index,
     name: `Product ${index + 1}`,
+    materials:
+      index === 1
+        ? [
+            ...product.materials,
+            {
+              assignmentId: 1016,
+              id: 1016,
+              name: "Steel",
+              slug: "steel",
+              specific: null,
+            },
+          ]
+        : product.materials,
     images:
       index === 1
         ? []
@@ -247,10 +273,26 @@ export const Preselected: Story = {
    * @returns A promise that resolves after chooser assertions pass.
    */
   play: async ({ canvas, userEvent }) => {
-    const chooser = canvas.getByText("Products", { selector: "summary" });
+    const chooser = canvas.getByText("web.collections.productSelector", {
+      selector: "summary",
+    });
     await expect(
       canvas.getByRole("button", { name: "Product 1" }),
     ).not.toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Close: Bronze" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Close: Polished" }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Close: Bronze" }),
+    );
+    await userEvent.click(chooser);
+    await userEvent.click(chooser);
+    await expect(
+      canvas.queryByRole("button", { name: "Close: Bronze" }),
+    ).toBeNull();
     await userEvent.click(chooser);
     const first = canvas.getByRole("button", {
       name: "Product 1",
@@ -279,6 +321,13 @@ export const Preselected: Story = {
     await expect(canvas.getByLabelText("Display name")).toHaveValue(
       "Product 13",
     );
+    await expect(
+      canvas.getByRole("button", { name: "Product 13" }),
+    ).not.toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Close: Bronze" }),
+    ).toBeVisible();
+    await userEvent.click(chooser);
     const search = canvas.getByRole("searchbox", { name: "Search" });
     await userEvent.type(search, "product 2");
     await expect(canvas.getByText("Page 1 of 1")).toBeVisible();
@@ -290,7 +339,14 @@ export const Preselected: Story = {
     await expect(canvas.getByLabelText("Display name")).toHaveValue(
       "Product 2",
     );
-    await expect(second).toHaveAttribute("aria-pressed", "true");
+    await expect(second).not.toBeVisible();
+    await expect(
+      canvas.queryByRole("button", { name: "Close: Bronze" }),
+    ).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Close: Polished" }),
+    ).toBeNull();
+    await userEvent.click(chooser);
     await userEvent.clear(search);
     await userEvent.type(search, "no match");
     await expect(

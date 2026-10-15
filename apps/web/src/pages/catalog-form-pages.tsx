@@ -3285,6 +3285,48 @@ function OwnershipLifecycleFields({
   );
 }
 
+/** Product-derived collection fields that are safe to initialize automatically. */
+type CollectionProductDefaults = Readonly<{
+  /** Collection-item display name. */
+  displayName: string;
+  /** Sole offered finish, when unambiguous. */
+  finish: ComboboxOption | null;
+  /** Sole offered material assignment, when unambiguous. */
+  material: CatalogLookup | null;
+}>;
+
+/**
+ * Resolves only unambiguous collection defaults from a catalog product.
+ *
+ * @param product - Selected catalog product, when present.
+ * @param t - Catalog translation formatter.
+ * @returns Display name and sole material and finish choices.
+ */
+function collectionProductDefaults(
+  product: CatalogProduct | undefined,
+  t: ReturnType<typeof useCatalogCopy>,
+): CollectionProductDefaults {
+  const assignment =
+    product?.materials.length === 1 ? product.materials[0] : null;
+  const option =
+    product?.finishOptions.length === 1 ? product.finishOptions[0] : null;
+  return {
+    displayName: product?.name ?? "",
+    finish: option
+      ? { id: option.id, name: localizedFinishLabel(option, t) }
+      : null,
+    material: assignment
+      ? {
+          id: assignment.assignmentId,
+          name: assignment.specific
+            ? `${assignment.name}: ${assignment.specific.name}`
+            : assignment.name,
+          slug: assignment.slug,
+        }
+      : null,
+  };
+}
+
 /**
  * Renders the form for adding a product to a collection.
  *
@@ -3366,8 +3408,9 @@ export function CollectionAddPage({
   const [product, setProduct] = React.useState<CatalogProduct | null>(
     initialProduct ?? null,
   );
+  const initialDefaults = collectionProductDefaults(initialProduct, t);
   const [displayName, setDisplayName] = React.useState(
-    initialProduct?.name ?? "",
+    initialDefaults.displayName,
   );
   const [description, setDescription] = React.useState("");
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
@@ -3384,8 +3427,12 @@ export function CollectionAddPage({
     React.useState<number | null>(null);
   const [installedRefillOfferingId, setInstalledRefillOfferingId] =
     React.useState<number | null>(null);
-  const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
-  const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
+  const [material, setMaterial] = React.useState<CatalogLookup | null>(
+    initialDefaults.material,
+  );
+  const [finish, setFinish] = React.useState<ComboboxOption | null>(
+    initialDefaults.finish,
+  );
   const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
   const [button, setButton] = React.useState<
     CatalogProduct | ComboboxOption | null
@@ -3401,6 +3448,9 @@ export function CollectionAddPage({
     Record<number, number>
   >({});
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [productSelectorOpen, setProductSelectorOpen] = React.useState(
+    !initialProduct,
+  );
   const [productQuery, setProductQuery] = React.useState("");
   const [productPage, setProductPage] = React.useState(0);
   const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
@@ -3451,6 +3501,33 @@ export function CollectionAddPage({
     : collections;
   const serialNumberIsValid =
     serialNumber === null || serialNumber.trim().length > 0;
+
+  /**
+   * Selects one product, applies its unambiguous defaults, and clears stale ownership state.
+   *
+   * @param candidate - Product selected from the catalog.
+   */
+  const selectProduct = (candidate: CatalogProduct) => {
+    const defaults = collectionProductDefaults(candidate, t);
+    setProduct(candidate);
+    setDisplayName(defaults.displayName);
+    setDescription("");
+    setBearing("");
+    setSerialNumber(null);
+    setInstalledPenPartIds([]);
+    setInstalledRefillProductId(null);
+    setInstalledRefillOfferingId(null);
+    setMaterial(defaults.material);
+    setFinish(defaults.finish);
+    setCustomFinish(emptyFinishOption());
+    setButton(null);
+    setButtonMaterial(null);
+    setButtonFinish(null);
+    setButtonCustomFinish(emptyFinishOption());
+    setDuplicateCounts({});
+    setFormError(null);
+    setProductSelectorOpen(false);
+  };
 
   /**
    * Saves the current collection-item fields.
@@ -3664,6 +3741,7 @@ export function CollectionAddPage({
           disabled={!product}
           help={t("web.catalog.help.markdownDescription")}
           id="collection-item-description"
+          key={product?.id ?? "no-product"}
           label={t("web.catalog.field.description")}
           onChange={setDescription}
           onLoadingChange={setDescriptionLoading}
@@ -3755,9 +3833,12 @@ export function CollectionAddPage({
             </Button>
           </div>
         </dialog>
-        <details open={!initialProduct}>
+        <details
+          onToggle={(event) => setProductSelectorOpen(event.currentTarget.open)}
+          open={productSelectorOpen}
+        >
           <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            {t("web.navigation.products")}
+            {t("web.collections.productSelector" as TranslationKey)}
           </summary>
           <div className="mt-4 grid gap-4">
             <Field label={t("web.catalog.field.productType")}>
@@ -3814,23 +3895,7 @@ export function CollectionAddPage({
                     className="h-full min-w-0 flex-col items-stretch justify-start gap-0 overflow-hidden p-0 text-left wrap-anywhere whitespace-normal"
                     key={candidate.id}
                     onClick={() => {
-                      setProduct(candidate);
-                      setDisplayName(candidate.name);
-                      setDescription("");
-                      setBearing("");
-                      setSerialNumber(null);
-                      setInstalledPenPartIds([]);
-                      setInstalledRefillProductId(null);
-                      setInstalledRefillOfferingId(null);
-                      setMaterial(null);
-                      setFinish(null);
-                      setCustomFinish(emptyFinishOption());
-                      setButton(null);
-                      setButtonMaterial(null);
-                      setButtonFinish(null);
-                      setButtonCustomFinish(emptyFinishOption());
-                      setDuplicateCounts({});
-                      setFormError(null);
+                      selectProduct(candidate);
                     }}
                     type="button"
                     variant={

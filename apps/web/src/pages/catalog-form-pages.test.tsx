@@ -750,7 +750,10 @@ describe("collection add form", () => {
   });
 
   it("renders localized collection copy and a disabled primary action", () => {
-    const product = productFixture(1003, "Zoom Zoom", "spinner");
+    const product = {
+      ...productFixture(1003, "Zoom Zoom", "spinner"),
+      description: "Catalog description must remain uncopied",
+    };
     const html = renderToStaticMarkup(
       createElement(CollectionAddPage, {
         collections: [
@@ -790,7 +793,11 @@ describe("collection add form", () => {
     expect(html).toContain(">Zoom Zoom</span>");
     expect(html).toMatch(/<details[^>]*>/u);
     expect(html).not.toMatch(/<details[^>]* open=/u);
-    expect(html).toMatch(/<summary[^>]*>Products<\/summary>/u);
+    expect(html).toMatch(
+      /<summary[^>]*>web\.collections\.productSelector<\/summary>/u,
+    );
+    expect(html).toContain('aria-label="Close: Bronze"');
+    expect(html).toContain('aria-label="Close: Polished"');
     expect(html).toContain(">Collection<");
     expect(html).toContain(">Add new collection<");
     expect(html).toContain(">Add to collection<");
@@ -799,10 +806,67 @@ describe("collection add form", () => {
       'id="collection-item-description-label">Description',
     );
     expect(html).toContain("0 / 5,000 characters");
+    expect(html).not.toContain("Catalog description must remain uncopied");
     expect(html).not.toContain('maxlength="5000"');
     expect(html).toContain('aria-label="Bearing"');
     expect(html).toContain("border-input bg-background");
     expect(html).toContain("focus-visible:ring-ring");
+  });
+
+  it.each([
+    { finishCount: 0, materialCount: 0 },
+    { finishCount: 1, materialCount: 0 },
+    { finishCount: 2, materialCount: 0 },
+    { finishCount: 0, materialCount: 1 },
+    { finishCount: 1, materialCount: 1 },
+    { finishCount: 2, materialCount: 1 },
+    { finishCount: 0, materialCount: 2 },
+    { finishCount: 1, materialCount: 2 },
+    { finishCount: 2, materialCount: 2 },
+  ])("defaults only sole choices for $materialCount materials and $finishCount finishes", ({
+    finishCount,
+    materialCount,
+  }) => {
+    const base = productFixture(1010, "Default choices", "spinner");
+    const product = {
+      ...base,
+      finishOptions: [
+        ...base.finishOptions,
+        {
+          colorEffect: null,
+          colors: [],
+          finishes: [{ id: 1014, name: "Blasted", slug: "blasted" }],
+          id: 1015,
+          pattern: null,
+        },
+      ].slice(0, finishCount),
+      materials: [
+        ...base.materials,
+        {
+          assignmentId: 1016,
+          id: 1016,
+          name: "Steel",
+          slug: "steel",
+          specific: null,
+        },
+      ].slice(0, materialCount),
+    };
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [],
+        defaultCollectionName: null,
+        initialProductId: product.id,
+        options: emptyCatalogOptions,
+        products: [product],
+      }),
+    );
+
+    expect(html.includes('aria-label="Close: Bronze"')).toBe(
+      materialCount === 1,
+    );
+    expect(html.includes('aria-label="Close: Polished"')).toBe(
+      finishCount === 1,
+    );
   });
 
   it("does not offer a bearing override for a button", () => {
