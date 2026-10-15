@@ -7,6 +7,8 @@ import type {
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
+  PublicSpinnerTrends,
+  SpinnerTrendMetricId,
 } from "@package/services";
 import {
   formatTranslation,
@@ -15,6 +17,7 @@ import {
 import { ActivityTrendsChart } from "@/components/activity-trends-chart";
 import { AppShell } from "@/components/app-shell";
 import { CatalogTrendsChart } from "@/components/catalog-trends-chart";
+import { SpinnerTrendVisualization } from "@/components/spinner-trend-visualization";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
   Select,
@@ -30,6 +33,8 @@ import { useLocale } from "@/providers/locale-provider";
 /** Trends keys supplied by the stacked localization change. */
 type TrendsTranslationKey =
   | TranslationKey
+  | "web.archive.spec.length"
+  | "web.archive.spec.weight"
   | "web.trends.approximateCollectors"
   | "web.trends.approximateItems"
   | "web.trends.collectionItems"
@@ -94,7 +99,15 @@ type TrendsTranslationKey =
   | "web.trends.range6Months"
   | "web.trends.rangeAll"
   | "web.trends.rangeWeek"
-  | "web.trends.rangeYear";
+  | "web.trends.rangeYear"
+  | "web.trends.coverage"
+  | "web.trends.exactValues"
+  | "web.trends.spinnerDescription"
+  | "web.trends.spinnerPrivacy"
+  | "web.trends.spinnerSuppressed"
+  | "web.trends.spinnerTitle"
+  | "web.trends.suppressed"
+  | "web.trends.value";
 
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
@@ -119,6 +132,8 @@ export type TrendsPageProps = {
   partAccessoryTrends?: PublicPartAccessoryTrends | null;
   /** Stable filters selected in URL search. */
   search?: CatalogTrendsSearch;
+  /** Coverage-qualified Spinner characteristics. */
+  spinnerTrends?: PublicSpinnerTrends | null;
   /** Exact public catalog-product counts in descending order. */
   trends: PublicProductTypeTrend[];
 };
@@ -138,6 +153,7 @@ export function TrendsPage({
   onSearchChange,
   partAccessoryTrends = null,
   search = {},
+  spinnerTrends = null,
   trends,
 }: TrendsPageProps) {
   const { locale } = useLocale();
@@ -152,6 +168,18 @@ export function TrendsPage({
     key: TrendsTranslationKey,
     values: Record<string, string | number> = {},
   ) => formatTranslation(key as TranslationKey, values, locale);
+  const spinnerMetricLabels: Record<SpinnerTrendMetricId, string> = {
+    bearing: t("web.catalog.field.bearing"),
+    bodyMaterial: t("web.trends.material"),
+    buttonDiameter: t("web.catalog.field.buttonDiameter"),
+    length: t("web.archive.spec.length"),
+    maker: t("web.trends.maker"),
+    spinDiameter: t("web.catalog.field.spinDiameter"),
+    thickness: t("web.catalog.field.thickness"),
+    thicknessWithButton: t("web.catalog.field.thicknessWithButton"),
+    weight: t("web.archive.spec.weight"),
+    width: t("web.catalog.field.width"),
+  };
   const { makerId, materialId, materialSpecificId, productId, productTypeId } =
     search;
   const visibleTrends = filterCatalogTrends(trends, productTypeId);
@@ -643,6 +671,55 @@ export function TrendsPage({
             </details>
           </>
         )}
+
+        {spinnerTrends && productTypeId === spinnerTrends.productTypeId ? (
+          <section aria-labelledby="spinner-trends-title" className="space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold" id="spinner-trends-title">
+                {t("web.trends.spinnerTitle")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("web.trends.spinnerDescription")}
+              </p>
+            </div>
+            {spinnerTrends.trends.map((trend) => {
+              const label = spinnerMetricLabels[trend.metric];
+              return (
+                <section className="space-y-3" key={trend.metric}>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold">{label}</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {t("web.trends.coverage", {
+                        coverage: new Intl.NumberFormat(locale, {
+                          maximumFractionDigits: 1,
+                        }).format(trend.coveragePercent),
+                      })}
+                    </p>
+                  </div>
+                  <SpinnerTrendVisualization
+                    approximateItemsLabel={t("web.trends.approximateItems")}
+                    catalogProductsLabel={t("web.trends.catalogProducts")}
+                    chartLabel={label}
+                    detailsLabel={t("web.trends.exactValues")}
+                    locale={locale}
+                    otherLabel={t("web.trends.other")}
+                    suppressedLabel={t("web.trends.suppressed")}
+                    trend={trend}
+                    valueLabel={t("web.trends.value")}
+                  />
+                  {trend.hasSuppressedCollectionValues ? (
+                    <p className="text-xs text-muted-foreground" role="status">
+                      {t("web.trends.spinnerSuppressed")}
+                    </p>
+                  ) : null}
+                </section>
+              );
+            })}
+            <p className="text-xs text-muted-foreground">
+              {t("web.trends.spinnerPrivacy")}
+            </p>
+          </section>
+        ) : null}
 
         <section
           aria-labelledby="catalog-material-trends-title"

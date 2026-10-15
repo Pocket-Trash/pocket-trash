@@ -7,6 +7,7 @@ import {
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
+  getPublicSpinnerTrends,
   listPublicProductTypeTrends,
 } from "@/lib/catalog-api";
 import { parseCatalogTrendsSearch } from "@/lib/catalog-filters";
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/trends")({
       catalogMaterialTrends,
       collectionMaterialTrends,
       activityTrends,
+      spinnerTrends,
     ] = await Promise.all([
       listPublicProductTypeTrends(),
       getPublicCollectionItemTrends(),
@@ -56,6 +58,7 @@ export const Route = createFileRoute("/trends")({
       getPublicCatalogMaterialTrends(),
       getPublicCollectionMaterialTrends(),
       getPublicActivityTrends({ data: deps.range }),
+      getPublicSpinnerTrends(),
     ]);
     return {
       activityTrends,
@@ -65,6 +68,7 @@ export const Route = createFileRoute("/trends")({
       collectionTrends,
       makerProductTrends,
       partAccessoryTrends,
+      spinnerTrends,
     };
   },
   pendingComponent: TrendsPendingPage,
@@ -93,6 +97,7 @@ function TrendsRoute() {
     collectionTrends,
     makerProductTrends,
     partAccessoryTrends,
+    spinnerTrends,
   } = Route.useLoaderData();
   return (
     <TrendsPage
@@ -110,6 +115,7 @@ function TrendsRoute() {
       }
       partAccessoryTrends={partAccessoryTrends}
       search={search}
+      spinnerTrends={spinnerTrends}
       trends={catalogTrends}
     />
   );

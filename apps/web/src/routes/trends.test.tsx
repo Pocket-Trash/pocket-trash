@@ -14,6 +14,8 @@ const getPublicCatalogMaterialTrends = vi.hoisted(() => vi.fn());
 const getPublicCollectionMaterialTrends = vi.hoisted(() => vi.fn());
 /** Provides the active Parts and Accessories generation to the route loader. */
 const getPublicPartAccessoryTrends = vi.hoisted(() => vi.fn());
+/** Provides coverage-qualified Spinner Trends to the route loader. */
+const getPublicSpinnerTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
   getPublicActivityTrends,
@@ -22,6 +24,7 @@ vi.mock("@/lib/catalog-api", () => ({
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
+  getPublicSpinnerTrends,
   listPublicProductTypeTrends,
 }));
 vi.mock("@/pages/trends-page", () => ({
@@ -85,6 +88,7 @@ describe("Trends route", () => {
     getPublicPartAccessoryTrends.mockResolvedValueOnce(collectionTrends);
     getPublicCatalogMaterialTrends.mockResolvedValueOnce([]);
     getPublicCollectionMaterialTrends.mockResolvedValueOnce(null);
+    getPublicSpinnerTrends.mockResolvedValueOnce(null);
     const activityTrends = {
       granularity: "month",
       range: "year",
@@ -103,6 +107,7 @@ describe("Trends route", () => {
       collectionTrends,
       makerProductTrends: null,
       partAccessoryTrends: collectionTrends,
+      spinnerTrends: null,
     });
     expect(getPublicActivityTrends).toHaveBeenCalledWith({ data: "year" });
   });

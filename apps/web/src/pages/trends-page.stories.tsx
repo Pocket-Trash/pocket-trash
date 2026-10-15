@@ -6,6 +6,7 @@ import type {
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
   PublicProductTypeTrend,
+  PublicSpinnerTrends,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
@@ -32,6 +33,51 @@ const trends: PublicProductTypeTrend[] = [
     productTypeName: "Pen",
   },
 ];
+
+/** Coverage-qualified Spinner distributions used by the drill-down story. */
+const spinnerTrends: PublicSpinnerTrends = {
+  catalogProductCount: 18,
+  productTypeId: 1000,
+  trends: [
+    {
+      coveragePercent: 100,
+      hasSuppressedCollectionValues: false,
+      metric: "maker",
+      unit: null,
+      values: [
+        {
+          catalogCount: 12,
+          collectionCount: 25,
+          key: "4000",
+          label: "Machine Era",
+          numericValue: null,
+        },
+        {
+          catalogCount: 6,
+          collectionCount: 10,
+          key: "4001",
+          label: "Lautie",
+          numericValue: null,
+        },
+      ],
+    },
+    {
+      coveragePercent: 72.2,
+      hasSuppressedCollectionValues: true,
+      metric: "weight",
+      unit: "g",
+      values: [
+        {
+          catalogCount: 4,
+          collectionCount: null,
+          key: "55",
+          label: "55",
+          numericValue: 55,
+        },
+      ],
+    },
+  ],
+};
 
 /** Recorded catalog and privacy-safe collection activity used by populated stories. */
 const activityTrends: PublicActivityTrends = {
@@ -294,6 +340,34 @@ export const MakerProductDrillDown: Story = {
     makerProductTrends,
     onSearchChange: fn(),
     trends,
+  },
+};
+
+/** Selected Spinner with coverage-qualified characteristic distributions. */
+export const SpinnerDrillDown: Story = {
+  args: {
+    activityTrends,
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
+    collectionTrends,
+    onSearchChange: fn(),
+    search: { productTypeId: 1000 },
+    spinnerTrends,
+    trends,
+  },
+  /**
+   * Verifies selected Spinner characteristic distributions.
+   *
+   * @param context - Story interaction context.
+   * @param context.canvasElement - Rendered story canvas.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Spinner details" }),
+    ).toBeVisible();
+    await expect(canvas.getAllByText("Machine Era")[0]).toBeVisible();
+    await expect(canvas.getByText("72.2% coverage")).toBeVisible();
   },
 };
 
