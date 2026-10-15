@@ -165,6 +165,13 @@ describe("runAutmogProducer", () => {
           JSON.stringify({
             products: [
               createProduct({
+                body_html: "<p>Replacement clips for Autmog pens.</p>",
+                handle: "pen-clips",
+                id: 6_955_113_873_595,
+                product_type: "Pen",
+                title: "Pen Clips",
+              }),
+              createProduct({
                 body_html: "<p>Clip add-on for an Autmog pen.</p>",
                 handle: "clip-add-on",
                 product_type: "Pen",
@@ -187,7 +194,7 @@ describe("runAutmogProducer", () => {
 
     expect(result).toMatchObject({
       enqueuedCount: 0,
-      fetchedCount: 2,
+      fetchedCount: 3,
       items: [],
     });
     expect(addBulk).toHaveBeenCalledWith([]);

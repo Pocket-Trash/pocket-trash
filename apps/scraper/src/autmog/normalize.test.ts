@@ -49,6 +49,7 @@ describe("normalizeAutmogProduct", () => {
   });
 
   it.each([
+    "Pen Clips",
     "Pen Tray",
     "Clip Add-on for Pen",
   ])("does not classify %s as a pen", (title) => {
