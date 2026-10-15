@@ -252,6 +252,16 @@ describe("Pens catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        productTypeSlug: "pen",
+        refillCompatibility: [
+          { targetGroupId: 1001, targetRefillProductId: null },
+          { targetGroupId: null, targetRefillProductId: 1002 },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
         mechanismId: 1000,
         productTypeSlug: "pen-mechanism",
       }).success,
@@ -269,6 +279,16 @@ describe("Pens catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         mechanismId: 1000,
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "pen",
+        refillCompatibility: [
+          { targetGroupId: 1001, targetRefillProductId: null },
+          { targetGroupId: 1001, targetRefillProductId: null },
+        ],
       }).success,
     ).toBe(false);
     expect(

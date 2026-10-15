@@ -198,6 +198,7 @@ describe("public Pens catalog reads", () => {
         name: "Author Pen",
         productId: penId,
         productTypeSlug: "pen",
+        reason: "Add refill compatibility",
         refillCompatibility: [
           { targetGroupId: null, targetRefillProductId: refillId },
           { targetGroupId: group.id, targetRefillProductId: null },
@@ -225,6 +226,7 @@ describe("public Pens catalog reads", () => {
         name: "Author Pen",
         productId: penId,
         productTypeSlug: "pen",
+        reason: "Clear refill compatibility",
         refillCompatibility: [],
         slug: "author-pen",
         specs: {},

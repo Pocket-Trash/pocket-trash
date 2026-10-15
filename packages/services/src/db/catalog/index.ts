@@ -8717,6 +8717,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     name: product.name,
     productTypeId: product.productTypeId,
     productTypeSlug: product.productTypeSlug,
+    refillCompatibility: product.refillCompatibility,
     refillModel: product.refillModel,
     refillOfferings: product.refillOfferings,
     slug: product.slug,

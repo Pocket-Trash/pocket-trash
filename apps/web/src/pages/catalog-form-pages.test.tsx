@@ -953,6 +953,35 @@ describe("Pens catalog administration", () => {
     expect(adminHtml).toContain("Needle");
     expect(adminHtml).toContain("Blue");
   });
+
+  it("edits Pen-wide refill groups and individual refills", () => {
+    const refill = productFixture(2000, "Precise V5", "refill");
+    const pen = {
+      ...productFixture(2001, "Test Pen", "pen"),
+      refillCompatibility: [
+        { targetGroupId: 1000, targetRefillProductId: null },
+        { targetGroupId: null, targetRefillProductId: refill.id },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: pen,
+        options: {
+          ...emptyCatalogOptions,
+          refillCompatibilityGroups: [
+            { id: 1000, name: "Parker G2", slug: "parker-g2" },
+          ],
+          relationshipProducts: [refill],
+        },
+        productTypeSlug: "pen",
+      }),
+    );
+
+    expect(html).toContain("Parker G2");
+    expect(html).toContain("Precise V5");
+    expect(html).toContain("Refill group: Parker G2");
+    expect(html).not.toContain("Individual refill: Precise V5");
+  });
 });
 
 /**
