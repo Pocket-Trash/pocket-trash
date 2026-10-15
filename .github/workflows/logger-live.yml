@@ -98,7 +98,7 @@ jobs:
       - name: Build logger live dependencies
         run: pnpm exec turbo run build --filter=@package/logger
 
-      - name: Fetch GitHub secrets from Infisical
+      - name: Fetch shared secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
           method: oidc
@@ -107,7 +107,7 @@ jobs:
           domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
-          secret-path: tools/github/secrets
+          secret-path: /shared
 
       - name: Run logger live Axiom test
         env:

@@ -9,6 +9,7 @@ repository secrets only bootstrap that connection.
 | --- | --- |
 | `tools/github/infisical-connection` | Secrets Sync source for GitHub repository bootstrap secrets. |
 | `tools/github/secrets` | Runtime workflow values fetched by GitHub Actions through OIDC. |
+| `/shared` | Shared application and workflow values fetched by GitHub Actions through OIDC. |
 
 Configure `tools/github/infisical-connection` in Infisical production and sync
 these values to GitHub repository secrets:
@@ -21,23 +22,20 @@ these values to GitHub repository secrets:
 Store workflow runtime values in `tools/github/secrets` with normalized names in
 each Infisical environment. Use `preview` for pull request, cleanup, refresh,
 logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
+Logger Live fetches `AXIOM_DATASET`, `AXIOM_TOKEN`, and
+`LOG_PROXY_CLIENT_KEY` only from `/shared` in the `preview` environment.
+Preview infrastructure cleanup fetches its Bunny Storage values from the same
+path.
 
 | Value | Preview | Prod |
 | --- | --- | --- |
-| `AXIOM_DATASET` | Required | Required |
 | `AXIOM_EDGE_DOMAIN` | Optional | Optional |
-| `AXIOM_TOKEN` | Required | Required |
 | `ASSET_FOLDER_PREFIX` | Required | Required |
-| `BUNNY_CDN_BASE_URL` | Required | Required |
 | `BUNNY_API_KEY` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_CDN_TOKEN_KEY` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_PULL_ZONE_ID` | Required for complete erasure | Required for complete erasure |
-| `BUNNY_STORAGE_ACCESS_KEY` | Required | Required |
-| `BUNNY_STORAGE_ENDPOINT` | Required | Required |
-| `BUNNY_STORAGE_ZONE_NAME` | Required | Required |
 | `CLERK_SECRET_KEY` | Required | Required |
 | `DISCORD_GITHUB_WEBHOOK_URL` | Required | - |
-| `LOG_PROXY_CLIENT_KEY` | Required | - |
 | `NEON_API_KEY` | Required | Required |
 | `NEON_DATABASE_NAME` | Required | Required |
 | `NEON_DATABASE_USER` | Required | Required |
@@ -59,7 +57,8 @@ URL to the matching Vercel branch as `API_URL`; production uses
 
 Create one Infisical machine identity with GitHub OIDC auth for
 `Pocket-Trash/pocket-trash`. Grant it read access to `tools/github/secrets` in
-the `preview` and `prod` environments.
+the `preview` and `prod` environments and `/shared` in the `preview`
+environment.
 
 Restrict the OIDC subject to the contexts this repo uses:
 
