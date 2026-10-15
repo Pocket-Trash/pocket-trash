@@ -57,22 +57,18 @@ describe("Pens catalog constraints", () => {
     const seeded = await database.query<{
       /** Seeded mechanism slugs. */
       mechanisms: string;
-      /** Seeded configuration-slot slugs. */
-      slots: string;
       /** Seeded Pens product-type slugs. */
       types: string;
     }>(`
       SELECT
         (SELECT string_agg(slug, ',' ORDER BY slug) FROM mechanisms
           WHERE slug IN ('bolt-action', 'click', 'twist')) AS mechanisms,
-        (SELECT string_agg(slug, ',' ORDER BY slug) FROM configuration_slot_kind) AS slots,
         (SELECT string_agg(slug, ',' ORDER BY slug) FROM product_types
           WHERE slug IN ('pen', 'pen-actuator', 'pen-clip', 'pen-mechanism',
             'pen-tip', 'pen-top-cap', 'refill')) AS types;
     `);
     expect(seeded.rows[0]).toEqual({
       mechanisms: "bolt-action,click,twist",
-      slots: "actuator,appearance,clip,material,mechanism,tip,top-cap",
       types:
         "pen,pen-actuator,pen-clip,pen-mechanism,pen-tip,pen-top-cap,refill",
     });
@@ -187,80 +183,35 @@ describe("Pens catalog constraints", () => {
     ).rejects.toThrow(/serial_number_valid/iu);
   });
 
-  it("enforces carrier kinds, required slots, ordered rules, and unique rule signatures", async () => {
-    await database.exec(
-      `INSERT INTO materials (name, slug) VALUES ('Pens Titanium', 'pens-titanium');`,
-    );
-    await expectRejectedTransaction(
-      database,
-      `INSERT INTO product_configuration_slot (product_id, slot_kind_id, position, required)
-       SELECT product.id, kind.id, 0, true
-       FROM product, configuration_slot_kind kind
-       WHERE product.slug = 'valid-pen' AND kind.slug = 'material';`,
-      /must contain a choice/iu,
-    );
+  it("stores direct compatible and installed Pen parts", async () => {
     await transaction(
       database,
       `
-        INSERT INTO product_material (product_id, material_id)
-        SELECT product.id, materials.id FROM product, materials
-        WHERE product.slug = 'valid-pen' AND materials.slug = 'pens-titanium';
-        INSERT INTO product_configuration_slot (product_id, slot_kind_id, position, required)
-        SELECT product.id, kind.id, 0, true FROM product, configuration_slot_kind kind
-        WHERE product.slug = 'valid-pen' AND kind.slug = 'material';
-        INSERT INTO product_configuration_choice
-          (product_id, slot_id, position, product_material_id)
-        SELECT slot.product_id, slot.id, 0, assignment.id
-        FROM product_configuration_slot slot
-        JOIN configuration_slot_kind kind ON kind.id = slot.slot_kind_id
-        JOIN product_material assignment ON assignment.product_id = slot.product_id
-        WHERE kind.slug = 'material';
+        INSERT INTO product (product_type_id, maker_id, name, slug)
+        SELECT pt.id, maker.id, 'Valid Tip', 'valid-tip'
+        FROM product_types pt, makers maker
+        WHERE pt.slug = 'pen-tip' AND maker.slug = 'pens-test-maker';
+        INSERT INTO product_detail_pen_part (id)
+        SELECT id FROM product WHERE slug = 'valid-tip';
+        INSERT INTO product_detail_pen_tip (id)
+        SELECT id FROM product WHERE slug = 'valid-tip';
+        INSERT INTO pen_compatible_part (pen_product_id, part_product_id)
+        SELECT pen.id, tip.id FROM product_detail_pen pen, product_detail_pen_tip tip;
+        INSERT INTO collection_item (owner_id, collection_id)
+        SELECT owner_id, id FROM user_collection WHERE normalized_name = 'pens';
+        INSERT INTO collection_detail_pen_tip (id, product_pen_tip_id)
+        SELECT item.id, tip.id
+        FROM collection_item item, product_detail_pen_tip tip
+        WHERE item.id NOT IN (SELECT id FROM collection_detail_pen);
+        INSERT INTO collection_item_installed_pen_part
+          (pen_collection_item_id, part_collection_item_id)
+        SELECT pen.id, tip.id
+        FROM collection_detail_pen pen, collection_detail_pen_tip tip;
       `,
     );
-    await transaction(
-      database,
-      `
-        INSERT INTO finish_option (product_id, position)
-        SELECT id, 0 FROM product WHERE slug = 'valid-pen';
-        INSERT INTO product_configuration_slot (product_id, slot_kind_id, position, required)
-        SELECT product.id, kind.id, 1, false FROM product, configuration_slot_kind kind
-        WHERE product.slug = 'valid-pen' AND kind.slug = 'appearance';
-        INSERT INTO product_configuration_choice
-          (product_id, slot_id, position, finish_option_id)
-        SELECT slot.product_id, slot.id, 0, finish.id
-        FROM product_configuration_slot slot
-        JOIN configuration_slot_kind kind ON kind.id = slot.slot_kind_id
-        JOIN finish_option finish ON finish.product_id = slot.product_id
-        WHERE kind.slug = 'appearance';
-        INSERT INTO product_configuration_choice_rule (product_id, target_choice_id, position)
-        SELECT target.product_id, target.id, 0
-        FROM product_configuration_choice target
-        JOIN product_configuration_slot slot ON slot.id = target.slot_id
-        WHERE slot.position = 1;
-        INSERT INTO product_configuration_choice_requirement
-          (rule_id, product_id, required_choice_id)
-        SELECT rule.id, rule.product_id, required.id
-        FROM product_configuration_choice_rule rule
-        JOIN product_configuration_choice required ON required.product_id = rule.product_id
-        JOIN product_configuration_slot slot ON slot.id = required.slot_id
-        WHERE slot.position = 0;
-      `,
-    );
-    await expectRejectedTransaction(
-      database,
-      `UPDATE product_configuration_slot SET position = 2
-       WHERE product_id = (SELECT id FROM product WHERE slug = 'valid-pen')
-         AND position = 0;`,
-      /earlier slot/iu,
-    );
-    await expectRejectedTransaction(
-      database,
-      `INSERT INTO product_configuration_choice_rule (product_id, target_choice_id, position)
-       SELECT product_id, id, 1 FROM product_configuration_choice
-       WHERE slot_id = (SELECT id FROM product_configuration_slot WHERE position = 1
-         AND product_id = (SELECT id FROM product WHERE slug = 'valid-pen'));`,
-      /at least one requirement/iu,
-    );
+    await expect(
+      database.query(`SELECT * FROM collection_item_installed_pen_part;`),
+    ).resolves.toMatchObject({ rows: [expect.any(Object)] });
   });
 
   it("rejects terminology collisions", async () => {
