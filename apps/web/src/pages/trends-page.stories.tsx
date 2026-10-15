@@ -5,6 +5,7 @@ import type {
   PublicCollectionMaterialTrends,
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
+  PublicPenRefillTrends,
   PublicProductTypeTrend,
   PublicSliderTrends,
   PublicSpinnerTrends,
@@ -121,6 +122,27 @@ const sliderTrends: PublicSliderTrends = {
           numericValue: null,
         },
       ],
+    },
+  ],
+};
+
+/** Exact compatible Pen and standalone Refill counts by refill format. */
+const penRefillTrends: PublicPenRefillTrends = {
+  penCoveragePercent: 71.4,
+  penProductTypeId: 1002,
+  refillProductTypeId: 1003,
+  values: [
+    {
+      compatiblePenCount: 12,
+      key: "4000",
+      label: "Pilot G2",
+      standaloneRefillCount: 4,
+    },
+    {
+      compatiblePenCount: 7,
+      key: "4001",
+      label: "Parker-style G2",
+      standaloneRefillCount: 6,
     },
   ],
 };
@@ -442,6 +464,34 @@ export const SliderDrillDown: Story = {
     ).toBeVisible();
     await expect(canvas.getAllByText("2×4")[0]).toBeVisible();
     await expect(canvas.getByText("75% coverage")).toBeVisible();
+  },
+};
+
+/** Selected Pen with exact refill-format compatibility Trends. */
+export const PensAndRefills: Story = {
+  args: {
+    activityTrends,
+    catalogMaterialTrends: [],
+    collectionMaterialTrends: null,
+    collectionTrends,
+    onSearchChange: fn(),
+    penRefillTrends,
+    search: { productTypeId: 1002 },
+    trends,
+  },
+  /**
+   * Verifies the Pen refill-format chart and series labels.
+   *
+   * @param context - Story interaction context.
+   * @param context.canvasElement - Rendered story canvas.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Pens and Refills" }),
+    ).toBeVisible();
+    await expect(canvas.getAllByText("Pilot G2")[0]).toBeVisible();
+    await expect(canvas.getByText("71.4% coverage")).toBeVisible();
   },
 };
 

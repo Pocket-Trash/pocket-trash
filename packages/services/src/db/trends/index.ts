@@ -6,6 +6,7 @@ import {
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,
 } from "./constants.js";
+import { getPublicPenRefillTrends as loadPublicPenRefillTrends } from "./pens.js";
 import { getPublicSliderTrends as loadPublicSliderTrends } from "./slider.js";
 import { getPublicSpinnerTrends as loadPublicSpinnerTrends } from "./spinner.js";
 
@@ -14,6 +15,10 @@ export {
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
   PUBLIC_TRENDS_STALE_MS,
 } from "./constants.js";
+export type {
+  PublicPenRefillTrends,
+  PublicPenRefillTrendValue,
+} from "./pens.js";
 export type {
   PublicSliderTrend,
   PublicSliderTrends,
@@ -292,6 +297,16 @@ export function createTrendsService(
      */
     async getPublicSliderTrends() {
       return await loadPublicSliderTrends(db);
+    },
+
+    /**
+     * Reads exact compatible Pen and standalone Refill counts by refill format.
+     *
+     * @returns Public Pens and Refills Trends, or null when either type is absent.
+     * @rejects When a database query fails.
+     */
+    async getPublicPenRefillTrends() {
+      return await loadPublicPenRefillTrends(db);
     },
 
     /**

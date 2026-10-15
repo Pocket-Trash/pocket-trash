@@ -1,4 +1,5 @@
 import type {
+  PublicPenRefillTrends,
   PublicProductTypeTrend,
   PublicSliderTrends,
   PublicSpinnerTrends,
@@ -87,6 +88,10 @@ vi.mock("@pocket-trash/localizations", () => ({
         "web.trends.partsAndAccessories": "Parts and Accessories",
         "web.trends.partsAndAccessoriesChartLabel":
           "Currently owned Parts and Accessories by product type",
+        "web.trends.penRefillDescription":
+          "Compare compatible Pens and standalone Refills by refill format.",
+        "web.trends.penRefillTitle": "Pens and Refills",
+        "web.trends.refillFormat": "Refill format",
         "web.trends.coverage": `${values.coverage}% coverage`,
         "web.trends.exactValues": "Exact values",
         "web.trends.spinnerDescription": "Spinner details",
@@ -99,8 +104,10 @@ vi.mock("@pocket-trash/localizations", () => ({
         "web.trends.sliderPrivacy": "Collection counts are privacy safe.",
         "web.trends.sliderSuppressed": "Some Slider values are hidden.",
         "web.trends.sliderTitle": "Slider details",
+        "web.trends.standaloneRefills": "Standalone Refills",
         "web.trends.suppressed": "Suppressed",
         "web.trends.value": "Value",
+        "web.pens.refill.compatiblePens": "Compatible Pens",
       }[key] ?? key
     );
   },
@@ -194,7 +201,53 @@ const sliderTrends: PublicSliderTrends = {
   ],
 };
 
+/** Exact Pens and Refills Trends used by product-type filter tests. */
+const penRefillTrends: PublicPenRefillTrends = {
+  penCoveragePercent: 70,
+  penProductTypeId: 1001,
+  refillProductTypeId: 1002,
+  values: [
+    {
+      compatiblePenCount: 8,
+      key: "42",
+      label: "Pilot G2",
+      standaloneRefillCount: 3,
+    },
+  ],
+};
+
 describe("TrendsPage", () => {
+  it("shows refill formats for Pen and Refill filters but not Pen parts", () => {
+    /**
+     * Renders the page with one selected product-type filter.
+     *
+     * @param productTypeId - Product type selected in URL state.
+     * @returns Server-rendered Trends markup.
+     */
+    const render = (productTypeId: number) =>
+      renderToStaticMarkup(
+        <TrendsPage
+          catalogMaterialTrends={[]}
+          collectionMaterialTrends={null}
+          collectionTrends={null}
+          onSearchChange={vi.fn()}
+          penRefillTrends={penRefillTrends}
+          search={{ productTypeId }}
+          trends={trends}
+        />,
+      );
+
+    for (const productTypeId of [1001, 1002]) {
+      const html = render(productTypeId);
+      expect(html).toContain("Pens and Refills");
+      expect(html).toContain("Compatible Pens");
+      expect(html).toContain("Standalone Refills");
+      expect(html).toContain("Pilot G2");
+      expect(html).toContain("70% coverage");
+    }
+    expect(render(1003)).not.toContain("Pilot G2");
+  });
+
   it("shows Spinner details only for the selected Spinner product type", () => {
     const selected = renderToStaticMarkup(
       <TrendsPage

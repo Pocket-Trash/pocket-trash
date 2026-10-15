@@ -18,6 +18,7 @@ import type {
   PublicMakerSummary,
   PublicMaterialSummary,
   PublicPartAccessoryTrends,
+  PublicPenRefillTrends,
   PublicProductTypeTrend,
   PublicSliderTrends,
   PublicSpinnerTrends,
@@ -1330,6 +1331,14 @@ export const getPublicSliderTrends = createServerFn({ method: "GET" }).handler(
     return await s.db.trends.getPublicSliderTrends();
   },
 );
+
+/** Returns exact compatible Pen and standalone Refill counts by refill format. */
+export const getPublicPenRefillTrends = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<PublicPenRefillTrends | null> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicPenRefillTrends();
+});
 
 /** Returns exact catalog and privacy-safe app-wide record creation activity. */
 export const getPublicActivityTrends = createServerFn({ method: "GET" })

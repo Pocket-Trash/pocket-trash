@@ -7,6 +7,7 @@ import {
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
+  getPublicPenRefillTrends,
   getPublicSliderTrends,
   getPublicSpinnerTrends,
   listPublicProductTypeTrends,
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/trends")({
       collectionMaterialTrends,
       activityTrends,
       sliderTrends,
+      penRefillTrends,
       spinnerTrends,
     ] = await Promise.all([
       listPublicProductTypeTrends(),
@@ -61,6 +63,7 @@ export const Route = createFileRoute("/trends")({
       getPublicCollectionMaterialTrends(),
       getPublicActivityTrends({ data: deps.range }),
       getPublicSliderTrends(),
+      getPublicPenRefillTrends(),
       getPublicSpinnerTrends(),
     ]);
     return {
@@ -72,6 +75,7 @@ export const Route = createFileRoute("/trends")({
       makerProductTrends,
       partAccessoryTrends,
       sliderTrends,
+      penRefillTrends,
       spinnerTrends,
     };
   },
@@ -102,6 +106,7 @@ function TrendsRoute() {
     makerProductTrends,
     partAccessoryTrends,
     sliderTrends,
+    penRefillTrends,
     spinnerTrends,
   } = Route.useLoaderData();
   return (
@@ -119,6 +124,7 @@ function TrendsRoute() {
         })
       }
       partAccessoryTrends={partAccessoryTrends}
+      penRefillTrends={penRefillTrends}
       search={search}
       sliderTrends={sliderTrends}
       spinnerTrends={spinnerTrends}

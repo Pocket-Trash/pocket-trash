@@ -6,6 +6,7 @@ import type {
   PublicMakerProductTrend,
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
+  PublicPenRefillTrends,
   PublicProductTypeTrend,
   PublicSliderTrends,
   PublicSpinnerTrends,
@@ -19,6 +20,7 @@ import {
 import { ActivityTrendsChart } from "@/components/activity-trends-chart";
 import { AppShell } from "@/components/app-shell";
 import { CatalogTrendsChart } from "@/components/catalog-trends-chart";
+import { PenRefillTrendVisualization } from "@/components/pen-refill-trend-visualization";
 import { SpinnerTrendVisualization } from "@/components/spinner-trend-visualization";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
@@ -53,6 +55,8 @@ export type TrendsPageProps = {
   onSearchChange: (search: CatalogTrendsSearch) => void;
   /** Active privacy-safe Parts and Accessories generation. */
   partAccessoryTrends?: PublicPartAccessoryTrends | null;
+  /** Exact compatible Pen and standalone Refill counts by refill format. */
+  penRefillTrends?: PublicPenRefillTrends | null;
   /** Stable filters selected in URL search. */
   search?: CatalogTrendsSearch;
   /** Coverage-qualified Slider characteristics. */
@@ -77,6 +81,7 @@ export function TrendsPage({
   makerProductTrends = null,
   onSearchChange,
   partAccessoryTrends = null,
+  penRefillTrends = null,
   search = {},
   sliderTrends = null,
   spinnerTrends = null,
@@ -704,6 +709,44 @@ export function TrendsPage({
             <p className="text-xs text-muted-foreground">
               {t("web.trends.sliderPrivacy")}
             </p>
+          </section>
+        ) : null}
+
+        {penRefillTrends &&
+        penRefillTrends.values.length > 0 &&
+        (productTypeId === penRefillTrends.penProductTypeId ||
+          productTypeId === penRefillTrends.refillProductTypeId) ? (
+          <section
+            aria-labelledby="pen-refill-trends-title"
+            className="space-y-4"
+          >
+            <div className="space-y-1">
+              <h2
+                className="text-lg font-semibold"
+                id="pen-refill-trends-title"
+              >
+                {t("web.trends.penRefillTitle")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("web.trends.penRefillDescription")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("web.trends.coverage", {
+                  coverage: new Intl.NumberFormat(locale, {
+                    maximumFractionDigits: 1,
+                  }).format(penRefillTrends.penCoveragePercent),
+                })}
+              </p>
+            </div>
+            <PenRefillTrendVisualization
+              chartLabel={t("web.trends.penRefillTitle")}
+              compatiblePensLabel={t("web.pens.refill.compatiblePens")}
+              detailsLabel={t("web.trends.exactValues")}
+              formatLabel={t("web.trends.refillFormat")}
+              otherLabel={t("web.trends.other")}
+              standaloneRefillsLabel={t("web.trends.standaloneRefills")}
+              trends={penRefillTrends}
+            />
           </section>
         ) : null}
 
