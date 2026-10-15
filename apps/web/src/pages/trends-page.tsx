@@ -30,85 +30,6 @@ import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import { filterCatalogTrends } from "@/lib/catalog-filters";
 import { useLocale } from "@/providers/locale-provider";
 
-/** Trends keys supplied by the stacked localization change. */
-type TrendsTranslationKey =
-  | TranslationKey
-  | "web.archive.spec.length"
-  | "web.archive.spec.weight"
-  | "web.trends.approximateCollectors"
-  | "web.trends.approximateItems"
-  | "web.trends.collectionItems"
-  | "web.trends.collectionItemsChartLabel"
-  | "web.trends.collectionItemsEmpty"
-  | "web.trends.collectionItemsError"
-  | "web.trends.collectionItemsPrivacy"
-  | "web.trends.collectionItemsStale"
-  | "web.trends.collectionItemsSuppressed"
-  | "web.trends.collectionItemsSuppressedEmpty"
-  | "web.trends.collectors"
-  | "web.trends.collectorsChartLabel"
-  | "web.trends.lastUpdated"
-  | "web.trends.partsAndAccessories"
-  | "web.trends.partsAndAccessoriesChartLabel"
-  | "web.trends.partsAndAccessoriesEmpty"
-  | "web.trends.partsAndAccessoriesError"
-  | "web.trends.partsAndAccessoriesPrivacy"
-  | "web.trends.partsAndAccessoriesStale"
-  | "web.trends.partsAndAccessoriesSuppressed"
-  | "web.trends.partsAndAccessoriesSuppressedEmpty"
-  | "web.trends.material"
-  | "web.trends.materialSpecific"
-  | "web.trends.allMaterials"
-  | "web.trends.allMaterialSpecifics"
-  | "web.trends.generalMaterial"
-  | "web.trends.unspecifiedMaterial"
-  | "web.trends.catalogMaterials"
-  | "web.trends.catalogMaterialsChartLabel"
-  | "web.trends.collectionMaterials"
-  | "web.trends.collectionMaterialsChartLabel"
-  | "web.trends.collectorMaterials"
-  | "web.trends.collectorMaterialsChartLabel"
-  | "web.trends.materialsEmpty"
-  | "web.trends.materialsError"
-  | "web.trends.materialsPrivacy"
-  | "web.trends.materialsStale"
-  | "web.trends.materialsSuppressed"
-  | "web.trends.materialsSuppressedEmpty"
-  | "web.trends.maker"
-  | "web.trends.allMakers"
-  | "web.trends.product"
-  | "web.trends.allProducts"
-  | "web.trends.makers"
-  | "web.trends.makersChartLabel"
-  | "web.trends.products"
-  | "web.trends.productsChartLabel"
-  | "web.trends.makerProductsEmpty"
-  | "web.trends.makerProductsError"
-  | "web.trends.makerProductsPrivacy"
-  | "web.trends.makerProductsStale"
-  | "web.trends.makerProductsSuppressed"
-  | "web.trends.viewProducts"
-  | "web.trends.activity"
-  | "web.trends.activityChartLabel"
-  | "web.trends.activityDate"
-  | "web.trends.activityPrivacy"
-  | "web.trends.activityRange"
-  | "web.trends.addedToPocketTrash"
-  | "web.trends.catalogRecordsAdded"
-  | "web.trends.range30Days"
-  | "web.trends.range6Months"
-  | "web.trends.rangeAll"
-  | "web.trends.rangeWeek"
-  | "web.trends.rangeYear"
-  | "web.trends.coverage"
-  | "web.trends.exactValues"
-  | "web.trends.spinnerDescription"
-  | "web.trends.spinnerPrivacy"
-  | "web.trends.spinnerSuppressed"
-  | "web.trends.spinnerTitle"
-  | "web.trends.suppressed"
-  | "web.trends.value";
-
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
   /** Exact catalog and privacy-safe app-wide record creation activity. */
@@ -165,9 +86,9 @@ export function TrendsPage({
    * @returns Localized Trends copy.
    */
   const t = (
-    key: TrendsTranslationKey,
+    key: TranslationKey,
     values: Record<string, string | number> = {},
-  ) => formatTranslation(key as TranslationKey, values, locale);
+  ) => formatTranslation(key, values, locale);
   const spinnerMetricLabels: Record<SpinnerTrendMetricId, string> = {
     bearing: t("web.catalog.field.bearing"),
     bodyMaterial: t("web.trends.material"),

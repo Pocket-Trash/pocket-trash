@@ -31,7 +31,7 @@ vi.mock("@/components/catalog-trends-chart", () => ({
 
 vi.mock("@pocket-trash/localizations", () => ({
   /**
-   * Supplies pending localization copy to the stacked application test.
+   * Supplies deterministic localization copy to the page test.
    *
    * @param key - Localization key.
    * @param values - Named interpolation values.
