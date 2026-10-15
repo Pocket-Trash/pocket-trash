@@ -198,7 +198,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Author Pen",
         productId: penId,
@@ -226,7 +228,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Author Pen",
         productId: penId,
