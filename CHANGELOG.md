@@ -33,6 +33,39 @@
 
 
 
+
+## 0.12.0
+
+### Minor Changes
+
+* Publish privacy-safe app-wide collection lifecycle Trends. (@app/web, @package/database, @package/services)
+* Add Spinner-specific Trends with coverage-qualified characteristic distributions. (@app/web, @package/services)
+* Let Pen editors select, clear, and create compatible Pen parts from the main product form. (@app/web, @package/services)
+* Add Pens and Refills Trends by refill format. (@app/web, @package/services)
+* Compare personal collection composition with privacy-safe community percentages. (@app/web)
+* Add a privacy-safe public Collectors chart and equivalent table. (@app/web)
+* Add UTC recorded-activity Trends for public catalog, privacy-safe community, and private user records. (@package/services, @app/web)
+* Auto-select unambiguous collection product fields and collapse the product selector after selection. (@app/web)
+* Move Pen refill compatibility into the top-level product editor and simplify compatibility to Pen-wide refill groups or individual refills. (@app/web, @package/database, @package/services, @package/logger)
+* Add the public catalog-product Trends overview with stable product-type filters and accessible exact counts. (@app/web, @package/services)
+* Add privacy-safe maker and product Trends drill-downs. (@app/web, @package/database, @package/services)
+* Track effective ownership periods for collection items, including corrections, departures, and reacquisitions. (@package/database, @package/services, @app/web)
+* Support products and collection items with material combinations. (@package/database, @package/services, @app/scraper, @app/web)
+* Add configurable privacy-safe Parts and Accessories Trends. (@app/web, @package/database, @package/logger, @package/services)
+* Replace generic Pen configuration with direct compatible and installed parts. (@app/scraper, @app/web, @package/database, @package/services)
+* Add owner-only current-state collection Trends with stable drill-down filters. (@app/web, @package/services)
+* Add opt-in, privacy-filtered public personal Trends pages. (@app/web, @package/database, @package/services)
+* Add Slider-specific Trends distributions. (@app/web, @package/services)
+* Add effective-date personal collection history Trends. (@app/web, @package/services)
+* Publish privacy-safe collection-item Trends by product type with atomic generations, nightly refreshes, and accessible public chart states. (@app/api, @app/web, @package/database, @package/services)
+* Add exact catalog and privacy-safe collection material Trends with stable drill-down filters. (@app/web, @package/database, @package/services)
+
+### Patch Changes
+
+* Exclude the Autmog Pen Clips accessory from Pen scraper runs. (@app/scraper)
+* Update Pocket Trash skills to v0.5.5. (@package/database)
+* Run the canonical Autmog and Saga scrapers once per week. (@app/scraper)
+
 ## 0.11.1
 
 ### Patch Changes
