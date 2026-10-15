@@ -458,6 +458,28 @@ type EditableWeightMeasurement = {
   value: string;
 };
 
+/** Product types accepted as direct Pen parts. */
+type PenPartProductType =
+  | "pen-actuator"
+  | "pen-clip"
+  | "pen-mechanism"
+  | "pen-tip"
+  | "pen-top-cap";
+
+/** Ordered Pen-part roles exposed by the compatibility editor. */
+const penPartProductTypes: Array<{
+  /** Localized plural role label. */
+  label: TranslationKey;
+  /** Canonical part product type. */
+  type: PenPartProductType;
+}> = [
+  { label: "web.pens.productType.tip", type: "pen-tip" },
+  { label: "web.pens.productType.clip", type: "pen-clip" },
+  { label: "web.pens.productType.mechanism", type: "pen-mechanism" },
+  { label: "web.pens.productType.actuator", type: "pen-actuator" },
+  { label: "web.pens.productType.topCap", type: "pen-top-cap" },
+];
+
 /** Controlled editor value keeps text inputs as strings before schema parsing. */
 type ProductEditorValue = Omit<
   ProductFormValue,
@@ -560,12 +582,30 @@ export function ProductEditor({
   const insertDialog = React.useRef<HTMLDialogElement>(null);
   const insertTrigger = React.useRef<HTMLButtonElement>(null);
   const insertDialogTitleId = React.useId();
+  const partDialog = React.useRef<HTMLDialogElement>(null);
+  const partTrigger = React.useRef<HTMLButtonElement>(null);
+  const partDialogTitleId = React.useId();
+  const [activePartType, setActivePartType] =
+    React.useState<PenPartProductType | null>(null);
+  const [openPartRoles, setOpenPartRoles] = React.useState(
+    () =>
+      new Set(
+        initialProduct?.compatibleParts.map(
+          ({ productTypeSlug }) => productTypeSlug as PenPartProductType,
+        ) ?? [],
+      ),
+  );
+  React.useEffect(() => {
+    if (activePartType) partDialog.current?.showModal();
+  }, [activePartType]);
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const defaultValues: ProductEditorValue = {
     aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
     buttonDiameter: initialProduct?.buttonDiameter ?? { unit: "mm", value: "" },
     compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
+    compatiblePartProductIds:
+      initialProduct?.compatibleParts.map(({ id }) => id) ?? [],
     description: initialProduct?.description ?? "",
     diameter: initialProduct?.diameter ?? { unit: "mm", value: "" },
     finishOptions: initialProduct?.finishOptions.length
@@ -709,6 +749,10 @@ export function ProductEditor({
           setFormError((error as ImageUploadError).key ?? "error.generic");
           return;
         }
+      }
+      if (onCreated) {
+        onCreated(result.product);
+        return;
       }
       await navigate({
         params: {
@@ -1071,83 +1115,179 @@ export function ProductEditor({
         ) : null}
 
         {productTypeSlug === "pen" ? (
-          <form.Field mode="array" name="refillCompatibility">
-            {(field) => {
-              const groupOptions: ComboboxOption[] = (
-                options.refillCompatibilityGroups ?? []
-              ).map(({ id, name }) => ({
-                group: "groups",
-                id: `group:${id}`,
-                name,
-                selectionName: `${t("web.pens.admin.targetType.group" as TranslationKey)}: ${name}`,
-              }));
-              const refillOptions: ComboboxOption[] =
-                options.relationshipProducts
-                  .filter(({ productTypeSlug }) => productTypeSlug === "refill")
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(({ id, name }) => ({
-                    group: "refills",
-                    id: `refill:${id}`,
-                    name,
-                  }));
-              const items = [...groupOptions, ...refillOptions];
-              const selected = field.state.value.flatMap(
-                ({ targetGroupId, targetRefillProductId }) => {
-                  const id =
-                    targetGroupId === null
-                      ? `refill:${targetRefillProductId}`
-                      : `group:${targetGroupId}`;
-                  const option = items.find((candidate) => candidate.id === id);
-                  return option ? [option] : [];
-                },
-              );
-              const label = t(
-                "web.pens.field.compatibleRefills" as TranslationKey,
-              );
-              return (
-                <Field label={label}>
-                  <CatalogMultiCombobox
-                    ariaLabel={label}
-                    groups={[
-                      {
-                        id: "groups",
-                        label: t(
-                          "web.pens.admin.targetType.group" as TranslationKey,
-                        ),
-                      },
-                      {
-                        id: "refills",
-                        label: t(
-                          "web.pens.admin.targetType.refill" as TranslationKey,
-                        ),
-                      },
-                    ]}
-                    items={items}
-                    onValueChange={(value) =>
-                      field.handleChange(
-                        value.map(({ id }) => {
-                          const [kind, rawId] = String(id).split(":");
-                          return {
-                            targetGroupId:
-                              kind === "group" ? Number(rawId) : null,
-                            targetRefillProductId:
-                              kind === "refill" ? Number(rawId) : null,
-                          };
-                        }),
-                      )
-                    }
-                    placeholder={label}
-                    removeLabel={(name) => `${t("web.action.delete")} ${name}`}
-                    value={selected}
-                  />
+          <>
+            <form.Field mode="array" name="refillCompatibility">
+              {(field) => {
+                const groupOptions: ComboboxOption[] = (
+                  options.refillCompatibilityGroups ?? []
+                ).map(({ id, name }) => ({
+                  group: "groups",
+                  id: `group:${id}`,
+                  name,
+                  selectionName: `${t("web.pens.admin.targetType.group" as TranslationKey)}: ${name}`,
+                }));
+                const refillOptions: ComboboxOption[] =
+                  options.relationshipProducts
+                    .filter(
+                      ({ productTypeSlug }) => productTypeSlug === "refill",
+                    )
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(({ id, name }) => ({
+                      group: "refills",
+                      id: `refill:${id}`,
+                      name,
+                    }));
+                const items = [...groupOptions, ...refillOptions];
+                const selected = field.state.value.flatMap(
+                  ({ targetGroupId, targetRefillProductId }) => {
+                    const id =
+                      targetGroupId === null
+                        ? `refill:${targetRefillProductId}`
+                        : `group:${targetGroupId}`;
+                    const option = items.find(
+                      (candidate) => candidate.id === id,
+                    );
+                    return option ? [option] : [];
+                  },
+                );
+                const label = t(
+                  "web.pens.field.compatibleRefills" as TranslationKey,
+                );
+                return (
+                  <Field label={label}>
+                    <CatalogMultiCombobox
+                      ariaLabel={label}
+                      groups={[
+                        {
+                          id: "groups",
+                          label: t(
+                            "web.pens.admin.targetType.group" as TranslationKey,
+                          ),
+                        },
+                        {
+                          id: "refills",
+                          label: t(
+                            "web.pens.admin.targetType.refill" as TranslationKey,
+                          ),
+                        },
+                      ]}
+                      items={items}
+                      onValueChange={(value) =>
+                        field.handleChange(
+                          value.map(({ id }) => {
+                            const [kind, rawId] = String(id).split(":");
+                            return {
+                              targetGroupId:
+                                kind === "group" ? Number(rawId) : null,
+                              targetRefillProductId:
+                                kind === "refill" ? Number(rawId) : null,
+                            };
+                          }),
+                        )
+                      }
+                      placeholder={label}
+                      removeLabel={(name) =>
+                        `${t("web.action.delete")} ${name}`
+                      }
+                      value={selected}
+                    />
+                    <FieldError
+                      error={serverErrors.refillCompatibility?.[0]}
+                      t={t}
+                    />
+                  </Field>
+                );
+              }}
+            </form.Field>
+            <form.Field mode="array" name="compatiblePartProductIds">
+              {(field) => (
+                <fieldset className="grid gap-4 rounded-md border border-border p-4">
+                  <legend className="px-1 font-semibold">
+                    {t("web.pens.compatibleParts.heading")}
+                  </legend>
+                  {penPartProductTypes.map((role) => {
+                    const checked = openPartRoles.has(role.type);
+                    const items = options.relationshipProducts.filter(
+                      (candidate) =>
+                        candidate.id !== initialProduct?.id &&
+                        candidate.productTypeSlug === role.type,
+                    );
+                    const selected = items.filter((candidate) =>
+                      field.state.value.includes(candidate.id),
+                    );
+                    return (
+                      <div className="grid gap-2" key={role.type}>
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <input
+                            checked={checked}
+                            onChange={(event) => {
+                              setOpenPartRoles((current) => {
+                                const next = new Set(current);
+                                if (event.target.checked) next.add(role.type);
+                                else next.delete(role.type);
+                                return next;
+                              });
+                              if (!event.target.checked)
+                                field.handleChange(
+                                  field.state.value.filter(
+                                    (id) =>
+                                      !items.some(
+                                        (candidate) => candidate.id === id,
+                                      ),
+                                  ),
+                                );
+                            }}
+                            type="checkbox"
+                          />
+                          {t(role.label)}
+                        </label>
+                        {checked ? (
+                          <div className="grid gap-2 pl-6">
+                            <CatalogMultiCombobox
+                              ariaLabel={t(role.label)}
+                              items={items}
+                              onValueChange={(value) => {
+                                const otherRoleIds = field.state.value.filter(
+                                  (id) =>
+                                    !items.some(
+                                      (candidate) => candidate.id === id,
+                                    ),
+                                );
+                                field.handleChange([
+                                  ...otherRoleIds,
+                                  ...value.map(({ id }) => Number(id)),
+                                ]);
+                              }}
+                              placeholder={t("web.catalog.selectProductType")}
+                              removeLabel={(name) =>
+                                t("web.action.removeSelection", { name })
+                              }
+                              value={selected}
+                            />
+                            <Button
+                              aria-haspopup="dialog"
+                              onClick={(event) => {
+                                partTrigger.current = event.currentTarget;
+                                setActivePartType(role.type);
+                              }}
+                              type="button"
+                              variant="outline"
+                            >
+                              {t("web.action.addProduct")}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                   <FieldError
-                    error={serverErrors.refillCompatibility?.[0]}
+                    error={serverErrors.compatiblePartProductIds?.[0]}
                     t={t}
                   />
-                </Field>
-              );
-            }}
-          </form.Field>
+                </fieldset>
+              )}
+            </form.Field>
+          </>
         ) : null}
 
         {(productTypeSlug === "pen" ||
@@ -1598,8 +1738,8 @@ export function ProductEditor({
       <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
         <Button
           onClick={() => {
-            if (quickCreate) {
-              onCancel?.();
+            if (onCancel) {
+              onCancel();
               return;
             }
             if (initialProduct) {
@@ -1667,6 +1807,53 @@ export function ProductEditor({
                   options={options}
                   productTypeSlug="slider-plate"
                   quickCreate
+                />
+              </div>
+            </dialog>,
+            document.body,
+          )
+        : null}
+      {typeof document !== "undefined" &&
+      productTypeSlug === "pen" &&
+      activePartType
+        ? createPortal(
+            <dialog
+              aria-labelledby={partDialogTitleId}
+              className="m-auto w-[min(64rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
+              onClose={() => {
+                setActivePartType(null);
+                partTrigger.current?.focus();
+              }}
+              ref={partDialog}
+            >
+              <div className="grid gap-4 p-6">
+                <h2 className="text-lg font-semibold" id={partDialogTitleId}>
+                  {t("web.action.addProduct")}
+                </h2>
+                <ProductEditor
+                  onCancel={() => {
+                    partDialog.current?.close();
+                    setActivePartType(null);
+                    partTrigger.current?.focus();
+                  }}
+                  onCreated={(part) => {
+                    setOptions((current) => ({
+                      ...current,
+                      relationshipProducts: [
+                        ...current.relationshipProducts,
+                        part,
+                      ].sort((a, b) => a.name.localeCompare(b.name)),
+                    }));
+                    form.setFieldValue("compatiblePartProductIds", [
+                      ...form.state.values.compatiblePartProductIds,
+                      part.id,
+                    ]);
+                    partDialog.current?.close();
+                    setActivePartType(null);
+                    partTrigger.current?.focus();
+                  }}
+                  options={options}
+                  productTypeSlug={activePartType}
                 />
               </div>
             </dialog>,

@@ -386,6 +386,7 @@ export const productFormSchema = z
     bearing: optionalBearingSchema,
     buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
+    compatiblePartProductIds: z.array(idSchema).default([]),
     refillCompatibility: z
       .array(
         z.object({
@@ -433,6 +434,7 @@ export const productFormSchema = z
         bearing,
         buttonDiameter,
         compatibleButtonId,
+        compatiblePartProductIds,
         diameter,
         finishOptions,
         includedInsertProductId,
@@ -460,6 +462,23 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: ["aliases"],
+        });
+      }
+      if (
+        new Set(compatiblePartProductIds).size !==
+        compatiblePartProductIds.length
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["compatiblePartProductIds"],
+        });
+      }
+      if (productTypeSlug !== "pen" && compatiblePartProductIds.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["compatiblePartProductIds"],
         });
       }
       if (
@@ -2033,6 +2052,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const input: ProductWriteInput = {
       actor,
       aliases: parsed.data.aliases,
+      compatiblePartProductIds: parsed.data.compatiblePartProductIds,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({
