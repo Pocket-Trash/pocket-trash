@@ -13,6 +13,7 @@ import type {
   ProductWriteInput,
   PublicActivityTrends,
   PublicCollectionItemTrends,
+  PublicCollectionLifecycleTrends,
   PublicCollectionMakerProductTrends,
   PublicMakerDetail,
   PublicMakerSummary,
@@ -1388,6 +1389,29 @@ export const getPublicActivityTrends = createServerFn({ method: "GET" })
     return await s.db.trends.getPublicActivityTrends(data);
   });
 
+/** Returns privacy-safe effective app-wide collection lifecycle history. */
+export const getPublicCollectionLifecycleTrends = createServerFn({
+  method: "GET",
+})
+  .validator(
+    z.object({
+      makerId: z.number().int().positive().optional(),
+      materialId: z.number().int().positive().optional(),
+      productTypeId: z.number().int().positive().optional(),
+      range: z.enum(activityTrendRanges),
+    }),
+  )
+  .handler(
+    async ({ data }): Promise<PublicCollectionLifecycleTrends | null> => {
+      const { s } = await import("@/lib/services");
+      const { range, ...filters } = data;
+      return await s.db.trends.getPublicCollectionLifecycleTrends(
+        range,
+        filters,
+      );
+    },
+  );
+
 /** Returns exact collection-item creation activity for the signed-in owner. */
 export const getUserActivityTrends = createServerFn({ method: "GET" })
   .validator(z.enum(activityTrendRanges))
@@ -2178,6 +2202,9 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
             productId: parsed.data.productId,
           })
         : await s.db.catalog.createProduct(input);
+      if (parsed.data.productId) {
+        await s.db.trends.refreshPublicCollectionItemTrends();
+      }
       return { ok: true as const, product };
     } catch (error) {
       return mutationFailure(error);

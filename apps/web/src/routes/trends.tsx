@@ -4,6 +4,7 @@ import {
   getPublicActivityTrends,
   getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
+  getPublicCollectionLifecycleTrends,
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
@@ -27,25 +28,31 @@ export const Route = createFileRoute("/trends")({
     meta: [{ title: formatTranslation("web.trends.title") }],
   }),
   /**
-   * Reloads recorded activity when the URL-backed range changes.
+   * Reloads lifecycle history when its URL-backed range or filters change.
    *
    * @param context - Route dependency context.
    * @param context.search - Validated Trends URL state.
-   * @returns Selected activity range.
+   * @returns Selected lifecycle range and dimensions.
    */
-  loaderDeps: ({ search }) => ({ range: search.range ?? "year" }),
+  loaderDeps: ({ search }) => ({
+    makerId: search.makerId,
+    materialId: search.materialId,
+    productTypeId: search.productTypeId,
+    range: search.range ?? "year",
+  }),
   /**
    * Loads exact public catalog-product Trends.
    *
    * @param context - Route loader context.
-   * @param context.deps - Validated activity range.
-   * @returns Public product-type and recorded-activity Trends.
+   * @param context.deps - Validated lifecycle range and dimensions.
+   * @returns Public catalog, lifecycle, and recorded-activity Trends.
    * @rejects When Trends cannot be loaded.
    */
   loader: async ({ deps }) => {
     const [
       catalogTrends,
       collectionTrends,
+      lifecycleTrends,
       makerProductTrends,
       partAccessoryTrends,
       catalogMaterialTrends,
@@ -57,6 +64,7 @@ export const Route = createFileRoute("/trends")({
     ] = await Promise.all([
       listPublicProductTypeTrends(),
       getPublicCollectionItemTrends(),
+      getPublicCollectionLifecycleTrends({ data: deps }),
       getPublicCollectionMakerProductTrends(),
       getPublicPartAccessoryTrends(),
       getPublicCatalogMaterialTrends(),
@@ -72,6 +80,7 @@ export const Route = createFileRoute("/trends")({
       catalogTrends,
       collectionMaterialTrends,
       collectionTrends,
+      lifecycleTrends,
       makerProductTrends,
       partAccessoryTrends,
       sliderTrends,
@@ -103,6 +112,7 @@ function TrendsRoute() {
     catalogTrends,
     collectionMaterialTrends,
     collectionTrends,
+    lifecycleTrends,
     makerProductTrends,
     partAccessoryTrends,
     sliderTrends,
@@ -115,6 +125,7 @@ function TrendsRoute() {
       catalogMaterialTrends={catalogMaterialTrends}
       collectionMaterialTrends={collectionMaterialTrends}
       collectionTrends={collectionTrends}
+      lifecycleTrends={lifecycleTrends}
       makerProductTrends={makerProductTrends}
       onSearchChange={(nextSearch) =>
         void navigate({

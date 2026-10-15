@@ -72,6 +72,42 @@ export type PublicActivityTrends = {
   values: ActivityTrendPoint[];
 };
 
+/** Stable public lifecycle dimensions selected in Trends URL state. */
+export type PublicCollectionLifecycleFilters = {
+  /** Stable maker identifier, or undefined for all makers. */
+  makerId?: number;
+  /** Stable general-material identifier, or undefined for all materials. */
+  materialId?: number;
+  /** Stable product-type identifier, or undefined for all product types. */
+  productTypeId?: number;
+};
+
+/** One privacy-safe app-wide ownership-lifecycle bucket. */
+export type PublicCollectionLifecycleTrendPoint = {
+  /** Rounded acquisition count, or null when privacy-suppressed. */
+  acquisitionCount: number | null;
+  /** UTC start of this daily, weekly, or monthly bucket. */
+  bucketStart: Date;
+  /** Rounded departure count, or null when privacy-suppressed. */
+  departureCount: number | null;
+};
+
+/** Active privacy-safe app-wide ownership-lifecycle generation. */
+export type PublicCollectionLifecycleTrends = {
+  /** Time the active generation was completed. */
+  generatedAt: Date;
+  /** Bucket size selected for the requested range. */
+  granularity: PublicActivityTrends["granularity"];
+  /** Whether at least one returned point was privacy-suppressed. */
+  hasSuppressedValues: boolean;
+  /** Stable selected range. */
+  range: ActivityTrendRange;
+  /** Whether the active generation is older than the freshness target. */
+  stale: boolean;
+  /** Chronological privacy-safe acquisition and departure buckets. */
+  values: PublicCollectionLifecycleTrendPoint[];
+};
+
 /** Exact private collection activity for one selected range. */
 export type UserActivityTrends = {
   /** Bucket size selected for the requested range. */
@@ -411,6 +447,82 @@ export function createTrendsService(
           collectionCount:
             row.collectionCount === null ? null : Number(row.collectionCount),
         })),
+      };
+    },
+
+    /**
+     * Reads privacy-safe effective acquisition and departure history.
+     *
+     * @param range - Stable selected time range.
+     * @param filters - Current public catalog dimensions.
+     * @param now - Current time used to anchor the UTC boundary and freshness.
+     * @returns Active lifecycle generation, or null before the first refresh.
+     * @rejects When a database query fails.
+     */
+    async getPublicCollectionLifecycleTrends(
+      range: ActivityTrendRange,
+      filters: PublicCollectionLifecycleFilters = {},
+      now = new Date(),
+    ): Promise<PublicCollectionLifecycleTrends | null> {
+      const [generation] = await db
+        .select()
+        .from(schema.publicTrendsGeneration)
+        .where(eq(schema.publicTrendsGeneration.active, true))
+        .limit(1);
+      if (!generation) return null;
+
+      const { granularity, start } = getActivityTrendRange(range, now);
+      const result = await db.execute<{
+        /** UTC bucket date. */
+        bucketStart: string;
+        /** Stored lifecycle event type. */
+        eventType: "acquisition" | "departure";
+        /** Rounded count, or null for a suppressed point. */
+        roundedCount: number | string | null;
+      }>(sql`
+        select
+          bucket_start as "bucketStart",
+          event_type as "eventType",
+          rounded_count as "roundedCount"
+        from public_collection_lifecycle_trend
+        where generation_id = ${generation.id}
+          and granularity = ${granularity}
+          and product_type_id is not distinct from ${filters.productTypeId ?? null}
+          and maker_id is not distinct from ${filters.makerId ?? null}
+          and material_id is not distinct from ${filters.materialId ?? null}
+          ${start ? sql`and bucket_start >= ${start.toISOString().slice(0, 10)}` : sql``}
+          and bucket_start <= ${now.toISOString().slice(0, 10)}
+        order by bucket_start, event_type
+      `);
+      const values = new Map<
+        string,
+        Omit<PublicCollectionLifecycleTrendPoint, "bucketStart">
+      >();
+      for (const row of result.rows) {
+        const point = values.get(row.bucketStart) ?? {
+          acquisitionCount: 0,
+          departureCount: 0,
+        };
+        point[`${row.eventType}Count`] =
+          row.roundedCount === null ? null : Number(row.roundedCount);
+        values.set(row.bucketStart, point);
+      }
+      const points = [...values].map(([bucketStart, point]) => ({
+        ...point,
+        bucketStart: new Date(`${bucketStart}T00:00:00.000Z`),
+      }));
+      return {
+        generatedAt: generation.generatedAt,
+        granularity,
+        hasSuppressedValues: points.some(
+          ({ acquisitionCount, departureCount }) =>
+            acquisitionCount === null || departureCount === null,
+        ),
+        range,
+        stale:
+          now.getTime() - generation.generatedAt.getTime() >
+          PUBLIC_TRENDS_STALE_MS,
+        values: points,
       };
     },
 
@@ -1192,6 +1304,97 @@ export function createTrendsService(
           ({ contributorCount }) =>
             contributorCount >= PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
         );
+        const lifecycleResult = await tx.execute<{
+          /** UTC bucket date. */
+          bucketStart: string;
+          /** Exact contributor count used only inside the refresh transaction. */
+          contributorCount: number | string;
+          /** Exact event count used only inside the refresh transaction. */
+          eventCount: number | string;
+          /** Stored lifecycle event type. */
+          eventType: "acquisition" | "departure";
+          /** Stored bucket size. */
+          granularity: PublicActivityTrends["granularity"];
+          /** Stable maker scope. */
+          makerId: number | string | null;
+          /** Stable material scope. */
+          materialId: number | string | null;
+          /** Stable product-type scope. */
+          productTypeId: number | string | null;
+        }>(sql`
+          with item_products as (
+            select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
+            union all select id, product_pen_clip_id from collection_detail_pen_clip
+            union all select id, product_pen_tip_id from collection_detail_pen_tip
+            union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
+            union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
+            union all select id, product_pen_actuator_id from collection_detail_pen_actuator
+            union all select id, product_spinner_id from collection_detail_spinner
+            union all select id, product_spinner_button_id from collection_detail_spinner_button
+            union all select id, product_slider_id from collection_detail_slider
+            union all select id, product_slider_plate_id from collection_detail_slider_plate
+            union all select id, product_slider_insert_id from collection_detail_slider_insert
+          ), eligible_periods as (
+            select distinct
+              ownership_period.id,
+              collection_item.owner_id,
+              product.product_type_id,
+              product.maker_id,
+              product_material_component.material_id,
+              ownership_period.effective_start_date,
+              ownership_period.effective_end_date
+            from collection_item_ownership_period ownership_period
+            inner join collection_item on collection_item.id = ownership_period.collection_item_id
+            inner join item_products on item_products.collection_item_id = collection_item.id
+            inner join product on product.id = item_products.product_id
+            inner join product_types on product_types.id = product.product_type_id
+            left join product_material on product_material.product_id = product.id
+            left join product_material_component
+              on product_material_component.product_material_id = product_material.id
+            where not product_types.is_part_or_accessory
+              or product_types.include_in_trends
+          ), events as (
+            select id, owner_id, product_type_id, maker_id, material_id,
+              effective_start_date as event_date, 'acquisition'::text as event_type
+            from eligible_periods
+            union all
+            select id, owner_id, product_type_id, maker_id, material_id,
+              effective_end_date, 'departure'::text
+            from eligible_periods
+            where effective_end_date is not null
+          ), bucketed as (
+            select
+              events.*,
+              granularities.granularity,
+              date_trunc(granularities.granularity, events.event_date::timestamp)::date as bucket_start
+            from events
+            cross join (values ('day'), ('week'), ('month')) granularities(granularity)
+          )
+          select
+            bucket_start as "bucketStart",
+            count(distinct owner_id)::integer as "contributorCount",
+            count(distinct id)::integer as "eventCount",
+            event_type as "eventType",
+            granularity,
+            maker_id as "makerId",
+            material_id as "materialId",
+            product_type_id as "productTypeId"
+          from bucketed
+          group by bucket_start, granularity, event_type,
+            cube(product_type_id, maker_id, material_id)
+          having grouping(material_id) = 1 or material_id is not null
+        `);
+        const lifecycleSource = lifecycleResult.rows.map((row) => ({
+          bucketStart: row.bucketStart,
+          contributorCount: Number(row.contributorCount),
+          eventCount: Number(row.eventCount),
+          eventType: row.eventType,
+          granularity: row.granularity,
+          makerId: row.makerId === null ? null : Number(row.makerId),
+          materialId: row.materialId === null ? null : Number(row.materialId),
+          productTypeId:
+            row.productTypeId === null ? null : Number(row.productTypeId),
+        }));
         const [generation] = await tx
           .insert(schema.publicTrendsGeneration)
           .values({
@@ -1202,6 +1405,10 @@ export function createTrendsService(
               publishableMaterials.length < materialSource.length,
             hasSuppressedMakerProductValues:
               publishableMakerProducts.length < makerProductSource.length,
+            hasSuppressedLifecycleValues: lifecycleSource.some(
+              ({ contributorCount }) =>
+                contributorCount < PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
+            ),
             hasSuppressedValues: publishable.length < primarySource.length,
           })
           .returning({ id: schema.publicTrendsGeneration.id });
@@ -1267,6 +1474,29 @@ export function createTrendsService(
                 Math.round(row.itemCount / PUBLIC_TRENDS_ROUNDING_INCREMENT) *
                 PUBLIC_TRENDS_ROUNDING_INCREMENT,
             })),
+          );
+        }
+        if (lifecycleSource.length > 0) {
+          await tx.insert(schema.publicCollectionLifecycleTrend).values(
+            lifecycleSource.map((row) => {
+              const suppressed =
+                row.contributorCount < PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD;
+              return {
+                bucketStart: row.bucketStart,
+                eventType: row.eventType,
+                generationId: generation.id,
+                granularity: row.granularity,
+                makerId: row.makerId,
+                materialId: row.materialId,
+                productTypeId: row.productTypeId,
+                roundedCount: suppressed
+                  ? null
+                  : Math.round(
+                      row.eventCount / PUBLIC_TRENDS_ROUNDING_INCREMENT,
+                    ) * PUBLIC_TRENDS_ROUNDING_INCREMENT,
+                suppressed,
+              };
+            }),
           );
         }
         await hooks.beforeActivate?.();

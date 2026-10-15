@@ -6,6 +6,8 @@ const listPublicProductTypeTrends = vi.hoisted(() => vi.fn());
 const getPublicActivityTrends = vi.hoisted(() => vi.fn());
 /** Provides the active collection-item generation to the route loader. */
 const getPublicCollectionItemTrends = vi.hoisted(() => vi.fn());
+/** Provides privacy-safe app-wide lifecycle history to the route loader. */
+const getPublicCollectionLifecycleTrends = vi.hoisted(() => vi.fn());
 /** Provides privacy-safe public maker and product Trends. */
 const getPublicCollectionMakerProductTrends = vi.hoisted(() => vi.fn());
 /** Provides exact catalog material Trends to the route loader. */
@@ -25,6 +27,7 @@ vi.mock("@/lib/catalog-api", () => ({
   getPublicActivityTrends,
   getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
+  getPublicCollectionLifecycleTrends,
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
   getPublicPartAccessoryTrends,
@@ -90,6 +93,15 @@ describe("Trends route", () => {
     };
     listPublicProductTypeTrends.mockResolvedValueOnce(trends);
     getPublicCollectionItemTrends.mockResolvedValueOnce(collectionTrends);
+    const lifecycleTrends = {
+      generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+      granularity: "month",
+      hasSuppressedValues: false,
+      range: "year",
+      stale: false,
+      values: [],
+    };
+    getPublicCollectionLifecycleTrends.mockResolvedValueOnce(lifecycleTrends);
     getPublicCollectionMakerProductTrends.mockResolvedValueOnce(null);
     getPublicPartAccessoryTrends.mockResolvedValueOnce(collectionTrends);
     getPublicPenRefillTrends.mockResolvedValueOnce(null);
@@ -105,7 +117,12 @@ describe("Trends route", () => {
     getPublicActivityTrends.mockResolvedValueOnce(activityTrends);
     await expect(
       (loader as (context: unknown) => Promise<unknown>)({
-        deps: { range: "year" },
+        deps: {
+          makerId: 2001,
+          materialId: 4001,
+          productTypeId: 1001,
+          range: "year",
+        },
       }),
     ).resolves.toEqual({
       activityTrends,
@@ -113,6 +130,7 @@ describe("Trends route", () => {
       catalogMaterialTrends: [],
       collectionMaterialTrends: null,
       collectionTrends,
+      lifecycleTrends,
       makerProductTrends: null,
       partAccessoryTrends: collectionTrends,
       sliderTrends: null,
@@ -120,5 +138,13 @@ describe("Trends route", () => {
       spinnerTrends: null,
     });
     expect(getPublicActivityTrends).toHaveBeenCalledWith({ data: "year" });
+    expect(getPublicCollectionLifecycleTrends).toHaveBeenCalledWith({
+      data: {
+        makerId: 2001,
+        materialId: 4001,
+        productTypeId: 1001,
+        range: "year",
+      },
+    });
   });
 });

@@ -1,0 +1,2 @@
+ALTER TABLE "public_collection_maker_product_trend" DROP CONSTRAINT "public_collection_maker_product_trend_product_maker_fk";--> statement-breakpoint
+ALTER TABLE "public_collection_maker_product_trend" ADD CONSTRAINT "public_collection_maker_product_trend_V97dcnKSS7KH_fkey" FOREIGN KEY ("product_id") REFERENCES "product"("id") ON DELETE RESTRICT;

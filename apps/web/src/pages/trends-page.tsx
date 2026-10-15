@@ -1,6 +1,7 @@
 import type {
   PublicActivityTrends,
   PublicCollectionItemTrends,
+  PublicCollectionLifecycleTrends,
   PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
   PublicMakerProductTrend,
@@ -34,6 +35,16 @@ import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import { filterCatalogTrends } from "@/lib/catalog-filters";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Translation keys supplied by the companion lifecycle localizations change. */
+type TrendsTranslationKey =
+  | TranslationKey
+  | "web.trends.acquisitions"
+  | "web.trends.departures"
+  | "web.trends.lifecycle"
+  | "web.trends.lifecycleChartLabel"
+  | "web.trends.lifecyclePrivacy"
+  | "web.trends.lifecycleStale";
+
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
   /** Exact catalog and privacy-safe app-wide record creation activity. */
@@ -44,6 +55,8 @@ export type TrendsPageProps = {
   collectionMaterialTrends: PublicCollectionMaterialTrends | null;
   /** Active privacy-safe collection-item generation. */
   collectionTrends: PublicCollectionItemTrends | null;
+  /** Active privacy-safe effective ownership lifecycle generation. */
+  lifecycleTrends?: PublicCollectionLifecycleTrends | null;
   /** Active privacy-safe maker and product generation. */
   makerProductTrends?: PublicCollectionMakerProductTrends | null;
   /**
@@ -78,6 +91,7 @@ export function TrendsPage({
   catalogMaterialTrends,
   collectionMaterialTrends,
   collectionTrends,
+  lifecycleTrends = null,
   makerProductTrends = null,
   onSearchChange,
   partAccessoryTrends = null,
@@ -96,9 +110,9 @@ export function TrendsPage({
    * @returns Localized Trends copy.
    */
   const t = (
-    key: TranslationKey,
+    key: TrendsTranslationKey,
     values: Record<string, string | number> = {},
-  ) => formatTranslation(key, values, locale);
+  ) => formatTranslation(key as TranslationKey, values, locale);
   const spinnerMetricLabels: Record<SpinnerTrendMetricId, string> = {
     bearing: t("web.catalog.field.bearing"),
     bodyMaterial: t("web.trends.material"),
@@ -543,6 +557,53 @@ export function TrendsPage({
             {t("web.trends.activityPrivacy")}
           </p>
         </section>
+
+        {lifecycleTrends ? (
+          <section
+            aria-labelledby="lifecycle-trends-title"
+            className="space-y-4"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 className="text-lg font-semibold" id="lifecycle-trends-title">
+                {t("web.trends.lifecycle")}
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {t("web.trends.lastUpdated", {
+                  date: dateFormatter.format(lifecycleTrends.generatedAt),
+                })}
+              </span>
+            </div>
+            <ActivityTrendsChart
+              chartLabel={t("web.trends.lifecycleChartLabel")}
+              dateLabel={t("web.trends.activityDate")}
+              locale={locale}
+              series={[
+                {
+                  name: t("web.trends.acquisitions"),
+                  values: lifecycleTrends.values.map((value) => ({
+                    bucketStart: value.bucketStart,
+                    count: value.acquisitionCount,
+                  })),
+                },
+                {
+                  name: t("web.trends.departures"),
+                  values: lifecycleTrends.values.map((value) => ({
+                    bucketStart: value.bucketStart,
+                    count: value.departureCount,
+                  })),
+                },
+              ]}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("web.trends.lifecyclePrivacy")}
+            </p>
+            {lifecycleTrends.stale ? (
+              <p className="text-xs text-muted-foreground" role="status">
+                {t("web.trends.lifecycleStale")}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         <h2 className="text-lg font-semibold">
           {t("web.trends.catalogProducts")}
