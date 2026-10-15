@@ -99,14 +99,18 @@ export const MultipleMaterials: Story = {
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await expect(canvas.getByText("Titanium + M390")).toBeVisible();
-    const edit = canvas.getByRole("button", { name: "Edit" });
+    const edit = canvas.getByRole("button", {
+      name: "Edit material combination",
+    });
     await userEvent.click(edit);
     const page = within(canvasElement.ownerDocument.body);
-    await expect(page.getByRole("dialog", { name: "Materials" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Material combination" }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
     await userEvent.keyboard("{Escape}");
     await expect(
-      page.getByRole("dialog", { name: "Materials" }),
+      page.getByRole("dialog", { name: "Material combination" }),
     ).toHaveAttribute("data-closed");
     await waitFor(() => expect(edit).toHaveFocus());
   },
@@ -125,19 +129,28 @@ export const AddFlows: Story = {
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      canvas.getByRole("button", { name: "Select a material" }),
-    );
+    const addMaterial = canvas
+      .getAllByRole("button", { name: "Add material" })
+      .at(0);
+    await expect(addMaterial).toBeDefined();
+    if (!addMaterial) return;
+    await userEvent.click(addMaterial);
     await expect(
-      page.getAllByRole("combobox", { name: "Materials" }),
-    ).toHaveLength(1);
+      page.getByRole("combobox", { name: "Material 1" }),
+    ).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveTextContent(
+      "Add at least one material.",
+    );
     await userEvent.keyboard("{Escape}");
     await userEvent.click(
-      canvas.getByRole("button", { name: "Select materials" }),
+      canvas.getByRole("button", { name: "Add material combination" }),
     );
     await expect(
-      page.getAllByRole("combobox", { name: "Materials" }),
-    ).toHaveLength(2);
+      page.getByRole("combobox", { name: "Material 1" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("combobox", { name: "Material 2" }),
+    ).toBeVisible();
   },
 };
 
@@ -162,10 +175,12 @@ export const DuplicateComponents: Story = {
    * @param context.userEvent - Storybook interaction driver.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Edit" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Edit material combination" }),
+    );
     const page = within(canvasElement.ownerDocument.body);
     await expect(page.getByRole("alert")).toHaveTextContent(
-      "This material and alloy or grade combination is already selected.",
+      "Each material can appear only once in a combination.",
     );
     await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
   },

@@ -626,11 +626,11 @@ export function MaterialAssignmentsEditor({
       materialCombinationSignature(assignment) ===
         materialCombinationSignature(draft),
   );
-  const hasInvalidDraft =
+  const hasIncompleteComponent =
     draft.materials.length === 0 ||
-    draft.materials.some(({ materialId }) => materialId === 0) ||
-    hasDuplicateComponent ||
-    hasDuplicateAssignment;
+    draft.materials.some(({ materialId }) => materialId === 0);
+  const hasInvalidDraft =
+    hasIncompleteComponent || hasDuplicateComponent || hasDuplicateAssignment;
 
   return (
     <>
@@ -640,7 +640,7 @@ export function MaterialAssignmentsEditor({
             {label(assignment)}
           </span>
           <Button onClick={() => open(index)} type="button" variant="outline">
-            {t("web.action.edit")}
+            {t("web.catalog.materialCombination.edit")}
           </Button>
           <Button
             aria-label={t("web.action.close")}
@@ -658,7 +658,7 @@ export function MaterialAssignmentsEditor({
         type="button"
         variant="outline"
       >
-        {t("web.catalog.selectMaterial")}
+        {t("web.catalog.materialCombination.addSingle")}
       </Button>
       <Button
         disabled={singleAssignment && value.length > 0}
@@ -666,7 +666,7 @@ export function MaterialAssignmentsEditor({
         type="button"
         variant="outline"
       >
-        {t("web.catalog.selectMaterials")}
+        {t("web.catalog.materialCombination.add")}
       </Button>
       <LookupDialog
         kind="material"
@@ -689,7 +689,9 @@ export function MaterialAssignmentsEditor({
       <Sheet onOpenChange={setIsOpen} open={isOpen}>
         <SheetContent className="sm:w-[40rem] sm:max-w-[90vw]">
           <SheetHeader>
-            <SheetTitle>{t("web.catalog.field.materials")}</SheetTitle>
+            <SheetTitle>
+              {t("web.catalog.materialCombination.title")}
+            </SheetTitle>
           </SheetHeader>
           <div className="grid min-h-0 gap-4 overflow-y-auto p-6">
             {draft.materials.map((selection, index) => (
@@ -698,7 +700,9 @@ export function MaterialAssignmentsEditor({
                 key={index}
               >
                 <CatalogCombobox
-                  ariaLabel={t("web.catalog.field.materials")}
+                  ariaLabel={t("web.catalog.materialCombination.component", {
+                    number: index + 1,
+                  })}
                   items={options.materials}
                   onValueChange={(material) =>
                     setDraft((current) => ({
@@ -775,11 +779,16 @@ export function MaterialAssignmentsEditor({
               type="button"
               variant="outline"
             >
-              {t("web.catalog.selectMaterial")}
+              {t("web.catalog.materialCombination.addSingle")}
             </Button>
+            {hasIncompleteComponent ? (
+              <p className="text-sm text-destructive" role="alert">
+                {t("web.catalog.materialCombination.empty")}
+              </p>
+            ) : null}
             {hasDuplicateComponent || hasDuplicateAssignment ? (
               <p className="text-sm text-destructive" role="alert">
-                {t("web.materials.validation.duplicateAssignment")}
+                {t("web.catalog.materialCombination.duplicate")}
               </p>
             ) : null}
             <div className="flex justify-end gap-2">

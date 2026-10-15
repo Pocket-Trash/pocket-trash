@@ -624,7 +624,7 @@ describe("product form conditional fields", () => {
 
     expect(html).toContain('aria-label="Name"');
     expect(html).toContain('aria-label="Maker"');
-    expect(html).toContain("Select materials");
+    expect(html).toContain("Add material combination");
     expect(html).toContain("Appearance");
     expect(html).toContain("Description");
     expect(html).not.toContain("Maker terminology");
