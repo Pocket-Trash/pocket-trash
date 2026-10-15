@@ -31,14 +31,15 @@ export function parseCatalogTrendsSearch(
 /**
  * Matches public catalog Trends to the selected product type.
  *
+ * @template T - Trend shape whose additional measure fields are preserved.
  * @param trends - Exact public catalog-product counts.
  * @param productTypeId - Selected stable product-type identifier.
  * @returns All Trends or the selected product-type Trend.
  */
-export function filterCatalogTrends(
-  trends: PublicProductTypeTrend[],
+export function filterCatalogTrends<T extends PublicProductTypeTrend>(
+  trends: T[],
   productTypeId?: number,
-): PublicProductTypeTrend[] {
+): T[] {
   return productTypeId
     ? trends.filter((trend) => trend.productTypeId === productTypeId)
     : trends;

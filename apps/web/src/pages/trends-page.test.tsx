@@ -36,6 +36,7 @@ vi.mock("@pocket-trash/localizations", () => ({
   formatTranslation: (key: string) => {
     return (
       {
+        "web.trends.approximateCollectors": "Approximate collectors",
         "web.trends.chartLabel": "Catalog products by product type",
         "web.trends.collectionItemsChartLabel":
           "Currently owned items by product type",
@@ -47,6 +48,8 @@ vi.mock("@pocket-trash/localizations", () => ({
           "Some product types are hidden because they do not meet the privacy threshold.",
         "web.trends.collectionItemsSuppressedEmpty":
           "Collection-item Trends are hidden until the privacy threshold is met.",
+        "web.trends.collectors": "Collectors",
+        "web.trends.collectorsChartLabel": "Collectors by product type",
         "web.trends.other": "Other",
         "web.trends.partsAndAccessories": "Parts and Accessories",
         "web.trends.partsAndAccessoriesChartLabel":
@@ -108,7 +111,7 @@ describe("TrendsPage", () => {
           stale: false,
           values: trends.map((trend) => ({
             ...trend,
-            collectorCount: trend.count * 5,
+            collectorCount: Math.ceil(trend.count / 2) * 5,
             count: trend.count * 5,
           })),
         }}
@@ -146,6 +149,8 @@ describe("TrendsPage", () => {
     expect(table).toContain("Type 10");
     expect(table).toContain(">1</td>");
     expect(html).toContain("Currently owned items by product type");
+    expect(html).toContain("Collectors by product type");
+    expect(html).toContain("Approximate collectors");
     expect(html).toContain("Some product types are hidden");
     expect(html).toContain("Parts and Accessories");
     expect(html).toContain("Slider Plate");
