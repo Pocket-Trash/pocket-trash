@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, mergeConfig } from "vitest/config";
-import viteConfig from "./.storybook/vite.config";
+import viteConfig from "./.storybook/vite.config.ts";
 
 /** Absolute directory containing the web package configuration. */
 const dirname = path.dirname(fileURLToPath(import.meta.url));
