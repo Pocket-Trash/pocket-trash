@@ -357,7 +357,9 @@ export const ConfigurablePen: Story = {
     });
     await userEvent.click(refill);
     const refillOptions = await page.findAllByRole("option");
-    await expect(refillOptions[0]).toHaveAccessibleName("Compatible refill");
+    await expect(refillOptions[0]).toHaveAccessibleName(
+      "Compatible refill Compatibility not recorded for this configuration",
+    );
     await userEvent.click(
       page.getByRole("option", { name: /compatible refill/iu }),
     );
