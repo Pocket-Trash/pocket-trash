@@ -1340,7 +1340,7 @@ export function createTrendsService(
               collection_item.owner_id,
               product.product_type_id,
               product.maker_id,
-              product_material.material_id,
+              product_material_component.material_id,
               ownership_period.effective_start_date,
               ownership_period.effective_end_date
             from collection_item_ownership_period ownership_period
@@ -1349,6 +1349,8 @@ export function createTrendsService(
             inner join product on product.id = item_products.product_id
             inner join product_types on product_types.id = product.product_type_id
             left join product_material on product_material.product_id = product.id
+            left join product_material_component
+              on product_material_component.product_material_id = product_material.id
             where not product_types.is_part_or_accessory
               or product_types.include_in_trends
           ), events as (

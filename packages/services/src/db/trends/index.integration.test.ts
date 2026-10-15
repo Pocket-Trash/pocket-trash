@@ -517,9 +517,12 @@ describe("public collection-item Trends", () => {
         })
         .where(eq(schema.product.id, fixture.sliderProductId));
       await db
-        .delete(schema.productMaterial)
+        .delete(schema.productMaterialComponent)
         .where(
-          eq(schema.productMaterial.materialId, fixture.titaniumMaterialId),
+          eq(
+            schema.productMaterialComponent.materialId,
+            fixture.titaniumMaterialId,
+          ),
         );
       await db
         .update(schema.productType)
