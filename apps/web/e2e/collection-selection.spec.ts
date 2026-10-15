@@ -135,7 +135,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
       .click();
     await expect(page).toHaveURL(/\/collections\/edit\/\d+$/u);
     await expect(
-      page.getByRole("combobox", { name: "Collection" }),
+      page.getByRole("combobox", { exact: true, name: "Collection" }),
     ).toBeVisible();
     await selectOption(page, "Collection", fixture.collectionNames[1]);
     await page.getByRole("button", { name: "Save" }).click();
