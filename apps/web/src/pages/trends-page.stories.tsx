@@ -1,6 +1,7 @@
 import type {
   PublicActivityTrends,
   PublicCollectionItemTrends,
+  PublicCollectionLifecycleTrends,
   PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
   PublicMaterialTrend,
@@ -170,6 +171,27 @@ const activityTrends: PublicActivityTrends = {
   ],
 };
 
+/** Privacy-safe ownership lifecycle used by populated stories. */
+const lifecycleTrends: PublicCollectionLifecycleTrends = {
+  generatedAt: new Date("2026-10-14T00:00:00.000Z"),
+  granularity: "month",
+  hasSuppressedValues: true,
+  range: "year",
+  stale: false,
+  values: [
+    {
+      acquisitionCount: 15,
+      bucketStart: new Date("2026-08-01T00:00:00.000Z"),
+      departureCount: 5,
+    },
+    {
+      acquisitionCount: null,
+      bucketStart: new Date("2026-09-01T00:00:00.000Z"),
+      departureCount: 10,
+    },
+  ],
+};
+
 /** Privacy-safe collection Trends used by populated stories. */
 const collectionTrends: PublicCollectionItemTrends = {
   generatedAt: new Date("2026-10-14T00:00:00.000Z"),
@@ -313,6 +335,7 @@ function TrendsFixture() {
       catalogMaterialTrends={[]}
       collectionMaterialTrends={null}
       collectionTrends={collectionTrends}
+      lifecycleTrends={lifecycleTrends}
       onSearchChange={setSearch}
       search={search}
       trends={trends}
@@ -328,6 +351,7 @@ export const Populated: Story = {
     catalogMaterialTrends: [],
     collectionMaterialTrends: null,
     collectionTrends,
+    lifecycleTrends,
     onSearchChange: fn(),
     trends,
   },
@@ -364,8 +388,8 @@ export const Populated: Story = {
     await expect(productTypeFilter).not.toHaveTextContent("all");
     await userEvent.keyboard("{Escape}");
 
-    await expect(canvas.getAllByRole("table")).toHaveLength(4);
-    await expect(canvas.getAllByRole("row")).toHaveLength(10);
+    await expect(canvas.getAllByRole("table")).toHaveLength(5);
+    await expect(canvas.getAllByRole("row")).toHaveLength(13);
     await expect(
       canvas.getAllByRole("rowheader", { name: "Spinner" }),
     ).toHaveLength(3);
