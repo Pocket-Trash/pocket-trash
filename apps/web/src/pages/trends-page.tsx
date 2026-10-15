@@ -109,10 +109,10 @@ export function TrendsPage({
   const sliderMetricLabels: Record<SliderTrendMetricId, string> = {
     bodyMaterial: t("web.trends.sliderBodyMaterial" as TranslationKey),
     length: t("web.archive.spec.length"),
-    magnetLayout: t("web.catalog.slider.layout.label"),
+    magnetLayout: t("web.slider.layout.label"),
     maker: t("web.trends.maker"),
     plateMaterial: t("web.trends.sliderPlateMaterial" as TranslationKey),
-    positionCount: t("web.catalog.slider.setup.clickCount"),
+    positionCount: t("web.slider.setup.clickCount"),
     thickness: t("web.catalog.field.thickness"),
     weight: t("web.archive.spec.weight"),
     width: t("web.catalog.field.width"),
