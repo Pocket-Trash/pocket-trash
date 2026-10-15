@@ -530,7 +530,6 @@ async function loadExistingState(
       name: schema.product.name,
       productId: schema.product.id,
       productTypeId: schema.product.productTypeId,
-      productUrl: schema.product.makerProductUrl,
       sourceHandle: schema.catalogSourceListing.sourceHandle,
     })
     .from(schema.catalogSourceListing)
@@ -556,44 +555,55 @@ async function loadExistingState(
   const listing = listings[0];
   if (!listing) return null;
 
-  const [materials, appearances, noses, compatibility] = await Promise.all([
-    db
-      .select({ materialId: schema.productMaterialComponent.materialId })
-      .from(schema.productMaterial)
-      .innerJoin(
-        schema.productMaterialComponent,
-        eq(
-          schema.productMaterialComponent.productMaterialId,
-          schema.productMaterial.id,
+  const [materials, appearances, noses, compatibility, links] =
+    await Promise.all([
+      db
+        .select({ materialId: schema.productMaterialComponent.materialId })
+        .from(schema.productMaterial)
+        .innerJoin(
+          schema.productMaterialComponent,
+          eq(
+            schema.productMaterialComponent.productMaterialId,
+            schema.productMaterial.id,
+          ),
+        )
+        .where(eq(schema.productMaterial.productId, listing.productId)),
+      db
+        .select({
+          finishId: schema.finishOptionFinish.finishId,
+          patternId: schema.finishOption.patternId,
+        })
+        .from(schema.finishOption)
+        .leftJoin(
+          schema.finishOptionFinish,
+          eq(schema.finishOption.id, schema.finishOptionFinish.finishOptionId),
+        )
+        .where(eq(schema.finishOption.productId, listing.productId)),
+      db
+        .select({ conceptId: schema.penNoseProfileAssignment.conceptId })
+        .from(schema.penNoseProfileAssignment)
+        .where(
+          eq(schema.penNoseProfileAssignment.productId, listing.productId),
         ),
-      )
-      .where(eq(schema.productMaterial.productId, listing.productId)),
-    db
-      .select({
-        finishId: schema.finishOptionFinish.finishId,
-        patternId: schema.finishOption.patternId,
-      })
-      .from(schema.finishOption)
-      .leftJoin(
-        schema.finishOptionFinish,
-        eq(schema.finishOption.id, schema.finishOptionFinish.finishOptionId),
-      )
-      .where(eq(schema.finishOption.productId, listing.productId)),
-    db
-      .select({ conceptId: schema.penNoseProfileAssignment.conceptId })
-      .from(schema.penNoseProfileAssignment)
-      .where(eq(schema.penNoseProfileAssignment.productId, listing.productId)),
-    db
-      .select({
-        targetGroupId: schema.refillCompatibilityAssertion.targetGroupId,
-        targetRefillProductId:
-          schema.refillCompatibilityAssertion.targetRefillProductId,
-      })
-      .from(schema.refillCompatibilityAssertion)
-      .where(
-        eq(schema.refillCompatibilityAssertion.penProductId, listing.productId),
-      ),
-  ]);
+      db
+        .select({
+          targetGroupId: schema.refillCompatibilityAssertion.targetGroupId,
+          targetRefillProductId:
+            schema.refillCompatibilityAssertion.targetRefillProductId,
+        })
+        .from(schema.refillCompatibilityAssertion)
+        .where(
+          eq(
+            schema.refillCompatibilityAssertion.penProductId,
+            listing.productId,
+          ),
+        ),
+      db
+        .select({ url: schema.productLink.url })
+        .from(schema.productLink)
+        .where(eq(schema.productLink.productId, listing.productId))
+        .orderBy(schema.productLink.position, schema.productLink.id),
+    ]);
   if (appearances.length > 1 || noses.length > 1 || compatibility.length > 1)
     throw new Error(
       `Autmog ${item.sourceProductId} has ambiguous canonical facts.`,
@@ -605,6 +615,8 @@ async function loadExistingState(
     materialIds: materials.map((row) => row.materialId).sort((a, b) => a - b),
     noseConceptId: noses[0]?.conceptId ?? null,
     patternId: appearances[0]?.patternId ?? null,
+    productUrl:
+      links.find(({ url }) => url === listing.listingUrl)?.url ?? null,
   };
 }
 
@@ -633,14 +645,17 @@ async function createCanonicalPen(
       .values({
         description: item.description,
         makerId: lookups.makerId,
-        makerProductUrl: item.productUrl,
-        makerProductUrlValid: true,
         name: item.title,
         productTypeId: lookups.penProductTypeId,
         slug: item.sourceHandle,
       })
       .returning({ id: schema.product.id });
     if (!product) throw new Error("Failed to create canonical Autmog product.");
+    await tx.insert(schema.productLink).values({
+      position: 0,
+      productId: product.id,
+      url: item.productUrl,
+    });
     await tx.insert(schema.productDetailPen).values({ id: product.id });
     const [listing] = await tx
       .insert(schema.catalogSourceListing)
@@ -682,8 +697,6 @@ async function updateCanonicalPen(
       .update(schema.product)
       .set({
         description: item.description,
-        makerProductUrl: item.productUrl,
-        makerProductUrlValid: true,
         name: item.title,
         updatedAt: new Date(),
       })
@@ -696,8 +709,67 @@ async function updateCanonicalPen(
         updatedAt: new Date(),
       })
       .where(eq(schema.catalogSourceListing.id, existing.listingId));
+    await replaceSourceProductLink(
+      tx,
+      existing.productId,
+      existing.listingUrl,
+      item.productUrl,
+    );
     await replaceSourceOwnedFacts(tx, existing.productId, lookups);
   });
+}
+
+/**
+ * Moves the scraper-owned link first while retaining every manual link's order and validity.
+ *
+ * @param tx - Active canonical catalog transaction.
+ * @param productId - Canonical product receiving the links.
+ * @param previousUrl - Source listing URL owned by the prior scrape.
+ * @param nextUrl - Source listing URL from the current scrape.
+ * @rejects When link replacement cannot be persisted.
+ */
+async function replaceSourceProductLink(
+  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  productId: number,
+  previousUrl: string,
+  nextUrl: string,
+) {
+  const links = await tx
+    .select({
+      id: schema.productLink.id,
+      position: schema.productLink.position,
+      url: schema.productLink.url,
+    })
+    .from(schema.productLink)
+    .where(eq(schema.productLink.productId, productId))
+    .orderBy(schema.productLink.position, schema.productLink.id);
+  const previousLink = links.find(({ url }) => url === previousUrl);
+  const nextLink = links.find(({ url }) => url === nextUrl);
+  const sourceLink = nextLink ?? previousLink;
+  const obsoleteLink =
+    previousLink && nextLink && previousLink.id !== nextLink.id
+      ? previousLink
+      : null;
+  if (obsoleteLink)
+    await tx
+      .delete(schema.productLink)
+      .where(eq(schema.productLink.id, obsoleteLink.id));
+  for (const [position, link] of links
+    .filter(({ id }) => id !== sourceLink?.id && id !== obsoleteLink?.id)
+    .entries())
+    await tx
+      .update(schema.productLink)
+      .set({ position: position + 1, updatedAt: new Date() })
+      .where(eq(schema.productLink.id, link.id));
+  if (sourceLink)
+    await tx
+      .update(schema.productLink)
+      .set({ isValid: true, position: 0, updatedAt: new Date(), url: nextUrl })
+      .where(eq(schema.productLink.id, sourceLink.id));
+  else
+    await tx
+      .insert(schema.productLink)
+      .values({ position: 0, productId, url: nextUrl });
 }
 
 /**

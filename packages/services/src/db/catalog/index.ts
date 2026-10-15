@@ -790,14 +790,8 @@ export type CatalogProduct = {
   makerSlug: string;
   /** Canonical mechanism taxonomy identifier for mechanism-part products. */
   mechanismId?: number | null;
-  /**
-   * Maker product URL.
-   */
-  makerProductUrl: string | null;
-  /**
-   * Whether the maker product URL has passed validation.
-   */
-  makerProductUrlValid: boolean;
+  /** Ordered external product links, including invalid links for authorized editors. */
+  productLinks: ProductLink[];
   /**
    * Maker URL.
    */
@@ -866,6 +860,18 @@ export type CatalogProduct = {
   weight: WeightMeasurement | null;
   /** Stored width and its entered unit. */
   width: DimensionMeasurement | null;
+};
+
+/** One ordered external link attached to a catalog product. */
+export type ProductLink = {
+  /** Database identifier. */
+  id: number;
+  /** Whether the link may be shown publicly. */
+  isValid: boolean;
+  /** Zero-based display position. */
+  position: number;
+  /** Normalized HTTP(S) URL. */
+  url: string;
 };
 
 /** One refill offering shown on a public refill page. */
@@ -973,10 +979,8 @@ export type ProductWriteInput = {
    * Maker identifier.
    */
   makerId: number;
-  /**
-   * Maker product URL.
-   */
-  makerProductUrl?: string | null;
+  /** Complete ordered replacement list of external product links. */
+  productLinks?: string[];
   /**
    * Finish options.
    */
@@ -1829,21 +1833,23 @@ export type CatalogService = {
     reason?: string;
   }): Promise<void>;
   /**
-   * Sets maker product URL validity.
+   * Sets product link validity.
    *
    * @param input - Product, validity decision, actor, and optional moderation reason.
    * @returns Completion after URL validity is stored.
    * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
    */
-  setMakerProductUrlValidity(input: {
+  setProductLinkValidity(input: {
     /**
      * Authenticated actor.
      */
     actor: Actor;
     /**
-     * Whether the maker product URL is considered valid.
+     * Whether the product link is considered valid.
      */
-    makerProductUrlValid: boolean;
+    isValid: boolean;
+    /** Product-link identifier. */
+    linkId: number;
     /**
      * Product identifier.
      */
@@ -3612,14 +3618,6 @@ export function createCatalogService(
                     }
                   : {}),
                 makerId: input.makerId,
-                ...(input.makerProductUrl !== undefined
-                  ? {
-                      makerProductUrl: normalizeOptionalUrl(
-                        input.makerProductUrl,
-                      ),
-                      makerProductUrlValid: true,
-                    }
-                  : {}),
                 name: input.name,
                 ownerClerkId: input.actor.clerkId,
                 productTypeId: type.id,
@@ -3627,6 +3625,8 @@ export function createCatalogService(
               })
               .returning({ id: schema.product.id });
             if (!row) throw new Error("Failed to create product.");
+
+            await replaceProductLinks(tx, row.id, input.productLinks ?? []);
 
             if (input.materialAssignments.length) {
               await insertProductMaterialCombinations(
@@ -5382,12 +5382,12 @@ export function createCatalogService(
       );
     },
     /**
-     * Sets maker product URL validity.
+     * Sets product link validity.
      *
      * @param input - Product, validity decision, actor, and optional moderation reason.
      * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
      */
-    async setMakerProductUrlValidity(input) {
+    async setProductLinkValidity(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
       const dependencies = requireProductAudit(users, audit);
@@ -5395,46 +5395,53 @@ export function createCatalogService(
         ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
         : null;
       await logger.operation(
-        loggerMessages.database.catalog.setMakerProductUrlValidity,
+        loggerMessages.database.catalog.setProductLinkValidity,
         async () =>
           await db.transaction(async (tx) => {
-            const [product] = await tx
+            const [link] = await tx
               .select({
-                makerProductUrlValid: schema.product.makerProductUrlValid,
+                isValid: schema.productLink.isValid,
                 ownerClerkId: schema.product.ownerClerkId,
                 ownerUserId: schema.user.id,
               })
-              .from(schema.product)
+              .from(schema.productLink)
+              .innerJoin(
+                schema.product,
+                eq(schema.productLink.productId, schema.product.id),
+              )
               .leftJoin(
                 schema.user,
                 eq(schema.product.ownerClerkId, schema.user.clerkId),
               )
-              .where(eq(schema.product.id, input.productId))
+              .where(
+                and(
+                  eq(schema.productLink.id, input.linkId),
+                  eq(schema.product.id, input.productId),
+                ),
+              )
               .limit(1);
-            if (!product) throw new Error("Product does not exist.");
+            if (!link) throw new Error("Product link does not exist.");
             if (
-              product.ownerClerkId !== input.actor.clerkId &&
+              link.ownerClerkId !== input.actor.clerkId &&
               !input.reason?.trim()
             ) {
               throw new Error("A moderation reason is required.");
             }
             await tx
-              .update(schema.product)
+              .update(schema.productLink)
               .set({
-                makerProductUrlValid: input.makerProductUrlValid,
+                isValid: input.isValid,
                 updatedAt: new Date(),
               })
-              .where(eq(schema.product.id, input.productId));
+              .where(eq(schema.productLink.id, input.linkId));
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
                 actor: input.actor,
                 actorUser,
-                after: { makerProductUrlValid: input.makerProductUrlValid },
-                before: {
-                  makerProductUrlValid: product.makerProductUrlValid,
-                },
-                definition: productAudit.makerProductUrlValidityChanged,
-                ownerUserId: product.ownerUserId,
+                after: { isValid: input.isValid, linkId: input.linkId },
+                before: { isValid: link.isValid, linkId: input.linkId },
+                definition: productAudit.productLinkValidityChanged,
+                ownerUserId: link.ownerUserId,
                 reason: input.reason,
                 targetId: input.productId,
               });
@@ -5442,7 +5449,8 @@ export function createCatalogService(
           }),
         {
           attributes: {
-            makerProductUrlValid: input.makerProductUrlValid,
+            isValid: input.isValid,
+            linkId: input.linkId,
             productId: input.productId,
           },
         },
@@ -5723,8 +5731,6 @@ export function createCatalogService(
             const [existing] = await tx
               .select({
                 id: schema.product.id,
-                makerProductUrl: schema.product.makerProductUrl,
-                makerProductUrlValid: schema.product.makerProductUrlValid,
                 ownerClerkId: schema.product.ownerClerkId,
                 ownerUserId: schema.user.id,
                 slug: schema.product.slug,
@@ -5765,11 +5771,6 @@ export function createCatalogService(
                     )[0] ?? failProductLoad(),
                   )
                 : undefined;
-            const makerProductUrl =
-              input.makerProductUrl === undefined
-                ? undefined
-                : normalizeOptionalUrl(input.makerProductUrl);
-
             await tx
               .update(schema.product)
               .set({
@@ -5781,21 +5782,17 @@ export function createCatalogService(
                     }
                   : {}),
                 makerId: input.makerId,
-                ...(makerProductUrl !== undefined
-                  ? {
-                      makerProductUrl,
-                      makerProductUrlValid:
-                        makerProductUrl !==
-                        normalizeOptionalUrl(existing.makerProductUrl)
-                          ? true
-                          : existing.makerProductUrlValid,
-                    }
-                  : {}),
                 name: input.name,
                 slug: input.slug,
                 updatedAt: new Date(),
               })
               .where(eq(schema.product.id, input.productId));
+            if (input.productLinks !== undefined)
+              await replaceProductLinks(
+                tx,
+                input.productId,
+                input.productLinks,
+              );
             const assignments = await tx
               .select({
                 id: schema.productMaterial.id,
@@ -8778,8 +8775,11 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     isPrivate: product.isPrivate,
     length: product.length,
     makerId: product.makerId,
-    makerProductUrl: product.makerProductUrl,
-    makerProductUrlValid: product.makerProductUrlValid,
+    productLinks: product.productLinks.map(({ id, isValid, position }) => ({
+      id,
+      isValid,
+      position,
+    })),
     mechanismId: product.mechanismId ?? null,
     magnetConfiguration: product.magnetConfiguration ?? null,
     magnetLayout: product.magnetLayout,
@@ -9721,8 +9721,6 @@ async function queryProducts(
       makerId: schema.maker.id,
       makerName: schema.maker.name,
       makerSlug: schema.maker.slug,
-      makerProductUrl: schema.product.makerProductUrl,
-      makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
       magnetConfiguration: schema.productDetailSlider.magnetConfiguration,
       magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productDetailSlider.magnetLayout}, ${schema.productDetailSliderInsert.magnetLayout})`,
@@ -9908,8 +9906,6 @@ async function queryProducts(
       makerId: row.makerId,
       makerName: row.makerName,
       makerSlug: row.makerSlug,
-      makerProductUrl: row.makerProductUrl,
-      makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
       mechanismId: row.mechanismId,
       magnetLayout: row.magnetLayout,
@@ -9959,6 +9955,7 @@ async function queryProducts(
       productTypeId: row.productTypeId,
       productTypeName: row.productTypeName,
       productTypeSlug: catalogProductType(row.productTypeSlug),
+      productLinks: [],
       slug: row.slug,
       spinDiameter: dimensionMeasurement(
         row.spinDiameter,
@@ -9980,6 +9977,7 @@ async function queryProducts(
     loadFinishOptions(db, result),
     loadPensCatalogDetails(db, result, viewer),
     loadProductImages(db, result, viewer),
+    loadProductLinks(db, result),
     loadProductRelationships(db, result, viewer),
   ]);
   for (const product of result) {
@@ -9988,6 +9986,45 @@ async function queryProducts(
       : null;
   }
   return result;
+}
+
+/**
+ * Hydrates ordered external links for visible products.
+ *
+ * @param db - Catalog database used for the link query.
+ * @param products - Visible products receiving ordered links.
+ * @rejects When product links cannot be loaded.
+ */
+async function loadProductLinks(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+) {
+  if (!products.length) return;
+  const rows = await db
+    .select({
+      id: schema.productLink.id,
+      isValid: schema.productLink.isValid,
+      position: schema.productLink.position,
+      productId: schema.productLink.productId,
+      url: schema.productLink.url,
+    })
+    .from(schema.productLink)
+    .where(
+      inArray(
+        schema.productLink.productId,
+        products.map(({ id }) => id),
+      ),
+    )
+    .orderBy(
+      asc(schema.productLink.productId),
+      asc(schema.productLink.position),
+      asc(schema.productLink.id),
+    );
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
+  for (const { productId, ...link } of rows)
+    productsById.get(productId)?.productLinks.push(link);
 }
 
 /**
@@ -12200,6 +12237,56 @@ async function listCatalogImageTrash(
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
+ * Replaces a product's ordered links while retaining unchanged row identity and validity.
+ *
+ * @param tx - Active catalog transaction.
+ * @param productId - Product receiving the replacement links.
+ * @param values - Ordered URL values from the write boundary.
+ * @rejects When a URL is invalid or duplicated, or persistence fails.
+ */
+async function replaceProductLinks(
+  tx: CatalogTransaction,
+  productId: number,
+  values: string[],
+) {
+  const urls = values.flatMap((value) => {
+    const url = normalizeOptionalUrl(value);
+    return url ? [url] : [];
+  });
+  if (new Set(urls).size !== urls.length)
+    throw new Error("Duplicate product links are not allowed.");
+  const existing = await tx
+    .select({ id: schema.productLink.id, url: schema.productLink.url })
+    .from(schema.productLink)
+    .where(eq(schema.productLink.productId, productId));
+  const existingByUrl = new Map(existing.map((link) => [link.url, link]));
+  const retainedIds = urls.flatMap((url) => {
+    const id = existingByUrl.get(url)?.id;
+    return id === undefined ? [] : [id];
+  });
+  await tx
+    .delete(schema.productLink)
+    .where(
+      retainedIds.length
+        ? and(
+            eq(schema.productLink.productId, productId),
+            notInArray(schema.productLink.id, retainedIds),
+          )
+        : eq(schema.productLink.productId, productId),
+    );
+  for (const [position, url] of urls.entries()) {
+    const link = existingByUrl.get(url);
+    if (link)
+      await tx
+        .update(schema.productLink)
+        .set({ position, updatedAt: new Date() })
+        .where(eq(schema.productLink.id, link.id));
+    else
+      await tx.insert(schema.productLink).values({ position, productId, url });
+  }
+}
+
+/**
  * Replaces one owned Pen's installed parts after validating compatibility and ownership.
  *
  * @param tx - Active catalog transaction.
@@ -13688,13 +13775,22 @@ function normalizeOptionalText(value: string | null | undefined) {
 }
 
 /**
- * Trims an optional URL and removes trailing slashes.
+ * Trims an optional HTTP(S) URL and removes trailing slashes.
  *
  * @param value - Optional URL to normalize.
  * @returns URL without trailing slashes, or `null` when absent or blank.
+ * @throws When a nonblank value is not an HTTP(S) URL.
  */
 function normalizeOptionalUrl(value: string | null | undefined) {
-  return value?.trim().replace(/\/+$/, "") || null;
+  const normalized = value?.trim().replace(/\/+$/, "") || null;
+  if (!normalized) return null;
+  try {
+    if (["http:", "https:"].includes(new URL(normalized).protocol))
+      return normalized;
+  } catch {
+    // Invalid URLs share the same service-boundary error below.
+  }
+  throw new Error("Product links must use HTTP or HTTPS.");
 }
 
 /**

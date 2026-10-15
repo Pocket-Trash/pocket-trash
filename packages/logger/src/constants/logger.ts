@@ -97,7 +97,7 @@ export const loggerMessages = {
         "database.catalog.listRefillCompatibilityGroups",
       listPensAdminOptions: "database.catalog.listPensAdminOptions",
       listSliderMagnetPresets: "database.catalog.listSliderMagnetPresets",
-      setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
+      setProductLinkValidity: "database.catalog.setProductLinkValidity",
       setProductTypePartOrAccessory:
         "database.catalog.setProductTypePartOrAccessory",
       setProductTypeTrendsInclusion:

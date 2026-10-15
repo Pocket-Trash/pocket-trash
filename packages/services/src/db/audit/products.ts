@@ -93,8 +93,8 @@ export const productAudit = {
     "products.maker",
   ),
   makerUpdated: definition("products.maker.updated", "products.maker"),
-  makerProductUrlValidityChanged: definition(
-    "products.product.maker_url_validity_changed",
+  productLinkValidityChanged: definition(
+    "products.product_link.validity_changed",
     "products.product",
   ),
   materialImageMoved: definition(

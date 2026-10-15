@@ -257,8 +257,7 @@ describe("finish option editor", () => {
       makerId: 1000,
       makerName: "Maker",
       makerSlug: "maker",
-      makerProductUrl: null,
-      makerProductUrlValid: true,
+      productLinks: [],
       makerUrl: null,
       magnetLayout: null,
       usesInserts: null,
@@ -480,6 +479,41 @@ describe("collection item deletion", () => {
 });
 
 describe("product form conditional fields", () => {
+  it("renders ordered product links with add, move, and remove controls", () => {
+    const product = productFixture(1003, "Linked product", "spinner");
+    product.productLinks = [
+      {
+        id: 2000,
+        isValid: true,
+        position: 0,
+        url: "https://maker.example/linked-product",
+      },
+      {
+        id: 2001,
+        isValid: false,
+        position: 1,
+        url: "https://stockist.example/linked-product",
+      },
+    ];
+
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: product,
+        options: emptyCatalogOptions,
+        productTypeSlug: "spinner",
+      }),
+    );
+
+    expect(html).toContain('name="productLinks.0"');
+    expect(html).toContain('name="productLinks.1"');
+    expect(html).toContain("https://maker.example/linked-product");
+    expect(html).toContain("https://stockist.example/linked-product");
+    expect(html).toContain("Add product link");
+    expect(html).toContain("Move product link 1 up");
+    expect(html).toContain("Move product link 2 down");
+    expect(html).toContain("Remove product link 1");
+  });
+
   it("renders the product and lookup slug previews as read-only inputs", () => {
     const html = renderToStaticMarkup(
       createElement(ProductEditor, {
@@ -629,7 +663,7 @@ describe("product form conditional fields", () => {
     expect(html).toContain("Appearance");
     expect(html).toContain("Description");
     expect(html).not.toContain("Maker terminology");
-    expect(html).not.toContain('name="makerProductUrl"');
+    expect(html).not.toContain('name="productLinks');
     expect(html).not.toContain('aria-label="Images"');
     expect(html).not.toContain('aria-label="Length"');
   });
@@ -1149,8 +1183,7 @@ function productFixture(
     makerId: 1,
     makerName: "Maker",
     makerSlug: "maker",
-    makerProductUrl: null,
-    makerProductUrlValid: true,
+    productLinks: [],
     makerUrl: null,
     magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
     usesInserts: productTypeSlug === "slider" ? false : null,

@@ -340,6 +340,9 @@ function MaterialProductCard({ product }: MaterialProductCardProps) {
         })}
         privateLabel={t("web.resources.moderation.privateBadge")}
         product={product}
+        productLinkLabel={t("web.action.visitProductPageFor", {
+          name: product.name,
+        })}
       />
       <ul className="flex flex-wrap gap-x-3 gap-y-1 p-3 text-sm">
         {product.materials.map((assignment) => (

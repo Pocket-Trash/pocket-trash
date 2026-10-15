@@ -299,8 +299,7 @@ const product: CatalogProduct = {
   makerId: 1,
   makerName: "KAP EDC",
   makerSlug: "kap-edc",
-  makerProductUrl: null,
-  makerProductUrlValid: true,
+  productLinks: [],
   makerUrl: "https://www.kapedc.com",
   magnetLayout: null,
   usesInserts: null,
@@ -756,6 +755,47 @@ function collectionImage(id: number): CatalogImage {
 }
 
 describe("ProductCard", () => {
+  it("links only the first valid external product page above the card overlay", () => {
+    const html = renderToStaticMarkup(
+      <ProductCard
+        finishOptionCountLabel="No finishes"
+        imageAlt="Catla"
+        imageCountLabel="No images"
+        materialCountLabel="No materials"
+        privateLabel="Private"
+        product={{
+          ...product,
+          productLinks: [
+            {
+              id: 2000,
+              isValid: false,
+              position: 0,
+              url: "https://invalid.example/catla",
+            },
+            {
+              id: 2001,
+              isValid: true,
+              position: 1,
+              url: "https://maker.example/catla",
+            },
+            {
+              id: 2002,
+              isValid: true,
+              position: 2,
+              url: "https://stockist.example/catla",
+            },
+          ],
+        }}
+        productLinkLabel="Visit Catla"
+      />,
+    );
+
+    expect(html).toContain('href="https://maker.example/catla"');
+    expect(html).not.toContain("https://invalid.example/catla");
+    expect(html).not.toContain("https://stockist.example/catla");
+    expect(html).toContain("relative z-20");
+  });
+
   it("keeps descriptions off cards", () => {
     const html = renderToStaticMarkup(
       <ProductCard
@@ -765,6 +805,7 @@ describe("ProductCard", () => {
         materialCountLabel="No materials"
         privateLabel="Private"
         product={{ ...product, description: "CARD_ONLY_DESCRIPTION" }}
+        productLinkLabel="Visit Catla"
       />,
     );
 
@@ -788,6 +829,7 @@ describe("ProductCard", () => {
             },
           ],
         }}
+        productLinkLabel="Visit Catla"
       />,
     );
 
@@ -1108,12 +1150,31 @@ describe("ProductDetailPage", () => {
     expect(html).toContain('href="/makers/kap-edc"');
   });
 
-  it("renders sanitized markdown and only valid maker product links", () => {
+  it("renders sanitized markdown and ordered valid product links", () => {
     const sourcedProduct = {
       ...product,
       bearing: "R188",
       description: "**Fast** <script>alert('no')</script>",
-      makerProductUrl: "https://www.kapedc.com/products/catla",
+      productLinks: [
+        {
+          id: 2000,
+          isValid: true,
+          position: 0,
+          url: "https://www.kapedc.com/products/catla",
+        },
+        {
+          id: 2001,
+          isValid: false,
+          position: 1,
+          url: "https://invalid.example/catla",
+        },
+        {
+          id: 2002,
+          isValid: true,
+          position: 2,
+          url: "https://stockist.example/catla",
+        },
+      ],
       spinDiameter: { unit: "mm" as const, value: "52" },
     };
 
@@ -1123,7 +1184,13 @@ describe("ProductDetailPage", () => {
     const invalidHtml = renderToStaticMarkup(
       <ProductDetailPage
         collectionItems={[]}
-        product={{ ...sourcedProduct, makerProductUrlValid: false }}
+        product={{
+          ...sourcedProduct,
+          productLinks: sourcedProduct.productLinks.map((link) => ({
+            ...link,
+            isValid: false,
+          })),
+        }}
       />,
     );
 
@@ -1132,6 +1199,11 @@ describe("ProductDetailPage", () => {
     expect(html).toContain("R188");
     expect(html).toContain("52 mm");
     expect(html).toContain('href="https://www.kapedc.com/products/catla"');
+    expect(html).toContain('href="https://stockist.example/catla"');
+    expect(html).not.toContain('href="https://invalid.example/catla"');
+    expect(html.indexOf("Visit Catla product page 1")).toBeLessThan(
+      html.indexOf("Visit Catla product page 2"),
+    );
     expect(html).toContain("hover:text-primary");
     expect(html).toContain("focus-visible:ring-ring");
     expect(html).toContain("text-[13.5px] leading-[1.6]");

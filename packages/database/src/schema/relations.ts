@@ -281,6 +281,7 @@ export const relations = defineRelations(tables, (r) => ({
     aliases: r.many.productAlias(),
     finishOptions: r.many.finishOption(),
     images: r.many.productImage(),
+    links: r.many.productLink(),
     maker: r.one.maker({
       from: [r.product.makerId],
       to: [r.maker.id],
@@ -328,6 +329,12 @@ export const relations = defineRelations(tables, (r) => ({
     sliderPlate: r.one.productDetailSliderPlate({
       from: [r.product.id],
       to: [r.productDetailSliderPlate.id],
+    }),
+  },
+  productLink: {
+    product: r.one.product({
+      from: [r.productLink.productId],
+      to: [r.product.id],
     }),
   },
   productImage: {
@@ -1041,6 +1048,9 @@ export const collectionItemImageRelations = relations.collectionItemImage;
 
 /** Connects a catalog product to its maker, type, finishes, images, materials, and spinner data. */
 export const productRelations = relations.product;
+
+/** Connects an external product link to its catalog product. */
+export const productLinkRelations = relations.productLink;
 
 /** Connects a product image to its catalog product. */
 export const productImageRelations = relations.productImage;

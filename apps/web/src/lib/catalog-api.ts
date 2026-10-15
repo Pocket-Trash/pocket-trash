@@ -294,6 +294,23 @@ const optionalUrlSchema = z
   .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage)
   .transform((value) => normalizeOptionalUrl(value) || null);
 
+/** Ordered product links with per-row URL and duplicate validation. */
+const productLinksSchema = z
+  .array(optionalUrlSchema)
+  .transform((links) => links.filter((link): link is string => link !== null))
+  .superRefine((links, context) => {
+    const firstIndexByUrl = new Map<string, number>();
+    for (const [index, link] of links.entries()) {
+      if (firstIndexByUrl.has(link))
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.duplicateProductLink",
+          path: [index],
+        });
+      else firstIndexByUrl.set(link, index);
+    }
+  });
+
 /**
  * Checks whether an optional URL uses HTTP or HTTPS.
  *
@@ -431,7 +448,7 @@ export const productFormSchema = z
     includedPlateProductId: idSchema.nullable(),
     length: dimensionMeasurementSchema,
     makerId: idSchema,
-    makerProductUrl: optionalUrlSchema,
+    productLinks: productLinksSchema,
     magnetConfiguration: sliderMagnetConfigurationSchema
       .nullable()
       .default(null),
@@ -2176,7 +2193,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
         }),
       ),
       makerId: parsed.data.makerId,
-      makerProductUrl: parsed.data.makerProductUrl,
+      productLinks: parsed.data.productLinks,
       magnetConfiguration: parsed.data
         .magnetConfiguration as SliderMagnetConfiguration | null,
       magnetLayout: parsed.data.magnetLayout as SliderMagnetLayout | null,

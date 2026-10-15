@@ -505,7 +505,10 @@ describe("catalog product persistence", () => {
           },
         ],
         makerId: maker.id,
-        makerProductUrl: "https://maker.example/spinner/",
+        productLinks: [
+          "https://maker.example/spinner/",
+          "https://shop.example/spinner",
+        ],
         materialAssignments: [
           {
             weight: null,
@@ -523,8 +526,18 @@ describe("catalog product persistence", () => {
           approvalStatus: "pending",
           bearing: "R188",
           description: "Created description",
-          makerProductUrl: "https://maker.example/spinner",
-          makerProductUrlValid: true,
+          productLinks: [
+            expect.objectContaining({
+              isValid: true,
+              position: 0,
+              url: "https://maker.example/spinner",
+            }),
+            expect.objectContaining({
+              isValid: true,
+              position: 1,
+              url: "https://shop.example/spinner",
+            }),
+          ],
           spinDiameter: { unit: "mm", value: "52" },
         }),
       );
@@ -617,9 +630,14 @@ describe("catalog product persistence", () => {
         }),
       ).resolves.toBe("rejected");
 
-      await service.setMakerProductUrlValidity({
+      const productLink = created.productLinks[0];
+      const secondProductLink = created.productLinks[1];
+      if (!productLink || !secondProductLink)
+        throw new Error("Product-link fixtures are required.");
+      await service.setProductLinkValidity({
         actor: { clerkId: "admin-test", role: "admin" },
-        makerProductUrlValid: false,
+        isValid: false,
+        linkId: productLink.id,
         productId: created.id,
         reason: "Broken source link",
       });
@@ -635,7 +653,11 @@ describe("catalog product persistence", () => {
           },
         ],
         makerId: maker.id,
-        makerProductUrl: "https://maker.example/spinner/",
+        productLinks: [
+          "https://shop.example/spinner",
+          "https://maker.example/spinner/",
+          "https://stockist.example/spinner",
+        ],
         materialAssignments: [
           {
             weight: null,
@@ -656,8 +678,25 @@ describe("catalog product persistence", () => {
         expect.objectContaining({
           bearing: "One Drop",
           description: "Edited description",
-          makerProductUrl: "https://maker.example/spinner",
-          makerProductUrlValid: false,
+          productLinks: [
+            expect.objectContaining({
+              id: secondProductLink.id,
+              isValid: true,
+              position: 0,
+              url: "https://shop.example/spinner",
+            }),
+            expect.objectContaining({
+              id: productLink.id,
+              isValid: false,
+              position: 1,
+              url: "https://maker.example/spinner",
+            }),
+            expect.objectContaining({
+              isValid: true,
+              position: 2,
+              url: "https://stockist.example/spinner",
+            }),
+          ],
           spinDiameter: { unit: "mm", value: "54" },
         }),
       );
