@@ -156,9 +156,9 @@ export const relations = defineRelations(tables, (r) => ({
   material: {
     specifics: r.many.materialSpecific(),
     autmogPens: r.many.tmpAutmogPenMaterials(),
-    collectionItems: r.many.collectionItem(),
+    collectionItems: r.many.collectionItemMaterial(),
     images: r.many.materialImage(),
-    products: r.many.productMaterial(),
+    products: r.many.productMaterialComponent(),
   },
   materialSpecific: {
     material: r.one.material({
@@ -166,8 +166,8 @@ export const relations = defineRelations(tables, (r) => ({
       to: [r.material.id],
     }),
     images: r.many.materialImage(),
-    products: r.many.productMaterial(),
-    collectionItems: r.many.collectionItem(),
+    products: r.many.productMaterialComponent(),
+    collectionItems: r.many.collectionItemMaterial(),
   },
   materialImage: {
     specific: r.one.materialSpecific({
@@ -189,20 +189,13 @@ export const relations = defineRelations(tables, (r) => ({
   },
   scraperRuns: {},
   collectionItem: {
-    specific: r.one.materialSpecific({
-      from: [r.collectionItem.materialSpecificId],
-      to: [r.materialSpecific.id],
-    }),
     collection: r.one.userCollection({
       from: [r.collectionItem.collectionId],
       to: [r.userCollection.id],
     }),
     finishOption: r.one.finishOption(),
     images: r.many.collectionItemImage(),
-    material: r.one.material({
-      from: [r.collectionItem.materialId],
-      to: [r.material.id],
-    }),
+    materials: r.many.collectionItemMaterial(),
     owner: r.one.user({
       from: [r.collectionItem.ownerId],
       to: [r.user.id],
@@ -345,17 +338,38 @@ export const relations = defineRelations(tables, (r) => ({
     sourceImages: r.many.catalogSourceImage(),
   },
   productMaterial: {
-    specific: r.one.materialSpecific({
-      from: [r.productMaterial.materialSpecificId],
-      to: [r.materialSpecific.id],
-    }),
-    material: r.one.material({
-      from: [r.productMaterial.materialId],
-      to: [r.material.id],
-    }),
+    components: r.many.productMaterialComponent(),
     product: r.one.product({
       from: [r.productMaterial.productId],
       to: [r.product.id],
+    }),
+  },
+  productMaterialComponent: {
+    assignment: r.one.productMaterial({
+      from: [r.productMaterialComponent.productMaterialId],
+      to: [r.productMaterial.id],
+    }),
+    material: r.one.material({
+      from: [r.productMaterialComponent.materialId],
+      to: [r.material.id],
+    }),
+    specific: r.one.materialSpecific({
+      from: [r.productMaterialComponent.materialSpecificId],
+      to: [r.materialSpecific.id],
+    }),
+  },
+  collectionItemMaterial: {
+    collectionItem: r.one.collectionItem({
+      from: [r.collectionItemMaterial.collectionItemId],
+      to: [r.collectionItem.id],
+    }),
+    material: r.one.material({
+      from: [r.collectionItemMaterial.materialId],
+      to: [r.material.id],
+    }),
+    specific: r.one.materialSpecific({
+      from: [r.collectionItemMaterial.materialSpecificId],
+      to: [r.materialSpecific.id],
     }),
   },
   finish: {

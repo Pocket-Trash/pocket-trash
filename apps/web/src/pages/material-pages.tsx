@@ -11,7 +11,10 @@ import { AppShell } from "@/components/app-shell";
 import { ImageGallery } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCard } from "@/components/material-card";
-import { MaterialLink } from "@/components/material-link";
+import {
+  MaterialCombinationLinks,
+  MaterialLink,
+} from "@/components/material-link";
 import { ProductCard } from "@/components/product-card";
 import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Button } from "@/components/ui/button";
@@ -339,9 +342,9 @@ function MaterialProductCard({ product }: MaterialProductCardProps) {
         product={product}
       />
       <ul className="flex flex-wrap gap-x-3 gap-y-1 p-3 text-sm">
-        {product.materials.map((material) => (
-          <li key={material.assignmentId}>
-            <MaterialLink material={material} />
+        {product.materials.map((assignment) => (
+          <li key={assignment.assignmentId}>
+            <MaterialCombinationLinks materials={assignment.materials} />
           </li>
         ))}
       </ul>
@@ -377,9 +380,9 @@ function MaterialCollectionItemCard({ item }: MaterialCollectionItemCardProps) {
       ) : null}
       <div className="grid flex-1 content-start gap-2 p-4">
         <h3 className="font-semibold">{item.displayName}</h3>
-        {item.material ? (
+        {item.materials.length ? (
           <p className="text-sm text-muted-foreground">
-            <MaterialLink material={item.material} />
+            <MaterialCombinationLinks materials={item.materials} />
           </p>
         ) : null}
         <p className="text-sm text-muted-foreground">

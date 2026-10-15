@@ -265,10 +265,9 @@ describe("finish option editor", () => {
       materials: [
         {
           assignmentId: 1000,
-          specific: null,
-          id: 1000,
-          name: "Bronze",
-          slug: "bronze",
+          materials: [
+            { specific: null, id: 1000, name: "Bronze", slug: "bronze" },
+          ],
         },
       ],
       name: "Spinner",
@@ -292,7 +291,7 @@ describe("finish option editor", () => {
       createElement(CollectionProductFields, {
         customFinish: emptyCustomFinish,
         finish: { id: 1002, name: "Polished" },
-        material: product.materials[0] ?? null,
+        material: { id: 1000, name: "Bronze", slug: "bronze" },
         onCustomFinishChange: vi.fn(),
         onFinishChange: vi.fn(),
         onMaterialChange: vi.fn(),
@@ -323,7 +322,7 @@ describe("finish option editor", () => {
           id: "custom",
           name: "web.collections.finishChoice.custom",
         },
-        material: product.materials[0] ?? null,
+        material: { id: 1000, name: "Bronze", slug: "bronze" },
         onCustomFinishChange: vi.fn(),
         onFinishChange: vi.fn(),
         onMaterialChange: vi.fn(),
@@ -625,7 +624,7 @@ describe("product form conditional fields", () => {
 
     expect(html).toContain('aria-label="Name"');
     expect(html).toContain('aria-label="Maker"');
-    expect(html).toContain('aria-label="Materials"');
+    expect(html).toContain("Add material combination");
     expect(html).toContain("Appearance");
     expect(html).toContain("Description");
     expect(html).not.toContain("Maker terminology");
@@ -793,9 +792,7 @@ describe("collection add form", () => {
     expect(html).toContain(">Zoom Zoom</span>");
     expect(html).toMatch(/<details[^>]*>/u);
     expect(html).not.toMatch(/<details[^>]* open=/u);
-    expect(html).toMatch(
-      /<summary[^>]*>web\.collections\.productSelector<\/summary>/u,
-    );
+    expect(html).toMatch(/<summary[^>]*>Product selector<\/summary>/u);
     expect(html).toContain('aria-label="Close: Bronze"');
     expect(html).toContain('aria-label="Close: Polished"');
     expect(html).toContain(">Collection<");
@@ -844,10 +841,14 @@ describe("collection add form", () => {
         ...base.materials,
         {
           assignmentId: 1016,
-          id: 1016,
-          name: "Steel",
-          slug: "steel",
-          specific: null,
+          materials: [
+            {
+              id: 1016,
+              name: "Steel",
+              slug: "steel",
+              specific: null,
+            },
+          ],
         },
       ].slice(0, materialCount),
     };
@@ -1134,10 +1135,14 @@ function productFixture(
     materials: [
       {
         assignmentId: id + 1,
-        specific: null,
-        id: id + 1,
-        name: "Bronze",
-        slug: "bronze",
+        materials: [
+          {
+            specific: null,
+            id: id + 1,
+            name: "Bronze",
+            slug: "bronze",
+          },
+        ],
       },
     ],
     name,
@@ -1203,7 +1208,7 @@ function collectionFixture(
     makerName: product.makerName,
     makerSlug: product.makerSlug,
     makerUrl: product.makerUrl,
-    material: product.materials[0] ?? null,
+    materials: product.materials[0]?.materials ?? [],
     name: product.name,
     ownerClerkId: "user_test",
     ownerImageUrl: null,

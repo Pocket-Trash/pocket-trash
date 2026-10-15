@@ -100,11 +100,28 @@ describe("public Slider Trends query", () => {
       const ultem = materials.find(({ slug }) => slug === "ultem");
       if (!titanium || !zirconium || !ultem)
         throw new Error("Slider fixture materials were not created.");
-      await db.insert(schema.productMaterial).values([
-        { materialId: titanium.id, productId: slider.id },
-        { materialId: zirconium.id, productId: plate.id },
-        { materialId: ultem.id, productId: insert.id },
-      ]);
+      const productMaterials = await db
+        .insert(schema.productMaterial)
+        .values([
+          { productId: slider.id },
+          { productId: plate.id },
+          { productId: insert.id },
+        ])
+        .returning({
+          id: schema.productMaterial.id,
+          productId: schema.productMaterial.productId,
+        });
+      await db.insert(schema.productMaterialComponent).values(
+        productMaterials.map(({ id, productId }) => ({
+          materialId:
+            productId === slider.id
+              ? titanium.id
+              : productId === plate.id
+                ? zirconium.id
+                : ultem.id,
+          productMaterialId: id,
+        })),
+      );
 
       const trends = await createTrendsService(
         db as unknown as Database,

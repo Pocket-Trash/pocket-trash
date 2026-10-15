@@ -97,10 +97,14 @@ describe("catalog trends", () => {
         throw new Error(
           "Trend duplicate-prevention fixtures were not created.",
         );
-      await db.insert(schema.productMaterial).values(
-        materials.map((material) => ({
-          materialId: material.id,
-          productId: firstSpinner.id,
+      const productMaterials = await db
+        .insert(schema.productMaterial)
+        .values(materials.map(() => ({ productId: firstSpinner.id })))
+        .returning({ id: schema.productMaterial.id });
+      await db.insert(schema.productMaterialComponent).values(
+        productMaterials.map(({ id }, index) => ({
+          materialId: materials[index]!.id,
+          productMaterialId: id,
         })),
       );
 

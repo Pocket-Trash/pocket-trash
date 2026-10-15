@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterButtonsByDiameter,
   finishOptionLabel,
+  materialCombinationLabel,
   nextAvailableSlug,
   normalizeOptionalUrl,
   positiveDecimalSchema,
@@ -68,5 +69,14 @@ describe("catalog helpers", () => {
         finishes: [{ name: "Anodized" }],
       }),
     ).toBe("Anodized · Blue → Purple Fade");
+  });
+
+  it("formats every component in a material combination", () => {
+    expect(
+      materialCombinationLabel([
+        { name: "Titanium", specific: null },
+        { name: "Steel", specific: { name: "M390" } },
+      ]),
+    ).toBe("Titanium + M390");
   });
 });

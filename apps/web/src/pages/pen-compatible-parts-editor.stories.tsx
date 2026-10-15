@@ -53,10 +53,14 @@ function product(
     materials: [
       {
         assignmentId: 1000 + id,
-        id: 1000,
-        name: "Titanium",
-        slug: "titanium",
-        specific: null,
+        materials: [
+          {
+            id: 1000,
+            name: "Titanium",
+            slug: "titanium",
+            specific: null,
+          },
+        ],
       },
     ],
     name,

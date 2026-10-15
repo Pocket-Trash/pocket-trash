@@ -382,6 +382,30 @@ export const finishOptionSchema = z
   });
 
 /**
+ * Builds the order-independent identity of a material combination.
+ *
+ * @param combination - Canonical material pairs to identify.
+ * @returns Stable sorted combination identity.
+ */
+export function materialCombinationSignature(combination: {
+  /** Canonical material pairs in the combination. */
+  materials: readonly {
+    /** General material identifier. */
+    materialId: number;
+    /** Optional alloy or grade identifier. */
+    materialSpecificId: number | null;
+  }[];
+}) {
+  return combination.materials
+    .map(
+      ({ materialId, materialSpecificId }) =>
+        `${materialId}:${materialSpecificId ?? "general"}`,
+    )
+    .sort()
+    .join("|");
+}
+
+/**
  * Schema that validates product form values and product-type-specific specifications.
  */
 export const productFormSchema = z
@@ -414,8 +438,14 @@ export const productFormSchema = z
     mechanismId: idSchema.nullable().default(null),
     materialAssignments: z.array(
       z.object({
-        materialId: idSchema,
-        materialSpecificId: idSchema.nullable(),
+        materials: z
+          .array(
+            z.object({
+              materialId: idSchema,
+              materialSpecificId: idSchema.nullable(),
+            }),
+          )
+          .min(1),
       }),
     ),
     name: slugNameSchema,
@@ -711,11 +741,20 @@ export const productFormSchema = z
           path: ["finishOptions"],
         });
       }
-      const materialPairs = materialAssignments.map(
-        ({ materialId, materialSpecificId }) =>
-          `${materialId}:${materialSpecificId ?? "general"}`,
-      );
-      if (new Set(materialPairs).size !== materialPairs.length)
+      const materialCombinations = materialAssignments.map((assignment) => {
+        const pairs = assignment.materials.map(
+          ({ materialId, materialSpecificId }) =>
+            `${materialId}:${materialSpecificId ?? "general"}`,
+        );
+        if (new Set(pairs).size !== pairs.length)
+          context.addIssue({
+            code: "custom",
+            message: "web.materials.validation.duplicateAssignment",
+            path: ["materialAssignments"],
+          });
+        return materialCombinationSignature(assignment);
+      });
+      if (new Set(materialCombinations).size !== materialCombinations.length)
         context.addIssue({
           code: "custom",
           message: "web.materials.validation.duplicateAssignment",

@@ -146,10 +146,14 @@ describe("owned slider assemblies", () => {
           .insert(schema.productDetailSliderInsert)
           .values({ id: insertProductId }),
       ]);
-      await db.insert(schema.productMaterial).values(
-        products.map((product) => ({
+      const productMaterials = await db
+        .insert(schema.productMaterial)
+        .values(products.map((product) => ({ productId: product.id })))
+        .returning({ id: schema.productMaterial.id });
+      await db.insert(schema.productMaterialComponent).values(
+        productMaterials.map(({ id }) => ({
           materialId: material.id,
-          productId: product.id,
+          productMaterialId: id,
         })),
       );
       await db

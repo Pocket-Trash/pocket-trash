@@ -520,7 +520,7 @@ export function productFilterItem(
     finishOptions: product.finishOptions,
     makerId: product.makerId,
     makerName: product.makerName,
-    materials: product.materials,
+    materials: product.materials.flatMap(({ materials }) => materials),
     patterns: product.finishOptions.flatMap(({ pattern }) =>
       pattern ? [pattern] : [],
     ),
@@ -571,7 +571,7 @@ export function collectionFilterItem(
     finishOptions: item.finishOption ? [item.finishOption] : [],
     makerId: item.makerId,
     makerName: item.makerName,
-    materials: item.material ? [item.material] : [],
+    materials: item.materials,
     patterns: item.finishOption?.pattern ? [item.finishOption.pattern] : [],
     plateComponents:
       item.productTypeSlug === "slider"

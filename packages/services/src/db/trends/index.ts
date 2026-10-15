@@ -695,11 +695,13 @@ export function createTrendsService(
             product.id,
             product.product_type_id,
             product_types.is_part_or_accessory,
-            product_material.material_id,
-            product_material.material_specific_id
+            product_material_component.material_id,
+            product_material_component.material_specific_id
           from product
           inner join product_types on product_types.id = product.product_type_id
           left join product_material on product_material.product_id = product.id
+          left join product_material_component
+            on product_material_component.product_material_id = product_material.id
           where product.approval_status = 'approved'
             and not product.is_private
             and (
@@ -1050,13 +1052,14 @@ export function createTrendsService(
               collection_item.owner_id,
               product.product_type_id,
               product_types.is_part_or_accessory,
-              product_material.material_id,
-              product_material.material_specific_id
+              collection_item_material.material_id,
+              collection_item_material.material_specific_id
             from item_products
             inner join collection_item on collection_item.id = item_products.collection_item_id
             inner join product on product.id = item_products.product_id
             inner join product_types on product_types.id = product.product_type_id
-            left join product_material on product_material.product_id = product.id
+            left join collection_item_material
+              on collection_item_material.collection_item_id = collection_item.id
             where collection_item.owned
               and collection_item.sold_at is null
               and (
@@ -1135,13 +1138,14 @@ export function createTrendsService(
               product.id as product_id,
               product.maker_id,
               product.product_type_id,
-              product_material.material_id,
-              product_material.material_specific_id
+              collection_item_material.material_id,
+              collection_item_material.material_specific_id
             from item_products
             inner join collection_item on collection_item.id = item_products.collection_item_id
             inner join product on product.id = item_products.product_id
             inner join product_types on product_types.id = product.product_type_id
-            left join product_material on product_material.product_id = product.id
+            left join collection_item_material
+              on collection_item_material.collection_item_id = collection_item.id
             where collection_item.owned
               and collection_item.sold_at is null
               and (

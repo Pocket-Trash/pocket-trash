@@ -119,8 +119,13 @@ describe("public Pens catalog reads", () => {
       );
       const [productMaterial] = await db
         .insert(schema.productMaterial)
-        .values({ materialId: material.id, productId: penId })
+        .values({ productId: penId })
         .returning({ id: schema.productMaterial.id });
+      if (!productMaterial) throw new Error("Product material missing.");
+      await db.insert(schema.productMaterialComponent).values({
+        materialId: material.id,
+        productMaterialId: productMaterial.id,
+      });
       await db.insert(schema.penCompatiblePart).values({
         partProductId: tipId,
         penProductId: penId,
@@ -193,7 +198,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Author Pen",
         productId: penId,
@@ -221,7 +228,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Author Pen",
         productId: penId,
@@ -300,7 +309,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: "Click Mechanism",
           productTypeSlug: "pen-mechanism",
@@ -314,7 +327,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           mechanismId: mechanism.id,
           name: "Click Mechanism",
@@ -347,7 +364,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Compatible Tip",
         productTypeSlug: "pen-tip",
@@ -360,7 +379,9 @@ describe("public Pens catalog reads", () => {
         finishOptions: [],
         makerId: maker.id,
         materialAssignments: [
-          { materialId: material.id, materialSpecificId: null },
+          {
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
         ],
         name: "Compatible Pen",
         productTypeSlug: "pen",
@@ -377,7 +398,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: pen.name,
           productId: pen.id,
@@ -393,7 +418,11 @@ describe("public Pens catalog reads", () => {
           finishOptions: [],
           makerId: maker.id,
           materialAssignments: [
-            { materialId: material.id, materialSpecificId: null },
+            {
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
           ],
           name: pen.name,
           productId: pen.id,

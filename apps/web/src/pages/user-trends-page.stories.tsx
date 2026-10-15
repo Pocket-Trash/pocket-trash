@@ -173,7 +173,7 @@ const baseItem: UserCollectionItem = {
   makerName: "Maker 1",
   makerSlug: "maker-1",
   makerUrl: null,
-  material: { id: 300, name: "Titanium", slug: "titanium", specific: null },
+  materials: [{ id: 300, name: "Titanium", slug: "titanium", specific: null }],
   name: "Product 1",
   ownerClerkId: "user_storybook",
   ownerImageUrl: null,

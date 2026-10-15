@@ -51,17 +51,13 @@ const product: CatalogProduct = {
   materials: [
     {
       assignmentId: 1000,
-      specific: null,
-      id: 1000,
-      name: "Bronze",
-      slug: "bronze",
+      materials: [{ specific: null, id: 1000, name: "Bronze", slug: "bronze" }],
     },
     {
       assignmentId: 1001,
-      specific: null,
-      id: 1001,
-      name: "Titanium",
-      slug: "titanium",
+      materials: [
+        { specific: null, id: 1001, name: "Titanium", slug: "titanium" },
+      ],
     },
   ],
   name: "Katla",

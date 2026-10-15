@@ -132,12 +132,6 @@ export const collectionItem = pgTable(
     displayName: text("display_name"),
     /** Optional Markdown description shown instead of the product description. */
     description: text("description"),
-    /** Optional alloy or grade belonging to the general material. */
-    materialSpecificId: bigint("material_specific_id", { mode: "number" }),
-    materialId: bigint("material_id", { mode: "number" }).references(
-      () => material.id,
-      { onDelete: "restrict" },
-    ),
     purchasedAt: timestamp("purchased_at", { withTimezone: true }),
     soldAt: timestamp("sold_at", { withTimezone: true }),
     purchasedFromUserId: bigint("purchased_from_user_id", {
@@ -176,16 +170,6 @@ export const collectionItem = pgTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.materialId, table.materialSpecificId],
-      foreignColumns: [materialSpecific.materialId, materialSpecific.id],
-      name: "collection_item_specific_parent_fk",
-    }).onDelete("restrict"),
-    index("collection_item_specific_id_idx").on(table.materialSpecificId),
-    check(
-      "collection_item_specific_requires_material",
-      sql`${table.materialSpecificId} is null or ${table.materialId} is not null`,
-    ),
-    foreignKey({
       columns: [table.collectionId, table.ownerId],
       foreignColumns: [userCollection.id, userCollection.ownerId],
       name: "collection_item_collection_owner_fk",
@@ -193,12 +177,6 @@ export const collectionItem = pgTable(
     index("collection_item_collection_visibility_idx").on(
       table.collectionId,
       table.ownerId,
-      table.approvalStatus,
-      table.isPrivate,
-    ),
-    index("collection_item_material_public_idx").on(
-      table.materialId,
-      table.owned,
       table.approvalStatus,
       table.isPrivate,
     ),
@@ -639,6 +617,22 @@ export const productMaterial = pgTable(
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => product.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    unique("product_material_id_product_unique").on(table.id, table.productId),
+  ],
+);
+
+/** Canonical material components belonging to one product assignment. */
+export const productMaterialComponent = pgTable(
+  "product_material_component",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    productMaterialId: bigint("product_material_id", { mode: "number" })
+      .notNull()
+      .references(() => productMaterial.id, { onDelete: "cascade" }),
     /** Optional alloy or grade belonging to the general material. */
     materialSpecificId: bigint("material_specific_id", { mode: "number" }),
     materialId: bigint("material_id", { mode: "number" })
@@ -646,17 +640,54 @@ export const productMaterial = pgTable(
       .references(() => material.id, { onDelete: "restrict" }),
   },
   (table) => [
-    unique("product_material_id_product_unique").on(table.id, table.productId),
     foreignKey({
       columns: [table.materialId, table.materialSpecificId],
       foreignColumns: [materialSpecific.materialId, materialSpecific.id],
-      name: "product_material_specific_parent_fk",
+      name: "product_material_component_specific_parent_fk",
     }).onDelete("restrict"),
-    index("product_material_specific_id_idx").on(table.materialSpecificId),
-    unique("product_material_assignment_unique")
-      .on(table.productId, table.materialId, table.materialSpecificId)
+    index("product_material_component_assignment_id_idx").on(
+      table.productMaterialId,
+    ),
+    index("product_material_component_material_id_idx").on(
+      table.materialId,
+      table.materialSpecificId,
+    ),
+    unique("product_material_component_unique")
+      .on(table.productMaterialId, table.materialId, table.materialSpecificId)
       .nullsNotDistinct(),
-    index("product_material_material_id_idx").on(table.materialId),
+  ],
+);
+
+/** Canonical material snapshot components belonging to one collection item. */
+export const collectionItemMaterial = pgTable(
+  "collection_item_material",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    collectionItemId: bigint("collection_item_id", { mode: "number" })
+      .notNull()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    /** Optional alloy or grade belonging to the general material. */
+    materialSpecificId: bigint("material_specific_id", { mode: "number" }),
+    materialId: bigint("material_id", { mode: "number" })
+      .notNull()
+      .references(() => material.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.materialId, table.materialSpecificId],
+      foreignColumns: [materialSpecific.materialId, materialSpecific.id],
+      name: "collection_item_material_specific_parent_fk",
+    }).onDelete("restrict"),
+    index("collection_item_material_item_id_idx").on(table.collectionItemId),
+    index("collection_item_material_material_id_idx").on(
+      table.materialId,
+      table.materialSpecificId,
+    ),
+    unique("collection_item_material_unique")
+      .on(table.collectionItemId, table.materialId, table.materialSpecificId)
+      .nullsNotDistinct(),
   ],
 );
 
@@ -1280,6 +1311,17 @@ export type NewCollectionItemImage = typeof collectionItemImage.$inferInsert;
 export type ProductMaterial = typeof productMaterial.$inferSelect;
 /** Values accepted when creating a product material row. */
 export type NewProductMaterial = typeof productMaterial.$inferInsert;
+/** Stored product material component row. */
+export type ProductMaterialComponent =
+  typeof productMaterialComponent.$inferSelect;
+/** Values accepted when creating a product material component row. */
+export type NewProductMaterialComponent =
+  typeof productMaterialComponent.$inferInsert;
+/** Stored collection item material snapshot row. */
+export type CollectionItemMaterial = typeof collectionItemMaterial.$inferSelect;
+/** Values accepted when creating a collection item material snapshot row. */
+export type NewCollectionItemMaterial =
+  typeof collectionItemMaterial.$inferInsert;
 /** Stored maker-scoped catalog terminology alias. */
 export type CatalogTerminologyAlias =
   typeof catalogTerminologyAlias.$inferSelect;

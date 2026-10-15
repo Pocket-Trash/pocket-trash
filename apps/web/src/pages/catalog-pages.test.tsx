@@ -247,7 +247,7 @@ const owners = [
         makerName: "KAP EDC",
         makerSlug: "kap-edc",
         makerUrl: null,
-        material: null,
+        materials: [],
         name: "Catla",
         ownerClerkId: "user_1002",
         ownerImageUrl: null,

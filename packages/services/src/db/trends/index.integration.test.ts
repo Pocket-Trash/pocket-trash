@@ -504,12 +504,19 @@ async function createFixture(database: Database) {
     .returning({ id: schema.materialSpecific.id });
   if (!titaniumSpecific)
     throw new Error("Trend material specific was not created.");
-  await database.insert(schema.productMaterial).values([
-    { materialId: steel.id, productId: sliderProductId },
+  const productMaterials = await database
+    .insert(schema.productMaterial)
+    .values([{ productId: sliderProductId }, { productId: sliderProductId }])
+    .returning({ id: schema.productMaterial.id });
+  await database.insert(schema.productMaterialComponent).values([
+    {
+      materialId: steel.id,
+      productMaterialId: productMaterials[0]!.id,
+    },
     {
       materialId: titanium.id,
       materialSpecificId: titaniumSpecific.id,
-      productId: sliderProductId,
+      productMaterialId: productMaterials[1]!.id,
     },
   ]);
 
@@ -596,6 +603,20 @@ async function createFixture(database: Database) {
     .insert(schema.collectionItem)
     .values(itemSpecs.map(({ item }) => item))
     .returning({ id: schema.collectionItem.id });
+  await database.insert(schema.collectionItemMaterial).values(
+    insertedItems.flatMap((item, index) =>
+      itemSpecs[index]?.productId === sliderProductId
+        ? [
+            { collectionItemId: item.id, materialId: steel.id },
+            {
+              collectionItemId: item.id,
+              materialId: titanium.id,
+              materialSpecificId: titaniumSpecific.id,
+            },
+          ]
+        : [],
+    ),
+  );
   await database
     .insert(schema.collectionDetailSlider)
     .values(

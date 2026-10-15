@@ -32,6 +32,10 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     .insert(schema.material)
     .values({ name: "Stainless Steel", slug: "stainless-steel" })
     .returning();
+  const [titanium] = await db
+    .insert(schema.material)
+    .values({ name: "Titanium", slug: "titanium" })
+    .returning();
   const [owner] = await db
     .insert(schema.user)
     .values({ clerkId: "specific-admin" })
@@ -72,14 +76,21 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     finishOptions: [],
     specs: {},
     materialAssignments: [
-      { materialId: material!.id, materialSpecificId: null },
-      { materialId: material!.id, materialSpecificId: specific.id },
+      {
+        materials: [{ materialId: material!.id, materialSpecificId: null }],
+      },
+      {
+        materials: [
+          { materialId: material!.id, materialSpecificId: specific.id },
+          { materialId: titanium!.id, materialSpecificId: null },
+        ],
+      },
     ],
   };
   const product = await services.catalog.createProduct(input);
   expect(product.materials).toHaveLength(2);
   const assignment = product.materials.find(
-    ({ specific: choice }) => choice?.id === specific.id,
+    ({ materials }) => materials[0]?.specific?.id === specific.id,
   )!;
   const unchanged = await services.catalog.updateProduct({
     ...input,
@@ -102,6 +113,33 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     buttonFinishOptionId: null,
     buttonCustomFinish: null,
   });
+  const genericAssignment = product.materials.find(
+    ({ materials }) => !materials[0]?.specific,
+  )!;
+  await services.collections.updateItem({
+    actor,
+    collectionItemId: item.spinnerItemId,
+    customFinish: null,
+    displayName: "Generic steel",
+    finishOptionId: null,
+    materialAssignmentId: genericAssignment.assignmentId,
+  });
+  expect(
+    (await services.collections.getOwnedItem(actor, item.spinnerItemId))
+      ?.materials,
+  ).toHaveLength(1);
+  await services.collections.updateItem({
+    actor,
+    collectionItemId: item.spinnerItemId,
+    customFinish: null,
+    displayName: "My M390",
+    finishOptionId: null,
+    materialAssignmentId: assignment.assignmentId,
+  });
+  expect(
+    (await services.collections.getOwnedItem(actor, item.spinnerItemId))
+      ?.materials,
+  ).toHaveLength(2);
   await services.catalog.updateProduct({
     ...input,
     productId: product.id,
@@ -123,10 +161,20 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     customFinish: null,
     finishOptionId: null,
   });
+  const retained = await services.collections.getOwnedItem(
+    actor,
+    item.spinnerItemId,
+  );
+  expect(retained?.materials).toHaveLength(2);
   expect(
-    (await services.collections.getOwnedItem(actor, item.spinnerItemId))
-      ?.material?.specific?.name,
-  ).toBe("M390 Grade");
+    retained?.materials.some(
+      ({ name, specific: choice }) =>
+        name === "Stainless Steel" && choice?.name === "M390 Grade",
+    ),
+  ).toBe(true);
+  expect(retained?.materials.some(({ name }) => name === "Titanium")).toBe(
+    true,
+  );
   await expect(
     services.collections.updateItem({
       actor,
@@ -149,7 +197,7 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     specs: {},
   });
   const buttonAssignment = buttonProduct.materials.find(
-    ({ specific: choice }) => choice?.id === specific.id,
+    ({ materials }) => materials[0]?.specific?.id === specific.id,
   )!;
   const buttonItemId = await services.collections.addSpinnerButton({
     actor,
@@ -157,7 +205,7 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
     displayName: "My button",
     productId: buttonProduct.id,
     materialAssignmentId: buttonProduct.materials.find(
-      ({ specific: choice }) => !choice,
+      ({ materials }) => !materials[0]?.specific,
     )!.assignmentId,
     finishOptionId: null,
     customFinish: null,
@@ -177,12 +225,23 @@ it("preserves offered IDs, retained canonical selections, and scoped upload comp
   });
   expect(
     (await db.select().from(schema.auditEvent)).some(
-      ({ action, targetId, afterState }) =>
-        action === "collections.item.updated" &&
-        targetId === String(buttonItemId) &&
-        afterState?.materialAssignmentId === buttonAssignment.assignmentId &&
-        afterState?.materialId === material!.id &&
-        afterState?.materialSpecificId === specific.id,
+      ({ action, targetId, afterState }) => {
+        const materials = afterState?.materials;
+        return (
+          action === "collections.item.updated" &&
+          targetId === String(buttonItemId) &&
+          afterState?.materialAssignmentId === buttonAssignment.assignmentId &&
+          Array.isArray(materials) &&
+          materials.some(
+            (selection) =>
+              typeof selection === "object" &&
+              selection !== null &&
+              !Array.isArray(selection) &&
+              selection.materialId === material!.id &&
+              selection.materialSpecificId === specific.id,
+          )
+        );
+      },
     ),
   ).toBe(true);
 

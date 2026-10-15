@@ -87,11 +87,11 @@ test("provides the locked deployment executables", async () => {
 test("rejects a fresh exact external dependency", async (t) => {
   const publishedAt = new Date().toISOString();
   const registry = await startRegistry(t, {
-    "external-package": { publishedAt },
+    "fresh-external-package": { publishedAt },
   });
 
   const result = await installFixture(t, registry, {
-    "external-package": "1.0.0",
+    "fresh-external-package": "1.0.0",
   });
 
   assert.notEqual(result.code, 0, result.output);

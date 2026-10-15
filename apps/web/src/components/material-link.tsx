@@ -1,4 +1,7 @@
-import type { CatalogLookup } from "@package/services";
+import type {
+  CatalogLookup,
+  ProductMaterialComponent,
+} from "@package/services";
 import { Link } from "@tanstack/react-router";
 
 /**
@@ -40,4 +43,25 @@ export function MaterialLink({
       {material.name}
     </Link>
   );
+}
+
+/**
+ * Renders every linked component in one material combination.
+ *
+ * @param props - Combination-link properties.
+ * @param props.materials - Ordered material components to render.
+ * @returns Linked components separated by plus signs.
+ */
+export function MaterialCombinationLinks({
+  materials,
+}: {
+  /** Material components in the combination. */
+  materials: ProductMaterialComponent[];
+}) {
+  return materials.map((material, index) => (
+    <span key={`${material.id}:${material.specific?.id ?? "general"}`}>
+      {index > 0 ? " + " : null}
+      <MaterialLink material={material} />
+    </span>
+  ));
 }
