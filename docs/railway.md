@@ -269,7 +269,11 @@ the workflow:
 2. Stages the selected `DATABASE_URL`, Bunny image prefix, cron flag, deployment
    metadata, and the Redis service reference on `pocket-trash (preview)` with
    `--skip-deploys`.
-3. Redeploys `pocket-trash-queue` from its configured image source so Redis is online.
+3. Redeploys the active queue from its configured image source so Redis is online.
+
+Until the separately approved provisioning and cutover stages are complete, the
+preview workflow continues to use `scraper-queue`. Switch this handoff to
+`pocket-trash-queue` only as part of the approved cutover.
 
 - Mutation-relevant PRs use the isolated `preview-pr-<number>` branch;
   DB-changing PRs also apply committed migrations before deployment.
