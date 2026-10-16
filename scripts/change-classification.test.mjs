@@ -389,6 +389,11 @@ test("syncs Font Awesome authentication into Railway before source builds", () =
       /variable set FONTAWESOME_PACKAGE_TOKEN[\s\S]*--stdin[\s\S]*--skip-deploys/u,
       jobName,
     );
+    assert.match(
+      steps[configureIndex].run,
+      /pnpm-install\.sh --frozen-lockfile --prefer-offline[\s\S]*variable set RAILPACK_INSTALL_CMD[\s\S]*--stdin[\s\S]*--skip-deploys/u,
+      jobName,
+    );
     assert.ok(clearIndex > configureIndex, jobName);
   }
 });

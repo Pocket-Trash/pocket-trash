@@ -703,6 +703,13 @@ jobs:
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
+          printf '%s' "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline" | pnpm exec railway variable set RAILPACK_INSTALL_CMD \
+            --stdin \
+            --skip-deploys \
+            --project "$RAILWAY_PROJECT_ID" \
+            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
+            --environment "$railway_environment"
+
           printf '%s' "$image_folder_prefix" | pnpm exec railway variable set BUNNY_IMAGE_FOLDER_PREFIX \
             --stdin \
             --skip-deploys \
@@ -1571,6 +1578,13 @@ jobs:
           set -euo pipefail
 
           printf '%s' "$FONTAWESOME_PACKAGE_TOKEN" | pnpm exec railway variable set FONTAWESOME_PACKAGE_TOKEN \
+            --stdin \
+            --skip-deploys \
+            --project "$RAILWAY_PROJECT_ID" \
+            --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
+            --environment production
+
+          printf '%s' "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline" | pnpm exec railway variable set RAILPACK_INSTALL_CMD \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
