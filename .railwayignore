@@ -35,6 +35,8 @@
 !packages/logger/**
 !packages/markdown/
 !packages/markdown/**
+!packages/queue/
+!packages/queue/**
 !packages/services/
 !packages/services/**
 !packages/tsconfig/
