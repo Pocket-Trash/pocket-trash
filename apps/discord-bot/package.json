@@ -1,0 +1,31 @@
+{
+  "name": "@app/discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx ../../packages/infisical-runner/src/cli.ts discord-bot dev -- tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "build:ci": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:ci": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@package/logger": "workspace:*",
+    "@package/queue": "workspace:*",
+    "@pocket-trash/localizations": "^0.43.1",
+    "discord.js": "^14.24.2",
+    "hono": "^4.13.9",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@package/tsconfig": "workspace:*",
+    "tsx": "latest"
+  }
+}
