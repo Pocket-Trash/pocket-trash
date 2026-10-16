@@ -95,10 +95,12 @@ belong to an application environment schema. Store it in these locations:
 | `tools/github/secrets` | `preview` and `prod` | GitHub Actions installs |
 | `/apps/web` | `preview` | Vercel Git-based Preview installs |
 
-pnpm binds the token to `npm.fontawesome.com` for the install process. Do not
-prefix it with `VITE_` or expose it to browser code. Vercel Production does not
-need the token because GitHub builds the production artifact and deploys it with
-`vercel deploy --prebuilt`.
+pnpm 11 rejects environment-variable interpolation for authentication in a
+committed project `.npmrc`. The install commands therefore pass the token as
+URL-scoped process configuration, binding it only to `npm.fontawesome.com` for
+that install. Do not prefix it with `VITE_` or expose it to browser code. Vercel
+Production does not need the token because GitHub builds the production
+artifact and deploys it with `vercel deploy --prebuilt`.
 
 ## Operational Runbooks
 

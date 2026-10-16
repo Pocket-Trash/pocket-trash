@@ -59,9 +59,10 @@ URL to the matching Vercel branch as `API_URL`; production uses
 Each job that installs repository dependencies fetches
 `FONTAWESOME_PACKAGE_TOKEN` before `pnpm install`, binds it to
 `npm.fontawesome.com` for that process, and blanks it from `GITHUB_ENV` after
-installation. GitHub does not expose the Infisical bootstrap secrets to forked
-pull requests, so fork contributors need their own Font Awesome Pro package
-access for a clean install.
+installation. Fork contributors need their own Font Awesome Pro package access
+for local installation. Upstream workflows for fork-origin pull requests cannot
+receive the Infisical bootstrap secrets, so their authenticated install jobs
+cannot run successfully.
 
 ## Machine Identity
 
