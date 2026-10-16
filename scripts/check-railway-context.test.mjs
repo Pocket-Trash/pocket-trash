@@ -30,7 +30,9 @@ function createFixture(context) {
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const files = {
     ".railwayignore":
-      "*\n!.railwayignore\n!package.json\n!pnpm-lock.yaml\n!pnpm-workspace.yaml\n!tsconfig.json\n!turbo.json\n!security-audit-exceptions.json\n!scripts/\n!scripts/security-audit.mjs\n!patches/\n!patches/**\n!apps/\n!apps/scraper/\n!apps/scraper/**\n!packages/\n!packages/database/\n!packages/database/**\n!packages/lint/\n!packages/lint/**\n",
+      "*\n!.railwayignore\n!railpack.json\n!package.json\n!pnpm-lock.yaml\n!pnpm-workspace.yaml\n!tsconfig.json\n!turbo.json\n!security-audit-exceptions.json\n!scripts/\n!scripts/pnpm-install.sh\n!scripts/security-audit.mjs\n!patches/\n!patches/**\n!apps/\n!apps/scraper/\n!apps/scraper/**\n!packages/\n!packages/database/\n!packages/database/**\n!packages/lint/\n!packages/lint/**\n",
+    "railpack.json":
+      '{"steps":{"install":{"commands":["./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline"]}}}\n',
     "package.json": JSON.stringify({
       name: "pocket-trash.app",
       type: "module",
@@ -42,6 +44,7 @@ function createFixture(context) {
     "tsconfig.json": "{}\n",
     "turbo.json": "{}\n",
     "security-audit-exceptions.json": "[]\n",
+    "scripts/pnpm-install.sh": '#!/bin/sh\nexec pnpm "$@"\n',
     "scripts/security-audit.mjs": "// Fixture audit input.\n",
     "patches/different-package.patch": "fixture patch\n",
     "apps/scraper/package.json": JSON.stringify({
@@ -115,7 +118,7 @@ test("rejects missing and untracked pnpm patch inputs", (context) => {
   assert.match(result.output, /patches\/different-package\.patch/);
 });
 
-test("rejects excluded security audit inputs", (context) => {
+test("rejects excluded install and security audit inputs", (context) => {
   const directory = createFixture(context);
   writeFileSync(
     join(directory, ".railwayignore"),
@@ -124,6 +127,7 @@ test("rejects excluded security audit inputs", (context) => {
   );
   const result = runChecker(directory);
   assert.notEqual(result.status, 0, result.output);
+  assert.match(result.output, /scripts\/pnpm-install\.sh/);
   assert.match(result.output, /scripts\/security-audit\.mjs/);
   assert.match(result.output, /security-audit-exceptions\.json/);
 });
@@ -142,7 +146,7 @@ test("rejects an excluded root workspace dependency", (context) => {
 test("accepts a complete tracked upload context", (context) => {
   const result = runChecker(createFixture(context));
   assert.equal(result.status, 0, result.output);
-  assert.match(result.output, /14 tracked files across 3 workspace packages/);
+  assert.match(result.output, /16 tracked files across 3 workspace packages/);
 });
 
 test("rejects missing audit and tracked scraper source files", (context) => {

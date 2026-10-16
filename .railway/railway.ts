@@ -60,6 +60,8 @@ export default defineRailway((ctx) => {
           "patches/**",
           ".railway/**",
           ".railwayignore",
+          "railpack.json",
+          "scripts/pnpm-install.sh",
           "scripts/security-audit.mjs",
           "security-audit-exceptions.json",
           "turbo.json",

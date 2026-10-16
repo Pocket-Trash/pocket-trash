@@ -36,10 +36,12 @@ For the preview scraper service:
 - Do not add a scraper `railway service redeploy --from-source` workflow step
   while native auto-deploy is enabled; that would create two builds per push.
 
-The root [`.railwayignore`](../.railwayignore) keeps CLI uploads below Railway's
-source-upload limit. It must include pnpm's referenced patches, the security
-audit script and exception manifest, and workspace dependencies of both the root
-manifest and scraper. CI and the production workflow run
+The root [`railpack.json`](../railpack.json) authenticates native installs before
+GitHub Actions can configure a new PR environment. The root
+[`.railwayignore`](../.railwayignore) keeps CLI uploads below Railway's source-upload
+limit. It must include pnpm's referenced patches, the security audit script and
+exception manifest, and workspace dependencies of both the root manifest and
+scraper. CI and the production workflow run
 `node scripts/check-railway-context.mjs` to reject missing, untracked, or excluded
 build inputs before upload. When adding build inputs, update the allowlist and
 the watched paths in `.railway/railway.ts` together.
@@ -47,7 +49,7 @@ the watched paths in `.railway/railway.ts` together.
 Railway needs `FONTAWESOME_PACKAGE_TOKEN` while installing the workspace because
 the supply-chain audit resolves the complete lockfile. The Deploy workflow copies
 the token from Infisical into each PR environment and production before their
-builds, and Railpack runs `scripts/pnpm-install.sh` so credentials stay in a
+builds. Railpack runs `scripts/pnpm-install.sh` so credentials stay in a
 permission-restricted temporary npm user config. Keep the preview template
 initialized with the same non-production token so the first native PR build can
 authenticate before GitHub Actions configures that PR environment. The token is
