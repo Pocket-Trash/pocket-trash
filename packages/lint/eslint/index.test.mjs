@@ -79,6 +79,23 @@ export function Card() {
     new Set(scoped[0].messages.map(({ ruleId }) => ruleId)),
     new Set(["no-console", "no-restricted-imports"]),
   );
+
+  const restrictedLucide = await eslint.lintText('import "lucide-react";\n', {
+    filePath: join(repoRoot, "apps/web/src/lucide-import.js"),
+  });
+  assert.deepEqual(
+    restrictedLucide[0].messages.map(({ message, ruleId }) => ({
+      message,
+      ruleId,
+    })),
+    [
+      {
+        message:
+          "'lucide-react' import is restricted from being used. Use Font Awesome icons instead.",
+        ruleId: "no-restricted-imports",
+      },
+    ],
+  );
   assert.equal(
     await eslint.isPathIgnored(join(repoRoot, "apps/web/src/routeTree.gen.ts")),
     true,
