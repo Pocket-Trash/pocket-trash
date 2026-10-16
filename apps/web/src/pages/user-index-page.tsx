@@ -1,19 +1,20 @@
 import {
+  faChartBar,
+  faFiles,
+  faFlask,
+  faFolder,
+  faGear,
+  faList,
+  faMessage,
+  faMessagePlus,
+  faUser,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import {
-  ChartNoAxesColumnIncreasing,
-  Files,
-  FlaskConical,
-  Folder,
-  ListTodo,
-  MessageSquare,
-  MessageSquarePlus,
-  Settings,
-  User,
-} from "lucide-react";
 import { UserPageShell } from "@/components/user-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -39,49 +40,49 @@ export function UserIndexPage({
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
     {
-      icon: User,
+      icon: faUser,
       label: t("web.navigation.account"),
       to: "/user/account" as const,
     },
     {
-      icon: Files,
+      icon: faFiles,
       label: t("web.resources.management.title"),
       to: "/user/resources" as const,
     },
     {
-      icon: Folder,
+      icon: faFolder,
       label: t("web.navigation.collections"),
       to: "/user/collections" as const,
     },
     {
-      icon: ChartNoAxesColumnIncreasing,
+      icon: faChartBar,
       label: t("web.trends.title"),
       to: "/user/trends" as const,
     },
     {
-      icon: Settings,
+      icon: faGear,
       label: t("web.settings.settings"),
       to: "/user/settings" as const,
     },
     {
-      icon: FlaskConical,
+      icon: faFlask,
       label: t("web.navigation.betaFeatures"),
       to: "/user/settings/beta-features" as const,
     },
     {
-      icon: MessageSquare,
+      icon: faMessage,
       label: t("web.feedback.title"),
       to: "/feedback" as const,
     },
     {
-      icon: MessageSquarePlus,
+      icon: faMessagePlus,
       label: t("web.feedback.new.title"),
       to: "/feedback/new" as const,
     },
     ...(hasFeedback
       ? [
           {
-            icon: ListTodo,
+            icon: faList,
             label: t("web.feedback.myRequests.title"),
             to: "/feedback/my-requests" as const,
           },
@@ -92,13 +93,17 @@ export function UserIndexPage({
   return (
     <UserPageShell contentClassName="p-0" title={t("web.navigation.user")}>
       <main className="grid w-full max-w-3xl gap-3 p-4 md:grid-cols-2 md:p-6">
-        {links.map(({ icon: Icon, label, to }) => (
+        {links.map(({ icon, label, to }) => (
           <Link
             className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             key={to}
             to={to}
           >
-            <Icon aria-hidden="true" className="size-5" />
+            <FontAwesomeIcon
+              aria-hidden="true"
+              className="size-5"
+              icon={icon}
+            />
             <span className="font-semibold">{label}</span>
           </Link>
         ))}

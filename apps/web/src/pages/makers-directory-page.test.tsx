@@ -63,7 +63,7 @@ describe("MakersDirectoryPage", () => {
     expect(html).toContain(
       "web.makers.collectionItemCount:{&quot;count&quot;:9}",
     );
-    expect(html).toContain("lucide-factory");
+    expect(html).toContain('data-icon="industry"');
   });
 });
 

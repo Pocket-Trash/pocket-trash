@@ -1,10 +1,15 @@
 import { useClerk } from "@clerk/tanstack-react-start";
 import {
+  faCircleCheck,
+  faSpinnerScale,
+  faTriangleExclamation,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -76,33 +81,32 @@ export function AccountErasureState({
     status.status === "needs_support"
       ? {
           description: "web.erasure.status.needsSupportDescription" as const,
-          icon: TriangleAlert,
+          icon: faTriangleExclamation,
           title: "web.erasure.status.needsSupport" as const,
         }
       : status.status === "completed"
         ? {
             description: "web.erasure.status.completedDescription" as const,
-            icon: CircleCheck,
+            icon: faCircleCheck,
             title: "web.erasure.status.completed" as const,
           }
         : {
             description: "web.erasure.status.processingDescription" as const,
-            icon: LoaderCircle,
+            icon: faSpinnerScale,
             title: "web.erasure.status.processing" as const,
           };
-  const Icon = copy.icon;
-
   return (
     <AppShell title={t("web.erasure.status.title")}>
       <main
         aria-live="polite"
         className="grid max-w-2xl gap-5 px-4 py-12 md:px-6"
       >
-        <Icon
+        <FontAwesomeIcon
           aria-hidden="true"
           className={
             status.status === "processing" ? "size-8 animate-spin" : "size-8"
           }
+          icon={copy.icon}
         />
         <div className="grid gap-2">
           <h2 className="m-0 text-2xl font-semibold">{t(copy.title)}</h2>
@@ -143,7 +147,11 @@ export function AccountErasedPage() {
   return (
     <AppShell title={t("web.erasure.status.title")}>
       <main className="grid max-w-2xl gap-5 px-4 py-12 md:px-6">
-        <CircleCheck aria-hidden="true" className="size-8" />
+        <FontAwesomeIcon
+          aria-hidden="true"
+          className="size-8"
+          icon={faCircleCheck}
+        />
         <div className="grid gap-2">
           <h2 className="m-0 text-2xl font-semibold">
             {t("web.erasure.status.completed")}

@@ -1,5 +1,13 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import {
+  faFileArrowUp,
+  faPlus,
+  faSpinnerScale,
+  faTrash,
+  faXmark,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   maxImageBytes,
   maxResourceFileBytes,
   maxResourceFiles,
@@ -11,7 +19,6 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileUp, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ResourceCard } from "@/components/resource-card";
@@ -87,11 +94,11 @@ export function ResourceManagementPage({
               render={<Link to="/user/resources/trash" />}
               variant="outline"
             >
-              <Trash2 />
+              <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
               {t("web.resources.trash.ownerTitle")}
             </Button>
             <Button nativeButton={false} render={<Link to="/resources/add" />}>
-              <Plus />
+              <FontAwesomeIcon aria-hidden="true" icon={faPlus} />
               {t("web.resources.action.add")}
             </Button>
           </div>
@@ -293,7 +300,7 @@ function ResourceEditForm({
                 type="button"
                 variant="secondary"
               >
-                <X />
+                <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
               </Button>
             </div>
           ))}
@@ -528,9 +535,13 @@ function ResourceVersionUploadForm({
       />
       <Button disabled={submitting} type="submit">
         {submitting ? (
-          <LoaderCircle aria-hidden="true" className="animate-spin" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="animate-spin"
+            icon={faSpinnerScale}
+          />
         ) : (
-          <FileUp />
+          <FontAwesomeIcon aria-hidden="true" icon={faFileArrowUp} />
         )}
         {t("web.resources.action.uploadNewVersion")}
       </Button>

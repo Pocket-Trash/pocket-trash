@@ -1,18 +1,19 @@
 import {
+  faChevronDown,
+  faChevronUp,
+  faFile,
+  faFileArrowDown,
+  faFileZipper,
+  faPencil,
+  faTrash,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   formatTranslation,
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  ChevronDown,
-  ChevronUp,
-  File,
-  FileArchive,
-  FileDown,
-  Pencil,
-  Trash2,
-} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -138,7 +139,11 @@ export function ResourceDetailPage({
             </div>
           ) : (
             <div className="flex aspect-4/3 items-center justify-center border-b border-border bg-muted text-muted-foreground md:border-r md:border-b-0">
-              <File aria-hidden="true" className="size-14" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="size-14"
+                icon={faFile}
+              />
               <span className="sr-only">
                 {t("web.resources.detail.noImage")}
               </span>
@@ -160,7 +165,7 @@ export function ResourceDetailPage({
                     size="sm"
                     variant="outline"
                   >
-                    <Pencil />
+                    <FontAwesomeIcon aria-hidden="true" icon={faPencil} />
                     {t("web.resources.action.edit")}
                   </Button>
                   <Button
@@ -169,7 +174,7 @@ export function ResourceDetailPage({
                     type="button"
                     variant="destructive"
                   >
-                    <Trash2 />
+                    <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
                     {t("web.resources.action.delete")}
                   </Button>
                 </div>
@@ -263,7 +268,10 @@ export function ResourceDetailPage({
               type="button"
               variant="ghost"
             >
-              {historyExpanded ? <ChevronUp /> : <ChevronDown />}
+              <FontAwesomeIcon
+                aria-hidden="true"
+                icon={historyExpanded ? faChevronUp : faChevronDown}
+              />
             </Button>
           </div>
           {historyExpanded ? (
@@ -363,7 +371,7 @@ export function ResourceDetailPage({
                 type="button"
                 variant="destructive"
               >
-                <Trash2 />
+                <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
                 {t("web.resources.action.delete")}
               </Button>
             </div>
@@ -473,7 +481,7 @@ function VersionCard({
               type="button"
               variant="outline"
             >
-              <FileArchive />
+              <FontAwesomeIcon aria-hidden="true" icon={faFileZipper} />
               {t("web.resources.action.download")}
             </Button>
           ) : null}
@@ -491,7 +499,10 @@ function VersionCard({
               type="button"
               variant="ghost"
             >
-              {expanded ? <ChevronUp /> : <ChevronDown />}
+              <FontAwesomeIcon
+                aria-hidden="true"
+                icon={expanded ? faChevronUp : faChevronDown}
+              />
             </Button>
           ) : null}
         </div>
@@ -585,7 +596,7 @@ function ResourceFileDownload({
             }
             variant="outline"
           >
-            <Pencil />
+            <FontAwesomeIcon aria-hidden="true" icon={faPencil} />
             {t("web.resources.action.edit")}
           </Button>
         ) : null}
@@ -595,7 +606,7 @@ function ResourceFileDownload({
           type="button"
           variant="outline"
         >
-          <FileDown />
+          <FontAwesomeIcon aria-hidden="true" icon={faFileArrowDown} />
           {t("web.resources.action.download")}
         </Button>
       </div>

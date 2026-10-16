@@ -1,5 +1,6 @@
+import { faIndustry } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { PublicMakerSummary } from "@package/services";
-import { Factory } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
@@ -194,9 +195,10 @@ function MakerCard({ maker }: MakerCardProps) {
             src={cardImageUrl(image.url)}
           />
         ) : (
-          <Factory
+          <FontAwesomeIcon
             aria-hidden="true"
             className="size-8 text-muted-foreground"
+            icon={faIndustry}
           />
         )}
       </div>
