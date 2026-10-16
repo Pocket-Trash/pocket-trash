@@ -34,6 +34,9 @@ jobs:
     name: Classify Changes
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       api: ${{ steps.classify.outputs.api }}
       scraper: ${{ steps.classify.outputs.scraper }}
@@ -56,9 +59,21 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install classifier dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Classify changes
         id: classify
         env:
@@ -234,8 +249,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 
@@ -986,8 +1003,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Build E2E workspace dependencies
         run: pnpm turbo run build --filter=@app/api
 
@@ -1103,8 +1122,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 
@@ -1225,8 +1246,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 
@@ -1289,8 +1312,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 
@@ -1429,8 +1454,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 
@@ -1532,8 +1559,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 

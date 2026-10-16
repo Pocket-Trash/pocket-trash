@@ -4,5 +4,6 @@
   "git": {
     "deploymentEnabled": false
   },
+  "installCommand": "env \"pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN\" pnpm install --frozen-lockfile",
   "outputDirectory": null
 }

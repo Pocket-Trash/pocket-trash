@@ -38,6 +38,7 @@ path.
 | `BUNNY_PULL_ZONE_ID` | Required for complete erasure | Required for complete erasure |
 | `CLERK_SECRET_KEY` | Required | Required |
 | `DISCORD_GITHUB_WEBHOOK_URL` | Required | - |
+| `FONTAWESOME_PACKAGE_TOKEN` | Required | Required |
 | `NEON_API_KEY` | Required | Required |
 | `NEON_DATABASE_NAME` | Required | Required |
 | `NEON_DATABASE_USER` | Required | Required |
@@ -54,6 +55,13 @@ The API deployment resolves `DATABASE_URL` from the matching Neon branch rather
 than storing it in `tools/github/secrets`. Preview deployments pass their Worker
 URL to the matching Vercel branch as `API_URL`; production uses
 `https://api.pocket-trash.app` in the Vercel production environment.
+
+Each job that installs repository dependencies fetches
+`FONTAWESOME_PACKAGE_TOKEN` before `pnpm install`, binds it to
+`npm.fontawesome.com` for that process, and blanks it from `GITHUB_ENV` after
+installation. GitHub does not expose the Infisical bootstrap secrets to forked
+pull requests, so fork contributors need their own Font Awesome Pro package
+access for a clean install.
 
 ## Machine Identity
 

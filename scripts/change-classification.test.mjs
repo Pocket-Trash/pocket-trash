@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -176,6 +177,7 @@ test("classifies package paths by affected domains", () => {
 
 test("classifies workflow and root build configuration conservatively", () => {
   for (const path of [
+    ".npmrc",
     ".github/workflows/ci.yml",
     ".github/scripts/ci-log.sh",
     "package.json",
@@ -187,6 +189,83 @@ test("classifies workflow and root build configuration conservatively", () => {
       path,
     );
   }
+});
+
+test("authenticates and clears private package access around every workflow install", () => {
+  const workflowsDirectory = fileURLToPath(
+    new URL("../.github/workflows", import.meta.url),
+  );
+
+  for (const filename of readdirSync(workflowsDirectory).filter((path) =>
+    path.endsWith(".yml"),
+  )) {
+    const workflow = parse(
+      readFileSync(
+        new URL(`../.github/workflows/${filename}`, import.meta.url),
+        "utf8",
+      ),
+    );
+
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const steps = job.steps ?? [];
+      const installIndex = steps.findIndex((step) =>
+        step.run?.includes("pnpm install"),
+      );
+      if (installIndex === -1) continue;
+
+      const permissions = job.permissions ?? workflow.permissions;
+      assert.equal(permissions?.contents, "read", `${filename}:${jobName}`);
+      assert.equal(
+        permissions?.["id-token"],
+        "write",
+        `${filename}:${jobName}`,
+      );
+
+      const packageSecretsIndex = steps.findIndex(
+        (step) =>
+          step.uses === "Infisical/secrets-action@v1.0.16" &&
+          step.with?.["secret-path"] === "tools/github/secrets",
+      );
+      assert.ok(
+        packageSecretsIndex >= 0 && packageSecretsIndex < installIndex,
+        `${filename}:${jobName}`,
+      );
+      const productionInstall =
+        filename === "railway-config.yml" ||
+        (filename === "deploy.yml" &&
+          ["production", "railway-production", "web-production"].includes(
+            jobName,
+          ));
+      assert.equal(
+        steps[packageSecretsIndex].with["env-slug"],
+        productionInstall ? "prod" : "preview",
+        `${filename}:${jobName}`,
+      );
+      assert.match(
+        steps[installIndex].run,
+        /pnpm_config_\/\/npm\.fontawesome\.com\/:_authToken=\$FONTAWESOME_PACKAGE_TOKEN/u,
+        `${filename}:${jobName}`,
+      );
+
+      const clearIndex = steps.findIndex(
+        (step, index) =>
+          index > installIndex &&
+          step.run?.includes("FONTAWESOME_PACKAGE_TOKEN="),
+      );
+      assert.ok(clearIndex > installIndex, `${filename}:${jobName}`);
+    }
+  }
+});
+
+test("passes the preview package token only to Vercel's install process", () => {
+  const config = JSON.parse(
+    readFileSync(new URL("../apps/web/vercel.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(
+    config.installCommand,
+    'env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile',
+  );
 });
 
 test("explicitly classifies every tracked repository path", () => {

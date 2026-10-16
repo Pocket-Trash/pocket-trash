@@ -312,6 +312,7 @@ const changeClassificationRules = [
   {
     category: "repository-validation",
     paths: [
+      ".npmrc",
       ".gitignore",
       ".infisical.json",
       ".railwayignore",
