@@ -30,6 +30,7 @@ Infisical into the hosting platform where possible.
 4. Confirm the app secret folders you need exist:
    - `/apps/web` in `dev`, `preview`, and `prod`
    - `/apps/scraper` in `dev`
+   - `/tools/package-manager` in `dev`
    - `/tools/logger-axiom-test` in `dev`, when running the live Axiom logger test
 
 See [Environment Variables](docs/environment-variables.md) for secret paths,
@@ -39,10 +40,13 @@ runtime ownership, and links to the authoritative source schemas.
 
 ```sh
 corepack enable
-pnpm install
+infisical run --env=dev --path=/tools/package-manager -- sh -c 'env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install'
 pnpm agent-skills:update
 pnpm infisical:check
 ```
+
+The Font Awesome token authenticates dependency installation only. Running the
+installed applications does not require it.
 
 `pnpm agent-skills:update` installs the shared Pocket Trash agent skills in a
 Git clone. Worktrees created by the Pocket Trash CLI install them automatically.
@@ -69,7 +73,7 @@ Link it into Pocket Trash:
 ```sh
 cd ../pocket-trash
 yalc add @pocket-trash/localizations --link
-pnpm install
+infisical run --env=dev --path=/tools/package-manager -- sh -c 'env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install'
 ```
 
 After localization changes, run `pnpm build && yalc push` from the

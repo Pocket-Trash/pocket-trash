@@ -17,6 +17,9 @@ jobs:
     name: Classify Changes
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null)
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       api: ${{ steps.classify.outputs.api }}
       scraper: ${{ steps.classify.outputs.scraper }}
@@ -40,9 +43,21 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install classifier dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: ./scripts/pnpm-install.sh --frozen-lockfile --ignore-scripts
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Classify changes
         id: classify
         env:
@@ -92,6 +107,9 @@ jobs:
     name: Metadata
     if: github.event_name == 'pull_request' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -106,9 +124,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Lint PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -118,6 +148,9 @@ jobs:
     name: Security
     if: github.event_name != 'pull_request' || ((github.event.action != 'edited' || github.event.changes.base != null) && github.event.action != 'labeled' && github.event.action != 'unlabeled')
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -132,9 +165,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Audit dependencies
         run: pnpm security:audit
 
@@ -170,6 +215,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.scraper == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -184,9 +232,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Validate Railway upload context
         run: node scripts/check-railway-context.mjs
 
@@ -202,6 +262,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.api == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -216,9 +279,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Build API workspace dependencies
         run: pnpm exec turbo run build:ci --filter=@app/api
 
@@ -234,6 +309,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.web == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -248,9 +326,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Build Vercel artifact
         env:
           CLERK_SECRET_KEY: ci-placeholder
@@ -275,6 +365,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.validation == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -289,9 +382,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Run lint
         run: pnpm lint
 
@@ -307,6 +412,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.validation == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -321,9 +429,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Run tests
         run: pnpm test:ci
 
@@ -336,6 +456,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.storybook == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -350,9 +473,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Install Playwright browsers
         run: pnpm --filter @app/web exec playwright install --with-deps chromium
 
@@ -368,6 +503,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.database_validation == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -382,9 +520,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Check Drizzle migration history
         working-directory: packages/database
         run: pnpm exec drizzle-kit check --config=drizzle.config.ts

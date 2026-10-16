@@ -14,6 +14,9 @@ jobs:
   refresh:
     name: Refresh Preview
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
     env:
       BUNNY_IMAGE_FOLDER_PREFIX: images/preview
       BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview
@@ -55,8 +58,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
 
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
       - name: Refresh preview from development
         id: preview_db
         shell: bash

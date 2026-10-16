@@ -43,7 +43,7 @@ From the `pocket-trash` repo:
 ```sh
 cd ../pocket-trash
 yalc add @pocket-trash/localizations --link
-pnpm install
+infisical run --env=dev --path=/tools/package-manager -- ./scripts/pnpm-install.sh
 ```
 
 Then run Pocket Trash:
@@ -83,7 +83,7 @@ From the `pocket-trash` repo:
 
 ```sh
 yalc remove @pocket-trash/localizations
-pnpm install
+infisical run --env=dev --path=/tools/package-manager -- ./scripts/pnpm-install.sh
 ```
 
 ## Notes

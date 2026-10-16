@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -176,6 +178,7 @@ test("classifies package paths by affected domains", () => {
 
 test("classifies workflow and root build configuration conservatively", () => {
   for (const path of [
+    ".npmrc",
     ".github/workflows/ci.yml",
     ".github/scripts/ci-log.sh",
     "package.json",
@@ -186,6 +189,177 @@ test("classifies workflow and root build configuration conservatively", () => {
       expected(validationDomains),
       path,
     );
+  }
+});
+
+test("configures Font Awesome authentication in a temporary user config", () => {
+  const installScript = readFileSync(
+    new URL("./pnpm-install.sh", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(installScript, /FONTAWESOME_PACKAGE_TOKEN is required/u);
+  assert.match(installScript, /umask 077/u);
+  assert.match(installScript, /NPM_CONFIG_USERCONFIG/u);
+  assert.match(installScript, /trap .*rm -f/u);
+});
+
+test("private package install removes its temporary credentials", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fontawesome-install-"));
+  const fakePnpm = join(directory, "pnpm");
+  const capturedConfig = join(directory, "captured-npmrc");
+  const capturedPath = join(directory, "captured-path");
+
+  try {
+    writeFileSync(
+      fakePnpm,
+      `#!/bin/sh
+cp "$NPM_CONFIG_USERCONFIG" "$CAPTURED_CONFIG"
+printf '%s' "$NPM_CONFIG_USERCONFIG" > "$CAPTURED_PATH"
+`,
+      { mode: 0o755 },
+    );
+    execFileSync(
+      "/bin/sh",
+      [
+        fileURLToPath(new URL("./pnpm-install.sh", import.meta.url)),
+        "--frozen-lockfile",
+      ],
+      {
+        env: {
+          ...process.env,
+          CAPTURED_CONFIG: capturedConfig,
+          CAPTURED_PATH: capturedPath,
+          FONTAWESOME_PACKAGE_TOKEN: "test-token",
+          PATH: `${directory}:${process.env.PATH}`,
+        },
+      },
+    );
+
+    assert.equal(
+      readFileSync(capturedConfig, "utf8"),
+      "//npm.fontawesome.com/:_authToken=test-token\n",
+    );
+    assert.equal(existsSync(readFileSync(capturedPath, "utf8")), false);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("authenticates and clears private package access around every workflow install", () => {
+  const workflowsDirectory = fileURLToPath(
+    new URL("../.github/workflows", import.meta.url),
+  );
+
+  for (const filename of readdirSync(workflowsDirectory).filter((path) =>
+    path.endsWith(".yml"),
+  )) {
+    const workflow = parse(
+      readFileSync(
+        new URL(`../.github/workflows/${filename}`, import.meta.url),
+        "utf8",
+      ),
+    );
+
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const steps = job.steps ?? [];
+      const installIndex = steps.findIndex((step) =>
+        step.run?.includes("scripts/pnpm-install.sh"),
+      );
+      if (installIndex === -1) continue;
+
+      const permissions = job.permissions ?? workflow.permissions;
+      assert.equal(permissions?.contents, "read", `${filename}:${jobName}`);
+      assert.equal(
+        permissions?.["id-token"],
+        "write",
+        `${filename}:${jobName}`,
+      );
+
+      const packageSecretsIndex = steps.findIndex(
+        (step) =>
+          step.uses === "Infisical/secrets-action@v1.0.16" &&
+          step.with?.["secret-path"] === "tools/github/secrets",
+      );
+      assert.ok(
+        packageSecretsIndex >= 0 && packageSecretsIndex < installIndex,
+        `${filename}:${jobName}`,
+      );
+      const productionInstall =
+        filename === "railway-config.yml" ||
+        (filename === "deploy.yml" &&
+          ["production", "railway-production", "web-production"].includes(
+            jobName,
+          ));
+      assert.equal(
+        steps[packageSecretsIndex].with["env-slug"],
+        productionInstall ? "prod" : "preview",
+        `${filename}:${jobName}`,
+      );
+      assert.match(
+        steps[installIndex].run,
+        /scripts\/pnpm-install\.sh/u,
+        `${filename}:${jobName}`,
+      );
+
+      const clearIndex = steps.findIndex(
+        (step, index) =>
+          index > installIndex &&
+          step.run?.includes("FONTAWESOME_PACKAGE_TOKEN="),
+      );
+      assert.ok(clearIndex > installIndex, `${filename}:${jobName}`);
+    }
+  }
+});
+
+test("passes the preview package token only to Vercel's install process", () => {
+  const config = JSON.parse(
+    readFileSync(new URL("../apps/web/vercel.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(
+    config.installCommand,
+    "../../scripts/pnpm-install.sh --frozen-lockfile",
+  );
+});
+
+test("syncs Font Awesome authentication into Railway before source builds", () => {
+  for (const [jobName, environment, configureName, clearName] of [
+    [
+      "preview",
+      "preview",
+      "Configure Railway scraper preview database and cron",
+      "Clear Font Awesome package token after Railway preview configuration",
+    ],
+    [
+      "railway-production",
+      "prod",
+      "Set Railway production metadata",
+      "Clear Font Awesome package token after Railway configuration",
+    ],
+  ]) {
+    const steps = deployWorkflow.jobs[jobName].steps;
+    const configureIndex = steps.findIndex(
+      (step) => step.name === configureName,
+    );
+    const fetchIndex = steps.findIndex(
+      (step, index) =>
+        index < configureIndex &&
+        step.uses === "Infisical/secrets-action@v1.0.16" &&
+        step.with?.["env-slug"] === environment &&
+        step.with?.["secret-path"] === "tools/github/secrets",
+    );
+    const clearIndex = steps.findIndex(
+      (step, index) => index > configureIndex && step.name === clearName,
+    );
+
+    assert.ok(fetchIndex >= 0, jobName);
+    assert.match(
+      steps[configureIndex].run,
+      /variable set FONTAWESOME_PACKAGE_TOKEN[\s\S]*--stdin[\s\S]*--skip-deploys/u,
+      jobName,
+    );
+    assert.ok(clearIndex > configureIndex, jobName);
   }
 });
 

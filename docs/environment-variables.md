@@ -26,6 +26,7 @@ and the scraper on Railway.
 | `/shared` | Values imported by applications and fetched by shared GitHub workflows |
 | `/local/database` | Optional developer-specific database URLs |
 | `/local/bunny` | Bunny account audits |
+| `/tools/package-manager` | Local package installation credentials |
 | `/tools/logger-axiom-test` | Local live Axiom integration test |
 | `tools/github/secrets` | GitHub Actions values fetched at runtime through OIDC |
 | `tools/github/infisical-connection` | Bootstrap values synchronized into GitHub repository secrets |
@@ -82,6 +83,26 @@ Browser-visible values must reach Vercel at build time. Shared server values
 are copied to their `VITE_` aliases only by
 [`applyWebClientEnvAliases`](../apps/web/vite.config.ts); do not expose other
 server secrets to the browser bundle.
+
+### Font Awesome package token
+
+`FONTAWESOME_PACKAGE_TOKEN` authenticates package installation and does not
+belong to an application environment schema. Store it in these locations:
+
+| Infisical path | Environment | Consumer |
+| --- | --- | --- |
+| `/tools/package-manager` | `dev` | Local pnpm installs |
+| `tools/github/secrets` | `preview` and `prod` | GitHub Actions and Railway installs |
+| `/apps/web` | `preview` | Vercel Git-based Preview installs |
+
+`scripts/pnpm-install.sh` writes the token to a permission-restricted temporary
+user config, binds it only to `npm.fontawesome.com`, and removes the file when
+installation ends. Do not prefix the token with `VITE_` or expose it to browser
+code. Vercel Production does not need the token because GitHub builds the
+production artifact and deploys it with `vercel deploy --prebuilt`. The Deploy
+workflow copies the token from Infisical into the Railway scraper service before
+Railway installs the workspace. Keep the preview template initialized with the
+same value so a new native PR build can authenticate before its workflow runs.
 
 ## Operational Runbooks
 

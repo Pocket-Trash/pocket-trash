@@ -1,4 +1,6 @@
+import { config } from "@fortawesome/fontawesome-svg-core";
 import { loggerMessages } from "@package/logger";
+import "@fortawesome/fontawesome-svg-core/styles.css";
 import { formatTranslation } from "@pocket-trash/localizations";
 import {
   createRootRoute,
@@ -26,6 +28,8 @@ import {
 } from "@/lib/user-settings";
 import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
+
+config.autoAddCss = false;
 
 /**
  * Provides the shared document shell, settings bootstrap, providers, and application chrome.

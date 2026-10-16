@@ -49,11 +49,22 @@ for (const environment of ["production", "preview"]) {
       "security-audit-exceptions.json",
       "turbo.json",
     ]);
-    assert.equal(Object.keys(scraper.variables).length, 24);
-    for (const value of Object.values(scraper.variables)) {
+    assert.equal(Object.keys(scraper.variables).length, 31);
+    assert.deepEqual(scraper.variables.RAILPACK_INSTALL_CMD, {
+      type: "literal",
+      value: "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+    });
+    for (const [name, value] of Object.entries(scraper.variables)) {
+      if (name === "RAILPACK_INSTALL_CMD") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
     assert.ok(scraper.variables.DATABASE_URL);
+    assert.ok(scraper.variables.BUNNY_CDN_TOKEN_KEY);
+    assert.ok(scraper.variables.BUNNY_RESOURCE_FOLDER_PREFIX);
+    assert.ok(scraper.variables.CLERK_SECRET_KEY);
+    assert.ok(scraper.variables.ERASURE_HMAC_SECRET);
+    assert.ok(scraper.variables.FONTAWESOME_PACKAGE_TOKEN);
+    assert.ok(scraper.variables.LOG_PROXY_CLIENT_KEY);
     assert.ok(scraper.variables.REDIS_URL);
     assert.ok(scraper.variables.SCRAPER_CRON_ENABLED);
     assert.ok(scraper.variables.LOG_DEPLOYMENT_ID);

@@ -51,8 +51,10 @@ it("renders the site links, accessible social links, and supplied year", () => {
 
   expect(html).toContain('href="https://x.com/pockettrashapp"');
   expect(html).toContain('aria-label="X (opens in a new tab)"');
+  expect(html).toContain('data-icon="x-twitter"');
   expect(html).toContain('href="https://discord.gg/jQWqfnCX73"');
   expect(html).toContain('aria-label="Discord (opens in a new tab)"');
+  expect(html).toContain('data-icon="discord"');
   expect(html.match(/target="_blank"/g)).toHaveLength(2);
   expect(html.match(/rel="noopener noreferrer"/g)).toHaveLength(2);
   expect(html).not.toContain("machinedpens");
