@@ -1,3 +1,5 @@
+import { faQuestionCircle } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogApprovalAction,
   CatalogApprovalStatus,
@@ -22,7 +24,6 @@ import {
 } from "@package/services/measurements";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CircleHelp } from "lucide-react";
 import { useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -2315,7 +2316,11 @@ function VisibilityButton({
               className="rounded-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               render={<button type="button" />}
             >
-              <CircleHelp aria-hidden="true" className="size-4" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={faQuestionCircle}
+              />
             </TooltipTrigger>
             <TooltipContent className="max-w-72" side="bottom">
               <span>{t("web.slider.privacy.inheritedDescription")}</span>

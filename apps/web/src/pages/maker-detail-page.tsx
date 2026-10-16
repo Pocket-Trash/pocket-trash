@@ -1,10 +1,11 @@
+import { faArrowUpRightFromSquare } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogProduct,
   PublicMakerDetail,
   UserCollectionItem,
 } from "@package/services";
 import { Link } from "@tanstack/react-router";
-import { ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ImageGallery } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -99,7 +100,11 @@ export function MakerDetailPage({
               target="_blank"
             >
               {t("web.makers.visitWebsite")}
-              <ExternalLink aria-hidden="true" className="size-4" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={faArrowUpRightFromSquare}
+              />
             </a>
           </div>
         ) : null}

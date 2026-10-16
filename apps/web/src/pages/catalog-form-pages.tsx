@@ -1,4 +1,10 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import {
+  faArrowRotateLeft,
+  faTrash,
+  faXmark,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogColor,
   CatalogFinishOption,
@@ -26,7 +32,6 @@ import {
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
-import { RotateCcw, Trash2, X } from "lucide-react";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { z } from "zod";
@@ -658,7 +663,7 @@ export function MaterialAssignmentsEditor({
             type="button"
             variant="outline"
           >
-            <X />
+            <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
           </Button>
         </div>
       ))}
@@ -777,7 +782,7 @@ export function MaterialAssignmentsEditor({
                   type="button"
                   variant="outline"
                 >
-                  <X />
+                  <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
                 </Button>
               </div>
             ))}
@@ -3220,7 +3225,7 @@ export function CollectionDeletionSection({
         type="button"
         variant="destructive"
       >
-        <Trash2 />
+        <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
         {t("web.collections.deletion.open")}
       </Button>
       <dialog
@@ -5886,7 +5891,10 @@ function CatalogImageEditor({
             type="button"
             variant="outline"
           >
-            {image.deletedAt ? <RotateCcw /> : <Trash2 />}
+            <FontAwesomeIcon
+              aria-hidden="true"
+              icon={image.deletedAt ? faArrowRotateLeft : faTrash}
+            />
             {t(
               image.deletedAt
                 ? "web.resources.action.restore"

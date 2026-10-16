@@ -1,9 +1,10 @@
+import { faArrowRotateLeft, faTrash } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { RotateCcw, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPageShell } from "@/components/admin-page-shell";
@@ -221,7 +222,7 @@ function ResourceTrashList({
               type="button"
               variant="outline"
             >
-              <RotateCcw />
+              <FontAwesomeIcon aria-hidden="true" icon={faArrowRotateLeft} />
               {t("web.resources.action.restore")}
             </Button>
             {showPermanentDelete ? (
@@ -281,7 +282,7 @@ function PermanentDeleteButton({
         type="button"
         variant="destructive"
       >
-        <Trash2 />
+        <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
         {t("web.resources.action.permanentlyDelete")}
       </Button>
       <dialog
@@ -348,7 +349,7 @@ function PermanentDeleteButton({
               type="button"
               variant="destructive"
             >
-              <Trash2 />
+              <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
               {t("web.resources.action.permanentlyDelete")}
             </Button>
           </div>

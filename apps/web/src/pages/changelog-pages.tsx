@@ -1,11 +1,16 @@
 import {
+  faChevronLeft,
+  faChevronRight,
+  faCopy,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   type ChangelogCategorySlug,
   changelogCategories,
   formatTranslation,
   getChangelogCategoryTitle,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "@/components/app-shell";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -127,7 +132,7 @@ export function ChangelogListPage({
               role={changelogPage.page === 1 ? "link" : undefined}
               tabIndex={changelogPage.page === 1 ? -1 : undefined}
             >
-              <ChevronLeft aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faChevronLeft} />
             </a>
             <output aria-live="polite" className="text-sm">
               {t("web.changelog.pageStatus", {
@@ -157,7 +162,7 @@ export function ChangelogListPage({
                 changelogPage.page === changelogPage.pageCount ? -1 : undefined
               }
             >
-              <ChevronRight aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faChevronRight} />
             </a>
           </nav>
         ) : null}
@@ -208,7 +213,7 @@ export function ChangelogEntryPage({ entry }: ChangelogEntryPageProps) {
           <EntryHeading entry={entry} />
           <div className="flex items-center gap-3">
             <Button onClick={copyLink} type="button" variant="outline">
-              <Copy aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faCopy} />
               {t("web.changelog.copyLink")}
             </Button>
             <span aria-live="polite" role="status">

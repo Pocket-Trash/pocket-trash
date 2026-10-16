@@ -1,9 +1,14 @@
 import {
+  faMagnifyingGlass,
+  faPlus,
+  faSpinnerScale,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LoaderCircle, Plus, Search } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -185,7 +190,11 @@ export function SubmitFeedbackPage() {
           ) : null}
           <Button disabled={submitting} type="submit">
             {submitting ? (
-              <LoaderCircle aria-hidden="true" className="animate-spin" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="animate-spin"
+                icon={faSpinnerScale}
+              />
             ) : null}
             {t(
               submitting
@@ -246,7 +255,7 @@ export function FeedbackBoardPage({
             {t("web.feedback.status.completed")}
           </Button>
           <Button nativeButton={false} render={<Link to="/feedback/new" />}>
-            <Plus aria-hidden="true" />
+            <FontAwesomeIcon aria-hidden="true" icon={faPlus} />
             {t("web.feedback.new.title")}
           </Button>
         </>
@@ -277,7 +286,7 @@ export function FeedbackBoardPage({
               value={search}
             />
             <Button disabled={loading} type="submit" variant="outline">
-              <Search aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
               {t("web.action.search")}
             </Button>
           </form>
@@ -371,7 +380,7 @@ export function CompletedFeedbackPage({
             {t("web.feedback.title")}
           </Button>
           <Button nativeButton={false} render={<Link to="/feedback/new" />}>
-            <Plus aria-hidden="true" />
+            <FontAwesomeIcon aria-hidden="true" icon={faPlus} />
             {t("web.feedback.new.title")}
           </Button>
         </>
@@ -402,7 +411,7 @@ export function CompletedFeedbackPage({
               value={search}
             />
             <Button disabled={loading} type="submit" variant="outline">
-              <Search aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
               {t("web.action.search")}
             </Button>
           </form>
@@ -473,7 +482,7 @@ export function MyFeedbackPage({
     <AppShell
       headerActions={
         <Button nativeButton={false} render={<Link to="/feedback/new" />}>
-          <Plus aria-hidden="true" />
+          <FontAwesomeIcon aria-hidden="true" icon={faPlus} />
           {t("web.feedback.new.title")}
         </Button>
       }
@@ -503,7 +512,7 @@ export function MyFeedbackPage({
               value={search}
             />
             <Button disabled={loading} type="submit" variant="outline">
-              <Search aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
               {t("web.action.search")}
             </Button>
           </form>

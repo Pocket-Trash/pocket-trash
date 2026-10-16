@@ -1,10 +1,11 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import { faPlus } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ResourceCard } from "@/components/resource-card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ export function ResourcesPage({
       headerActions={
         isSignedIn ? (
           <Button nativeButton={false} render={<Link to="/resources/add" />}>
-            <Plus />
+            <FontAwesomeIcon aria-hidden="true" icon={faPlus} />
             {t("web.resources.action.add")}
           </Button>
         ) : null

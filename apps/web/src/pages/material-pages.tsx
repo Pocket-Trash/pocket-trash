@@ -1,3 +1,8 @@
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogProduct,
   PublicMaterial,
@@ -5,7 +10,6 @@ import type {
   UserCollectionItem,
 } from "@package/services";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ImageGallery } from "@/components/image-gallery";
@@ -281,7 +285,7 @@ export function MaterialResultPage<T>({
             type="button"
             variant="outline"
           >
-            <ChevronLeft />
+            <FontAwesomeIcon aria-hidden="true" icon={faChevronLeft} />
           </Button>
           <output aria-live="polite" className="text-sm">
             {t("web.collections.gallery.pageStatus", { page, pageCount })}
@@ -294,7 +298,7 @@ export function MaterialResultPage<T>({
             type="button"
             variant="outline"
           >
-            <ChevronRight />
+            <FontAwesomeIcon aria-hidden="true" icon={faChevronRight} />
           </Button>
         </nav>
       ) : null}

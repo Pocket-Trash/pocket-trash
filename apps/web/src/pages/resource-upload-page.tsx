@@ -1,4 +1,6 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import { faSpinnerScale } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   maxImageBytes,
   maxResourceFileBytes,
@@ -11,7 +13,6 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { useNavigate } from "@tanstack/react-router";
-import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -225,7 +226,11 @@ export function ResourceUploadPage() {
 
           <Button disabled={submitting} type="submit">
             {submitting ? (
-              <LoaderCircle aria-hidden="true" className="animate-spin" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="animate-spin"
+                icon={faSpinnerScale}
+              />
             ) : null}
             {t("web.resources.action.add")}
           </Button>
