@@ -149,11 +149,13 @@ export const seedUserSettings = [
   },
 ] as const;
 
-/**
- * Canonical product types inserted by the catalog seed.
- *
- * @internal
- */
+/** Approved placeholder metadata for product types without category art. */
+const productTypeImagePlaceholder = {
+  imageAlt: "No image set",
+  imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+} as const;
+
+/** Canonical product types inserted by the catalog seed. */
 export const seedProductTypes = [
   { isPartOrAccessory: false, name: "Pen", slug: "pen" },
   { isPartOrAccessory: true, name: "Pen Actuator", slug: "pen-actuator" },
@@ -172,7 +174,7 @@ export const seedProductTypes = [
   { isPartOrAccessory: true, name: "Slider Plate", slug: "slider-plate" },
   { isPartOrAccessory: true, name: "Slider Insert", slug: "slider-insert" },
   { isPartOrAccessory: false, name: "Fountain Pen", slug: "fountain-pen" },
-] as const;
+].map((value) => ({ ...productTypeImagePlaceholder, ...value }));
 
 /**
  * Canonical makers inserted or updated by the catalog seed.
@@ -629,6 +631,30 @@ export function normalizeSeedUrl(url: string | null): string | null {
 }
 
 /**
+ * Normalizes and validates a required HTTPS seed image URL.
+ *
+ * @param url - Reviewed image URL.
+ * @returns Normalized HTTPS URL.
+ * @throws When the URL is blank, malformed, or not HTTPS.
+ * @internal
+ */
+export function normalizeSeedImageUrl(url: string): string {
+  const normalized = normalizeSeedUrl(url);
+  if (!normalized) throw new Error("Product type image URL is required.");
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch (error) {
+    throw new Error("Product type image URL must be a valid HTTPS URL.", {
+      cause: error,
+    });
+  }
+  if (parsed.protocol !== "https:")
+    throw new Error("Product type image URL must use HTTPS.");
+  return normalized;
+}
+
+/**
  * Resolves a reviewed KAP label to its canonical general and optional specific slugs.
  *
  * @param term - Reviewed source material label.
@@ -751,11 +777,17 @@ export async function seedUsersAndSettings(db: ReturnType<typeof createDb>) {
  */
 export async function seedCatalog(db: ReturnType<typeof createDb>) {
   for (const value of seedProductTypes) {
+    const imageAlt = value.imageAlt.trim();
+    if (!imageAlt)
+      throw new Error(
+        `Product type ${value.slug} image description is required.`,
+      );
+    const imageUrl = normalizeSeedImageUrl(value.imageUrl);
     await db
       .insert(productType)
-      .values(value)
+      .values({ ...value, imageAlt, imageUrl })
       .onConflictDoUpdate({
-        set: { name: value.name, updatedAt: new Date() },
+        set: { imageAlt, imageUrl, name: value.name, updatedAt: new Date() },
         target: productType.slug,
       });
   }

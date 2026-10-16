@@ -129,6 +129,11 @@ const emptyCatalogOptions = {
   relationshipProducts: [],
   spinnerButtons: [],
 };
+/** Product-type image metadata used by form tests. */
+const productTypeImage = {
+  imageAlt: "No image set",
+  imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+} as const;
 
 describe("collection deletion choices", () => {
   it("keeps collection creation in a single column", () => {
@@ -543,6 +548,7 @@ describe("product form conditional fields", () => {
         productTypes: [
           {
             id: product.productTypeId,
+            ...productTypeImage,
             isPartOrAccessory: false,
             name: product.productTypeName,
             slug: productTypeSlug,
@@ -600,6 +606,7 @@ describe("product form conditional fields", () => {
           productTypes: [
             {
               id: product.productTypeId,
+              ...productTypeImage,
               isPartOrAccessory: productTypeSlug !== "slider",
               name: product.productTypeName,
               slug: productTypeSlug,
@@ -832,6 +839,7 @@ describe("collection add form", () => {
           productTypes: [
             {
               id: 1,
+              ...productTypeImage,
               isPartOrAccessory: false,
               name: "Spinner",
               slug: "spinner",
@@ -938,6 +946,7 @@ describe("collection add form", () => {
           productTypes: [
             {
               id: 2,
+              ...productTypeImage,
               isPartOrAccessory: true,
               name: "Spinner button",
               slug: "spinner-button",
@@ -970,6 +979,7 @@ describe("collection add form", () => {
           productTypes: [
             {
               id: product.productTypeId,
+              ...productTypeImage,
               isPartOrAccessory: productTypeSlug !== "slider",
               name: product.productTypeName,
               slug: productTypeSlug,
@@ -1013,6 +1023,7 @@ describe("collection add form", () => {
           productTypes: [
             {
               id: product.productTypeId,
+              ...productTypeImage,
               isPartOrAccessory: false,
               name: product.productTypeName,
               slug: "slider",

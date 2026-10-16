@@ -245,6 +245,8 @@ describe("catalog product persistence", () => {
         expect.arrayContaining([
           {
             id: productType.id,
+            imageAlt: "No image set",
+            imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
             isPartOrAccessory: false,
             name: "Spinner",
             slug: "spinner",
@@ -286,6 +288,8 @@ describe("catalog product persistence", () => {
         }),
       ).resolves.toEqual({
         id: productType.id,
+        imageAlt: "No image set",
+        imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
         isPartOrAccessory: true,
         name: "Spinner",
         slug: "spinner",

@@ -422,8 +422,10 @@ export const productType = pgTable(
     isPartOrAccessory: boolean("is_part_or_accessory").default(false).notNull(),
     /** Whether this secondary type is published in public Trends. */
     includeInTrends: boolean("include_in_trends").default(false).notNull(),
-    imageUrl: text("image_url"),
-    imageAlt: text("image_alt"),
+    imageUrl: text("image_url")
+      .default("https://cdn.pocket-trash.app/assets/static/no-image.png")
+      .notNull(),
+    imageAlt: text("image_alt").default("No image set").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -432,6 +434,14 @@ export const productType = pgTable(
       .notNull(),
   },
   (table) => ({
+    imageAltValid: check(
+      "product_types_image_alt_valid",
+      sql`char_length(trim(${table.imageAlt})) between 1 and 500`,
+    ),
+    imageUrlValid: check(
+      "product_types_image_url_valid",
+      sql`${table.imageUrl} ~ '^https://[^[:space:]]+$'`,
+    ),
     slugUnique: uniqueIndex("product_types_slug_unique").on(table.slug),
   }),
 );

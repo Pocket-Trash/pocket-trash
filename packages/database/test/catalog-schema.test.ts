@@ -146,6 +146,18 @@ describe("catalog schema", () => {
     expect(productType.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining(["image_url", "image_alt"]),
     );
+    expect(
+      productType.columns.find(({ name }) => name === "image_url")?.notNull,
+    ).toBe(true);
+    expect(
+      productType.columns.find(({ name }) => name === "image_alt")?.notNull,
+    ).toBe(true);
+    expect(productType.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_types_image_alt_valid",
+        "product_types_image_url_valid",
+      ]),
+    );
     const spinnerColumns = getTableConfig(
       schema.productDetailSpinner,
     ).columns.map(({ name }) => name);

@@ -236,6 +236,10 @@ export type WritableCatalogProductType = Extract<
 export type CatalogProductTypeSummary = {
   /** Database identifier. */
   id: number;
+  /** Description of the category image. */
+  imageAlt: string;
+  /** Stable category image URL. */
+  imageUrl: string;
   /** Whether the type belongs in Parts and Accessories. */
   isPartOrAccessory: boolean;
   /** Display name. */
@@ -4946,6 +4950,8 @@ export function createCatalogService(
       return await db
         .select({
           id: schema.productType.id,
+          imageAlt: schema.productType.imageAlt,
+          imageUrl: schema.productType.imageUrl,
           isPartOrAccessory: schema.productType.isPartOrAccessory,
           name: schema.productType.name,
           slug: schema.productType.slug,
@@ -5060,6 +5066,8 @@ export function createCatalogService(
             const [before] = await tx
               .select({
                 id: schema.productType.id,
+                imageAlt: schema.productType.imageAlt,
+                imageUrl: schema.productType.imageUrl,
                 isPartOrAccessory: schema.productType.isPartOrAccessory,
                 name: schema.productType.name,
                 slug: schema.productType.slug,
@@ -5077,6 +5085,8 @@ export function createCatalogService(
               .where(eq(schema.productType.id, input.productTypeId))
               .returning({
                 id: schema.productType.id,
+                imageAlt: schema.productType.imageAlt,
+                imageUrl: schema.productType.imageUrl,
                 isPartOrAccessory: schema.productType.isPartOrAccessory,
                 name: schema.productType.name,
                 slug: schema.productType.slug,

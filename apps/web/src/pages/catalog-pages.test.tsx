@@ -87,6 +87,12 @@ vi.mock("@tanstack/react-router", () => ({
   },
 }));
 
+/** Approved product-type placeholder image metadata. */
+const productTypeImage = {
+  imageAlt: "No image set",
+  imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+} as const;
+
 vi.mock("@/components/app-shell", () => ({
   /**
    * Renders a minimal application shell for tests.
@@ -860,30 +866,35 @@ describe("ProductsPage", () => {
   it("groups visible product types and links into the product list", () => {
     const productTypes: CatalogProductTypeSummary[] = [
       {
+        ...productTypeImage,
         id: 1,
         isPartOrAccessory: false,
         name: "Spinner",
         slug: "spinner",
       },
       {
+        ...productTypeImage,
         id: 2,
         isPartOrAccessory: false,
         name: "Slider",
         slug: "slider",
       },
       {
+        ...productTypeImage,
         id: 3,
         isPartOrAccessory: true,
         name: "Slider Plate",
         slug: "slider-plate",
       },
       {
+        ...productTypeImage,
         id: 4,
         isPartOrAccessory: true,
         name: "Spinner Button",
         slug: "spinner-button",
       },
       {
+        ...productTypeImage,
         id: 5,
         isPartOrAccessory: false,
         name: "Empty type",
@@ -925,6 +936,11 @@ describe("ProductsPage", () => {
     expect(html).not.toContain("Empty type");
     expect(html).toContain('href="/products?view=all"');
     expect(html).toContain('href="/products?type=spinner&amp;view=all"');
+    expect(html).toContain('alt="No image set"');
+    expect(html).toContain(
+      "https://cdn.pocket-trash.app/assets/static/no-image.png?width=640",
+    );
+    expect(html).not.toContain("product-images/one.webp");
   });
 
   it("matches any offered pattern together with the included plate", () => {

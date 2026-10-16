@@ -11,6 +11,8 @@ const productTypes: CatalogProductTypeSummary[] = Array.from(
   { length: 31 },
   (_, index) => ({
     id: index + 1,
+    imageAlt: "No image set",
+    imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
     isPartOrAccessory: false,
     name: `Product Type ${String(index + 1).padStart(2, "0")}`,
     slug: `product-type-${String(index + 1).padStart(2, "0")}`,
