@@ -7,10 +7,7 @@ import {
   getGrimsmoSagaCatalogJobId,
   getGrimsmoVariationBatchJobId,
 } from "../queue/job-ids.js";
-import {
-  removeCompletedJobsById,
-  type ScraperQueues,
-} from "../queue/queues.js";
+import { enqueueScraperJobs, type ScraperQueues } from "../queue/queues.js";
 import {
   type GrimsmoSourceName,
   type NormalizedGrimsmoKnifeVariation,
@@ -137,7 +134,7 @@ export async function runGrimsmoProducer({
     let jobs: {
       /** Queue payload processed by the item worker. */
       data: ScraperItemJob;
-      /** Stable BullMQ job name. */
+      /** Stable queue job name. */
       name: string;
       /** Deterministic queue options. */
       opts: {
@@ -200,12 +197,14 @@ export async function runGrimsmoProducer({
     }
     const archiveReconciliationJobs =
       definition.kind === "pen" || skipArchiveReconciliation ? 0 : 1;
-    const removedCompletedItemJobs = await removeCompletedJobsById(
+    const removedCompletedItemJobs = await enqueueScraperJobs(
       queues.items,
-      jobs.map((job) => job.opts.jobId).filter(Boolean),
+      jobs.map((job) => ({
+        id: job.opts.jobId,
+        name: job.name,
+        payload: job.data,
+      })),
     );
-
-    await queues.items.addBulk(jobs);
 
     logger.info(loggerMessages.scraper.grimsmo.fetchCompleted, {
       attributes: {

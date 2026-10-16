@@ -242,10 +242,10 @@ function createContext(
     queues: {
       close: vi.fn(),
       images: {
-        getJobCounts: vi.fn(async () => counts.images),
+        counts: vi.fn(async () => ({ ...counts.images, failed: 0 })),
       } as unknown as ScraperJobContext["queues"]["images"],
       items: {
-        getJobCounts: vi.fn(async () => counts.items),
+        counts: vi.fn(async () => ({ ...counts.items, failed: 0 })),
       } as unknown as ScraperJobContext["queues"]["items"],
     },
     redis: {

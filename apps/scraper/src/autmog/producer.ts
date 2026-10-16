@@ -1,10 +1,7 @@
 import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import { getAutmogPenJobId } from "../queue/job-ids.js";
-import {
-  removeCompletedJobsById,
-  type ScraperQueues,
-} from "../queue/queues.js";
+import { enqueueScraperJobs, type ScraperQueues } from "../queue/queues.js";
 import {
   type NormalizedAutmogPen,
   type ScraperItemJob,
@@ -116,18 +113,12 @@ export async function runAutmogProducer({
       jobId: getAutmogPenJobId(item),
       name: "autmog.pen",
     }));
-    const removedCompletedItemJobs = await removeCompletedJobsById(
+    const removedCompletedItemJobs = await enqueueScraperJobs(
       queues.items,
-      jobs.map((job) => job.jobId),
-    );
-
-    await queues.items.addBulk(
       jobs.map((job) => ({
-        data: job.data,
+        id: job.jobId,
         name: job.name,
-        opts: {
-          jobId: job.jobId,
-        },
+        payload: job.data,
       })),
     );
 

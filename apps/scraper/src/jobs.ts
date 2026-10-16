@@ -59,9 +59,7 @@ export type ScraperJobContext = {
    * Configured image-storage service.
    */
   imageStorage: ImagesService;
-  /**
-   * Redis connection shared with BullMQ.
-   */
+  /** Redis connection used by scraper-owned cron checkpoints. */
   redis: ReturnType<typeof createRedisConnection>;
   /**
    * Scraper item and image queues.
@@ -128,11 +126,11 @@ export async function createScraperJobContext(
     });
   }
 
-  const queues = createScraperQueues(redis);
+  const queues = createScraperQueues(env.REDIS_URL);
 
   return {
     /**
-     * Closes BullMQ queues and disconnects Redis.
+     * Closes shared queues and disconnects checkpoint storage.
      *
      * @returns A promise that settles after queue connections close.
      */
@@ -416,7 +414,6 @@ export async function runQueueProcessorJob({
           items: env.SCRAPER_ITEM_BATCH_SIZE,
         },
         concurrency: env.SCRAPER_QUEUE_CONCURRENCY,
-        connection: context.redis,
         db: context.db,
         dryRun: env.SCRAPER_DRY_RUN,
         imageFolderPrefix: context.imageFolderPrefix,

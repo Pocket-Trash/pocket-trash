@@ -8,8 +8,8 @@ import { runGrimsmoProducer } from "./producer.js";
 
 describe("runGrimsmoProducer", () => {
   it("enqueues one bounded canonical Saga catalog reconciliation", async () => {
-    const addBulk = vi.fn().mockResolvedValue([]);
-    const queues = createQueues(addBulk);
+    const enqueueMany = vi.fn().mockResolvedValue([]);
+    const queues = createQueues(enqueueMany);
     const inventoryProduct = createProduct({
       body_html:
         "<ul><li>Stonewashed Titanium Body</li><li>Bronze Slider</li></ul>",
@@ -38,10 +38,10 @@ describe("runGrimsmoProducer", () => {
       fetchedCount: 2,
       inventoryFetchedCount: 1,
     });
-    const [jobs] = addBulk.mock.calls[0] ?? [];
+    const [jobs] = enqueueMany.mock.calls[0] ?? [];
     expect(jobs).toEqual([
       expect.objectContaining({
-        data: expect.objectContaining({
+        payload: expect.objectContaining({
           source: "grimsmo-saga",
           snapshot: expect.objectContaining({
             appearances: expect.arrayContaining([
@@ -60,15 +60,10 @@ describe("runGrimsmoProducer", () => {
   });
 
   it("re-enqueues an identical catalog snapshot after completion", async () => {
-    const completedJob = {
-      getState: vi.fn().mockResolvedValue("completed"),
-      remove: vi.fn().mockResolvedValue(undefined),
-    };
-    const addBulk = vi.fn().mockResolvedValue([]);
-    const queues = createQueues(
-      addBulk,
-      vi.fn().mockResolvedValue(completedJob),
-    );
+    const enqueueMany = vi
+      .fn()
+      .mockResolvedValue([{ accepted: true, replacedCompleted: true }]);
+    const queues = createQueues(enqueueMany);
     const product = createProduct({ handle: "saga-1", id: 1 });
 
     const result = await runGrimsmoProducer({
@@ -82,26 +77,21 @@ describe("runGrimsmoProducer", () => {
     });
 
     expect(result.removedCompletedItemJobs).toBe(1);
-    expect(completedJob.remove).toHaveBeenCalledOnce();
-    expect(addBulk).toHaveBeenCalledOnce();
+    expect(enqueueMany).toHaveBeenCalledOnce();
   });
 });
 
 /**
  * Creates the queue surface used by producer tests.
  *
- * @param addBulk - Spy receiving the produced item jobs.
- * @param getJob - Spy resolving previously queued jobs by identifier.
+ * @param enqueueMany - Spy receiving the produced item jobs.
  * @returns Minimal scraper queue fixture.
  */
-function createQueues(
-  addBulk: ReturnType<typeof vi.fn>,
-  getJob = vi.fn(async () => null),
-): ScraperQueues {
+function createQueues(enqueueMany: ReturnType<typeof vi.fn>): ScraperQueues {
   return {
     close: vi.fn(),
-    images: { addBulk: vi.fn() },
-    items: { addBulk, getJob },
+    images: { enqueueMany: vi.fn() },
+    items: { enqueueMany },
   } as unknown as ScraperQueues;
 }
 

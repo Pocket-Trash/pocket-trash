@@ -1,8 +1,7 @@
 import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
+import type { QueueJob } from "@package/queue";
 import type { ImagesService } from "@package/services";
-import { type Job, type Queue, Worker } from "bullmq";
-import type { Redis } from "ioredis";
 import {
   syncCanonicalAutmogImage,
   syncCanonicalAutmogPen,
@@ -26,7 +25,6 @@ import {
   type GrimsmoKnifeSourceName,
   type ScraperImageJob,
   type ScraperItemJob,
-  scraperQueueNames,
   scraperSources,
 } from "../scraper-types.js";
 import {
@@ -35,7 +33,7 @@ import {
   getTmpImageDeleteJobId,
   getTmpImageUploadJobId,
 } from "./job-ids.js";
-import { removeCompletedJobsById, type ScraperQueues } from "./queues.js";
+import { enqueueScraperJobs, type ScraperQueues } from "./queues.js";
 
 /**
  * Completed, failed, and skipped counts from draining one queue.
@@ -76,10 +74,6 @@ export type RunQueueProcessorOptions = {
    * Maximum jobs processed concurrently by a queue worker.
    */
   concurrency: number;
-  /**
-   * Redis connection shared with BullMQ workers and queues.
-   */
-  connection: Redis;
   /**
    * Database used for scraper persistence.
    */
@@ -303,7 +297,6 @@ type TmpScraperImageJob = Extract<
 export async function runQueueProcessor({
   batchSize,
   concurrency,
-  connection,
   db,
   dryRun = false,
   imageFolderPrefix,
@@ -323,14 +316,12 @@ export async function runQueueProcessor({
   });
 
   try {
-    const items = await drainQueue<ScraperItemJob>({
-      batchSize: batchSize.items,
+    const items = await queues.items.process({
       concurrency,
-      connection,
       /**
        * Processes one queued job and returns its drain outcome.
        *
-       * @param job - BullMQ job to process.
+       * @param job - Validated queue job to process.
        *
        * @returns Promise resolving to `"skipped"` for a skipped job; `"completed"` or
        * `undefined` count as completed.
@@ -339,17 +330,14 @@ export async function runQueueProcessor({
        */
       handler: (job) =>
         processItemJob({ db, dryRun, errorCounter, job, logger, queues }),
-      logger,
-      queueName: scraperQueueNames.items,
+      limit: batchSize.items,
     });
-    const images = await drainQueue<ScraperImageJob>({
-      batchSize: batchSize.images,
+    const images = await queues.images.process({
       concurrency,
-      connection,
       /**
        * Processes one queued job and returns its drain outcome.
        *
-       * @param job - BullMQ job to process.
+       * @param job - Validated queue job to process.
        *
        * @returns Promise resolving to `"skipped"` for a skipped job; `"completed"` or
        * `undefined` count as completed.
@@ -366,8 +354,7 @@ export async function runQueueProcessor({
           job,
           logger,
         }),
-      logger,
-      queueName: scraperQueueNames.images,
+      limit: batchSize.images,
     });
 
     logger.info(loggerMessages.scraper.processor.completed, {
@@ -427,18 +414,8 @@ export async function runQueueDeadLetterProcessor({
   });
 
   try {
-    const items = await processDeadLetters({
-      batchSize: batchSize.items,
-      logger,
-      queue: queues.items,
-      queueName: scraperQueueNames.items,
-    });
-    const images = await processDeadLetters({
-      batchSize: batchSize.images,
-      logger,
-      queue: queues.images,
-      queueName: scraperQueueNames.images,
-    });
+    const items = await queues.items.redriveFailed(batchSize.items);
+    const images = await queues.images.redriveFailed(batchSize.images);
 
     logger.info(loggerMessages.scraper.queue.deadLetterCompleted, {
       attributes: {
@@ -495,7 +472,7 @@ async function processItemJob({
   /**
    * BullMQ job being processed.
    */
-  job: Job<ScraperItemJob>;
+  job: QueueJob<ScraperItemJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -508,8 +485,8 @@ async function processItemJob({
   const startedAt = Date.now();
 
   try {
-    if (job.data.type === "grimsmo.sagaCatalog") {
-      const result = await syncCanonicalSagaCatalog(db, job.data.snapshot, {
+    if (job.payload.type === "grimsmo.sagaCatalog") {
+      const result = await syncCanonicalSagaCatalog(db, job.payload.snapshot, {
         dryRun,
       });
       const imageJobs = result.imageCandidates.map((image) => ({
@@ -552,7 +529,7 @@ async function processItemJob({
             productId: result.productId,
           },
           removedCompletedImageJobs,
-          source: job.data.source,
+          source: job.payload.source,
           updated:
             result.newAppearanceCount > 0 ||
             result.newColorNames.length > 0 ||
@@ -566,24 +543,27 @@ async function processItemJob({
         attributes: {
           durationMs: Date.now() - startedAt,
           jobId: job.id,
-          source: job.data.source,
-          type: job.data.type,
+          source: job.payload.source,
+          type: job.payload.type,
         },
       });
       return;
     }
 
     if (
-      job.data.type === "grimsmo.sagaMaterials" ||
-      job.data.type === "grimsmo.penVariation" ||
-      job.data.type === "grimsmo.penVariationBatch"
+      job.payload.type === "grimsmo.sagaMaterials" ||
+      job.payload.type === "grimsmo.penVariation" ||
+      job.payload.type === "grimsmo.penVariationBatch"
     ) {
       const materialNames =
-        job.data.type === "grimsmo.sagaMaterials"
-          ? job.data.materialNames
-          : job.data.type === "grimsmo.penVariation"
-            ? [...job.data.item.bodyMaterials, ...job.data.item.sliderMaterials]
-            : job.data.items.flatMap((item) => [
+        job.payload.type === "grimsmo.sagaMaterials"
+          ? job.payload.materialNames
+          : job.payload.type === "grimsmo.penVariation"
+            ? [
+                ...job.payload.item.bodyMaterials,
+                ...job.payload.item.sliderMaterials,
+              ]
+            : job.payload.items.flatMap((item) => [
                 ...item.bodyMaterials,
                 ...item.sliderMaterials,
               ]);
@@ -602,7 +582,7 @@ async function processItemJob({
             productId: result.productId,
             unresolvedMaterialNames: result.unresolvedMaterialNames,
           },
-          source: job.data.source,
+          source: job.payload.source,
           updated: result.newMaterialNames.length > 0,
           versioned: false,
         },
@@ -611,39 +591,39 @@ async function processItemJob({
         attributes: {
           durationMs: Date.now() - startedAt,
           jobId: job.id,
-          source: job.data.source,
-          type: job.data.type,
+          source: job.payload.source,
+          type: job.payload.type,
         },
       });
       return;
     }
 
-    if (job.data.type === "grimsmo.knifeVariationBatch") {
+    if (job.payload.type === "grimsmo.knifeVariationBatch") {
       const archivedCount = await reconcileGrimsmoKnifeVariationBatch(db, {
-        items: job.data.items,
-        source: job.data.source,
+        items: job.payload.items,
+        source: job.payload.source,
       });
       logger.info(loggerMessages.scraper.database.archiveCompleted, {
         attributes: {
           archivedCount,
           durationMs: Date.now() - startedAt,
           jobId: job.id,
-          source: job.data.source,
+          source: job.payload.source,
         },
       });
       logger.info(loggerMessages.scraper.processor.itemJobCompleted, {
         attributes: {
           durationMs: Date.now() - startedAt,
           jobId: job.id,
-          source: job.data.source,
-          type: job.data.type,
+          source: job.payload.source,
+          type: job.payload.type,
         },
       });
       return;
     }
 
-    if (job.data.type === "grimsmo.knifeVariation") {
-      const data = job.data;
+    if (job.payload.type === "grimsmo.knifeVariation") {
+      const data = job.payload;
       const source: GrimsmoKnifeSourceName = data.source;
       const result = await syncGrimsmoKnifeVariation(db, data.item);
       const imageJobs = [
@@ -705,7 +685,7 @@ async function processItemJob({
       return;
     }
 
-    const data = job.data;
+    const data = job.payload;
     const result = await syncCanonicalAutmogPen(db, data.item, { dryRun });
     const imageJobs = result.imageCandidates.map((image) => ({
       data: {
@@ -730,13 +710,14 @@ async function processItemJob({
     let removedCompletedImageJobs = 0;
 
     if (!dryRun && imageJobs.length > 0) {
-      removedCompletedImageJobs = await removeCompletedJobsById(
+      removedCompletedImageJobs = await enqueueScraperJobs(
         queues.images,
-        imageJobs
-          .map((imageJob) => imageJob.opts.jobId)
-          .filter((jobId): jobId is string => Boolean(jobId)),
+        imageJobs.map((imageJob) => ({
+          id: imageJob.opts.jobId,
+          name: imageJob.name,
+          payload: imageJob.data,
+        })),
       );
-      await queues.images.addBulk(imageJobs);
     }
 
     logger.info(loggerMessages.scraper.database.mutationCompleted, {
@@ -768,15 +749,15 @@ async function processItemJob({
     errorCounter.record(loggerMessages.scraper.database.mutationFailed, {
       error,
       jobId: job.id,
-      source: job.data.source,
-      type: job.data.type,
+      source: job.payload.source,
+      type: job.payload.type,
     });
     logger.error(loggerMessages.scraper.database.mutationFailed, {
       attributes: {
         durationMs: Date.now() - startedAt,
         jobId: job.id,
-        source: job.data.source,
-        type: job.data.type,
+        source: job.payload.source,
+        type: job.payload.type,
       },
       error,
     });
@@ -784,8 +765,8 @@ async function processItemJob({
       attributes: {
         durationMs: Date.now() - startedAt,
         jobId: job.id,
-        source: job.data.source,
-        type: job.data.type,
+        source: job.payload.source,
+        type: job.payload.type,
       },
       error,
     });
@@ -832,7 +813,7 @@ async function processImageJob({
   /**
    * BullMQ job being processed.
    */
-  job: Job<ScraperImageJob>;
+  job: QueueJob<ScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -841,25 +822,25 @@ async function processImageJob({
   const startedAt = Date.now();
 
   if (
-    job.data.type === "autmog.image.upload" ||
-    job.data.type === "grimsmo.sagaImage.upload"
+    job.payload.type === "autmog.image.upload" ||
+    job.payload.type === "grimsmo.sagaImage.upload"
   ) {
     if (dryRun) {
       logger.info(loggerMessages.scraper.processor.imageJobCompleted, {
         attributes: {
           durationMs: Date.now() - startedAt,
           jobId: job.id,
-          source: job.data.source,
-          type: job.data.type,
+          source: job.payload.source,
+          type: job.payload.type,
         },
       });
       return "skipped";
     }
     const uploaded = await imageStorage.uploadRemoteImage({
       entity: "products",
-      entityId: job.data.productId,
+      entityId: job.payload.productId,
       prefix: imageFolderPrefix,
-      sourceUrl: job.data.sourceUrl,
+      sourceUrl: job.payload.sourceUrl,
     });
     if (!uploaded)
       throw new Error("Canonical catalog image upload returned no result.");
@@ -870,31 +851,31 @@ async function processImageJob({
       contentType: uploaded.contentType,
       fileName,
       objectPath: uploaded.filePath.replace(/^\//u, ""),
-      position: job.data.position,
+      position: job.payload.position,
       sha256: uploaded.sha256,
       size: uploaded.size,
-      sourceImageId: job.data.sourceImageId,
-      sourceUrl: job.data.sourceUrl,
+      sourceImageId: job.payload.sourceImageId,
+      sourceUrl: job.payload.sourceUrl,
       url: uploaded.url,
     };
-    if (job.data.type === "autmog.image.upload")
+    if (job.payload.type === "autmog.image.upload")
       await syncCanonicalAutmogImage(db, {
-        listingId: job.data.listingId,
-        productId: job.data.productId,
+        listingId: job.payload.listingId,
+        productId: job.payload.productId,
         uploaded: uploadedImage,
       });
     else
       await syncCanonicalSagaImage(db, {
-        listingId: job.data.listingId,
-        productId: job.data.productId,
+        listingId: job.payload.listingId,
+        productId: job.payload.productId,
         uploaded: uploadedImage,
       });
     logger.info(loggerMessages.scraper.processor.imageJobCompleted, {
       attributes: {
         durationMs: Date.now() - startedAt,
         jobId: job.id,
-        source: job.data.source,
-        type: job.data.type,
+        source: job.payload.source,
+        type: job.payload.type,
       },
     });
     return "completed";
@@ -905,7 +886,7 @@ async function processImageJob({
     errorCounter,
     imageFolderPrefix,
     imageStorage,
-    job: job as Job<TmpScraperImageJob>,
+    job: job as QueueJob<TmpScraperImageJob>,
     logger,
     startedAt,
   });
@@ -930,15 +911,15 @@ async function enqueueImageJobs(
      */
     data: ScraperImageJob;
     /**
-     * BullMQ job name passed to `addBulk`.
+     * Stable queue job name.
      */
     name: string;
     /**
-     * BullMQ options for the queued job.
+     * Stable queue job identity.
      */
     opts: {
       /**
-       * Deterministic BullMQ job identifier.
+       * Deterministic queue job identifier.
        */
       jobId: string;
     };
@@ -948,13 +929,14 @@ async function enqueueImageJobs(
     return 0;
   }
 
-  const removedCompletedImageJobs = await removeCompletedJobsById(
+  return enqueueScraperJobs(
     queues.images,
-    imageJobs.map((imageJob) => imageJob.opts.jobId),
+    imageJobs.map((imageJob) => ({
+      id: imageJob.opts.jobId,
+      name: imageJob.name,
+      payload: imageJob.data,
+    })),
   );
-  await queues.images.addBulk(imageJobs);
-
-  return removedCompletedImageJobs;
 }
 
 /**
@@ -1085,7 +1067,7 @@ async function processTmpImageJob({
   /**
    * BullMQ job being processed.
    */
-  job: Job<TmpScraperImageJob>;
+  job: QueueJob<TmpScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -1096,13 +1078,13 @@ async function processTmpImageJob({
   startedAt: number;
 }): Promise<ImageJobResult> {
   try {
-    const row = await getTmpImageForProcessing(db, job.data.imageId);
+    const row = await getTmpImageForProcessing(db, job.payload.imageId);
 
     if (!row) {
       return logMissingImageRow({ job, logger, startedAt });
     }
 
-    if (job.data.type === "tmp.image.upload") {
+    if (job.payload.type === "tmp.image.upload") {
       if (!["pending_upload", "upload_failed"].includes(row.image.status)) {
         logger.info(loggerMessages.scraper.image.uploadSkipped, {
           attributes: {
@@ -1212,9 +1194,9 @@ async function processTmpImageJob({
     return "completed";
   } catch (error) {
     await markTmpImageFailed(db, {
-      imageId: job.data.imageId,
+      imageId: job.payload.imageId,
       status:
-        job.data.type === "tmp.image.upload"
+        job.payload.type === "tmp.image.upload"
           ? "upload_failed"
           : "delete_failed",
     });
@@ -1238,7 +1220,7 @@ function logMissingImageRow({
   /**
    * BullMQ job being processed.
    */
-  job: Job<TmpScraperImageJob>;
+  job: QueueJob<TmpScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -1251,11 +1233,11 @@ function logMissingImageRow({
   logger.warn(loggerMessages.scraper.processor.imageJobCompleted, {
     attributes: {
       durationMs: Date.now() - startedAt,
-      imageId: job.data.imageId,
+      imageId: job.payload.imageId,
       jobId: job.id,
       skipped: true,
       skipReason: "missing-image-row",
-      type: job.data.type,
+      type: job.payload.type,
     },
   });
   return "skipped";
@@ -1284,7 +1266,7 @@ function logImageJobError({
   /**
    * BullMQ job being processed.
    */
-  job: Job<TmpScraperImageJob>;
+  job: QueueJob<TmpScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -1294,31 +1276,31 @@ function logImageJobError({
    */
   startedAt: number;
 }) {
-  const primaryErrorMessage = job.data.type.includes(".upload")
+  const primaryErrorMessage = job.payload.type.includes(".upload")
     ? loggerMessages.scraper.image.uploadFailed
     : loggerMessages.scraper.image.deleteFailed;
 
   errorCounter.record(primaryErrorMessage, {
     error,
-    imageId: job.data.imageId,
+    imageId: job.payload.imageId,
     jobId: job.id,
-    type: job.data.type,
+    type: job.payload.type,
   });
   logger.error(primaryErrorMessage, {
     attributes: {
       durationMs: Date.now() - startedAt,
-      imageId: job.data.imageId,
+      imageId: job.payload.imageId,
       jobId: job.id,
-      type: job.data.type,
+      type: job.payload.type,
     },
     error,
   });
   logger.error(loggerMessages.scraper.processor.imageJobFailed, {
     attributes: {
       durationMs: Date.now() - startedAt,
-      imageId: job.data.imageId,
+      imageId: job.payload.imageId,
       jobId: job.id,
-      type: job.data.type,
+      type: job.payload.type,
     },
     error,
   });
@@ -1516,271 +1498,4 @@ function logProcessorErrorSummary({
       totalErrors: summary.totalErrors,
     },
   });
-}
-
-/**
- * Processes one bounded queue batch and returns terminal job counts.
- * Forces worker closure after five minutes; earlier completion allows thirty seconds
- * for graceful closure before forcing it.
- *
- * @param options - Dependencies and controls for the operation.
- *
- * @returns Completed, failed, and skipped job counts.
- *
- * @template TJobData - Queue job payload type.
- *
- * @rejects When queue processing or a required dependency fails.
- */
-async function drainQueue<TJobData>({
-  batchSize,
-  concurrency,
-  connection,
-  handler,
-  logger,
-  queueName,
-}: {
-  /**
-   * Target job count for this drain; concurrency may complete additional active jobs.
-   */
-  batchSize: number;
-  /**
-   * Maximum jobs processed concurrently by a queue worker.
-   */
-  concurrency: number;
-  /**
-   * Redis connection shared with BullMQ workers and queues.
-   */
-  connection: Redis;
-  /**
-   * Processes one queued job and returns its drain outcome.
-   *
-   * @param job - BullMQ job to process.
-   *
-   * @returns Promise resolving to `"skipped"` for a skipped job; `"completed"` or
-   * `undefined` count as completed.
-   *
-   * @rejects When queue processing or a required dependency fails.
-   */
-  handler: (job: Job<TJobData>) => Promise<"completed" | "skipped" | undefined>;
-  /**
-   * Logger used for scraper lifecycle events.
-   */
-  logger: Logger;
-  /**
-   * Stable BullMQ queue name.
-   */
-  queueName: string;
-}): Promise<QueueDrainStats> {
-  const startedAt = Date.now();
-  const stats: QueueDrainStats = {
-    completed: 0,
-    failed: 0,
-    skipped: 0,
-  };
-
-  return new Promise((resolve, reject) => {
-    let finishPromise: Promise<void> | null = null;
-    let worker: Worker<TJobData> | null = null;
-    const timeout = setTimeout(
-      () => {
-        void finishDrain({ force: true }).then(() => resolve(stats), reject);
-      },
-      5 * 60 * 1000,
-    );
-    /**
-     * Stops the active queue drain once and records its final statistics.
-     *
-     * @param options - Dependencies and controls for the operation.
-     *
-     * @returns The shared worker-close promise.
-     */
-    const finishDrain = ({
-      force = false,
-    }: {
-      /**
-       * Whether to force closure without waiting for active jobs.
-       */
-      force?: boolean;
-    } = {}) => {
-      if (finishPromise) {
-        return finishPromise;
-      }
-
-      finishPromise = (async () => {
-        clearTimeout(timeout);
-        await closeWorkerWithDeadline(worker, force);
-        logger.info(loggerMessages.scraper.queue.drainCompleted, {
-          attributes: {
-            completedJobs: stats.completed,
-            durationMs: Date.now() - startedAt,
-            failedJobs: stats.failed,
-            queue: queueName,
-            skippedJobs: stats.skipped,
-          },
-        });
-      })();
-
-      return finishPromise;
-    };
-    /**
-     * Finishes the drain after the requested number of jobs reaches a terminal state.
-     */
-    const maybeCloseWorker = () => {
-      if (stats.completed + stats.failed + stats.skipped >= batchSize) {
-        void finishDrain().then(() => resolve(stats), reject);
-      }
-    };
-
-    worker = new Worker<TJobData>(
-      queueName,
-      async (job) => {
-        const result = await handler(job);
-
-        if (result === "skipped") {
-          stats.skipped += 1;
-        } else {
-          stats.completed += 1;
-        }
-
-        maybeCloseWorker();
-      },
-      {
-        autorun: true,
-        concurrency,
-        connection,
-      },
-    );
-
-    worker.on("drained", () => {
-      void finishDrain().then(() => resolve(stats), reject);
-    });
-    worker.on("failed", () => {
-      stats.failed += 1;
-      maybeCloseWorker();
-    });
-    worker.on("error", (error) => {
-      logger.error(loggerMessages.scraper.queue.drainFailed, {
-        attributes: {
-          queue: queueName,
-        },
-        error,
-      });
-      void finishDrain({ force: true }).then(() => reject(error), reject);
-    });
-  });
-}
-
-/**
- * Closes a worker immediately when forced; otherwise allows thirty seconds for
- * graceful closure before forcing it.
- *
- * @param worker - BullMQ worker to close, or `null` before creation.
- *
- * @param force - Whether to force worker closure.
- *
- * @template TJobData - Queue job payload type.
- *
- * @rejects When queue processing or a required dependency fails.
- */
-async function closeWorkerWithDeadline<TJobData>(
-  worker: Worker<TJobData> | null,
-  force: boolean,
-) {
-  if (!worker) {
-    return;
-  }
-
-  if (force) {
-    await worker.close(true);
-    return;
-  }
-
-  let forceClose: NodeJS.Timeout | undefined;
-
-  await Promise.race([
-    worker.close(),
-    new Promise<void>((resolve) => {
-      forceClose = setTimeout(() => {
-        void worker.close(true).finally(resolve);
-      }, 30_000);
-    }),
-  ]);
-
-  clearTimeout(forceClose);
-}
-
-/**
- * Retries a bounded batch of failed jobs and reports requeue outcomes.
- *
- * @param options - Dependencies and controls for the operation.
- *
- * @returns Failed, requeued, and retry-failure counts.
- *
- * @template TJobData - Queue job payload type.
- *
- * @rejects When queue processing or a required dependency fails.
- */
-async function processDeadLetters<TJobData>({
-  batchSize,
-  logger,
-  queue,
-  queueName,
-}: {
-  /**
-   * Maximum jobs processed from each queue during this run.
-   */
-  batchSize: number;
-  /**
-   * Logger used for scraper lifecycle events.
-   */
-  logger: Logger;
-  /**
-   * BullMQ queue operated on by the processor.
-   */
-  queue: Queue<TJobData>;
-  /**
-   * Stable BullMQ queue name.
-   */
-  queueName: string;
-}): Promise<QueueDeadLetterStats> {
-  const startedAt = Date.now();
-  const failedCount = await queue.getFailedCount();
-  const jobs = batchSize > 0 ? await queue.getFailed(0, batchSize - 1) : [];
-  const stats: QueueDeadLetterStats = {
-    failed: failedCount,
-    requeueFailed: 0,
-    requeued: 0,
-  };
-
-  for (const job of jobs) {
-    try {
-      await job.retry("failed");
-      stats.requeued += 1;
-    } catch (error) {
-      stats.requeueFailed += 1;
-      logger.error(loggerMessages.scraper.queue.deadLetterFailed, {
-        attributes: {
-          attemptsMade: job.attemptsMade,
-          failedReason: job.failedReason,
-          jobId: job.id,
-          jobName: job.name,
-          queue: queueName,
-        },
-        error,
-      });
-    }
-  }
-
-  logger.info(loggerMessages.scraper.queue.deadLetterCompleted, {
-    attributes: {
-      batchSize,
-      durationMs: Date.now() - startedAt,
-      failedJobs: failedCount,
-      queue: queueName,
-      requeueFailedJobs: stats.requeueFailed,
-      requeuedJobs: stats.requeued,
-    },
-  });
-
-  return stats;
 }
