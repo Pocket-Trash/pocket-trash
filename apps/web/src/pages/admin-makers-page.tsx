@@ -1,4 +1,11 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import {
+  faArrowRotateLeft,
+  faIndustry,
+  faPencil,
+  faTrash,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogImage, CatalogMaker } from "@package/services";
 import {
   maxImageBytes,
@@ -11,7 +18,6 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Factory, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
@@ -94,14 +100,22 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
                   />
                 ) : (
                   <div className="grid aspect-[4/3] place-items-center rounded-md bg-muted text-muted-foreground">
-                    <Factory aria-hidden="true" className="size-8" />
+                    <FontAwesomeIcon
+                      aria-hidden="true"
+                      className="size-8"
+                      icon={faIndustry}
+                    />
                     <span className="sr-only">
                       {t("web.admin.makers.imagesEmpty")}
                     </span>
                   </div>
                 )}
                 <div className="flex items-start gap-3">
-                  <Factory aria-hidden="true" className="mt-0.5 size-5" />
+                  <FontAwesomeIcon
+                    aria-hidden="true"
+                    className="mt-0.5 size-5"
+                    icon={faIndustry}
+                  />
                   <div className="min-w-0 flex-1">
                     <h2 className="m-0 truncate text-base font-semibold">
                       {maker.name}
@@ -122,7 +136,7 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
                   params={{ makerId: String(maker.id) }}
                   to="/admin/makers/$makerId/edit"
                 >
-                  <Pencil aria-hidden="true" />
+                  <FontAwesomeIcon aria-hidden="true" icon={faPencil} />
                   {t("web.action.edit")}
                 </Link>
               </li>
@@ -389,7 +403,11 @@ function MakerImageFields({
       {!activeImages.length && !images.length ? (
         <div className="grid aspect-[4/3] max-w-sm place-items-center rounded-lg border border-dashed border-border bg-muted text-muted-foreground">
           <div className="grid justify-items-center gap-2 text-sm">
-            <Factory aria-hidden="true" className="size-8" />
+            <FontAwesomeIcon
+              aria-hidden="true"
+              className="size-8"
+              icon={faIndustry}
+            />
             <span>{t("web.admin.makers.imagesEmpty")}</span>
           </div>
         </div>
@@ -455,7 +473,10 @@ function MakerImageFields({
             type="button"
             variant="outline"
           >
-            {image.deletedAt ? <RotateCcw /> : <Trash2 />}
+            <FontAwesomeIcon
+              aria-hidden="true"
+              icon={image.deletedAt ? faArrowRotateLeft : faTrash}
+            />
             {t(
               image.deletedAt
                 ? "web.resources.action.restore"

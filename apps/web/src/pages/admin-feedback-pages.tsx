@@ -1,3 +1,5 @@
+import { faCircleX, faMagnifyingGlass } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   AdminFeedbackSort,
   ListAdminFeedbackOptions,
@@ -12,7 +14,6 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { CircleX, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPageShell } from "@/components/admin-page-shell";
@@ -593,7 +594,7 @@ function AdminFeedbackPage({
                     type="button"
                     variant="ghost"
                   >
-                    <CircleX aria-hidden="true" />
+                    <FontAwesomeIcon aria-hidden="true" icon={faCircleX} />
                   </Button>
                 ) : null}
               </div>
@@ -620,7 +621,7 @@ function AdminFeedbackPage({
                 </select>
               ) : null}
               <Button disabled={loading} type="submit" variant="outline">
-                <Search aria-hidden="true" />
+                <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
                 {t("web.action.search")}
               </Button>
             </form>

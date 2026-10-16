@@ -1,9 +1,10 @@
+import { faCheck } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AdminPageShell } from "@/components/admin-page-shell";
@@ -133,7 +134,7 @@ export function AdminFeedbackNotificationsPage({
                   type="button"
                   variant="outline"
                 >
-                  <Check />
+                  <FontAwesomeIcon aria-hidden="true" icon={faCheck} />
                   {t("web.resources.action.accept")}
                 </Button>
               </article>

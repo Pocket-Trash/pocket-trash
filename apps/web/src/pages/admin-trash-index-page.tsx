@@ -1,9 +1,10 @@
+import { faImageSlash, faTrash } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { ImageOff, PackageX } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -25,7 +26,7 @@ export function AdminTrashIndexPage() {
     ...(hasPermission(actor, "resources.manage")
       ? [
           {
-            icon: PackageX,
+            icon: faTrash,
             label: t("web.resources.trash.adminTitle"),
             to: "/admin/trash/resources" as const,
           },
@@ -35,7 +36,7 @@ export function AdminTrashIndexPage() {
     hasPermission(actor, "collections.manage")
       ? [
           {
-            icon: ImageOff,
+            icon: faImageSlash,
             label: t("web.admin.hub.catalogImageTrash"),
             to: "/admin/trash/catalog-images" as const,
           },
@@ -50,13 +51,17 @@ export function AdminTrashIndexPage() {
       title={t("web.admin.trash.title")}
     >
       <main className="grid w-full max-w-3xl gap-3 p-4 md:grid-cols-2 md:p-6">
-        {links.map(({ icon: Icon, label, to }) => (
+        {links.map(({ icon, label, to }) => (
           <Link
             className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             key={to}
             to={to}
           >
-            <Icon aria-hidden="true" className="size-5" />
+            <FontAwesomeIcon
+              aria-hidden="true"
+              className="size-5"
+              icon={icon}
+            />
             <span className="font-semibold">{label}</span>
           </Link>
         ))}

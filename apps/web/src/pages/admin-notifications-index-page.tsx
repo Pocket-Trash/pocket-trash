@@ -1,9 +1,10 @@
+import { faBell } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Bell } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -53,7 +54,11 @@ export function AdminNotificationsIndexPage() {
             key={to}
             to={to}
           >
-            <Bell aria-hidden="true" className="size-5" />
+            <FontAwesomeIcon
+              aria-hidden="true"
+              className="size-5"
+              icon={faBell}
+            />
             <span className="font-semibold">{label}</span>
           </Link>
         ))}
