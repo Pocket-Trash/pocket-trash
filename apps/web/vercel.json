@@ -4,6 +4,6 @@
   "git": {
     "deploymentEnabled": false
   },
-  "installCommand": "./scripts/pnpm-install.sh --frozen-lockfile",
+  "installCommand": "../../scripts/pnpm-install.sh --frozen-lockfile",
   "outputDirectory": null
 }

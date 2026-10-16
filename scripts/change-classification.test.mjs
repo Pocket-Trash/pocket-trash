@@ -319,7 +319,7 @@ test("passes the preview package token only to Vercel's install process", () => 
 
   assert.equal(
     config.installCommand,
-    "./scripts/pnpm-install.sh --frozen-lockfile",
+    "../../scripts/pnpm-install.sh --frozen-lockfile",
   );
 });
 
