@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 /** Validation domains emitted for local checks and GitHub Actions jobs. */
 export const validationDomains = [
   "api",
+  "discord_bot",
   "scraper",
   "web",
   "database_validation",
@@ -169,6 +170,11 @@ const changeClassificationRules = [
     mutationDomains: allMutationDomains,
   },
   {
+    category: "discord-bot",
+    prefixes: ["apps/discord-bot/"],
+    domains: ["discord_bot", "validation"],
+  },
+  {
     category: "scraper",
     prefixes: ["apps/scraper/"],
     domains: ["scraper", "preview", "validation"],
@@ -203,7 +209,7 @@ const changeClassificationRules = [
   {
     category: "shared-queue",
     prefixes: ["packages/queue/"],
-    domains: ["scraper", "preview", "validation"],
+    domains: ["discord_bot", "scraper", "preview", "validation"],
   },
   {
     category: "validation-tooling",
@@ -249,6 +255,7 @@ const changeClassificationRules = [
     paths: ["tsconfig.json", "turbo.json"],
     domains: [
       "api",
+      "discord_bot",
       "scraper",
       "web",
       "storybook",
@@ -267,7 +274,7 @@ const changeClassificationRules = [
       "scripts/pnpm-install.sh",
     ],
     prefixes: [".railway/"],
-    domains: ["scraper", "preview", "validation"],
+    domains: ["discord_bot", "scraper", "preview", "validation"],
   },
   {
     category: "local-scraper-tooling",
