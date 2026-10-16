@@ -16,6 +16,9 @@ for (const environment of ["production", "preview"]) {
     const scraper = definition.resources.find(
       (resource) => resource.type === "service",
     );
+    const queue = definition.resources.find(
+      (resource) => resource.address === "database.pocket-trash-queue",
+    );
     assert.equal(definition.name, "Pocket Trash");
     assert.equal(
       scraper.name,
@@ -83,11 +86,16 @@ for (const environment of ["production", "preview"]) {
     assert.deepEqual(
       definition.resources.map((resource) => resource.address).sort(),
       [
+        "database.pocket-trash-queue",
         "database.scraper-queue",
         `service.${scraper.name}`,
         "volume.redis-volume",
       ],
     );
+    assert.equal(queue.name, "pocket-trash-queue");
+    assert.match(queue.deploy.startCommand, /--save 60 1/);
+    assert.match(queue.deploy.startCommand, /--appendonly yes/);
+    assert.match(queue.deploy.startCommand, /--appendfsync everysec/);
     const volume = definition.resources.find(
       (resource) => resource.type === "volume",
     );

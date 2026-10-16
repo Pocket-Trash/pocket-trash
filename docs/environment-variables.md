@@ -16,13 +16,14 @@ boundaries.
 ## Runtime Ownership
 
 Pocket Trash runs the web application on Vercel, the API on Cloudflare Workers,
-and the scraper on Railway.
+and the scraper and Discord bot on Railway.
 
 | Infisical path | Owner and destination |
 | --- | --- |
 | `/apps/web` | Web development, builds, tests, and database commands; deploy workflows copy required values to Vercel |
 | `/apps/api` | Local API development and Cloudflare Worker deployment |
 | `/apps/scraper` | Local scraper commands and Railway services |
+| `/apps/discord-bot` | Local Discord-bot development and its Railway service; Discord, GitHub, logger, Linear, and AI credentials stay app-owned |
 | `/local/database` | Optional developer-specific database URLs |
 | `/tools/package-manager` | Local package installation credentials |
 | `/tools/logger-axiom-test` | Local live Axiom integration test |
@@ -40,6 +41,12 @@ secret from the logger tooling path to enforce the development, preview, and
 production dataset map fields without placing it in an application runtime or
 `tools/github/secrets`. Runtime `AXIOM_TOKEN` values remain limited to ingest,
 plus query access where the logger live test requires it.
+
+Railway owns the shared `REDIS_URL` reference for the scraper and Discord bot.
+Point both services at `${{pocket-trash-queue.REDIS_URL}}`; do not copy the URL,
+password, or public endpoint into Infisical. Sharing this credential also shares
+capacity and outage scope, while stable app-specific queue names and payload
+schemas prevent logical overlap.
 
 ## Cross-Runtime Constraints
 

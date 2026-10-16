@@ -1,7 +1,8 @@
 # Railway
 
-Railway hosts the scheduled scraper service and its Redis queue. Postgres remains
-the durable source of truth.
+Railway hosts the scheduled scraper service and the shared Redis queue used by
+the scraper and Discord bot. Postgres and Linear remain the durable sources of
+truth for application and support-ticket data.
 
 The deployment contract lives in [`.railway/railway.ts`](../.railway/railway.ts), and the
 preview and production handoff lives in the
@@ -16,7 +17,8 @@ Create these resources in the Pocket Trash Railway project:
 | Resource | Railway name | Configuration |
 | --- | --- | --- |
 | Scraper cron service | `pocket-trash` in production; `pocket-trash (preview)` in previews | Project IaC with no legacy Config File setting |
-| Redis | `scraper-queue` | Railway Redis template |
+| Redis | `pocket-trash-queue` | Railway Redis template with `redis-volume` |
+| Legacy Redis during migration | `scraper-queue` | Retained until separately approved cleanup |
 
 Railway may detect other deployable workspace apps during repository import.
 Skip them: this project deploys only `apps/scraper`.
@@ -59,7 +61,7 @@ not used by scraper application code.
 
 Keep one authoring file, [`.railway/railway.ts`](../.railway/railway.ts), and the
 CLI-generated [`.railway/README.md`](../.railway/README.md). The file describes the
-existing scraper, Redis queue, and Redis volume. Production uses `pocket-trash`;
+existing scraper, shared Redis queue, and Redis volume. Production uses `pocket-trash`;
 the `preview` template uses `pocket-trash (preview)`. Native PR environments
 inherit the preview template rather than being planned individually. Secrets,
 Redis references, cron enablement, database URLs, and deployment metadata stay
@@ -98,6 +100,38 @@ CLI passes the saved project's name into the IaC context.
 Railway does not read IaC during a source deployment. Apply reviewed configuration
 changes explicitly before deploying code that depends on them. Production source
 uploads still use the tag release workflow; applying a plan is not a release.
+
+### Shared Redis migration
+
+The initial production and preview rename plans inspected on 2026-10-16 both
+reported exactly `1 to add, 0 to change, 1 to destroy`: create database
+`pocket-trash-queue` and delete database `scraper-queue`. The IaC rename is
+therefore a replacement, not an in-place rename. The checked-in migration stage
+retains both resources; its reviewed production and preview plans report
+`1 to add, 0 to change, 0 to destroy`. Do not apply even that additive plan
+without express user permission.
+
+Migration requires separate, explicitly approved stages:
+
+1. Temporarily describe both Redis resources and provision
+   `pocket-trash-queue` without deleting or detaching `scraper-queue` or
+   `redis-volume`.
+2. Enable RDB snapshots and AOF (`appendonly yes`, `appendfsync everysec`) on the
+   new resource, then verify both persistence modes after a restart test.
+3. Pause producers, drain `scraper-images` and `scraper-items`, and verify their
+   active, waiting, delayed, and failed counts. Copy any required Redis-local
+   scraper checkpoints.
+4. Switch the scraper and Discord bot `REDIS_URL` references, resume consumers,
+   and verify queue processing, deduplication, the Axiom cursor, and ticket
+   operations before resuming producers.
+5. Observe at least one complete scraper schedule and the Discord health checks.
+   Roll back references to `scraper-queue` if verification fails.
+6. Remove `scraper-queue` and its obsolete data only in a later cleanup with
+   separate user approval and a fresh plan proving the exact deletion.
+
+Provisioning, switching, deployment, and cleanup are production actions. This
+repository change records the desired state and plan result only; it authorizes
+none of those actions.
 
 ### Legacy cutover
 
@@ -168,16 +202,43 @@ validated defaults are documented beside
 
 ## Redis
 
-Provision Redis in Railway; the scraper must not provision it at runtime. Set
-`REDIS_URL` on the scraper as a Railway service reference:
+Provision Redis in Railway; applications must not provision it at runtime. Set
+`REDIS_URL` on both the scraper and Discord bot as a Railway service reference:
 
 ```dotenv
-REDIS_URL=${{scraper-queue.REDIS_PUBLIC_URL}}
+REDIS_URL=${{pocket-trash-queue.REDIS_URL}}
 ```
 
-Use the actual Redis service name if it differs. Keep this reference in Railway
-rather than copying a Railway URL into Infisical. Redis is a queue, not durable
-history; losing it must not delete the persisted scraper state in Postgres.
+Keep this reference in Railway rather than copying credentials into Infisical.
+Both applications intentionally share credentials, the 5 GB `redis-volume`,
+capacity, persistence, and outage scope. They use separate stable queue names:
+`scraper-images`, `scraper-items`, and app-owned Discord notification queues.
+Payload schemas remain owned by each app. Losing Redis must not delete scraper
+history in Postgres or support tickets in Linear, but it can delay both workloads
+and lose Redis-local reconciliation state.
+
+RDB snapshots remain enabled with `save 60 1`. AOF is also enabled with
+one-second flushing. A confirmed write can therefore lose up to roughly one
+second during a host failure; AOF and RDB live on the same volume and are not
+independent backups. Keep volume alerts at 80%, 95%, and 100%, inventory Railway
+volume backups before storing new categories of personal data, and test restore
+behavior before relying on a backup.
+
+Notification delivery retains completed jobs for 24 hours, capped at 1,000, so
+the delayed Axiom fallback still finds the direct-delivery job ID and cannot post
+a duplicate. Failed notification jobs remain for 14 days. With a 64 KiB maximum
+normalized notification payload, completed payloads consume at most about 64 MiB;
+7,000 failures (the documented Axiom ceiling of 500 notifications/day for 14
+days) consume about 448 MiB before BullMQ overhead. Reserve 1 GiB of the 5 GB
+volume for Discord notification work and investigate before total volume usage
+reaches 80%. Direct notifications are not rate-limited by Axiom, so sustained
+error volume above that planning envelope is degraded operation, not permission
+to shorten the 24-hour deduplication window.
+
+The bot-local Axiom intake cursor advances only after a terminal intake result.
+Ticket-operation records retain recovery state while a ticket is being created;
+after Discord finalization, only thread-to-Linear mappings remain for 90 days.
+These keys are operational state, not durable truth.
 
 Secret ownership and non-Railway environment placement are documented in
 [environment-variables.md](./environment-variables.md). Bunny provisioning and
@@ -208,7 +269,7 @@ the workflow:
 2. Stages the selected `DATABASE_URL`, Bunny image prefix, cron flag, deployment
    metadata, and the Redis service reference on `pocket-trash (preview)` with
    `--skip-deploys`.
-3. Redeploys `scraper-queue` from its configured image source so Redis is online.
+3. Redeploys `pocket-trash-queue` from its configured image source so Redis is online.
 
 - Mutation-relevant PRs use the isolated `preview-pr-<number>` branch;
   DB-changing PRs also apply committed migrations before deployment.

@@ -27,7 +27,7 @@ env:
   DB_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-db-preview -->"
   RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME: "pocket-trash (preview)"
   RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME: "pocket-trash"
-  RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME: "scraper-queue"
+  RAILWAY_QUEUE_PREVIEW_SERVICE_NAME: "pocket-trash-queue"
 
 jobs:
   classify-changes:
@@ -273,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in NEON_API_KEY NEON_PROJECT_ID NEON_DATABASE_NAME NEON_DATABASE_USER VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME; do
+          for name in NEON_API_KEY NEON_PROJECT_ID NEON_DATABASE_NAME NEON_DATABASE_USER VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME RAILWAY_QUEUE_PREVIEW_SERVICE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -661,7 +661,7 @@ jobs:
           else
             scraper_cron_enabled="false"
           fi
-          redis_url_reference='$'"{{${RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME}.REDIS_PUBLIC_URL}}"
+          redis_url_reference='$'"{{${RAILWAY_QUEUE_PREVIEW_SERVICE_NAME}.REDIS_URL}}"
 
           jq -cn \
             --arg app "ci" \
@@ -798,7 +798,7 @@ jobs:
             --arg message "ci.railway.preview.queue.deployStarted" \
             --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
             --arg railway_environment "$railway_environment" \
-            --arg service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
+            --arg service "$RAILWAY_QUEUE_PREVIEW_SERVICE_NAME" \
             '{
               app: $app,
               environment: $environment,
@@ -815,21 +815,21 @@ jobs:
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
+            --service "$RAILWAY_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
           printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
+            --service "$RAILWAY_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
           pnpm exec railway service redeploy \
             --from-source \
             --yes \
             --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
+            --service "$RAILWAY_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
       - name: Create DB preview comment app token
