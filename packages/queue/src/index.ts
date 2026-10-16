@@ -205,6 +205,7 @@ export interface DefinedQueue<TPayload> {
    *
    * @param options - Handler and drain limits.
    * @returns Terminal outcome counts.
+   * @rejects When the queue is closed, has the wrong mode, or transport setup fails.
    */
   process(options: QueueProcessOptions<TPayload>): Promise<QueueProcessResult>;
   /**
@@ -212,6 +213,7 @@ export interface DefinedQueue<TPayload> {
    *
    * @param options - Handler and concurrency.
    * @returns Open worker handle.
+   * @rejects When the queue is closed, has the wrong mode, or transport setup fails.
    */
   processContinuously(options: {
     /** Maximum number of jobs processed at once. */

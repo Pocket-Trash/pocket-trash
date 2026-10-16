@@ -186,16 +186,19 @@ class BullMqDefinedQueue<TPayload> implements DefinedQueue<TPayload> {
     const payload = this.#definition.schema.parse(input.payload);
     const lockKey = `${this.#queue.toKey(input.id)}:enqueue-lock`;
     const lockToken = crypto.randomUUID();
-    const acquired = await this.#connection.set(
-      lockKey,
-      lockToken,
-      "PX",
-      30_000,
-      "NX",
-    );
-    if (acquired !== "OK") {
-      return { accepted: false, replacedCompleted: false };
-    }
+    let acquired: "OK" | null;
+    do {
+      acquired = await this.#connection.set(
+        lockKey,
+        lockToken,
+        "PX",
+        30_000,
+        "NX",
+      );
+      if (acquired !== "OK") {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } while (acquired !== "OK");
 
     try {
       const existing = await this.#queue.getJob(input.id);
@@ -216,12 +219,16 @@ class BullMqDefinedQueue<TPayload> implements DefinedQueue<TPayload> {
       await this.#queue.add(input.name, payload, { jobId: input.id });
       return { accepted: true, replacedCompleted };
     } finally {
-      await this.#connection.eval(
-        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0",
-        1,
-        lockKey,
-        lockToken,
-      );
+      try {
+        await this.#connection.eval(
+          "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0",
+          1,
+          lockKey,
+          lockToken,
+        );
+      } catch {
+        // The lease expires; cleanup must not overwrite the durable enqueue outcome.
+      }
     }
   }
 
