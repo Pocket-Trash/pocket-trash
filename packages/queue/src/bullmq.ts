@@ -216,8 +216,16 @@ class BullMqDefinedQueue<TPayload> implements DefinedQueue<TPayload> {
         replacedCompleted = true;
       }
 
-      await this.#queue.add(input.name, payload, { jobId: input.id });
-      return { accepted: true, replacedCompleted };
+      const enqueueToken = crypto.randomUUID();
+      await this.#queue.add(input.name, payload, {
+        jobId: input.id,
+        telemetry: { metadata: enqueueToken, omitContext: true },
+      });
+      const stored = await this.#queue.getJob(input.id);
+      return {
+        accepted: stored?.opts.telemetry?.metadata === enqueueToken,
+        replacedCompleted,
+      };
     } finally {
       try {
         await this.#connection.eval(
