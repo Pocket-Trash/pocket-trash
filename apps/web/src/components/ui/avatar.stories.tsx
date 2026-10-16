@@ -1,5 +1,6 @@
+import { faCheck } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { Check } from "lucide-react";
 import { withThemePanels } from "../../../.storybook/theme-panels";
 import {
   Avatar,
@@ -79,7 +80,7 @@ export const WithBadge: Story = {
       <AvatarImage alt="Ada Lovelace" src="" />
       <AvatarFallback>AL</AvatarFallback>
       <AvatarBadge>
-        <Check />
+        <FontAwesomeIcon aria-hidden="true" icon={faCheck} />
       </AvatarBadge>
     </Avatar>
   ),

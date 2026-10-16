@@ -1,5 +1,10 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
+import {
+  faCheck,
+  faChevronRight,
+  faCircle,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -159,7 +164,11 @@ function DropdownMenuCheckboxItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenuPrimitive.CheckboxItemIndicator>
-          <CheckIcon className="size-4" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-4"
+            icon={faCheck}
+          />
         </MenuPrimitive.CheckboxItemIndicator>
       </span>
       {children}
@@ -208,7 +217,11 @@ function DropdownMenuRadioItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenuPrimitive.RadioItemIndicator>
-          <CircleIcon className="size-2 fill-current" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-2 fill-current"
+            icon={faCircle}
+          />
         </MenuPrimitive.RadioItemIndicator>
       </span>
       {children}
@@ -333,7 +346,11 @@ function DropdownMenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto size-4" />
+      <FontAwesomeIcon
+        aria-hidden="true"
+        className="ml-auto size-4"
+        icon={faChevronRight}
+      />
     </MenuPrimitive.SubmenuTrigger>
   );
 }

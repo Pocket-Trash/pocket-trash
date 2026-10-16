@@ -1,4 +1,9 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  faChevronLeft,
+  faChevronRight,
+  faXmark,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { type ReactNode, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -264,7 +269,7 @@ export function ImageLightbox({
               type="button"
               variant="secondary"
             >
-              <X />
+              <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
             </Button>
             {images.length > 1 ? (
               <Button
@@ -275,7 +280,7 @@ export function ImageLightbox({
                 type="button"
                 variant="secondary"
               >
-                <ChevronLeft />
+                <FontAwesomeIcon aria-hidden="true" icon={faChevronLeft} />
               </Button>
             ) : null}
             {images[selectedIndex] ? (
@@ -294,7 +299,7 @@ export function ImageLightbox({
                 type="button"
                 variant="secondary"
               >
-                <ChevronRight />
+                <FontAwesomeIcon aria-hidden="true" icon={faChevronRight} />
               </Button>
             ) : null}
           </div>

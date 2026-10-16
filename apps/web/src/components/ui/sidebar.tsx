@@ -1,8 +1,9 @@
 "use client";
 
+import { faSidebar } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { cva, type VariantProps } from "class-variance-authority";
-import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -411,7 +412,7 @@ function SidebarTrigger({
           />
         }
       >
-        <PanelLeftIcon />
+        <FontAwesomeIcon aria-hidden="true" icon={faSidebar} />
         <span className="sr-only">{label}</span>
       </TooltipTrigger>
       <TooltipContent

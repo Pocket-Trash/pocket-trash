@@ -1,11 +1,12 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import { faChevronRight, faHouse } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   DEFAULT_LOCALE,
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, Home } from "lucide-react";
 import type * as React from "react";
 import { toast } from "sonner";
 import { LanguageSelect } from "@/components/language-select";
@@ -123,13 +124,18 @@ export function AppShell({
                 className="shrink-0 rounded-sm p-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 to="/"
               >
-                <Home aria-hidden="true" className="size-3.5" />
+                <FontAwesomeIcon
+                  aria-hidden="true"
+                  className="size-3.5"
+                  icon={faHouse}
+                />
               </Link>
               {breadcrumbItems.map((item, index) => (
                 <span className="contents" key={`${item.label}-${index}`}>
-                  <ChevronRight
+                  <FontAwesomeIcon
                     aria-hidden="true"
                     className="size-3.5 shrink-0"
+                    icon={faChevronRight}
                   />
                   {item.to === "/collections/$userId" ? (
                     <Link
@@ -161,7 +167,11 @@ export function AppShell({
                   )}
                 </span>
               ))}
-              <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0"
+                icon={faChevronRight}
+              />
               <span aria-current="page" className="truncate text-foreground">
                 {title}
               </span>

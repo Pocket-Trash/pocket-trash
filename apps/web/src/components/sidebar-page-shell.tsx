@@ -1,6 +1,7 @@
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useStore } from "@nanostores/react";
 import { Link } from "@tanstack/react-router";
-import type { LucideIcon } from "lucide-react";
 import { type ReactNode, useContext } from "react";
 import { AppShell, type AppShellProps } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,7 @@ export type SidebarLink = {
   /** Whether the top-level destination is active. */
   active?: boolean;
   /** Icon rendered with the top-level destination. */
-  icon: LucideIcon;
+  icon: IconDefinition;
   /** Localized destination label. */
   label: string;
   /** Subroutes shown while the top-level destination is active. */
@@ -74,7 +75,7 @@ export type SidebarLink = {
 /** One button rendered after the sidebar utility destinations. */
 type SidebarAction = {
   /** Icon rendered with the action. */
-  icon: LucideIcon;
+  icon: IconDefinition;
   /** Localized action label. */
   label: string;
   /** Callback invoked when the action is selected. */
@@ -290,7 +291,7 @@ export function SidebarNavigation({
  */
 function SidebarNavigationGroup({
   active = false,
-  icon: Icon,
+  icon,
   label,
   links,
   to,
@@ -313,7 +314,11 @@ function SidebarNavigationGroup({
             />
           }
         >
-          <Icon aria-hidden="true" className="size-4 shrink-0" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-4 shrink-0"
+            icon={icon}
+          />
           <span className={cn(!expanded && "md:sr-only")}>{label}</span>
         </TooltipTrigger>
         <TooltipContent
@@ -348,11 +353,7 @@ function SidebarNavigationGroup({
  * @param props - Sidebar action properties.
  * @returns One sidebar action.
  */
-function SidebarNavigationAction({
-  icon: Icon,
-  label,
-  onSelect,
-}: SidebarAction) {
+function SidebarNavigationAction({ icon, label, onSelect }: SidebarAction) {
   const { isMobile, open, openMobile } = useSidebar();
   const expanded = isMobile ? openMobile : open;
 
@@ -370,7 +371,11 @@ function SidebarNavigationAction({
           />
         }
       >
-        <Icon aria-hidden="true" className="size-4 shrink-0" />
+        <FontAwesomeIcon
+          aria-hidden="true"
+          className="size-4 shrink-0"
+          icon={icon}
+        />
         <span className={cn(!expanded && "md:sr-only")}>{label}</span>
       </TooltipTrigger>
       <TooltipContent

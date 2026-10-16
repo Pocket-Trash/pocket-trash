@@ -1,3 +1,19 @@
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import {
+  faBlockQuote,
+  faBold,
+  faH1,
+  faH2,
+  faH3,
+  faItalic,
+  faLinkSimple,
+  faListOl,
+  faListUl,
+  faMinus,
+  faStrikethrough,
+  faTable,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   htmlToMarkdown,
   isSafeMarkdownLink,
@@ -7,20 +23,6 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import {
-  Bold,
-  Heading1,
-  Heading2,
-  Heading3,
-  Italic,
-  Link2,
-  List,
-  ListOrdered,
-  Minus,
-  Strikethrough,
-  Table2,
-  TextQuote,
-} from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,10 +132,7 @@ type ToolbarAction = Readonly<{
   /** Format applied by the action. */
   format: MarkdownVisualFormat;
   /** Icon displayed by the action. */
-  icon: React.ComponentType<{
-    /** Optional icon classes. */
-    className?: string;
-  }>;
+  icon: IconDefinition;
   /** Localization key for its accessible label. */
   label: TranslationKey;
 }>;
@@ -152,52 +151,52 @@ type SourceLineEdit = Readonly<{
 const toolbarActions: readonly ToolbarAction[] = [
   {
     format: "heading1",
-    icon: Heading1,
+    icon: faH1,
     label: "web.markdownEditor.toolbar.heading1",
   },
   {
     format: "heading2",
-    icon: Heading2,
+    icon: faH2,
     label: "web.markdownEditor.toolbar.heading2",
   },
   {
     format: "heading3",
-    icon: Heading3,
+    icon: faH3,
     label: "web.markdownEditor.toolbar.heading3",
   },
   {
     format: "bold",
-    icon: Bold,
+    icon: faBold,
     label: "web.markdownEditor.toolbar.bold",
   },
   {
     format: "italic",
-    icon: Italic,
+    icon: faItalic,
     label: "web.markdownEditor.toolbar.italic",
   },
   {
     format: "strikethrough",
-    icon: Strikethrough,
+    icon: faStrikethrough,
     label: "web.markdownEditor.toolbar.strikethrough",
   },
   {
     format: "unorderedList",
-    icon: List,
+    icon: faListUl,
     label: "web.markdownEditor.toolbar.unorderedList",
   },
   {
     format: "orderedList",
-    icon: ListOrdered,
+    icon: faListOl,
     label: "web.markdownEditor.toolbar.orderedList",
   },
   {
     format: "horizontalRule",
-    icon: Minus,
+    icon: faMinus,
     label: "web.markdownEditor.toolbar.horizontalRule",
   },
   {
     format: "blockquote",
-    icon: TextQuote,
+    icon: faBlockQuote,
     label: "web.markdownEditor.toolbar.blockquote",
   },
 ];
@@ -591,7 +590,7 @@ export const MarkdownEditor = React.forwardRef<
           role="toolbar"
           tabIndex={0}
         >
-          {toolbarActions.map(({ format, icon: Icon, label: labelKey }) => (
+          {toolbarActions.map(({ format, icon, label: labelKey }) => (
             <Button
               aria-label={t(labelKey)}
               aria-pressed={
@@ -612,7 +611,7 @@ export const MarkdownEditor = React.forwardRef<
               type="button"
               variant="ghost"
             >
-              <Icon />
+              <FontAwesomeIcon aria-hidden="true" icon={icon} />
             </Button>
           ))}
           <Button
@@ -626,7 +625,7 @@ export const MarkdownEditor = React.forwardRef<
             type="button"
             variant="ghost"
           >
-            <Link2 />
+            <FontAwesomeIcon aria-hidden="true" icon={faLinkSimple} />
           </Button>
           <Button
             aria-label={t("web.markdownEditor.toolbar.table")}
@@ -638,7 +637,7 @@ export const MarkdownEditor = React.forwardRef<
             type="button"
             variant="ghost"
           >
-            <Table2 />
+            <FontAwesomeIcon aria-hidden="true" icon={faTable} />
           </Button>
         </div>
         {mode === "visual" ? (

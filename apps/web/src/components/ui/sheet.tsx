@@ -1,6 +1,7 @@
 import { Drawer as SheetPrimitive } from "@base-ui/react/drawer";
+import { faXmark } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { formatTranslation } from "@pocket-trash/localizations";
-import { XIcon } from "lucide-react";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -126,7 +127,11 @@ function SheetContent({
             {children}
           </SheetPrimitive.Content>
           <SheetPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
-            <XIcon className="size-4" />
+            <FontAwesomeIcon
+              aria-hidden="true"
+              className="size-4"
+              icon={faXmark}
+            />
             <span className="sr-only">
               {formatTranslation("web.action.close", {}, locale)}
             </span>

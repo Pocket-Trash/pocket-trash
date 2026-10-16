@@ -1,21 +1,21 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import {
+  faBell,
+  faBoxesStacked,
+  faComputerMouseScrollwheel,
+  faFlag,
+  faGear,
+  faIndustry,
+  faMessage,
+  faSliders,
+  faTrash,
+  faUsers,
+} from "@fortawesome/pro-light-svg-icons";
 import { hasPermission, normalizeActor } from "@package/services/authorization";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import {
-  Bell,
-  Boxes,
-  Factory,
-  Flag,
-  MessageSquare,
-  ScrollText,
-  Settings,
-  SlidersHorizontal,
-  Trash2,
-  UsersRound,
-} from "lucide-react";
 import type { ReactNode } from "react";
 import type { AppShellProps } from "@/components/app-shell";
 import {
@@ -111,7 +111,7 @@ function AdminSidebar({
     ...(canManageProducts
       ? [
           {
-            icon: Factory,
+            icon: faIndustry,
             active: section === "makers",
             label: t("web.admin.makers.title"),
             to: "/admin/makers" as const,
@@ -121,7 +121,7 @@ function AdminSidebar({
     ...(canManageUsers
       ? [
           {
-            icon: UsersRound,
+            icon: faUsers,
             active: section === "users",
             label: t("web.admin.users.title"),
             to: "/admin/users" as const,
@@ -131,7 +131,7 @@ function AdminSidebar({
     ...(canReadAudit
       ? [
           {
-            icon: ScrollText,
+            icon: faComputerMouseScrollwheel,
             active: section === "audit",
             label: t("web.admin.audit.title"),
             to: "/admin/audit" as const,
@@ -141,13 +141,13 @@ function AdminSidebar({
     ...(canManageProducts
       ? [
           {
-            icon: Boxes,
+            icon: faBoxesStacked,
             active: section === "materials",
             label: t("web.admin.hub.materials"),
             to: "/admin/materials" as const,
           },
           {
-            icon: SlidersHorizontal,
+            icon: faSliders,
             active: section === "magnet-presets",
             label: t("web.slider.magnet.presets" as TranslationKey),
             to: "/admin/slider-magnet-presets" as const,
@@ -157,7 +157,7 @@ function AdminSidebar({
     ...(canManageFeedback || canManageResources
       ? [
           {
-            icon: Bell,
+            icon: faBell,
             active: section === "notifications",
             label: t("web.admin.notifications.title"),
             links: [
@@ -185,7 +185,7 @@ function AdminSidebar({
     ...(canManageFeedback
       ? [
           {
-            icon: MessageSquare,
+            icon: faMessage,
             active: section === "feedback",
             label: t("web.feedback.title"),
             links: [
@@ -215,7 +215,7 @@ function AdminSidebar({
     ...(canManageProducts
       ? [
           {
-            icon: Settings,
+            icon: faGear,
             active: section === "config",
             label: t("web.admin.config.title"),
             to: "/admin/config" as const,
@@ -225,7 +225,7 @@ function AdminSidebar({
     ...(canManageFlags
       ? [
           {
-            icon: Flag,
+            icon: faFlag,
             label: t("web.admin.featureFlags.featureFlags"),
             to: "/admin/settings/feature-flags" as const,
           },
@@ -234,7 +234,7 @@ function AdminSidebar({
     ...(canManageResources || canManageCatalog
       ? [
           {
-            icon: Trash2,
+            icon: faTrash,
             active: section === "trash",
             label: t("web.admin.trash.title"),
             links: [

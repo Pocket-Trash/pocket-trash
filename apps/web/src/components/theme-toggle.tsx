@@ -1,8 +1,10 @@
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { faDesktop, faMoon, faSun } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Monitor, Moon, Sun } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
@@ -16,15 +18,15 @@ import { useTheme } from "@/providers/theme-provider";
 /** Selectable themes and their localized labels and icons. */
 const themeOptions: Array<{
   /** Icon representing the theme. */
-  icon: typeof Sun;
+  icon: IconDefinition;
   /** Translation key for the accessible theme label. */
   labelKey: TranslationKey;
   /** Theme identifier selected when the option is pressed. */
   value: ThemeMode;
 }> = [
-  { icon: Moon, labelKey: "web.settings.dark", value: "dark" },
-  { icon: Sun, labelKey: "web.settings.light", value: "light" },
-  { icon: Monitor, labelKey: "web.settings.system", value: "system" },
+  { icon: faMoon, labelKey: "web.settings.dark", value: "dark" },
+  { icon: faSun, labelKey: "web.settings.light", value: "light" },
+  { icon: faDesktop, labelKey: "web.settings.system", value: "system" },
 ];
 
 /**
@@ -55,7 +57,6 @@ export function ThemeToggle() {
       value={theme}
     >
       {themeOptions.map((option) => {
-        const Icon = option.icon;
         const label = t(option.labelKey);
 
         return (
@@ -70,7 +71,7 @@ export function ThemeToggle() {
                 />
               }
             >
-              <Icon />
+              <FontAwesomeIcon aria-hidden="true" icon={option.icon} />
             </TooltipTrigger>
             <TooltipContent side="top">{label}</TooltipContent>
           </Tooltip>
