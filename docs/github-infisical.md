@@ -57,9 +57,10 @@ URL to the matching Vercel branch as `API_URL`; production uses
 `https://api.pocket-trash.app` in the Vercel production environment.
 
 Each job that installs repository dependencies fetches
-`FONTAWESOME_PACKAGE_TOKEN` before `pnpm install`, binds it to
-`npm.fontawesome.com` for that process, and blanks it from `GITHUB_ENV` after
-installation. Fork contributors need their own Font Awesome Pro package access
+`FONTAWESOME_PACKAGE_TOKEN` before running `scripts/pnpm-install.sh`. The script
+binds it to `npm.fontawesome.com` through a temporary user config, and the job
+blanks it from `GITHUB_ENV` after installation. Fork contributors need their own
+Font Awesome Pro package access
 for local installation. Upstream workflows for fork-origin pull requests cannot
 receive the Infisical bootstrap secrets, so their authenticated install jobs
 cannot run successfully.

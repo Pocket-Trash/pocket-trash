@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -191,6 +192,60 @@ test("classifies workflow and root build configuration conservatively", () => {
   }
 });
 
+test("configures Font Awesome authentication in a temporary user config", () => {
+  const installScript = readFileSync(
+    new URL("./pnpm-install.sh", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(installScript, /FONTAWESOME_PACKAGE_TOKEN is required/u);
+  assert.match(installScript, /umask 077/u);
+  assert.match(installScript, /NPM_CONFIG_USERCONFIG/u);
+  assert.match(installScript, /trap .*rm -f/u);
+});
+
+test("private package install removes its temporary credentials", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fontawesome-install-"));
+  const fakePnpm = join(directory, "pnpm");
+  const capturedConfig = join(directory, "captured-npmrc");
+  const capturedPath = join(directory, "captured-path");
+
+  try {
+    writeFileSync(
+      fakePnpm,
+      `#!/bin/sh
+cp "$NPM_CONFIG_USERCONFIG" "$CAPTURED_CONFIG"
+printf '%s' "$NPM_CONFIG_USERCONFIG" > "$CAPTURED_PATH"
+`,
+      { mode: 0o755 },
+    );
+    execFileSync(
+      "/bin/sh",
+      [
+        fileURLToPath(new URL("./pnpm-install.sh", import.meta.url)),
+        "--frozen-lockfile",
+      ],
+      {
+        env: {
+          ...process.env,
+          CAPTURED_CONFIG: capturedConfig,
+          CAPTURED_PATH: capturedPath,
+          FONTAWESOME_PACKAGE_TOKEN: "test-token",
+          PATH: `${directory}:${process.env.PATH}`,
+        },
+      },
+    );
+
+    assert.equal(
+      readFileSync(capturedConfig, "utf8"),
+      "//npm.fontawesome.com/:_authToken=test-token\n",
+    );
+    assert.equal(existsSync(readFileSync(capturedPath, "utf8")), false);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
 test("authenticates and clears private package access around every workflow install", () => {
   const workflowsDirectory = fileURLToPath(
     new URL("../.github/workflows", import.meta.url),
@@ -209,7 +264,7 @@ test("authenticates and clears private package access around every workflow inst
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = job.steps ?? [];
       const installIndex = steps.findIndex((step) =>
-        step.run?.includes("pnpm install"),
+        step.run?.includes("scripts/pnpm-install.sh"),
       );
       if (installIndex === -1) continue;
 
@@ -243,7 +298,7 @@ test("authenticates and clears private package access around every workflow inst
       );
       assert.match(
         steps[installIndex].run,
-        /pnpm_config_\/\/npm\.fontawesome\.com\/:_authToken=\$FONTAWESOME_PACKAGE_TOKEN/u,
+        /scripts\/pnpm-install\.sh/u,
         `${filename}:${jobName}`,
       );
 
@@ -264,7 +319,7 @@ test("passes the preview package token only to Vercel's install process", () => 
 
   assert.equal(
     config.installCommand,
-    'env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install --frozen-lockfile',
+    "./scripts/pnpm-install.sh --frozen-lockfile",
   );
 });
 
