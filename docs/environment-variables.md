@@ -99,7 +99,9 @@ belong to an application environment schema. Store it in these locations:
 user config, binds it only to `npm.fontawesome.com`, and removes the file when
 installation ends. Do not prefix the token with `VITE_` or expose it to browser
 code. Vercel Production does not need the token because GitHub builds the
-production artifact and deploys it with `vercel deploy --prebuilt`.
+production artifact and deploys it with `vercel deploy --prebuilt`. Railway does
+not need the token because its scraper build installs only the scraper workspace
+dependency closure, which excludes the web-only Font Awesome packages.
 
 ## Operational Runbooks
 

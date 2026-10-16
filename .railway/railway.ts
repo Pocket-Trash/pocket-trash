@@ -88,6 +88,8 @@ export default defineRailway((ctx) => {
         IMAGE_KIT_URL_ENDPOINT: preserve(),
         LOG_LEVEL: preserve(),
         REDIS_URL: preserve(),
+        RAILPACK_INSTALL_CMD:
+          "pnpm install --filter @app/scraper... --frozen-lockfile --prefer-offline",
         SCRAPER_CRON_ENABLED: preserve(),
         SCRAPER_IMAGE_BATCH_SIZE: preserve(),
         SCRAPER_ITEM_BATCH_SIZE: preserve(),

@@ -49,8 +49,14 @@ for (const environment of ["production", "preview"]) {
       "security-audit-exceptions.json",
       "turbo.json",
     ]);
-    assert.equal(Object.keys(scraper.variables).length, 24);
-    for (const value of Object.values(scraper.variables)) {
+    assert.equal(Object.keys(scraper.variables).length, 25);
+    assert.deepEqual(scraper.variables.RAILPACK_INSTALL_CMD, {
+      type: "literal",
+      value:
+        "pnpm install --filter @app/scraper... --frozen-lockfile --prefer-offline",
+    });
+    for (const [name, value] of Object.entries(scraper.variables)) {
+      if (name === "RAILPACK_INSTALL_CMD") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
     assert.ok(scraper.variables.DATABASE_URL);

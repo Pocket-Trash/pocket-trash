@@ -44,6 +44,11 @@ manifest and scraper. CI and the production workflow run
 build inputs before upload. When adding build inputs, update the allowlist and
 the watched paths in `.railway/railway.ts` together.
 
+Railpack installs only the `@app/scraper` workspace dependency closure. This
+keeps web-only private packages out of scraper builds, so Railway does not need
+the Font Awesome package token. Keep `RAILPACK_INSTALL_CMD` aligned with the
+scraper build filter in [`.railway/railway.ts`](../.railway/railway.ts).
+
 ## Infrastructure changes
 
 Keep one authoring file, [`.railway/railway.ts`](../.railway/railway.ts), and the
