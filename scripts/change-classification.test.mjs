@@ -323,6 +323,46 @@ test("passes the preview package token only to Vercel's install process", () => 
   );
 });
 
+test("syncs Font Awesome authentication into Railway before source builds", () => {
+  for (const [jobName, environment, configureName, clearName] of [
+    [
+      "preview",
+      "preview",
+      "Configure Railway scraper preview database and cron",
+      "Clear Font Awesome package token after Railway preview configuration",
+    ],
+    [
+      "railway-production",
+      "prod",
+      "Set Railway production metadata",
+      "Clear Font Awesome package token after Railway configuration",
+    ],
+  ]) {
+    const steps = deployWorkflow.jobs[jobName].steps;
+    const configureIndex = steps.findIndex(
+      (step) => step.name === configureName,
+    );
+    const fetchIndex = steps.findIndex(
+      (step, index) =>
+        index < configureIndex &&
+        step.uses === "Infisical/secrets-action@v1.0.16" &&
+        step.with?.["env-slug"] === environment &&
+        step.with?.["secret-path"] === "tools/github/secrets",
+    );
+    const clearIndex = steps.findIndex(
+      (step, index) => index > configureIndex && step.name === clearName,
+    );
+
+    assert.ok(fetchIndex >= 0, jobName);
+    assert.match(
+      steps[configureIndex].run,
+      /variable set FONTAWESOME_PACKAGE_TOKEN[\s\S]*--stdin[\s\S]*--skip-deploys/u,
+      jobName,
+    );
+    assert.ok(clearIndex > configureIndex, jobName);
+  }
+});
+
 test("explicitly classifies every tracked repository path", () => {
   const paths = execFileSync("git", ["ls-files"], {
     encoding: "utf8",

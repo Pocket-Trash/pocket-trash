@@ -81,6 +81,7 @@ export default defineRailway((ctx) => {
         BUNNY_STORAGE_ENDPOINT: preserve(),
         BUNNY_STORAGE_ZONE_NAME: preserve(),
         DATABASE_URL: preserve(),
+        FONTAWESOME_PACKAGE_TOKEN: preserve(),
         IMAGE_CDN_BASE_URL: preserve(),
         IMAGE_FOLDER_PREFIX: preserve(),
         IMAGE_KIT_PRIVATE_KEY: preserve(),
@@ -89,7 +90,7 @@ export default defineRailway((ctx) => {
         LOG_LEVEL: preserve(),
         REDIS_URL: preserve(),
         RAILPACK_INSTALL_CMD:
-          "pnpm install --filter @app/scraper... --frozen-lockfile --prefer-offline",
+          "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
         SCRAPER_CRON_ENABLED: preserve(),
         SCRAPER_IMAGE_BATCH_SIZE: preserve(),
         SCRAPER_ITEM_BATCH_SIZE: preserve(),

@@ -44,10 +44,14 @@ manifest and scraper. CI and the production workflow run
 build inputs before upload. When adding build inputs, update the allowlist and
 the watched paths in `.railway/railway.ts` together.
 
-Railpack installs only the `@app/scraper` workspace dependency closure. This
-keeps web-only private packages out of scraper builds, so Railway does not need
-the Font Awesome package token. Keep `RAILPACK_INSTALL_CMD` aligned with the
-scraper build filter in [`.railway/railway.ts`](../.railway/railway.ts).
+Railway needs `FONTAWESOME_PACKAGE_TOKEN` while installing the workspace because
+the supply-chain audit resolves the complete lockfile. The Deploy workflow copies
+the token from Infisical into each PR environment and production before their
+builds, and Railpack runs `scripts/pnpm-install.sh` so credentials stay in a
+permission-restricted temporary npm user config. Keep the preview template
+initialized with the same non-production token so the first native PR build can
+authenticate before GitHub Actions configures that PR environment. The token is
+not used by scraper application code.
 
 ## Infrastructure changes
 

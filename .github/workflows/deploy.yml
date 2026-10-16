@@ -611,6 +611,18 @@ jobs:
           REPOSITORY_ID: ${{ github.event.repository.id }}
         run: bash .github/scripts/vercel-branch-database-url.sh deploy-preview
 
+      - name: Fetch Font Awesome package token for Railway preview
+        if: steps.db.outputs.can_deploy == 'true'
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
+
       - name: Configure Railway scraper preview database and cron
         if: steps.db.outputs.can_deploy == 'true'
         shell: bash
@@ -622,7 +634,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          : "${FONTAWESOME_PACKAGE_TOKEN:?FONTAWESOME_PACKAGE_TOKEN is required}"
           printf '::add-mask::%s\n' "$DATABASE_URL"
+          printf '::add-mask::%s\n' "$FONTAWESOME_PACKAGE_TOKEN"
 
           railway_environment="pocket-trash-pr-${PR_NUMBER}"
           if [[ "$ISOLATED" == "true" ]]; then
@@ -664,6 +678,13 @@ jobs:
             }'
 
           printf '%s' "$DATABASE_URL" | pnpm exec railway variable set DATABASE_URL \
+            --stdin \
+            --skip-deploys \
+            --project "$RAILWAY_PROJECT_ID" \
+            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
+            --environment "$railway_environment"
+
+          printf '%s' "$FONTAWESOME_PACKAGE_TOKEN" | pnpm exec railway variable set FONTAWESOME_PACKAGE_TOKEN \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
@@ -736,6 +757,10 @@ jobs:
             echo "Actual: ${railway_scraper_cron_enabled:-<unset>}" >&2
             exit 1
           fi
+
+      - name: Clear Font Awesome package token after Railway preview configuration
+        if: ${{ always() && steps.db.outputs.can_deploy == 'true' }}
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
 
       - name: Deploy Railway scraper queue preview
         if: steps.db.outputs.can_deploy == 'true'
@@ -1481,12 +1506,23 @@ jobs:
 
           echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
 
+      - name: Fetch Font Awesome package token for Railway production
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: prod
+          secret-path: tools/github/secrets
+
       - name: Validate Railway configuration
         shell: bash
         run: |
           set -euo pipefail
 
-          for name in RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME; do
+          for name in FONTAWESOME_PACKAGE_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -1498,6 +1534,13 @@ jobs:
         run: |
           set -euo pipefail
 
+          printf '%s' "$FONTAWESOME_PACKAGE_TOKEN" | pnpm exec railway variable set FONTAWESOME_PACKAGE_TOKEN \
+            --stdin \
+            --skip-deploys \
+            --project "$RAILWAY_PROJECT_ID" \
+            --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
+            --environment production
+
           pnpm exec railway variable set \
             APP_ENV=production \
             LOG_DEPLOYMENT_ID=production \
@@ -1506,6 +1549,10 @@ jobs:
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
             --environment production
+
+      - name: Clear Font Awesome package token after Railway configuration
+        if: always()
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
 
       - name: Validate Railway upload context
         run: node scripts/check-railway-context.mjs
