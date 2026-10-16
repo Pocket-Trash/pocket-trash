@@ -169,6 +169,7 @@ test("classifies package paths by affected domains", () => {
       "packages/markdown/src/index.ts",
       ["scraper", "web", "storybook", "preview", "safe_e2e", "validation"],
     ],
+    ["packages/queue/src/index.ts", ["scraper", "preview", "validation"]],
     ["packages/json-data/autmog.json", ["validation"]],
     ["packages/lint/index.mjs", ["validation"]],
   ]) {

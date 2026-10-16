@@ -201,6 +201,11 @@ const changeClassificationRules = [
     ],
   },
   {
+    category: "shared-queue",
+    prefixes: ["packages/queue/"],
+    domains: ["scraper", "preview", "validation"],
+  },
+  {
     category: "validation-tooling",
     prefixes: [
       "packages/github-discord-notifier/",
