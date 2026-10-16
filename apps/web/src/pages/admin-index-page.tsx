@@ -1,21 +1,22 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import {
+  faBell,
+  faBoxesStacked,
+  faComputerMouseScrollwheel,
+  faGear,
+  faIndustry,
+  faMessage,
+  faShieldCheck,
+  faSliders,
+  faUsers,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { hasPermission, normalizeActor } from "@package/services/authorization";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import {
-  Bell,
-  Boxes,
-  Factory,
-  MessageSquare,
-  ScrollText,
-  Settings,
-  ShieldCheck,
-  SlidersHorizontal,
-  UsersRound,
-} from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -36,42 +37,42 @@ export function AdminIndexPage() {
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const feedbackLink = {
-    icon: MessageSquare,
+    icon: faMessage,
     label: t("web.feedback.title"),
     to: "/admin/feedback" as const,
   };
   const notificationsLink = {
-    icon: Bell,
+    icon: faBell,
     label: t("web.admin.notifications.title"),
     to: "/notifications" as const,
   };
   const auditLink = {
-    icon: ScrollText,
+    icon: faComputerMouseScrollwheel,
     label: t("web.admin.audit.title"),
     to: "/admin/audit" as const,
   };
   const usersLink = {
-    icon: UsersRound,
+    icon: faUsers,
     label: t("web.admin.users.title"),
     to: "/admin/users" as const,
   };
   const materialsLink = {
-    icon: Boxes,
+    icon: faBoxesStacked,
     label: t("web.admin.hub.materials"),
     to: "/admin/materials" as const,
   };
   const makersLink = {
-    icon: Factory,
+    icon: faIndustry,
     label: t("web.admin.makers.title"),
     to: "/admin/makers" as const,
   };
   const magnetPresetsLink = {
-    icon: SlidersHorizontal,
+    icon: faSliders,
     label: t("web.slider.magnet.presets" as TranslationKey),
     to: "/admin/slider-magnet-presets" as const,
   };
   const configLink = {
-    icon: Settings,
+    icon: faGear,
     label: t("web.admin.config.title"),
     to: "/admin/config" as const,
   };
@@ -96,19 +97,27 @@ export function AdminIndexPage() {
         className="grid content-start gap-4 p-4 md:p-6"
       >
         <div className="flex items-center gap-3">
-          <ShieldCheck aria-hidden="true" className="size-6" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-6"
+            icon={faShieldCheck}
+          />
           <p className="m-0 text-sm text-muted-foreground">
             {t("web.admin.hub.description")}
           </p>
         </div>
         <div className="grid w-full max-w-2xl gap-3 sm:grid-cols-2">
-          {primaryLinks.map(({ icon: Icon, label, to }) => (
+          {primaryLinks.map(({ icon, label, to }) => (
             <Link
               className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               key={to}
               to={to}
             >
-              <Icon aria-hidden="true" className="size-5" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="size-5"
+                icon={icon}
+              />
               <span className="font-semibold">{label}</span>
             </Link>
           ))}

@@ -1,8 +1,9 @@
+import { faMagnifyingGlass, faUser } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Search, UserRound } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -156,7 +157,7 @@ export function AdminUsersPage() {
               value={query}
             />
             <Button disabled={busy} type="submit" variant="outline">
-              <Search aria-hidden="true" />
+              <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
               {t("web.action.search")}
             </Button>
           </form>
@@ -170,7 +171,7 @@ export function AdminUsersPage() {
                 type="button"
                 variant="outline"
               >
-                <UserRound aria-hidden="true" />
+                <FontAwesomeIcon aria-hidden="true" icon={faUser} />
                 <span className="min-w-0 text-left">
                   <span className="block truncate">{user.name}</span>
                   <span className="block truncate text-xs text-muted-foreground">

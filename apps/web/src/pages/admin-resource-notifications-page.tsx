@@ -1,10 +1,16 @@
 import {
+  faCheck,
+  faShieldMinus,
+  faTrash,
+  faUserXmark,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   formatTranslation,
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Check, ShieldMinus, Trash2, UserRoundX } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPageShell } from "@/components/admin-page-shell";
@@ -91,7 +97,7 @@ export function AdminResourceNotificationsPage({
               render={<Link to="/admin/account-erasure" />}
               variant="outline"
             >
-              <UserRoundX />
+              <FontAwesomeIcon aria-hidden="true" icon={faUserXmark} />
               {t("web.erasure.admin.navigation")}
             </Button>
             <Button
@@ -99,7 +105,7 @@ export function AdminResourceNotificationsPage({
               render={<Link to="/admin/trash/catalog-images" />}
               variant="outline"
             >
-              <Trash2 />
+              <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
               {t("web.resources.upload.imagesLabel")}
             </Button>
             <Button
@@ -107,7 +113,7 @@ export function AdminResourceNotificationsPage({
               render={<Link to="/admin/trash/resources" />}
               variant="outline"
             >
-              <Trash2 />
+              <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
               {t("web.resources.trash.adminTitle")}
             </Button>
           </div>
@@ -185,7 +191,7 @@ export function AdminResourceNotificationsPage({
                     type="button"
                     variant="outline"
                   >
-                    <Check />
+                    <FontAwesomeIcon aria-hidden="true" icon={faCheck} />
                     {t("web.resources.action.accept")}
                   </Button>
                   {!notification.isPrivate ? (
@@ -198,7 +204,10 @@ export function AdminResourceNotificationsPage({
                       type="button"
                       variant="destructive"
                     >
-                      <ShieldMinus />
+                      <FontAwesomeIcon
+                        aria-hidden="true"
+                        icon={faShieldMinus}
+                      />
                       {t("web.resources.action.markPrivate")}
                     </Button>
                   ) : null}

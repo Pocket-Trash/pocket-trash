@@ -1,4 +1,11 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import {
+  faArrowDown,
+  faArrowRotateLeft,
+  faArrowUp,
+  faTrash,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   AdminMaterial,
   AdminMaterialSummary,
@@ -11,7 +18,6 @@ import {
   maxImageSessionFiles,
 } from "@package/services/constants";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
@@ -645,7 +651,10 @@ function MaterialImageEditor({
                         }
                       }}
                     >
-                      {direction < 0 ? <ArrowUp /> : <ArrowDown />}
+                      <FontAwesomeIcon
+                        aria-hidden="true"
+                        icon={direction < 0 ? faArrowUp : faArrowDown}
+                      />
                     </Button>
                   );
                 })
@@ -695,7 +704,10 @@ function MaterialImageEditor({
               type="button"
               variant="outline"
             >
-              {archived ? <RotateCcw /> : <Trash2 />}
+              <FontAwesomeIcon
+                aria-hidden="true"
+                icon={archived ? faArrowRotateLeft : faTrash}
+              />
               {archived
                 ? t("web.materials.image.restore")
                 : t("web.action.deleteImage")}

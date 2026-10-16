@@ -1,16 +1,17 @@
+import {
+  faBoxArchive,
+  faCheck,
+  faMagnifyingGlass,
+  faShield,
+  faSlidersSimple,
+  faToggleOff,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { FeatureFlagAudience } from "@package/feature-flags";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import {
-  Archive,
-  Check,
-  Search,
-  Settings2,
-  Shield,
-  ToggleLeft,
-} from "lucide-react";
 import { useEffect, useState } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -209,7 +210,10 @@ export function AdminFeatureFlagsPage() {
                     type="button"
                     variant="outline"
                   >
-                    <Settings2 />
+                    <FontAwesomeIcon
+                      aria-hidden="true"
+                      icon={faSlidersSimple}
+                    />
                   </Button>
                   <Button
                     aria-label={`${t("web.action.archive")} ${flag.slug}`}
@@ -224,7 +228,7 @@ export function AdminFeatureFlagsPage() {
                     type="button"
                     variant="outline"
                   >
-                    <Archive />
+                    <FontAwesomeIcon aria-hidden="true" icon={faBoxArchive} />
                   </Button>
                 </div>
               </div>
@@ -313,7 +317,7 @@ export function AdminFeatureFlagsPage() {
                 {t("web.admin.featureFlags.globalDefaultEnabled")}
               </label>
               <Button onClick={saveFlag} type="button">
-                <Check />
+                <FontAwesomeIcon aria-hidden="true" icon={faCheck} />
                 {t("web.action.saveFlag")}
               </Button>
             </div>
@@ -336,7 +340,7 @@ export function AdminFeatureFlagsPage() {
                 type="button"
                 variant="outline"
               >
-                <Search />
+                <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
               </Button>
             </div>
             <div className="mt-3 grid gap-2">
@@ -348,7 +352,7 @@ export function AdminFeatureFlagsPage() {
                   type="button"
                   variant="outline"
                 >
-                  <Shield />
+                  <FontAwesomeIcon aria-hidden="true" icon={faShield} />
                   <span className="min-w-0 text-left">
                     <span className="block truncate">{user.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
@@ -383,7 +387,10 @@ export function AdminFeatureFlagsPage() {
                     >
                       <span>{flag.name}</span>
                       <span className="flex items-center gap-2 text-xs">
-                        <ToggleLeft />
+                        <FontAwesomeIcon
+                          aria-hidden="true"
+                          icon={faToggleOff}
+                        />
                         {flag.enabled
                           ? t("web.status.enabled")
                           : t("web.status.disabled")}

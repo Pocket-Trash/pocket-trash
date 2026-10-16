@@ -1,3 +1,8 @@
+import {
+  faBoxesStacked,
+  faChartColumn,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogProductTypeSummary,
   TrendsProductTypeConfiguration,
@@ -18,7 +23,6 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { Boxes, ChartColumn } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPageShell } from "@/components/admin-page-shell";
@@ -84,7 +88,11 @@ export function AdminConfigPage() {
           className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           to="/admin/config/products"
         >
-          <Boxes aria-hidden="true" className="size-5" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-5"
+            icon={faBoxesStacked}
+          />
           <span className="font-semibold">
             {formatTranslation("web.navigation.products", {}, locale)}
           </span>
@@ -93,7 +101,11 @@ export function AdminConfigPage() {
           className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           to="/admin/config/trends"
         >
-          <ChartColumn aria-hidden="true" className="size-5" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-5"
+            icon={faChartColumn}
+          />
           <span className="font-semibold">
             {formatTranslation(
               "web.admin.config.trends.title" as TranslationKey,

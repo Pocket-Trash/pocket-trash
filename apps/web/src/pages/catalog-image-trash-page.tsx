@@ -1,6 +1,7 @@
+import { faArrowRotateLeft } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogImageTrashItem } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
-import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
@@ -83,7 +84,7 @@ export function CatalogImageTrashPage({
               type="button"
               variant="outline"
             >
-              <RotateCcw />
+              <FontAwesomeIcon aria-hidden="true" icon={faArrowRotateLeft} />
               {t("web.resources.action.restore")}
             </Button>
           </article>
