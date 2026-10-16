@@ -1,3 +1,5 @@
+import { faDiscord, faXTwitter } from "@fortawesome/free-brands-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,
   type TranslationKey,
@@ -80,15 +82,7 @@ export function PageFooter({
           target="_blank"
         >
           <span className="sr-only">{t("web.footer.xNewTab")}</span>
-          <svg
-            aria-hidden="true"
-            className="size-5"
-            fill="currentColor"
-            focusable="false"
-            viewBox="0 0 24 24"
-          >
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-          </svg>
+          <FontAwesomeIcon aria-hidden className="size-5" icon={faXTwitter} />
         </a>
         <a
           aria-label={t("web.footer.discordNewTab")}
@@ -98,15 +92,7 @@ export function PageFooter({
           target="_blank"
         >
           <span className="sr-only">{t("web.footer.discordNewTab")}</span>
-          <svg
-            aria-hidden="true"
-            className="size-5"
-            fill="currentColor"
-            focusable="false"
-            viewBox="0 0 24 24"
-          >
-            <path d="M20.317 4.369a19.8 19.8 0 0 0-4.885-1.515l-.617 1.267a18.3 18.3 0 0 0-5.613 0l-.625-1.267a19.7 19.7 0 0 0-4.89 1.519C.595 8.954-.243 13.418.176 17.816a19.9 19.9 0 0 0 5.993 3.03l1.462-1.99a12.8 12.8 0 0 1-2.303-1.106q.289-.21.564-.43a14.2 14.2 0 0 0 12.221 0q.277.225.565.43a12.9 12.9 0 0 1-2.307 1.106l1.462 1.99a19.8 19.8 0 0 0 5.993-3.03c.491-5.1-.84-9.523-3.509-13.447M8.02 15.127c-1.167 0-2.129-1.075-2.129-2.397s.94-2.406 2.129-2.406 2.15 1.084 2.129 2.406c-.02 1.322-.94 2.397-2.129 2.397m7.974 0c-1.168 0-2.129-1.075-2.129-2.397s.94-2.406 2.129-2.406 2.149 1.084 2.129 2.406c-.021 1.322-.941 2.397-2.129 2.397" />
-          </svg>
+          <FontAwesomeIcon aria-hidden className="size-5" icon={faDiscord} />
         </a>
       </div>
       <p className="mt-3 text-[11.5px] leading-5">
