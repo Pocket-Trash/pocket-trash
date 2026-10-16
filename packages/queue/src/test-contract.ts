@@ -126,6 +126,43 @@ export function defineQueueAdapterContract(
       await adapter.close();
     });
 
+    it("accepts only one concurrent replacement of a completed job", async () => {
+      const adapter = await createAdapter();
+      const queue = adapter.define({
+        deduplication: { replaceCompleted: true },
+        mode: "bounded",
+        name: `contract-replace-race-${crypto.randomUUID()}`,
+        retention: {
+          completed: { ageSeconds: 86_400, count: 1_000 },
+          failed: { ageSeconds: 604_800 },
+        },
+        retry: { attempts: 1 },
+        schema: payloadSchema,
+      });
+      await queue.enqueue({
+        id: "stable",
+        name: "test",
+        payload: { value: "original" },
+      });
+      await queue.process({
+        concurrency: 1,
+        /**
+         * Completes the retained job before replacement.
+         *
+         * @returns A completed outcome.
+         */
+        handler: async () => undefined,
+        limit: 1,
+      });
+
+      const outcomes = await Promise.all([
+        queue.enqueue({ id: "stable", name: "test", payload: { value: "a" } }),
+        queue.enqueue({ id: "stable", name: "test", payload: { value: "b" } }),
+      ]);
+      expect(outcomes.filter((outcome) => outcome.accepted)).toHaveLength(1);
+      await adapter.close();
+    });
+
     it("delivers jobs enqueued after a continuous worker starts", async () => {
       const adapter = await createAdapter();
       const queue = adapter.define({

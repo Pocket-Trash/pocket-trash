@@ -26,20 +26,130 @@ const scraperQueuePolicy = {
   },
 };
 
-/** Required shape shared by normalized source items persisted in queue jobs. */
-const normalizedItemSchema = z
-  .object({
+/** Runtime shape shared by normalized source images. */
+const normalizedImageSchema = z.object({
+  altText: z.string().nullable(),
+  height: z.number().int().nullable(),
+  position: z.number().int(),
+  sourceHash: z.string(),
+  sourceImageId: z.string().nullable(),
+  sourceUrl: z.string(),
+  width: z.number().int().nullable(),
+});
+
+/** Runtime shape of normalized parent Grimsmo product metadata. */
+const normalizedGrimsmoProductSchema = z.object({
+  detailsHash: z.string(),
+  productHandle: z.string(),
+  productUrl: z.string(),
+  title: z.string(),
+});
+
+/** Runtime shape of a complete normalized Autmog pen. */
+const normalizedAutmogPenSchema = z.object({
+  availableForSale: z.boolean(),
+  bodyDetails: z.array(z.string()),
+  clip: z.string().nullable(),
+  currencyCode: z.string(),
+  description: z.string().nullable(),
+  detailsHash: z.string(),
+  finish: z.string().nullable(),
+  grip: z.string().nullable(),
+  imageSetHash: z.string(),
+  images: z.array(normalizedImageSchema),
+  materials: z.array(z.string()),
+  mechanism: z.string().nullable(),
+  normalizedData: z.object({
     availableForSale: z.boolean(),
-    detailsHash: z.string(),
+    bodyDetails: z.array(z.string()),
+    bodyShape: z.string().nullable(),
+    category: z.string().nullable(),
+    clip: z.string().nullable(),
+    finish: z.string().nullable(),
+    grip: z.string().nullable(),
     imageSetHash: z.string(),
-    images: z.array(z.json()),
-    sourceHandle: z.string(),
-    sourceProductId: z.string(),
+    images: z.array(normalizedImageSchema),
+    materials: z.array(z.string()),
+    mechanism: z.string().nullable(),
+    nose: z.string().nullable(),
+    priceMaxCents: z.number().int().nullable(),
+    priceMinCents: z.number().int().nullable(),
+    productUrl: z.string(),
+    refill: z.string().nullable(),
+    size: z.string().nullable(),
     title: z.string(),
     variants: z.array(z.json()),
-  })
-  .passthrough()
-  .and(z.json());
+  }),
+  nose: z.string().nullable(),
+  priceMaxCents: z.number().int().nullable(),
+  priceMinCents: z.number().int().nullable(),
+  productTypes: z.array(z.string()),
+  productUrl: z.string(),
+  refill: z.string().nullable(),
+  size: z.string().nullable(),
+  sourceHandle: z.string(),
+  sourceProductId: z.string(),
+  tags: z.array(z.string()),
+  title: z.string(),
+  variants: z.array(z.json()),
+});
+
+/** Runtime shape shared by complete normalized Grimsmo variations. */
+const normalizedGrimsmoVariationShape = {
+  availableForSale: z.boolean(),
+  bodyText: z.string().nullable(),
+  bullets: z.array(z.string()),
+  bulletsByCategory: z.record(z.string(), z.array(z.string())),
+  case: z.string().nullable(),
+  currencyCode: z.string(),
+  description: z.string().nullable(),
+  detailsHash: z.string(),
+  imageSetHash: z.string(),
+  images: z.array(normalizedImageSchema),
+  priceMaxCents: z.number().int().nullable(),
+  priceMinCents: z.number().int().nullable(),
+  product: normalizedGrimsmoProductSchema,
+  productUrl: z.string(),
+  sourceCollection: z.enum(["archive", "inventory"]),
+  sourceHandle: z.string(),
+  sourceProductId: z.string(),
+  tags: z.array(z.string()),
+  title: z.string(),
+  titleFull: z.string(),
+  variants: z.array(z.json()),
+};
+
+/** Runtime shape of a complete normalized Grimsmo pen variation. */
+const normalizedGrimsmoPenSchema = z.object({
+  ...normalizedGrimsmoVariationShape,
+  bodyColors: z.array(z.string()),
+  bodyFinishes: z.array(z.string()),
+  bodyMaterials: z.array(z.string()),
+  book: z.string().nullable(),
+  engraving: z.string().nullable(),
+  refill: z.string().nullable(),
+  sagaNumber: z.string().nullable(),
+  sliderColors: z.array(z.string()),
+  sliderMaterials: z.array(z.string()),
+  sliderStyle: z.string().nullable(),
+  tipLogo: z.string().nullable(),
+  visibleBullets: z.array(z.string()),
+});
+
+/** Runtime shape of a complete normalized Grimsmo knife variation. */
+const normalizedGrimsmoKnifeSchema = z.object({
+  ...normalizedGrimsmoVariationShape,
+  bladeFinishes: z.array(z.string()),
+  bladeSteels: z.array(z.string()),
+  handleColors: z.array(z.string()),
+  handleFinishes: z.array(z.string()),
+  handleMaterials: z.array(z.string()),
+  hardwareColors: z.array(z.string()),
+  knifeNumber: z.string().nullable(),
+  knifeType: z.enum(["fjell", "norseman", "rask"]),
+  mechanisms: z.array(z.string()),
+  patterns: z.array(z.string()),
+});
 
 /** Runtime shape of the bounded Saga catalog snapshot. */
 const sagaCatalogSnapshotSchema = z.object({
@@ -68,7 +178,7 @@ const sagaCatalogSnapshotSchema = z.object({
 /** Runtime validator for each scraper item payload variant. */
 const scraperItemPayloadSchema = z.discriminatedUnion("type", [
   z.object({
-    item: normalizedItemSchema,
+    item: normalizedAutmogPenSchema,
     source: z.literal(scraperSources.autmog),
     type: z.literal("autmog.pen"),
   }),
@@ -83,17 +193,17 @@ const scraperItemPayloadSchema = z.discriminatedUnion("type", [
     type: z.literal("grimsmo.sagaMaterials"),
   }),
   z.object({
-    item: normalizedItemSchema,
+    item: normalizedGrimsmoPenSchema,
     source: z.literal(scraperSources.grimsmoSaga),
     type: z.literal("grimsmo.penVariation"),
   }),
   z.object({
-    items: z.array(normalizedItemSchema),
+    items: z.array(normalizedGrimsmoPenSchema),
     source: z.literal(scraperSources.grimsmoSaga),
     type: z.literal("grimsmo.penVariationBatch"),
   }),
   z.object({
-    item: normalizedItemSchema,
+    item: normalizedGrimsmoKnifeSchema,
     source: z.enum([
       scraperSources.grimsmoFjell,
       scraperSources.grimsmoNorseman,
@@ -102,7 +212,7 @@ const scraperItemPayloadSchema = z.discriminatedUnion("type", [
     type: z.literal("grimsmo.knifeVariation"),
   }),
   z.object({
-    items: z.array(normalizedItemSchema),
+    items: z.array(normalizedGrimsmoKnifeSchema),
     source: z.enum([
       scraperSources.grimsmoFjell,
       scraperSources.grimsmoNorseman,

@@ -63,3 +63,44 @@ it("models retry delay and exhaustion deterministically", async () => {
   await expect(queue.counts()).resolves.toMatchObject({ failed: 0 });
   await adapter.close();
 });
+
+it("retries an immediate continuous failure and closes it with the queue", async () => {
+  const adapter = createInMemoryQueueAdapter();
+  const queue = adapter.define({
+    deduplication: { replaceCompleted: false },
+    mode: "continuous",
+    name: "immediate-retry",
+    retention: {
+      completed: { ageSeconds: 60, count: 10 },
+      failed: { ageSeconds: 60 },
+    },
+    retry: { attempts: 2 },
+    schema: z.object({ value: z.string() }),
+  });
+  let attemptedTwice!: () => void;
+  const twoAttempts = new Promise<void>((resolve) => {
+    attemptedTwice = resolve;
+  });
+  let attempts = 0;
+  await queue.processContinuously({
+    concurrency: 1,
+    /**
+     * Fails twice to exhaust immediate retries.
+     *
+     * @rejects On every attempt.
+     */
+    handler: async () => {
+      attempts += 1;
+      if (attempts === 2) attemptedTwice();
+      throw new Error("expected failure");
+    },
+  });
+  await queue.enqueue({ id: "job", name: "test", payload: { value: "x" } });
+
+  await expect(twoAttempts).resolves.toBeUndefined();
+  await queue.close();
+  await expect(
+    queue.enqueue({ id: "later", name: "test", payload: { value: "x" } }),
+  ).rejects.toThrow("Queue is closed");
+  await adapter.close();
+});

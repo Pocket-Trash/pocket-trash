@@ -145,6 +145,7 @@ export type QueueProcessOptions<TPayload> = {
    *
    * @param job - Validated portable queue job.
    * @returns Terminal handler outcome.
+   * @rejects To trigger configured retry and failure handling.
    */
   handler: (
     job: QueueJob<TPayload>,
@@ -185,7 +186,8 @@ export interface DefinedQueue<TPayload> {
    * Enqueues one validated job under its stable identifier.
    *
    * @param input - Job to validate and persist.
-   * @returns Durable enqueue outcome.
+   * @returns Enqueue outcome.
+   * @rejects When payload validation or persistence fails.
    */
   enqueue(input: QueueEnqueueInput<TPayload>): Promise<QueueEnqueueResult>;
   /**
@@ -193,6 +195,7 @@ export interface DefinedQueue<TPayload> {
    *
    * @param inputs - Jobs to validate and persist.
    * @returns Outcomes aligned with input order.
+   * @rejects When payload validation or persistence fails.
    */
   enqueueMany(
     inputs: readonly QueueEnqueueInput<TPayload>[],
@@ -308,6 +311,7 @@ export function createInMemoryQueueAdapter(
     ) {
       const jobs = new Map<string, MemoryJob<TPayload>>();
       const continuousWorkers = new Set<() => void>();
+      const closeContinuousWorkers = new Set<() => Promise<void>>();
       let closed = false;
 
       const queue: DefinedQueue<TPayload> = {
@@ -318,6 +322,9 @@ export function createInMemoryQueueAdapter(
          */
         async close() {
           closed = true;
+          await Promise.all(
+            [...closeContinuousWorkers].map((close) => close()),
+          );
         },
         /**
          * Counts jobs by portable state.
@@ -416,6 +423,9 @@ export function createInMemoryQueueAdapter(
                 onEvent: options.onEvent,
                 options: { ...processOptions, limit: Number.POSITIVE_INFINITY },
               });
+              if ([...jobs.values()].some((job) => job.state === "waiting")) {
+                queueMicrotask(wake);
+              }
               const retryAt = nextMemoryRetryAt(jobs.values());
               if (retryAt !== undefined && !workerClosed) {
                 clearTimeout(retryTimer);
@@ -431,18 +441,26 @@ export function createInMemoryQueueAdapter(
           };
           continuousWorkers.add(wake);
           wake();
+          /**
+           * Stops this continuous worker.
+           *
+           * @returns Worker cleanup completion.
+           */
+          const close = async () => {
+            workerClosed = true;
+            continuousWorkers.delete(wake);
+            closeContinuousWorkers.delete(close);
+            clearTimeout(retryTimer);
+            await processing;
+          };
+          closeContinuousWorkers.add(close);
           return {
             /**
              * Stops this continuous worker.
              *
              * @returns Worker cleanup completion.
              */
-            async close() {
-              workerClosed = true;
-              continuousWorkers.delete(wake);
-              clearTimeout(retryTimer);
-              await processing;
-            },
+            close,
           };
         },
         /**
