@@ -63,9 +63,9 @@ describe("resource card", () => {
       />,
     );
 
-    expect(single).toContain("lucide-file-down");
-    expect(single).not.toContain("lucide-file-archive");
-    expect(multiple).toContain("lucide-file-archive");
+    expect(single).toContain('data-icon="file-arrow-down"');
+    expect(single).not.toContain('data-icon="file-zipper"');
+    expect(multiple).toContain('data-icon="file-zipper"');
     expect(multiple).toContain(">Download</button>");
     expect(multiple).toContain("Downloads: 4");
   });

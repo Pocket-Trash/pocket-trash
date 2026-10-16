@@ -1,5 +1,6 @@
+import { faPlus } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { Plus } from "lucide-react";
 import { expect, fn } from "storybook/test";
 import { withThemePanels } from "../../../.storybook/theme-panels";
 import { Button } from "./button";
@@ -110,7 +111,11 @@ export const Large: Story = {
  * Shows the button icon example.
  */
 export const Icon: Story = {
-  args: { "aria-label": "Add item", children: <Plus />, size: "icon" },
+  args: {
+    "aria-label": "Add item",
+    children: <FontAwesomeIcon aria-hidden="true" icon={faPlus} />,
+    size: "icon",
+  },
   /**
    * Exercises the button icon interaction and assertions.
    *

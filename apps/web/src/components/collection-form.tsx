@@ -1,3 +1,8 @@
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogImage, UserCollectionSummary } from "@package/services";
 import {
   createColumnHelper,
@@ -6,7 +11,6 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 import {
   MarkdownEditor,
@@ -579,7 +583,7 @@ export function CollectionCoverManager({
                 type="button"
                 variant="outline"
               >
-                <ChevronLeft />
+                <FontAwesomeIcon aria-hidden="true" icon={faChevronLeft} />
               </Button>
               <output aria-live="polite" className="text-sm">
                 {copy.pageStatus(
@@ -595,7 +599,7 @@ export function CollectionCoverManager({
                 type="button"
                 variant="outline"
               >
-                <ChevronRight />
+                <FontAwesomeIcon aria-hidden="true" icon={faChevronRight} />
               </Button>
             </nav>
           ) : null}

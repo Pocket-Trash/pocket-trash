@@ -1,5 +1,11 @@
+import {
+  faArrowUpRightFromSquare,
+  faTriangleExclamation,
+  faUpload,
+  faXmark,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { resourceMimeTypesByExtension } from "@package/services/constants";
-import { ExternalLink, TriangleAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -284,7 +290,11 @@ export function FileDropInput({
             addFiles(event.dataTransfer.files);
           }}
         >
-          <Upload aria-hidden="true" className="size-6 text-muted-foreground" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-6 text-muted-foreground"
+            icon={faUpload}
+          />
           <span>{label}</span>
           <span
             className="text-xs leading-5 font-normal text-muted-foreground"
@@ -319,7 +329,7 @@ export function FileDropInput({
                 type="button"
                 variant="ghost"
               >
-                <X />
+                <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
               </Button>
             </li>
           ))}
@@ -333,9 +343,10 @@ export function FileDropInput({
           aria-live="polite"
           className="flex gap-2 border-l-4 border-primary bg-accent/30 p-3 text-sm font-normal"
         >
-          <TriangleAlert
+          <FontAwesomeIcon
             aria-hidden="true"
             className="mt-0.5 size-4 shrink-0"
+            icon={faTriangleExclamation}
           />
           <p>
             {aspectRatioWarning}{" "}
@@ -346,7 +357,11 @@ export function FileDropInput({
               target="_blank"
             >
               {aspectRatioHelpLabel}
-              <ExternalLink aria-hidden="true" className="size-3.5" />
+              <FontAwesomeIcon
+                aria-hidden="true"
+                className="size-3.5"
+                icon={faArrowUpRightFromSquare}
+              />
             </a>
           </p>
         </div>

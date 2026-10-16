@@ -1,5 +1,6 @@
+import { faSliders } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogColor } from "@package/services";
-import { SlidersHorizontal } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -338,7 +339,7 @@ export function CatalogFilterBar({
           type="button"
           variant="outline"
         >
-          <SlidersHorizontal aria-hidden="true" />
+          <FontAwesomeIcon aria-hidden="true" icon={faSliders} />
           {copy.moreFilters}
         </Button>
         <Sheet open={mobileAdvancedOpen} onOpenChange={setMobileAdvancedOpen}>
@@ -346,7 +347,7 @@ export function CatalogFilterBar({
             className="min-[881px]:hidden"
             render={
               <Button type="button" variant="outline">
-                <SlidersHorizontal aria-hidden="true" />
+                <FontAwesomeIcon aria-hidden="true" icon={faSliders} />
                 {copy.moreFilters}
               </Button>
             }

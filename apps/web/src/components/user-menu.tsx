@@ -1,5 +1,16 @@
 import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
 import {
+  faArrowRightFromBracket,
+  faChartBar,
+  faFiles,
+  faFlask,
+  faFolder,
+  faGear,
+  faShield,
+  faUser,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   hasStaffPermission,
   normalizeActor,
 } from "@package/services/authorization";
@@ -8,16 +19,6 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import {
-  ChartNoAxesColumnIncreasing,
-  Files,
-  FlaskConical,
-  Folder,
-  LogOut,
-  Settings,
-  Shield,
-  User,
-} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,35 +107,35 @@ export function UserMenu() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link to="/user/account" />}>
-          <User />
+          <FontAwesomeIcon aria-hidden="true" icon={faUser} />
           {t("web.navigation.account")}
         </DropdownMenuItem>
         {hasStaffPermission(
           userId ? normalizeActor(userId, sessionClaims) : undefined,
         ) ? (
           <DropdownMenuItem render={<Link to="/admin" />}>
-            <Shield />
+            <FontAwesomeIcon aria-hidden="true" icon={faShield} />
             {t("web.admin.hub.title")}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem render={<Link to="/user/collections" />}>
-          <Folder />
+          <FontAwesomeIcon aria-hidden="true" icon={faFolder} />
           {t("web.navigation.collections")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/trends" />}>
-          <ChartNoAxesColumnIncreasing />
+          <FontAwesomeIcon aria-hidden="true" icon={faChartBar} />
           {t("web.trends.title")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/resources" />}>
-          <Files />
+          <FontAwesomeIcon aria-hidden="true" icon={faFiles} />
           {t("web.navigation.resources")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings" />}>
-          <Settings />
+          <FontAwesomeIcon aria-hidden="true" icon={faGear} />
           {t("web.settings.settings")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
-          <FlaskConical />
+          <FontAwesomeIcon aria-hidden="true" icon={faFlask} />
           {t("web.navigation.betaFeatures")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -143,7 +144,7 @@ export function UserMenu() {
             void clerk.signOut({ redirectUrl: "/" });
           }}
         >
-          <LogOut />
+          <FontAwesomeIcon aria-hidden="true" icon={faArrowRightFromBracket} />
           {t("web.navigation.logOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>

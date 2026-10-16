@@ -1,4 +1,8 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCatalogCopy } from "@/lib/catalog-copy";
@@ -133,7 +137,7 @@ export function PaginatedCards<T>({
             type="button"
             variant="outline"
           >
-            <ChevronLeft />
+            <FontAwesomeIcon aria-hidden="true" icon={faChevronLeft} />
           </Button>
           <output aria-live="polite" className="text-sm">
             {t("web.collections.gallery.pageStatus", {
@@ -149,7 +153,7 @@ export function PaginatedCards<T>({
             type="button"
             variant="outline"
           >
-            <ChevronRight />
+            <FontAwesomeIcon aria-hidden="true" icon={faChevronRight} />
           </Button>
         </nav>
       ) : null}

@@ -1,5 +1,15 @@
 import { useAuth, useClerk } from "@clerk/tanstack-react-start";
 import {
+  faArrowRightFromBracket,
+  faChartBar,
+  faFiles,
+  faFlask,
+  faFolder,
+  faGear,
+  faShield,
+  faUser,
+} from "@fortawesome/pro-light-svg-icons";
+import {
   hasStaffPermission,
   normalizeActor,
 } from "@package/services/authorization";
@@ -7,16 +17,6 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import {
-  ChartNoAxesColumnIncreasing,
-  Files,
-  FlaskConical,
-  Folder,
-  LogOut,
-  Settings,
-  Shield,
-  User,
-} from "lucide-react";
 import type { AppShellProps } from "@/components/app-shell";
 import {
   type SidebarLink,
@@ -81,7 +81,7 @@ export function UserPageShell({
   const primaryLinks: SidebarLink[] = [
     {
       active: section === "collections",
-      icon: Folder,
+      icon: faFolder,
       label: t("web.navigation.collections"),
       links: [
         {
@@ -93,13 +93,13 @@ export function UserPageShell({
     },
     {
       active: section === "trends",
-      icon: ChartNoAxesColumnIncreasing,
+      icon: faChartBar,
       label: t("web.trends.title"),
       to: "/user/trends",
     },
     {
       active: section === "resources",
-      icon: Files,
+      icon: faFiles,
       label: t("web.navigation.resources"),
       links: [
         { label: t("web.resources.action.add"), to: "/resources/add" },
@@ -112,7 +112,7 @@ export function UserPageShell({
     },
     {
       active: section === "account",
-      icon: User,
+      icon: faUser,
       label: t("web.navigation.account"),
       to: "/user/account",
     },
@@ -121,7 +121,7 @@ export function UserPageShell({
     ...(hasStaffPermission(actor)
       ? [
           {
-            icon: Shield,
+            icon: faShield,
             label: t("web.navigation.admin"),
             to: "/admin" as const,
           },
@@ -129,13 +129,13 @@ export function UserPageShell({
       : []),
     {
       active: section === "settings",
-      icon: Settings,
+      icon: faGear,
       label: t("web.settings.settings"),
       to: "/user/settings",
     },
     {
       active: section === "beta-features",
-      icon: FlaskConical,
+      icon: faFlask,
       label: t("web.navigation.betaFeatures"),
       to: "/user/settings/beta-features",
     },
@@ -154,7 +154,7 @@ export function UserPageShell({
       sidebar={
         <SidebarNavigation
           action={{
-            icon: LogOut,
+            icon: faArrowRightFromBracket,
             label: t("web.action.signOut"),
             /** Signs out the current user and returns to the home page. */
             onSelect: () => {

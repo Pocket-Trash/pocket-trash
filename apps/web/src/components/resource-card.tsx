@@ -1,17 +1,18 @@
 import {
+  faBox,
+  faFile,
+  faFileArrowDown,
+  faFileLines,
+  faFileZipper,
+  faPencil,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   formatTranslation,
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import {
-  Box,
-  File,
-  FileArchive,
-  FileDown,
-  FileText,
-  Pencil,
-} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -129,7 +130,10 @@ export function ResourceCard({
               }}
               type="button"
             >
-              {downloadsArchive ? <FileArchive /> : <FileDown />}
+              <FontAwesomeIcon
+                aria-hidden="true"
+                icon={downloadsArchive ? faFileZipper : faFileArrowDown}
+              />
               {t("web.resources.action.download")}
             </Button>
             <Button
@@ -157,7 +161,7 @@ export function ResourceCard({
                 }
                 variant="outline"
               >
-                <Pencil />
+                <FontAwesomeIcon aria-hidden="true" icon={faPencil} />
                 {t("web.resources.action.edit")}
               </Button>
             ) : null}
@@ -326,15 +330,31 @@ function ResourceFileIcon({
   const className = "size-16";
 
   if (extension === ".zip") {
-    return <FileArchive aria-hidden="true" className={className} />;
+    return (
+      <FontAwesomeIcon
+        aria-hidden="true"
+        className={className}
+        icon={faFileZipper}
+      />
+    );
   }
   if (extension === ".pdf" || extension === ".txt") {
-    return <FileText aria-hidden="true" className={className} />;
+    return (
+      <FontAwesomeIcon
+        aria-hidden="true"
+        className={className}
+        icon={faFileLines}
+      />
+    );
   }
   if ([".3mf", ".step", ".stl", ".stp"].includes(extension)) {
-    return <Box aria-hidden="true" className={className} />;
+    return (
+      <FontAwesomeIcon aria-hidden="true" className={className} icon={faBox} />
+    );
   }
-  return <File aria-hidden="true" className={className} />;
+  return (
+    <FontAwesomeIcon aria-hidden="true" className={className} icon={faFile} />
+  );
 }
 
 /**

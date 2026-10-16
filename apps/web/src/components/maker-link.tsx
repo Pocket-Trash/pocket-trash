@@ -1,5 +1,6 @@
+import { faArrowUpRightFromSquare } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "@tanstack/react-router";
-import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -56,7 +57,11 @@ export function MakerLink({
       target="_blank"
     >
       {name}
-      <ExternalLink aria-hidden="true" className="size-3 shrink-0" />
+      <FontAwesomeIcon
+        aria-hidden="true"
+        className="size-3 shrink-0"
+        icon={faArrowUpRightFromSquare}
+      />
     </a>
   );
 }

@@ -1,3 +1,8 @@
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { UserCollectionSummary } from "@package/services";
 import {
   createColumnHelper,
@@ -6,7 +11,6 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useMemo } from "react";
 import {
   type GalleryImage,
@@ -228,7 +232,10 @@ export function CollectionGallery({
                       type="button"
                       variant="outline"
                     >
-                      <ChevronLeft />
+                      <FontAwesomeIcon
+                        aria-hidden="true"
+                        icon={faChevronLeft}
+                      />
                     </Button>
                     <output aria-live="polite" className="text-sm">
                       {copy.pageStatus(
@@ -244,7 +251,10 @@ export function CollectionGallery({
                       type="button"
                       variant="outline"
                     >
-                      <ChevronRight />
+                      <FontAwesomeIcon
+                        aria-hidden="true"
+                        icon={faChevronRight}
+                      />
                     </Button>
                   </nav>
                 ) : null}

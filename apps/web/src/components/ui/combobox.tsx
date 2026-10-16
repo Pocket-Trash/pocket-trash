@@ -1,5 +1,10 @@
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
-import { Check, ChevronDown, X } from "lucide-react";
+import {
+  faCheck,
+  faChevronDown,
+  faXmark,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -313,7 +318,11 @@ function ComboboxControl({
         aria-label={ariaLabel}
         className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground"
       >
-        <ChevronDown aria-hidden="true" className="size-4" />
+        <FontAwesomeIcon
+          aria-hidden="true"
+          className="size-4"
+          icon={faChevronDown}
+        />
       </ComboboxPrimitive.Trigger>
     </div>
   );
@@ -369,7 +378,11 @@ function ComboboxOptions({
                   ) : null}
                 </span>
                 <ComboboxPrimitive.ItemIndicator>
-                  <Check aria-hidden="true" className="size-4" />
+                  <FontAwesomeIcon
+                    aria-hidden="true"
+                    className="size-4"
+                    icon={faCheck}
+                  />
                 </ComboboxPrimitive.ItemIndicator>
               </ComboboxPrimitive.Item>
             )}
@@ -423,7 +436,11 @@ function ComboboxGroupedOptions({
                     >
                       <span>{item.name}</span>
                       <ComboboxPrimitive.ItemIndicator>
-                        <Check aria-hidden="true" className="size-4" />
+                        <FontAwesomeIcon
+                          aria-hidden="true"
+                          className="size-4"
+                          icon={faCheck}
+                        />
                       </ComboboxPrimitive.ItemIndicator>
                     </ComboboxPrimitive.Item>
                   )}
@@ -493,7 +510,7 @@ function SelectionPill({
         onClick={onRemove}
         type="button"
       >
-        <X aria-hidden="true" className="size-3" />
+        <FontAwesomeIcon aria-hidden="true" className="size-3" icon={faXmark} />
       </button>
     </span>
   );
@@ -525,7 +542,11 @@ function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
         aria-label={props["aria-label"] ?? props.placeholder}
         className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground outline-none"
       >
-        <ChevronDown aria-hidden="true" className="size-4" />
+        <FontAwesomeIcon
+          aria-hidden="true"
+          className="size-4"
+          icon={faChevronDown}
+        />
       </ComboboxPrimitive.Trigger>
     </div>
   );
@@ -596,7 +617,7 @@ function ComboboxItem({
     >
       {children}
       <ComboboxPrimitive.ItemIndicator className="absolute right-2">
-        <Check aria-hidden="true" className="size-4" />
+        <FontAwesomeIcon aria-hidden="true" className="size-4" icon={faCheck} />
       </ComboboxPrimitive.ItemIndicator>
     </ComboboxPrimitive.Item>
   );

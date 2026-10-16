@@ -1,5 +1,10 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import {
+  faCheck,
+  faChevronDown,
+  faChevronUp,
+} from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +56,11 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon>
-        <ChevronDownIcon className="opacity-50" />
+        <FontAwesomeIcon
+          aria-hidden="true"
+          className="opacity-50"
+          icon={faChevronDown}
+        />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -141,7 +150,11 @@ function SelectItem({
     >
       <span className="absolute right-2 flex size-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <FontAwesomeIcon
+            aria-hidden="true"
+            className="size-4"
+            icon={faCheck}
+          />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -169,7 +182,11 @@ function SelectScrollUpButton({
       data-slot="select-scroll-up-button"
       {...props}
     >
-      <ChevronUpIcon className="size-4" />
+      <FontAwesomeIcon
+        aria-hidden="true"
+        className="size-4"
+        icon={faChevronUp}
+      />
     </SelectPrimitive.ScrollUpArrow>
   );
 }
@@ -194,7 +211,11 @@ function SelectScrollDownButton({
       data-slot="select-scroll-down-button"
       {...props}
     >
-      <ChevronDownIcon className="size-4" />
+      <FontAwesomeIcon
+        aria-hidden="true"
+        className="size-4"
+        icon={faChevronDown}
+      />
     </SelectPrimitive.ScrollDownArrow>
   );
 }
