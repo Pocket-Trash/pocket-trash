@@ -17,11 +17,12 @@ Create these resources in the Pocket Trash Railway project:
 | Resource | Railway name | Configuration |
 | --- | --- | --- |
 | Scraper cron service | `pocket-trash` in production; `pocket-trash (preview)` in previews | Project IaC with no legacy Config File setting |
+| Discord bot service | `discord-bot` in production only | One replica, zero-overlap deploys, `/health` readiness check |
 | Redis | `pocket-trash-queue` | Railway Redis template with `redis-volume` |
 | Legacy Redis during migration | `scraper-queue` | Retained until separately approved cleanup |
 
 Railway may detect other deployable workspace apps during repository import.
-Skip them: this project deploys only `apps/scraper`.
+Skip them: this project deploys only `apps/scraper` and `apps/discord-bot`.
 
 For the production scraper service:
 
@@ -38,12 +39,23 @@ For the preview scraper service:
 - Do not add a scraper `railway service redeploy --from-source` workflow step
   while native auto-deploy is enabled; that would create two builds per push.
 
+For the production Discord bot service:
+
+- Do not create a preview service. A second gateway process would consume the
+  same Discord events and queue.
+- Keep one replica and zero deployment overlap so only one process owns the
+  gateway session and continuous worker.
+- Use `/health`; it returns healthy only after the Discord gateway and worker
+  start and Redis answers a live queue-count request.
+- Load application-owned values from Infisical `/apps/discord-bot`. Keep
+  `REDIS_URL` as the Railway reference to `pocket-trash-queue`.
+
 The root [`railpack.json`](../railpack.json) authenticates native installs before
 GitHub Actions can configure a new PR environment. The root
 [`.railwayignore`](../.railwayignore) keeps CLI uploads below Railway's source-upload
 limit. It must include pnpm's referenced patches, the security audit script and
-exception manifest, and workspace dependencies of both the root manifest and
-scraper. CI and the production workflow run
+exception manifest, and workspace dependencies of the root manifest, scraper,
+and Discord bot. CI and the production workflow run
 `node scripts/check-railway-context.mjs` to reject missing, untracked, or excluded
 build inputs before upload. When adding build inputs, update the allowlist and
 the watched paths in `.railway/railway.ts` together.
@@ -107,9 +119,11 @@ The initial production and preview rename plans inspected on 2026-10-16 both
 reported exactly `1 to add, 0 to change, 1 to destroy`: create database
 `pocket-trash-queue` and delete database `scraper-queue`. The IaC rename is
 therefore a replacement, not an in-place rename. The checked-in migration stage
-retains both resources; its reviewed production and preview plans report
-`1 to add, 0 to change, 0 to destroy`. Do not apply even that additive plan
-without express user permission.
+retains both resources. After adding the production-only bot service, the
+reviewed production plan reports `2 to add, 0 to change, 0 to destroy` (the
+queue and bot), while preview reports `1 to add, 0 to change, 0 to destroy`
+(the queue only). Do not apply either additive plan without express user
+permission.
 
 Migration requires separate, explicitly approved stages:
 
@@ -247,13 +261,17 @@ preview namespaces are documented in [image-cdn.md](./image-cdn.md).
 ## Production deploys
 
 Production scraper deploys are downstream of the release workflow's database
-migrations. The workflow:
+migrations. The current workflow:
 
 1. Applies committed migrations to the production Neon branch.
 2. Deploys and smoke-tests the production API.
 3. Stages Railway production metadata with `--skip-deploys`.
 4. Uploads the checked-out release source to Railway.
 5. Waits for the Railway CLI deployment command to succeed.
+
+That upload targets only `pocket-trash`; it does not deploy `discord-bot`.
+Creating the bot service from the reviewed IaC plan and activating its source
+deployment are separate production actions.
 
 Do not move Drizzle migrations into the Railway build, pre-deploy, start, or
 cron command. That could run scraper code before the production schema is ready.

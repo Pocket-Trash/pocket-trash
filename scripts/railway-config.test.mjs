@@ -14,7 +14,14 @@ for (const environment of ["production", "preview"]) {
       project,
     );
     const scraper = definition.resources.find(
-      (resource) => resource.type === "service",
+      (resource) =>
+        resource.name ===
+        (environment === "production"
+          ? "pocket-trash"
+          : "pocket-trash (preview)"),
+    );
+    const discordBot = definition.resources.find(
+      (resource) => resource.name === "discord-bot",
     );
     const queue = definition.resources.find(
       (resource) => resource.address === "database.pocket-trash-queue",
@@ -83,15 +90,29 @@ for (const environment of ["production", "preview"]) {
       if (name === "RAILPACK_INSTALL_CMD") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
+    const expectedAddresses = [
+      "database.pocket-trash-queue",
+      "database.scraper-queue",
+      `service.${scraper.name}`,
+      "volume.redis-volume",
+    ];
+    if (environment === "production")
+      expectedAddresses.push("service.discord-bot");
     assert.deepEqual(
       definition.resources.map((resource) => resource.address).sort(),
-      [
-        "database.pocket-trash-queue",
-        "database.scraper-queue",
-        `service.${scraper.name}`,
-        "volume.redis-volume",
-      ],
+      expectedAddresses.sort(),
     );
+    if (environment === "production") {
+      assert.equal(discordBot.deploy.healthcheckPath, "/health");
+      assert.equal(discordBot.deploy.overlapSeconds, 0);
+      assert.equal(
+        discordBot.variables.REDIS_URL.resource,
+        "database.pocket-trash-queue",
+      );
+      assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
+    } else {
+      assert.equal(discordBot, undefined);
+    }
     assert.equal(queue.name, "pocket-trash-queue");
     assert.match(queue.deploy.startCommand, /--save 60 1/);
     assert.match(queue.deploy.startCommand, /--appendonly yes/);

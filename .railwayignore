@@ -1,4 +1,4 @@
-# Railway deploys only the scraper service from this monorepo. Keep the upload
+# Railway deploys the scraper and Discord bot from this monorepo. Keep the upload
 # small enough for Railway's source upload limit by excluding unrelated apps,
 # static assets, local dependencies, and generated output.
 
@@ -23,6 +23,8 @@
 !apps/
 !apps/scraper/
 !apps/scraper/**
+!apps/discord-bot/
+!apps/discord-bot/**
 
 !packages/
 !packages/database/
