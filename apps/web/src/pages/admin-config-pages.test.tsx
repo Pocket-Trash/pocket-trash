@@ -37,6 +37,12 @@ vi.mock("@tanstack/react-router", () => ({
   },
 }));
 
+/** Product-type image metadata used by configuration tests. */
+const productTypeImage = {
+  imageAlt: "No image set",
+  imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+} as const;
+
 vi.mock("@/components/admin-page-shell", () => ({
   /**
    * Renders only the administration page content.
@@ -102,6 +108,7 @@ describe("administrator configuration pages", () => {
       <AdminProductConfigPage
         productTypes={Array.from({ length: 31 }, (_, index) => ({
           id: index + 1,
+          ...productTypeImage,
           isPartOrAccessory: index % 2 === 0,
           name: `Product Type ${String(index + 1).padStart(2, "0")}`,
           slug: `product-type-${index + 1}`,
