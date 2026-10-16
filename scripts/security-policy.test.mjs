@@ -25,8 +25,8 @@ const deployWorkflow = await readFile(".github/workflows/deploy.yml", "utf8");
 const rootPackage = JSON.parse(await readFile("package.json", "utf8"));
 /** API package manifest under test. */
 const apiPackage = JSON.parse(await readFile("apps/api/package.json", "utf8"));
-/** Railway build configuration under test. */
-const railwayConfig = (
+/** Railway service build configurations under test. */
+const railwayServices = (
   await railway(
     createRailwayContext({
       projectName: "Pocket Trash",
@@ -34,13 +34,13 @@ const railwayConfig = (
     }),
     project,
   )
-).resources.find((resource) => resource.type === "service");
+).resources.filter((resource) => resource.type === "service");
 
 test("gates artifacts, releases, and deployments on the audit", () => {
   assert.match(ciWorkflow, /name: Security/);
   assert.equal(
     ciWorkflow.match(/needs: \[security, classify-changes\]/g)?.length,
-    7,
+    8,
   );
   assert.ok(
     (deployWorkflow.match(/- name: Audit dependencies/g)?.length ?? 0) >= 5,
@@ -54,7 +54,9 @@ test("gates artifacts, releases, and deployments on the audit", () => {
     apiPackage.scripts.deploy,
     /^pnpm --dir \.\.\/\.\. security:audit/,
   );
-  assert.match(railwayConfig.build.buildCommand, /^pnpm security:audit/);
+  for (const service of railwayServices) {
+    assert.match(service.build.buildCommand, /^pnpm security:audit/);
+  }
 });
 
 test("pins patched shell-quote and Sharp releases across transitive paths", () => {

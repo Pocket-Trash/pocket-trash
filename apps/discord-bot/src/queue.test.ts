@@ -5,7 +5,11 @@ import { createDeliveryQueueRuntime } from "./queue.js";
 describe("delivery queue runtime", () => {
   it("starts continuously and closes its worker, queue, and adapter", async () => {
     const adapter = createInMemoryQueueAdapter();
-    const deliver = vi.fn().mockResolvedValue(undefined);
+    const pendingDelivery = { resolve: undefined as (() => void) | undefined };
+    const delivery = new Promise<void>((resolve) => {
+      pendingDelivery.resolve = resolve;
+    });
+    const deliver = vi.fn(() => delivery);
     const runtime = createDeliveryQueueRuntime({ adapter, deliver });
 
     await runtime.start();
@@ -24,7 +28,14 @@ describe("delivery queue runtime", () => {
     ).toEqual({ accepted: true, replacedCompleted: false });
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledOnce());
 
-    await runtime.close();
+    let closed = false;
+    const close = runtime.close().then(() => {
+      closed = true;
+    });
+    await Promise.resolve();
+    expect(closed).toBe(false);
+    pendingDelivery.resolve?.();
+    await close;
     expect(runtime.started()).toBe(false);
     await expect(
       runtime.enqueue({

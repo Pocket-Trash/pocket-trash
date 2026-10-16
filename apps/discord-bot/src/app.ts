@@ -5,6 +5,21 @@ import type { BotReadiness } from "./readiness.js";
 type CreateAppOptions = {
   /** Live readiness controller. */
   readiness: Pick<BotReadiness, "check">;
+  /** Source-specific webhook routes to mount. */
+  webhookRoutes?: readonly WebhookRoute[];
+};
+
+/** Authenticated source-specific webhook route. */
+type WebhookRoute = {
+  /**
+   * Handles one source webhook request.
+   *
+   * @param request - Untrusted source request.
+   * @returns Source acknowledgement response.
+   */
+  handle(request: Request): Promise<Response>;
+  /** Absolute Hono route path. */
+  path: string;
 };
 
 /**
@@ -56,6 +71,9 @@ export function createApp(options: CreateAppOptions) {
       readiness.ok ? 200 : 503,
     );
   });
+  for (const route of options.webhookRoutes ?? []) {
+    app.post(route.path, (context) => route.handle(context.req.raw));
+  }
   return app;
 }
 

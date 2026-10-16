@@ -14,7 +14,7 @@ describe("Discord bot HTTP app", () => {
   });
 
   it("maps unavailable queue storage to a webhook 503", async () => {
-    const intake = createWebhookIntake({
+    const handle = createWebhookIntake({
       enqueue: vi.fn().mockRejectedValue(new Error("Redis unavailable")),
       /**
        * Produces one normalized fixture delivery.
@@ -23,7 +23,13 @@ describe("Discord bot HTTP app", () => {
        */
       normalize: async () => ({ id: "delivery", payload: { version: 1 } }),
     });
+    const app = createApp({
+      readiness: { check: vi.fn().mockResolvedValue({ ok: true }) },
+      webhookRoutes: [{ handle, path: "/webhooks/source" }],
+    });
 
-    expect((await intake(new Request("https://bot.test"))).status).toBe(503);
+    expect(
+      (await app.request("/webhooks/source", { method: "POST" })).status,
+    ).toBe(503);
   });
 });

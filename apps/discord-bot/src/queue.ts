@@ -52,8 +52,12 @@ export function createDeliveryQueueRuntime(options: {
   return {
     /** Closes the worker, queue, and adapter-owned Redis connection. */
     async close() {
-      await options.adapter.close();
-      worker = undefined;
+      try {
+        await worker?.close();
+      } finally {
+        await options.adapter.close();
+        worker = undefined;
+      }
     },
     /**
      * Checks Redis through portable queue counts.

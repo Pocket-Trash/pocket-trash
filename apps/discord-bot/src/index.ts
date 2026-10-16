@@ -8,6 +8,7 @@ import { createDiscordBotEnv } from "./env.js";
 import {
   assertGatewayDisconnectAllowed,
   discordGatewayIntents,
+  registerGatewayReadinessListeners,
 } from "./gateway.js";
 import { createDiscordBotLogger } from "./logger.js";
 import { createDeliveryQueueRuntime } from "./queue.js";
@@ -73,7 +74,7 @@ const server = serve({ fetch: createApp({ readiness }).fetch, port: env.PORT });
 /** Prevents duplicate resource shutdown. */
 let shuttingDown = false;
 
-client.once(Events.ClientReady, () => readiness.setGatewayReady(true));
+registerGatewayReadinessListeners(client, readiness.setGatewayReady);
 client.on(Events.ShardDisconnect, (event) => {
   readiness.setGatewayReady(false);
   try {

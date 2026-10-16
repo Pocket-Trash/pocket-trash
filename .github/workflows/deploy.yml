@@ -39,7 +39,6 @@ jobs:
       id-token: write
     outputs:
       api: ${{ steps.classify.outputs.api }}
-      discord_bot: ${{ steps.classify.outputs.discord_bot }}
       scraper: ${{ steps.classify.outputs.scraper }}
       web: ${{ steps.classify.outputs.web }}
       database_validation: ${{ steps.classify.outputs.database_validation }}

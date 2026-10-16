@@ -9,6 +9,7 @@ are documented at their source:
 - [Web server logger configuration](../apps/web/src/lib/services.ts)
 - [Web browser logger configuration](../apps/web/src/lib/logger.ts)
 - [Scraper logger configuration](../apps/scraper/src/lib/logger.ts)
+- [Discord bot logger configuration](../apps/discord-bot/src/logger.ts)
 
 Do not copy those contracts into this runbook.
 
@@ -53,6 +54,7 @@ settings in the matching Infisical application path:
 - Web server: `/apps/web`
 - API worker: `/apps/api`
 - Scraper: `/apps/scraper`
+- Discord bot: `/apps/discord-bot`
 
 The Axiom token in each application path needs ingest access to that
 environment's dataset. Only give query access to the dedicated live-test token.
