@@ -1,6 +1,6 @@
 import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
-import type { QueueJob } from "@package/queue";
+import type { QueueEnqueueInput, QueueJob } from "@package/queue";
 import type { ImagesService } from "@package/services";
 import {
   syncCanonicalAutmogImage,
@@ -243,7 +243,7 @@ type ProcessorErrorSample = {
    */
   imageId?: number;
   /**
-   * Deterministic BullMQ job identifier.
+   * Deterministic queue job identifier.
    */
   jobId?: string;
   /**
@@ -470,7 +470,7 @@ async function processItemJob({
    */
   errorCounter: ProcessorErrorCounter;
   /**
-   * BullMQ job being processed.
+   * Portable queue job being processed.
    */
   job: QueueJob<ScraperItemJob>;
   /**
@@ -490,7 +490,13 @@ async function processItemJob({
         dryRun,
       });
       const imageJobs = result.imageCandidates.map((image) => ({
-        data: {
+        id: getGrimsmoSagaImageUploadJobId({
+          listingId: image.listingId,
+          sourceImageId: image.sourceImageId,
+          sourceUrl: image.sourceUrl,
+        }),
+        name: "grimsmo.sagaImage.upload",
+        payload: {
           listingId: image.listingId,
           position: image.position,
           productId: image.productId,
@@ -498,14 +504,6 @@ async function processItemJob({
           sourceImageId: image.sourceImageId,
           sourceUrl: image.sourceUrl,
           type: "grimsmo.sagaImage.upload" as const,
-        },
-        name: "grimsmo.sagaImage.upload",
-        opts: {
-          jobId: getGrimsmoSagaImageUploadJobId({
-            listingId: image.listingId,
-            sourceImageId: image.sourceImageId,
-            sourceUrl: image.sourceUrl,
-          }),
         },
       }));
       const removedCompletedImageJobs = dryRun
@@ -628,33 +626,29 @@ async function processItemJob({
       const result = await syncGrimsmoKnifeVariation(db, data.item);
       const imageJobs = [
         ...result.uploadImageJobs.map((imageJob) => ({
-          data: {
+          id: getTmpImageUploadJobId({
+            imageId: imageJob.imageId,
+            source,
+            sourceHash: imageJob.sourceHash,
+          }),
+          name: "tmp.image.upload",
+          payload: {
             imageId: imageJob.imageId,
             source,
             sourceHash: imageJob.sourceHash,
             type: "tmp.image.upload" as const,
           },
-          name: "tmp.image.upload",
-          opts: {
-            jobId: getTmpImageUploadJobId({
-              imageId: imageJob.imageId,
-              source,
-              sourceHash: imageJob.sourceHash,
-            }),
-          },
         })),
         ...result.deleteImageJobs.map((imageJob) => ({
-          data: {
+          id: getTmpImageDeleteJobId({
+            imageId: imageJob.imageId,
+            source,
+          }),
+          name: "tmp.image.delete",
+          payload: {
             imageId: imageJob.imageId,
             source,
             type: "tmp.image.delete" as const,
-          },
-          name: "tmp.image.delete",
-          opts: {
-            jobId: getTmpImageDeleteJobId({
-              imageId: imageJob.imageId,
-              source,
-            }),
           },
         })),
       ];
@@ -688,7 +682,13 @@ async function processItemJob({
     const data = job.payload;
     const result = await syncCanonicalAutmogPen(db, data.item, { dryRun });
     const imageJobs = result.imageCandidates.map((image) => ({
-      data: {
+      id: getAutmogImageUploadJobId({
+        listingId: image.listingId,
+        sourceImageId: image.sourceImageId,
+        sourceUrl: image.sourceUrl,
+      }),
+      name: "autmog.image.upload",
+      payload: {
         listingId: image.listingId,
         position: image.position,
         productId: image.productId,
@@ -697,14 +697,6 @@ async function processItemJob({
         sourceUrl: image.sourceUrl,
         type: "autmog.image.upload" as const,
       },
-      name: "autmog.image.upload",
-      opts: {
-        jobId: getAutmogImageUploadJobId({
-          listingId: image.listingId,
-          sourceImageId: image.sourceImageId,
-          sourceUrl: image.sourceUrl,
-        }),
-      },
     }));
 
     let removedCompletedImageJobs = 0;
@@ -712,11 +704,7 @@ async function processItemJob({
     if (!dryRun && imageJobs.length > 0) {
       removedCompletedImageJobs = await enqueueScraperJobs(
         queues.images,
-        imageJobs.map((imageJob) => ({
-          id: imageJob.opts.jobId,
-          name: imageJob.name,
-          payload: imageJob.data,
-        })),
+        imageJobs,
       );
     }
 
@@ -811,7 +799,7 @@ async function processImageJob({
    */
   imageStorage: ImagesService;
   /**
-   * BullMQ job being processed.
+   * Portable queue job being processed.
    */
   job: QueueJob<ScraperImageJob>;
   /**
@@ -905,38 +893,13 @@ async function processImageJob({
  */
 async function enqueueImageJobs(
   queues: ScraperQueues,
-  imageJobs: {
-    /**
-     * Queue payload for the job.
-     */
-    data: ScraperImageJob;
-    /**
-     * Stable queue job name.
-     */
-    name: string;
-    /**
-     * Stable queue job identity.
-     */
-    opts: {
-      /**
-       * Deterministic queue job identifier.
-       */
-      jobId: string;
-    };
-  }[],
+  imageJobs: QueueEnqueueInput<ScraperImageJob>[],
 ) {
   if (imageJobs.length === 0) {
     return 0;
   }
 
-  return enqueueScraperJobs(
-    queues.images,
-    imageJobs.map((imageJob) => ({
-      id: imageJob.opts.jobId,
-      name: imageJob.name,
-      payload: imageJob.data,
-    })),
-  );
+  return enqueueScraperJobs(queues.images, imageJobs);
 }
 
 /**
@@ -963,7 +926,7 @@ function logItemMutationCompleted({
    */
   imageJobs: number;
   /**
-   * Deterministic BullMQ job identifier.
+   * Deterministic queue job identifier.
    */
   jobId: string | undefined;
   /**
@@ -1065,7 +1028,7 @@ async function processTmpImageJob({
    */
   imageStorage: ImagesService;
   /**
-   * BullMQ job being processed.
+   * Portable queue job being processed.
    */
   job: QueueJob<TmpScraperImageJob>;
   /**
@@ -1218,7 +1181,7 @@ function logMissingImageRow({
   startedAt,
 }: {
   /**
-   * BullMQ job being processed.
+   * Portable queue job being processed.
    */
   job: QueueJob<TmpScraperImageJob>;
   /**
@@ -1264,7 +1227,7 @@ function logImageJobError({
    */
   errorCounter: ProcessorErrorCounter;
   /**
-   * BullMQ job being processed.
+   * Portable queue job being processed.
    */
   job: QueueJob<TmpScraperImageJob>;
   /**

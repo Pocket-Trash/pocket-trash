@@ -256,6 +256,8 @@ type MemoryJob<TPayload> = QueueJob<TPayload> & {
   state: "active" | "completed" | "delayed" | "failed" | "waiting";
   /** Completion timestamp used for deterministic retention. */
   completedAt?: number;
+  /** Failure timestamp used for deterministic retention. */
+  failedAt?: number;
   /** Earliest timestamp at which a delayed retry may run. */
   retryAt?: number;
 };
@@ -323,7 +325,7 @@ export function createInMemoryQueueAdapter(
          * @returns Portable queue counts.
          */
         async counts() {
-          pruneCompleted(jobs, definition, now());
+          pruneRetained(jobs, definition, now());
           promoteDueRetries(jobs.values(), now());
           return countMemoryJobs(jobs.values());
         },
@@ -336,7 +338,7 @@ export function createInMemoryQueueAdapter(
         async enqueue(input) {
           assertOpen(closed);
           const payload = definition.schema.parse(input.payload);
-          pruneCompleted(jobs, definition, now());
+          pruneRetained(jobs, definition, now());
           const existing = jobs.get(input.id);
           const replacedCompleted = Boolean(
             existing?.state === "completed" &&
@@ -373,7 +375,7 @@ export function createInMemoryQueueAdapter(
          *
          * @param processOptions - Handler and limits.
          * @returns Terminal outcome counts.
-         * @rejects When the handler or payload validation fails unexpectedly.
+         * @rejects When the queue is closed or is not bounded.
          */
         async process(processOptions) {
           assertOpen(closed);
@@ -393,7 +395,7 @@ export function createInMemoryQueueAdapter(
          *
          * @param processOptions - Handler and concurrency.
          * @returns Worker handle.
-         * @rejects When initial processing fails unexpectedly.
+         * @rejects When the queue is closed or is not continuous.
          */
         async processContinuously(processOptions) {
           assertOpen(closed);
@@ -402,6 +404,7 @@ export function createInMemoryQueueAdapter(
           }
           let workerClosed = false;
           let processing = Promise.resolve();
+          let retryTimer: NodeJS.Timeout | undefined;
           /** Schedules one continuous drain. */
           const wake = () => {
             processing = processing.then(async () => {
@@ -413,6 +416,17 @@ export function createInMemoryQueueAdapter(
                 onEvent: options.onEvent,
                 options: { ...processOptions, limit: Number.POSITIVE_INFINITY },
               });
+              const retryAt = nextMemoryRetryAt(jobs.values());
+              if (retryAt !== undefined && !workerClosed) {
+                clearTimeout(retryTimer);
+                retryTimer = setTimeout(
+                  () => {
+                    retryTimer = undefined;
+                    if (now() >= retryAt) wake();
+                  },
+                  Math.max(0, retryAt - now()),
+                );
+              }
             });
           };
           continuousWorkers.add(wake);
@@ -426,6 +440,7 @@ export function createInMemoryQueueAdapter(
             async close() {
               workerClosed = true;
               continuousWorkers.delete(wake);
+              clearTimeout(retryTimer);
               await processing;
             },
           };
@@ -444,6 +459,7 @@ export function createInMemoryQueueAdapter(
           for (const job of failed.slice(0, limit)) {
             job.state = "waiting";
             job.error = undefined;
+            job.failedAt = undefined;
           }
           return {
             failed: failed.length,
@@ -507,14 +523,31 @@ function promoteDueRetries<TPayload>(
 }
 
 /**
- * Applies completed-job age and count retention to in-memory state.
+ * Returns the earliest delayed retry timestamp.
+ *
+ * @param jobs - Jobs that may be delayed.
+ * @returns Earliest retry timestamp, when one exists.
+ * @template TPayload - Validated payload type.
+ */
+function nextMemoryRetryAt<TPayload>(jobs: Iterable<MemoryJob<TPayload>>) {
+  let next: number | undefined;
+  for (const job of jobs) {
+    if (job.state === "delayed" && job.retryAt !== undefined) {
+      next = next === undefined ? job.retryAt : Math.min(next, job.retryAt);
+    }
+  }
+  return next;
+}
+
+/**
+ * Applies completed and failed job retention to in-memory state.
  *
  * @param jobs - Mutable jobs keyed by stable identifier.
  * @param definition - Queue retention policy.
  * @param now - Current Unix milliseconds.
  * @template TPayload - Validated payload type.
  */
-function pruneCompleted<TPayload>(
+function pruneRetained<TPayload>(
   jobs: Map<string, MemoryJob<TPayload>>,
   definition: QueueDefinition<TPayload, "bounded" | "continuous">,
   now: number,
@@ -527,6 +560,15 @@ function pruneCompleted<TPayload>(
       index >= definition.retention.completed.count ||
       now - (job.completedAt ?? now) >
         definition.retention.completed.ageSeconds * 1_000
+    ) {
+      jobs.delete(job.id);
+    }
+  }
+  for (const job of jobs.values()) {
+    if (
+      job.state === "failed" &&
+      now - (job.failedAt ?? now) >
+        definition.retention.failed.ageSeconds * 1_000
     ) {
       jobs.delete(job.id);
     }
@@ -576,7 +618,6 @@ async function processMemoryJobs<TPayload>(input: {
         .slice(index, index + input.options.concurrency)
         .map(async (job) => {
           job.state = "active";
-          job.attemptsMade += 1;
           input.onEvent?.({
             jobId: job.id,
             queue: input.definition.name,
@@ -596,6 +637,7 @@ async function processMemoryJobs<TPayload>(input: {
             });
           } catch (error) {
             job.error = error;
+            job.attemptsMade += 1;
             if (job.attemptsMade < input.definition.retry.attempts) {
               const backoff = input.definition.retry.backoff;
               const multiplier =
@@ -608,6 +650,7 @@ async function processMemoryJobs<TPayload>(input: {
                 : undefined;
             } else {
               job.state = "failed";
+              job.failedAt = input.now();
             }
             stats.failed += 1;
             input.onEvent?.({
@@ -620,6 +663,6 @@ async function processMemoryJobs<TPayload>(input: {
     );
   }
 
-  pruneCompleted(input.jobs, input.definition, input.now());
+  pruneRetained(input.jobs, input.definition, input.now());
   return stats;
 }

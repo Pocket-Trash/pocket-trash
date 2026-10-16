@@ -9,16 +9,7 @@ import { defineQueueAdapterContract } from "./test-contract.js";
  * @returns A deterministic in-memory adapter.
  */
 function createAdapter() {
-  return createInMemoryQueueAdapter({ now: currentTime });
-}
-
-/**
- * Supplies a stable clock for retention tests.
- *
- * @returns A stable Unix timestamp.
- */
-function currentTime() {
-  return 1_000;
+  return createInMemoryQueueAdapter();
 }
 
 defineQueueAdapterContract("in-memory queue adapter", createAdapter);
@@ -68,5 +59,7 @@ it("models retry delay and exhaustion deterministically", async () => {
     delayed: 0,
     failed: 1,
   });
+  now += 60_001;
+  await expect(queue.counts()).resolves.toMatchObject({ failed: 0 });
   await adapter.close();
 });

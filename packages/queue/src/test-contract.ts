@@ -164,6 +164,51 @@ export function defineQueueAdapterContract(
       await adapter.close();
     });
 
+    it("reports matching attempt numbers and retries continuous jobs", async () => {
+      const adapter = await createAdapter();
+      const queue = adapter.define({
+        deduplication: { replaceCompleted: false },
+        mode: "continuous",
+        name: `contract-retry-${crypto.randomUUID()}`,
+        retention: {
+          completed: { ageSeconds: 86_400, count: 1_000 },
+          failed: { ageSeconds: 604_800 },
+        },
+        retry: { attempts: 2, backoff: { delayMs: 5, type: "fixed" } },
+        schema: payloadSchema,
+      });
+      const attempts: number[] = [];
+      let delivered!: () => void;
+      const delivery = new Promise<void>((resolve) => {
+        delivered = resolve;
+      });
+      const worker = await queue.processContinuously({
+        concurrency: 1,
+        /**
+         * Fails once, then records successful retry delivery.
+         *
+         * @param job - Portable queue job under test.
+         * @returns A completed outcome on the retry.
+         * @rejects On the first delivery attempt.
+         */
+        handler: async (job) => {
+          attempts.push(job.attemptsMade);
+          if (attempts.length === 1) throw new Error("retry once");
+          delivered();
+        },
+      });
+      await queue.enqueue({
+        id: "retry",
+        name: "test",
+        payload: { value: "retry" },
+      });
+
+      await expect(delivery).resolves.toBeUndefined();
+      expect(attempts).toEqual([0, 1]);
+      await worker.close();
+      await adapter.close();
+    });
+
     it("reports counts and redrives retained failures", async () => {
       const adapter = await createAdapter();
       const queue = adapter.define({

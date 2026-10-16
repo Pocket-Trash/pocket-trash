@@ -26,15 +26,136 @@ const scraperQueuePolicy = {
   },
 };
 
-/** Runtime validator for scraper item payloads persisted in Redis. */
-const scraperItemJobSchema = z.custom<ScraperItemJob>(isScraperItemJob, {
-  error: "Invalid scraper item queue payload.",
+/** Required shape shared by normalized source items persisted in queue jobs. */
+const normalizedItemSchema = z
+  .object({
+    availableForSale: z.boolean(),
+    detailsHash: z.string(),
+    imageSetHash: z.string(),
+    images: z.array(z.json()),
+    sourceHandle: z.string(),
+    sourceProductId: z.string(),
+    title: z.string(),
+    variants: z.array(z.json()),
+  })
+  .passthrough()
+  .and(z.json());
+
+/** Runtime shape of the bounded Saga catalog snapshot. */
+const sagaCatalogSnapshotSchema = z.object({
+  appearances: z.array(
+    z.object({
+      colorNames: z.array(z.string()),
+      finishNames: z.array(z.string()),
+      sliderOption: z.string().nullable(),
+    }),
+  ),
+  colorNames: z.array(z.string()),
+  finishNames: z.array(z.string()),
+  images: z.array(
+    z.object({
+      listingUrl: z.string(),
+      sourceHandle: z.string(),
+      sourceImageId: z.string(),
+      sourceProductId: z.string(),
+      sourceUrl: z.string(),
+    }),
+  ),
+  materialNames: z.array(z.string()),
+  sliderOptions: z.array(z.string()),
 });
 
+/** Runtime validator for each scraper item payload variant. */
+const scraperItemPayloadSchema = z.discriminatedUnion("type", [
+  z.object({
+    item: normalizedItemSchema,
+    source: z.literal(scraperSources.autmog),
+    type: z.literal("autmog.pen"),
+  }),
+  z.object({
+    snapshot: sagaCatalogSnapshotSchema,
+    source: z.literal(scraperSources.grimsmoSaga),
+    type: z.literal("grimsmo.sagaCatalog"),
+  }),
+  z.object({
+    materialNames: z.array(z.string()),
+    source: z.literal(scraperSources.grimsmoSaga),
+    type: z.literal("grimsmo.sagaMaterials"),
+  }),
+  z.object({
+    item: normalizedItemSchema,
+    source: z.literal(scraperSources.grimsmoSaga),
+    type: z.literal("grimsmo.penVariation"),
+  }),
+  z.object({
+    items: z.array(normalizedItemSchema),
+    source: z.literal(scraperSources.grimsmoSaga),
+    type: z.literal("grimsmo.penVariationBatch"),
+  }),
+  z.object({
+    item: normalizedItemSchema,
+    source: z.enum([
+      scraperSources.grimsmoFjell,
+      scraperSources.grimsmoNorseman,
+      scraperSources.grimsmoRask,
+    ]),
+    type: z.literal("grimsmo.knifeVariation"),
+  }),
+  z.object({
+    items: z.array(normalizedItemSchema),
+    source: z.enum([
+      scraperSources.grimsmoFjell,
+      scraperSources.grimsmoNorseman,
+      scraperSources.grimsmoRask,
+    ]),
+    type: z.literal("grimsmo.knifeVariationBatch"),
+  }),
+]);
+
+/** Runtime validator for scraper item payloads persisted in Redis. */
+const scraperItemJobSchema = z.custom<ScraperItemJob>(
+  (value) => scraperItemPayloadSchema.safeParse(value).success,
+  { error: "Invalid scraper item queue payload." },
+);
+
+/** Runtime validator for each scraper image payload variant. */
+const scraperImagePayloadSchema = z.discriminatedUnion("type", [
+  z.object({
+    listingId: z.number().int(),
+    position: z.number().int(),
+    productId: z.number().int(),
+    source: z.literal(scraperSources.autmog),
+    sourceImageId: z.string(),
+    sourceUrl: z.string(),
+    type: z.literal("autmog.image.upload"),
+  }),
+  z.object({
+    listingId: z.number().int(),
+    position: z.number().int(),
+    productId: z.number().int(),
+    source: z.literal(scraperSources.grimsmoSaga),
+    sourceImageId: z.string(),
+    sourceUrl: z.string(),
+    type: z.literal("grimsmo.sagaImage.upload"),
+  }),
+  z.object({
+    imageId: z.number().int(),
+    source: z.enum(Object.values(scraperSources)),
+    sourceHash: z.string(),
+    type: z.literal("tmp.image.upload"),
+  }),
+  z.object({
+    imageId: z.number().int(),
+    source: z.enum(Object.values(scraperSources)),
+    type: z.literal("tmp.image.delete"),
+  }),
+]);
+
 /** Runtime validator for scraper image payloads persisted in Redis. */
-const scraperImageJobSchema = z.custom<ScraperImageJob>(isScraperImageJob, {
-  error: "Invalid scraper image queue payload.",
-});
+const scraperImageJobSchema = z.custom<ScraperImageJob>(
+  (value) => scraperImagePayloadSchema.safeParse(value).success,
+  { error: "Invalid scraper image queue payload." },
+);
 
 /** Item and image queues plus their shared close operation. */
 export type ScraperQueues = {
@@ -168,68 +289,3 @@ function actionableCounts(counts: QueueCounts): ScraperQueueJobCounts {
  * @param value - Unknown persisted payload.
  * @returns Whether the payload is a supported scraper item job.
  */
-function isScraperItemJob(value: unknown): value is ScraperItemJob {
-  if (!isRecord(value) || typeof value.type !== "string") return false;
-  if (!Object.values(scraperSources).includes(value.source as never))
-    return false;
-
-  if (value.type === "grimsmo.sagaCatalog") return isRecord(value.snapshot);
-  if (value.type === "grimsmo.sagaMaterials")
-    return isStringArray(value.materialNames);
-  if (value.type.endsWith("VariationBatch")) return Array.isArray(value.items);
-  return (
-    ["autmog.pen", "grimsmo.knifeVariation", "grimsmo.penVariation"].includes(
-      value.type,
-    ) && isRecord(value.item)
-  );
-}
-
-/**
- * Checks the common envelope and job-specific data of one image payload.
- *
- * @param value - Unknown persisted payload.
- * @returns Whether the payload is a supported scraper image job.
- */
-function isScraperImageJob(value: unknown): value is ScraperImageJob {
-  if (!isRecord(value) || typeof value.type !== "string") return false;
-  if (!Object.values(scraperSources).includes(value.source as never))
-    return false;
-
-  if (value.type === "tmp.image.delete")
-    return typeof value.imageId === "number";
-  if (value.type === "tmp.image.upload") {
-    return (
-      typeof value.imageId === "number" && typeof value.sourceHash === "string"
-    );
-  }
-  return (
-    ["autmog.image.upload", "grimsmo.sagaImage.upload"].includes(value.type) &&
-    typeof value.listingId === "number" &&
-    typeof value.position === "number" &&
-    typeof value.productId === "number" &&
-    typeof value.sourceImageId === "string" &&
-    typeof value.sourceUrl === "string"
-  );
-}
-
-/**
- * Checks whether an unknown value is an object-like record.
- *
- * @param value - Unknown candidate.
- * @returns Whether the candidate is a non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/**
- * Checks whether an unknown value is an array of strings.
- *
- * @param value - Unknown candidate.
- * @returns Whether every array member is a string.
- */
-function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === "string")
-  );
-}

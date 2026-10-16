@@ -37,7 +37,7 @@ describe("scraper job ids", () => {
     );
   });
 
-  it("creates BullMQ-safe job ids without colon separators", () => {
+  it("creates transport-safe job ids without colon separators", () => {
     const jobIds = [
       getAutmogArchiveJobId(["2", "1"]),
       getTmpImageUploadJobId({

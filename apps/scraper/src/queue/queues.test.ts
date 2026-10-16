@@ -3,6 +3,26 @@ import { describe, expect, it } from "vitest";
 import { createScraperQueues, enqueueScraperJobs } from "./queues.js";
 
 describe("scraper queues", () => {
+  it("rejects malformed nested item payloads", async () => {
+    const queues = createScraperQueues(
+      "redis://unused",
+      createInMemoryQueueAdapter(),
+    );
+
+    await expect(
+      queues.items.enqueue({
+        id: "invalid",
+        name: "autmog.pen",
+        payload: {
+          item: { sourceHandle: 1 },
+          source: "autmog",
+          type: "autmog.pen",
+        } as never,
+      }),
+    ).rejects.toThrow("Invalid scraper item queue payload");
+    await queues.close();
+  });
+
   it("replaces a completed deterministic job through scraper policy", async () => {
     const queues = createScraperQueues(
       "redis://unused",

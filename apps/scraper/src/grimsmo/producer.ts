@@ -1,5 +1,6 @@
 import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
+import type { QueueEnqueueInput } from "@package/queue";
 import { getGrimsmoVariationSyncState } from "../db/grimsmo.js";
 import {
   getGrimsmoKnifeVariationJobId,
@@ -131,17 +132,7 @@ export async function runGrimsmoProducer({
     const archiveItems = items.filter(
       (item) => item.sourceCollection === "archive",
     );
-    let jobs: {
-      /** Queue payload processed by the item worker. */
-      data: ScraperItemJob;
-      /** Stable queue job name. */
-      name: string;
-      /** Deterministic queue options. */
-      opts: {
-        /** Stable identifier used to replace a completed equivalent job. */
-        jobId: string;
-      };
-    }[];
+    let jobs: QueueEnqueueInput<ScraperItemJob>[];
     let enqueuedItemJobs: number;
     let skippedUnchangedItems: number;
 
@@ -151,14 +142,12 @@ export async function runGrimsmoProducer({
       );
       jobs = [
         {
-          data: {
+          id: getGrimsmoSagaCatalogJobId(snapshot),
+          name: "grimsmo.sagaCatalog",
+          payload: {
             snapshot,
             source: scraperSources.grimsmoSaga,
             type: "grimsmo.sagaCatalog",
-          },
-          name: "grimsmo.sagaCatalog",
-          opts: {
-            jobId: getGrimsmoSagaCatalogJobId(snapshot),
           },
         },
       ];
@@ -199,11 +188,7 @@ export async function runGrimsmoProducer({
       definition.kind === "pen" || skipArchiveReconciliation ? 0 : 1;
     const removedCompletedItemJobs = await enqueueScraperJobs(
       queues.items,
-      jobs.map((job) => ({
-        id: job.opts.jobId,
-        name: job.name,
-        payload: job.data,
-      })),
+      jobs,
     );
 
     logger.info(loggerMessages.scraper.grimsmo.fetchCompleted, {
@@ -377,28 +362,24 @@ function createJobs({
     if (source === scraperSources.grimsmoSaga) {
       const penItem = item as NormalizedGrimsmoPenVariation;
       return {
-        data: {
+        id: getGrimsmoPenVariationJobId(source, penItem),
+        name: "grimsmo.penVariation",
+        payload: {
           item: penItem,
           source,
           type: "grimsmo.penVariation" as const,
-        },
-        name: "grimsmo.penVariation",
-        opts: {
-          jobId: getGrimsmoPenVariationJobId(source, penItem),
         },
       };
     }
 
     const knifeItem = item as NormalizedGrimsmoKnifeVariation;
     return {
-      data: {
+      id: getGrimsmoKnifeVariationJobId(source, knifeItem),
+      name: "grimsmo.knifeVariation",
+      payload: {
         item: knifeItem,
         source,
         type: "grimsmo.knifeVariation" as const,
-      },
-      name: "grimsmo.knifeVariation",
-      opts: {
-        jobId: getGrimsmoKnifeVariationJobId(source, knifeItem),
       },
     };
   });
@@ -408,46 +389,32 @@ function createJobs({
     .map((item) => item.sourceHandle);
 
   if (skipArchiveReconciliation) {
-    return itemJobs satisfies {
-      /**
-       * Queue payload for the scraper job.
-       */
-      data: ScraperItemJob;
-      /**
-       * Queue job name consumed by the item worker.
-       */
-      name: string;
-      /**
-       * Queue options carrying the deterministic job identifier.
-       */
-      opts: {
-        /**
-         * Deterministic identifier used to deduplicate the queue job.
-         */
-        jobId: string;
-      };
-    }[];
+    return itemJobs satisfies QueueEnqueueInput<ScraperItemJob>[];
   }
 
   const batchJob =
     source === scraperSources.grimsmoSaga
       ? {
-          data: {
+          id: getGrimsmoVariationBatchJobId({
+            inventorySourceHandles,
+            source,
+            sourceHandles,
+          }),
+          name: "grimsmo.penVariationBatch",
+          payload: {
             items: items as NormalizedGrimsmoPenVariation[],
             source,
             type: "grimsmo.penVariationBatch" as const,
           },
-          name: "grimsmo.penVariationBatch",
-          opts: {
-            jobId: getGrimsmoVariationBatchJobId({
-              inventorySourceHandles,
-              source,
-              sourceHandles,
-            }),
-          },
         }
       : {
-          data: {
+          id: getGrimsmoVariationBatchJobId({
+            inventorySourceHandles,
+            source,
+            sourceHandles,
+          }),
+          name: "grimsmo.knifeVariationBatch",
+          payload: {
             items: items as NormalizedGrimsmoKnifeVariation[],
             source: source as
               | typeof scraperSources.grimsmoFjell
@@ -455,33 +422,7 @@ function createJobs({
               | typeof scraperSources.grimsmoRask,
             type: "grimsmo.knifeVariationBatch" as const,
           },
-          name: "grimsmo.knifeVariationBatch",
-          opts: {
-            jobId: getGrimsmoVariationBatchJobId({
-              inventorySourceHandles,
-              source,
-              sourceHandles,
-            }),
-          },
         };
 
-  return [...itemJobs, batchJob] satisfies {
-    /**
-     * Queue payload for the scraper job.
-     */
-    data: ScraperItemJob;
-    /**
-     * Queue job name consumed by the item worker.
-     */
-    name: string;
-    /**
-     * Queue options carrying the deterministic job identifier.
-     */
-    opts: {
-      /**
-       * Deterministic identifier used to deduplicate the queue job.
-       */
-      jobId: string;
-    };
-  }[];
+  return [...itemJobs, batchJob] satisfies QueueEnqueueInput<ScraperItemJob>[];
 }
