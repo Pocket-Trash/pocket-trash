@@ -367,8 +367,10 @@ export function ProductsPage({
     const visibleTypes = new Map<
       CatalogProductType,
       {
-        /** Optional representative product image. */
-        imageUrl: string | null;
+        /** Description of the category image. */
+        imageAlt: string;
+        /** Stable category image URL. */
+        imageUrl: string;
         /** Localized product-type label. */
         label: string;
         /** Product-type metadata. */
@@ -380,15 +382,10 @@ export function ProductsPage({
     for (const product of products) {
       const productType = typeMetadata.get(product.productTypeSlug);
       if (!productType) continue;
-      const imageUrl =
-        product.images.find(({ deletedAt }) => !deletedAt)?.url ?? null;
-      const existing = visibleTypes.get(product.productTypeSlug);
-      if (existing) {
-        if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl;
-        continue;
-      }
+      if (visibleTypes.has(product.productTypeSlug)) continue;
       visibleTypes.set(product.productTypeSlug, {
-        imageUrl,
+        imageAlt: productType.imageAlt,
+        imageUrl: productType.imageUrl,
         label: localizedProductTypeLabel(
           t,
           product.productTypeSlug,
@@ -414,12 +411,14 @@ export function ProductsPage({
           <h2 className="sr-only">{t("web.navigation.products")}</h2>
           <section className="grid gap-[18px] sm:grid-cols-2 xl:grid-cols-4">
             <ProductTypeNavigationCard
+              imageAlt=""
               imageUrl="https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp"
               label={t("web.catalog.allProducts")}
               search={{ view: "all" }}
             />
-            {primary.map(({ imageUrl, label, slug }) => (
+            {primary.map(({ imageAlt, imageUrl, label, slug }) => (
               <ProductTypeNavigationCard
+                imageAlt={imageAlt}
                 imageUrl={imageUrl}
                 key={slug}
                 label={label}
@@ -439,14 +438,17 @@ export function ProductsPage({
                 {t("web.catalog.partsAndAccessories")}
               </h3>
               <div className="grid gap-[18px] sm:grid-cols-2 xl:grid-cols-4">
-                {partsAndAccessories.map(({ imageUrl, label, slug }) => (
-                  <ProductTypeNavigationCard
-                    imageUrl={imageUrl}
-                    key={slug}
-                    label={label}
-                    search={{ type: slug, view: "all" }}
-                  />
-                ))}
+                {partsAndAccessories.map(
+                  ({ imageAlt, imageUrl, label, slug }) => (
+                    <ProductTypeNavigationCard
+                      imageAlt={imageAlt}
+                      imageUrl={imageUrl}
+                      key={slug}
+                      label={label}
+                      search={{ type: slug, view: "all" }}
+                    />
+                  ),
+                )}
               </div>
             </section>
           ) : null}
@@ -513,25 +515,27 @@ export function ProductsPage({
  * Renders one keyboard-accessible product-directory navigation card.
  *
  * @param props - Product-type navigation properties.
- * @param props.imageUrl - Optional representative product image.
+ * @param props.imageAlt - Description of the category image.
+ * @param props.imageUrl - Stable category image URL.
  * @param props.label - Localized card label.
  * @param props.search - Product-list search selected by the card.
  * @returns Product-type navigation card.
  */
 function ProductTypeNavigationCard({
+  imageAlt,
   imageUrl,
   label,
   search,
 }: {
-  /** Optional representative product image. */
-  imageUrl: string | null;
+  /** Description of the category image. */
+  imageAlt: string;
+  /** Stable category image URL. */
+  imageUrl: string;
   /** Localized card label. */
   label: string;
   /** Product-list search selected by the card. */
   search: ProductTypeNavigationSearch;
 }) {
-  const fallbackImage =
-    "https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp";
   return (
     <Link
       className="group overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-[border-color,transform] hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -539,10 +543,10 @@ function ProductTypeNavigationCard({
       to="/products"
     >
       <img
-        alt=""
+        alt={imageAlt}
         className="aspect-4/3 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
         loading="lazy"
-        src={imageUrl ? cardImageUrl(imageUrl) : `${fallbackImage}?width=640`}
+        src={cardImageUrl(imageUrl)}
       />
       <div className="p-5 text-xl font-semibold">{label}</div>
     </Link>

@@ -4,6 +4,12 @@ import { expect, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionAddPage } from "./catalog-form-pages";
 
+/** Product-type image metadata used by collection stories. */
+const productTypeImage = {
+  imageAlt: "No image set",
+  imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+} as const;
+
 /** Catalog product used by the chooser interaction stories. */
 const product: CatalogProduct = {
   aliases: [],
@@ -221,24 +227,28 @@ const meta = {
       productTypes: [
         {
           id: 1,
+          ...productTypeImage,
           isPartOrAccessory: false,
           name: "Spinner",
           slug: "spinner",
         },
         {
           id: 2,
+          ...productTypeImage,
           isPartOrAccessory: true,
           name: "Spinner button",
           slug: "spinner-button",
         },
         {
           id: 3,
+          ...productTypeImage,
           isPartOrAccessory: false,
           name: "Slider",
           slug: "slider",
         },
         {
           id: 4,
+          ...productTypeImage,
           isPartOrAccessory: false,
           name: "Pen",
           slug: "pen",

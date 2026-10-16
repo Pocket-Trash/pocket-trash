@@ -36,6 +36,12 @@ const collectionImage = image(
   "collection-images/thirteen.webp",
 );
 
+/** Approved product-type placeholder image metadata. */
+const productTypeImage = {
+  imageAlt: "No image set",
+  imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+} as const;
+
 /** Catalog product shared by the stories. */
 const product: CatalogProduct = {
   aliases: [],
@@ -647,6 +653,9 @@ export const ProductDirectory: Story = {
    */
   play: async ({ canvas }) => {
     const links = within(canvas.getByRole("main")).getAllByRole("link");
+    await expect(
+      canvas.getAllByRole("img", { name: "No image set" }),
+    ).toHaveLength(3);
     await expect(links[0]).toHaveAttribute("href", "/products?view=all");
     await expect(links[1]).toHaveAttribute(
       "href",
@@ -665,18 +674,21 @@ export const ProductDirectory: Story = {
   render: () => {
     const productTypes: CatalogProductTypeSummary[] = [
       {
+        ...productTypeImage,
         id: 1,
         isPartOrAccessory: false,
         name: "Spinner",
         slug: "spinner",
       },
       {
+        ...productTypeImage,
         id: 2,
         isPartOrAccessory: false,
         name: "Slider",
         slug: "slider",
       },
       {
+        ...productTypeImage,
         id: 3,
         isPartOrAccessory: true,
         name: "Slider Plate",

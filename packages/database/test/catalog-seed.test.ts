@@ -4,6 +4,7 @@ import {
   catalogSeedTimestamp,
   loadKapedcSeedData,
   materialPairForTerm,
+  normalizeSeedImageUrl,
   seedCatalog,
   seedColorEffects,
   seedColors,
@@ -94,6 +95,10 @@ function createSeedDb() {
   const productTypes = new Map<
     string,
     {
+      /** Description of the product-type image. */
+      imageAlt: string;
+      /** Product-type image URL. */
+      imageUrl: string;
       /** Whether the type belongs in Parts and Accessories. */
       isPartOrAccessory: boolean;
       /** Product-type display name. */
@@ -110,6 +115,10 @@ function createSeedDb() {
         (value: {
           /** Optional hexadecimal value for colors. */
           hex?: string;
+          /** Optional image description. */
+          imageAlt?: string;
+          /** Optional image URL. */
+          imageUrl?: string;
           /** Optional Parts and Accessories classification. */
           isPartOrAccessory?: boolean;
           /** Lookup display name. */
@@ -150,6 +159,8 @@ function createSeedDb() {
             } else if (table === productType && value.slug) {
               if (!productTypes.has(value.slug))
                 productTypes.set(value.slug, {
+                  imageAlt: value.imageAlt ?? "",
+                  imageUrl: value.imageUrl ?? "",
                   isPartOrAccessory: value.isPartOrAccessory ?? false,
                   name: value.name,
                   slug: value.slug,
@@ -162,6 +173,10 @@ function createSeedDb() {
               async (config?: {
                 /** Values updated on conflict. */
                 set?: {
+                  /** Replacement image description. */
+                  imageAlt?: string;
+                  /** Replacement image URL. */
+                  imageUrl?: string;
                   /** Replacement display name. */
                   name?: string;
                 };
@@ -171,6 +186,8 @@ function createSeedDb() {
                   if (existing && config?.set?.name)
                     productTypes.set(value.slug, {
                       ...existing,
+                      imageAlt: config.set.imageAlt ?? existing.imageAlt,
+                      imageUrl: config.set.imageUrl ?? existing.imageUrl,
                       name: config.set.name,
                     });
                   return;
@@ -289,6 +306,20 @@ function createImageSeedDb() {
 }
 
 describe("catalog seed", () => {
+  it("requires product type image URLs to use valid HTTPS", () => {
+    expect(
+      normalizeSeedImageUrl(
+        " https://cdn.pocket-trash.app/assets/static/no-image.png ",
+      ),
+    ).toBe("https://cdn.pocket-trash.app/assets/static/no-image.png");
+    expect(() => normalizeSeedImageUrl("http://example.com/image.png")).toThrow(
+      "Product type image URL must use HTTPS.",
+    );
+    expect(() => normalizeSeedImageUrl("not a url")).toThrow(
+      "Product type image URL must be a valid HTTPS URL.",
+    );
+  });
+
   it("references shared immutable preview images without copying them", async () => {
     const inserted: Array<Record<string, unknown>> = [];
     const db = {
@@ -607,6 +638,8 @@ describe("catalog seed", () => {
     if (!sliderPlate) throw new Error("Slider plate was not seeded.");
     state.productTypes.set("slider-plate", {
       ...sliderPlate,
+      imageAlt: "Stale description",
+      imageUrl: "https://example.com/stale.png",
       isPartOrAccessory: false,
     });
     await seedCatalog(state.db);
@@ -619,6 +652,10 @@ describe("catalog seed", () => {
     expect(state.productTypes.get("slider-plate")?.isPartOrAccessory).toBe(
       false,
     );
+    expect(state.productTypes.get("slider-plate")).toMatchObject({
+      imageAlt: "No image set",
+      imageUrl: "https://cdn.pocket-trash.app/assets/static/no-image.png",
+    });
     expect(state.makers.size).toBe(seedMakers.length);
     expect(state.materials.size).toBe(seedMaterials.length);
     expect(state.materials.has("m390-steel")).toBe(false);
