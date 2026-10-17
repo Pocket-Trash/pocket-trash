@@ -48,6 +48,14 @@ pnpm infisical:check
 The Font Awesome token authenticates dependency installation only. Running the
 installed applications does not require it.
 
+The web app renders icons with `@fortawesome/react-fontawesome`. Non-brand
+icons use `@fortawesome/pro-light-svg-icons` by default and
+`@fortawesome/pro-solid-svg-icons` only when the light icon is unclear at its
+rendered size. Brand icons use `@fortawesome/free-brands-svg-icons`. Regular,
+Thin, Duotone, Sharp, Kit, and aggregate Pro packages are intentionally not
+installed. Import icon definitions directly instead of registering a global
+library.
+
 `pnpm agent-skills:update` installs the shared Pocket Trash agent skills in a
 Git clone. Worktrees created by the Pocket Trash CLI install them automatically.
 
