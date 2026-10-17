@@ -55,9 +55,11 @@ while (pendingPackageNames.length > 0) {
 /** Install and build entry points required in the tracked upload context. */
 const requiredBuildFiles = [
   ".railwayignore",
+  "railpack.json",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
+  "scripts/pnpm-install.sh",
   "scripts/security-audit.mjs",
   "security-audit-exceptions.json",
   "tsconfig.json",

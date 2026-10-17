@@ -1,10 +1,8 @@
 import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
+import type { QueueEnqueueInput } from "@package/queue";
 import { getAutmogPenJobId } from "../queue/job-ids.js";
-import {
-  removeCompletedJobsById,
-  type ScraperQueues,
-} from "../queue/queues.js";
+import { enqueueScraperJobs, type ScraperQueues } from "../queue/queues.js";
 import {
   type NormalizedAutmogPen,
   type ScraperItemJob,
@@ -94,41 +92,18 @@ export async function runAutmogProducer({
     const items = products
       .map(normalizeAutmogProduct)
       .filter((item) => item.normalizedData.category === "pen");
-    const jobs: {
-      /**
-       * Queue payload for the scraper job.
-       */
-      data: ScraperItemJob;
-      /**
-       * Deterministic identifier used to deduplicate the queue job.
-       */
-      jobId: string;
-      /**
-       * Queue job name consumed by the item worker.
-       */
-      name: string;
-    }[] = items.map((item) => ({
-      data: {
+    const jobs: QueueEnqueueInput<ScraperItemJob>[] = items.map((item) => ({
+      id: getAutmogPenJobId(item),
+      name: "autmog.pen",
+      payload: {
         item,
         source: scraperSources.autmog,
         type: "autmog.pen",
       },
-      jobId: getAutmogPenJobId(item),
-      name: "autmog.pen",
     }));
-    const removedCompletedItemJobs = await removeCompletedJobsById(
+    const removedCompletedItemJobs = await enqueueScraperJobs(
       queues.items,
-      jobs.map((job) => job.jobId),
-    );
-
-    await queues.items.addBulk(
-      jobs.map((job) => ({
-        data: job.data,
-        name: job.name,
-        opts: {
-          jobId: job.jobId,
-        },
-      })),
+      jobs,
     );
 
     logger.info(loggerMessages.scraper.queue.enqueueCompleted, {

@@ -169,6 +169,7 @@ test("classifies package paths by affected domains", () => {
       "packages/markdown/src/index.ts",
       ["scraper", "web", "storybook", "preview", "safe_e2e", "validation"],
     ],
+    ["packages/queue/src/index.ts", ["scraper", "preview", "validation"]],
     ["packages/json-data/autmog.json", ["validation"]],
     ["packages/lint/index.mjs", ["validation"]],
   ]) {
@@ -386,6 +387,11 @@ test("syncs Font Awesome authentication into Railway before source builds", () =
     assert.match(
       steps[configureIndex].run,
       /variable set FONTAWESOME_PACKAGE_TOKEN[\s\S]*--stdin[\s\S]*--skip-deploys/u,
+      jobName,
+    );
+    assert.match(
+      steps[configureIndex].run,
+      /pnpm-install\.sh --frozen-lockfile --prefer-offline[\s\S]*variable set RAILPACK_INSTALL_CMD[\s\S]*--stdin[\s\S]*--skip-deploys/u,
       jobName,
     );
     assert.ok(clearIndex > configureIndex, jobName);

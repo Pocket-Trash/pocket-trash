@@ -8,14 +8,11 @@ import { runAutmogProducer } from "./producer.js";
 describe("runAutmogProducer", () => {
   it("enqueues canonical item jobs without archive reconciliation", async () => {
     const product = createProduct({ id: 123 });
-    const addBulk = vi.fn().mockResolvedValue([]);
+    const enqueueMany = vi.fn().mockResolvedValue([]);
     const queues = {
       close: vi.fn(),
-      images: { addBulk: vi.fn() },
-      items: {
-        addBulk,
-        getJob: vi.fn(async () => null),
-      },
+      images: { enqueueMany: vi.fn() },
+      items: { enqueueMany },
     } as unknown as ScraperQueues;
     const logger = {
       error: vi.fn(),
@@ -33,7 +30,7 @@ describe("runAutmogProducer", () => {
       queues,
     });
 
-    const [jobs] = addBulk.mock.calls[0] ?? [];
+    const [jobs] = enqueueMany.mock.calls[0] ?? [];
     expect(jobs).toHaveLength(1);
     expect(jobs[0].name).toBe("autmog.pen");
     expect(result.enqueuedCount).toBe(1);
@@ -51,16 +48,13 @@ describe("runAutmogProducer", () => {
   });
 
   it("re-enqueues an A → B → A transition despite its completed job", async () => {
-    const addBulk = vi.fn().mockResolvedValue([]);
-    const completedJob = {
-      getState: vi.fn().mockResolvedValue("completed"),
-      remove: vi.fn().mockResolvedValue(undefined),
-    };
-    const getJob = vi.fn().mockResolvedValueOnce(completedJob);
+    const enqueueMany = vi
+      .fn()
+      .mockResolvedValue([{ accepted: true, replacedCompleted: true }]);
     const queues = {
       close: vi.fn(),
-      images: { addBulk: vi.fn() },
-      items: { addBulk, getJob },
+      images: { enqueueMany: vi.fn() },
+      items: { enqueueMany },
     } as unknown as ScraperQueues;
     const product = createProduct({ id: 123 });
     const fetcher = vi.fn().mockResolvedValue(
@@ -80,29 +74,25 @@ describe("runAutmogProducer", () => {
 
     expect(result.fetchedCount).toBe(1);
     expect(result.removedCompletedItemJobs).toBe(1);
-    expect(completedJob.remove).toHaveBeenCalledTimes(1);
-    expect(addBulk).toHaveBeenCalledTimes(1);
-    const [jobs] = addBulk.mock.calls[0] ?? [];
+    expect(enqueueMany).toHaveBeenCalledTimes(1);
+    const [jobs] = enqueueMany.mock.calls[0] ?? [];
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
-      data: {
+      payload: {
         source: "autmog",
         type: "autmog.pen",
       },
       name: "autmog.pen",
     });
-    expect(jobs[0].opts.jobId).toMatch(/^autmog--pen--123--sha256%3A/);
+    expect(jobs[0].id).toMatch(/^autmog--pen--123--sha256%3A/);
   });
 
   it("skips archive reconciliation during limited source scrapes", async () => {
-    const addBulk = vi.fn().mockResolvedValue([]);
+    const enqueueMany = vi.fn().mockResolvedValue([]);
     const queues = {
       close: vi.fn(),
-      images: { addBulk: vi.fn() },
-      items: {
-        addBulk,
-        getJob: vi.fn(async () => null),
-      },
+      images: { enqueueMany: vi.fn() },
+      items: { enqueueMany },
     } as unknown as ScraperQueues;
     const fetcher = vi.fn().mockResolvedValue(
       new Response(
@@ -136,10 +126,10 @@ describe("runAutmogProducer", () => {
       skipArchiveReconciliation: true,
     });
 
-    const [jobs] = addBulk.mock.calls[0] ?? [];
+    const [jobs] = enqueueMany.mock.calls[0] ?? [];
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
-      data: {
+      payload: {
         source: "autmog",
         type: "autmog.pen",
       },
@@ -148,14 +138,11 @@ describe("runAutmogProducer", () => {
   });
 
   it("does not enqueue Autmog accessories as canonical Pens", async () => {
-    const addBulk = vi.fn().mockResolvedValue([]);
+    const enqueueMany = vi.fn().mockResolvedValue([]);
     const queues = {
       close: vi.fn(),
-      images: { addBulk: vi.fn() },
-      items: {
-        addBulk,
-        getJob: vi.fn(async () => null),
-      },
+      images: { enqueueMany: vi.fn() },
+      items: { enqueueMany },
     } as unknown as ScraperQueues;
 
     const result = await runAutmogProducer({
@@ -197,7 +184,7 @@ describe("runAutmogProducer", () => {
       fetchedCount: 3,
       items: [],
     });
-    expect(addBulk).toHaveBeenCalledWith([]);
+    expect(enqueueMany).toHaveBeenCalledWith([]);
   });
 });
 

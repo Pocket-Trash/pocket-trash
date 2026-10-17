@@ -1,34 +1,56 @@
-import { describe, expect, it, vi } from "vitest";
-import { removeCompletedJobsById } from "./queues.js";
+import { createInMemoryQueueAdapter } from "@package/queue";
+import { describe, expect, it } from "vitest";
+import { createScraperQueues, enqueueScraperJobs } from "./queues.js";
 
-describe("removeCompletedJobsById", () => {
-  it("removes only completed jobs and de-duplicates job ids", async () => {
-    const completedJob = {
-      getState: vi.fn().mockResolvedValue("completed"),
-      remove: vi.fn().mockResolvedValue(undefined),
-    };
-    const waitingJob = {
-      getState: vi.fn().mockResolvedValue("waiting"),
-      remove: vi.fn().mockResolvedValue(undefined),
-    };
-    const queue = {
-      getJob: vi
-        .fn()
-        .mockResolvedValueOnce(completedJob)
-        .mockResolvedValueOnce(waitingJob)
-        .mockResolvedValueOnce(null),
-    };
+describe("scraper queues", () => {
+  it("rejects malformed nested item payloads", async () => {
+    const queues = createScraperQueues(
+      "redis://unused",
+      createInMemoryQueueAdapter(),
+    );
 
     await expect(
-      removeCompletedJobsById(queue as never, [
-        "completed-job",
-        "completed-job",
-        "waiting-job",
-        "missing-job",
-      ]),
-    ).resolves.toBe(1);
-    expect(queue.getJob).toHaveBeenCalledTimes(3);
-    expect(completedJob.remove).toHaveBeenCalledTimes(1);
-    expect(waitingJob.remove).not.toHaveBeenCalled();
+      queues.items.enqueue({
+        id: "invalid",
+        name: "autmog.pen",
+        payload: {
+          item: { sourceHandle: 1 },
+          source: "autmog",
+          type: "autmog.pen",
+        } as never,
+      }),
+    ).rejects.toThrow("Invalid scraper item queue payload");
+    await queues.close();
+  });
+
+  it("replaces a completed deterministic job through scraper policy", async () => {
+    const queues = createScraperQueues(
+      "redis://unused",
+      createInMemoryQueueAdapter(),
+    );
+    const job = {
+      id: "image-1",
+      name: "tmp.image.delete",
+      payload: {
+        imageId: 1,
+        source: "autmog" as const,
+        type: "tmp.image.delete" as const,
+      },
+    };
+
+    await enqueueScraperJobs(queues.images, [job]);
+    await queues.images.process({
+      concurrency: 1,
+      /**
+       * Completes the representative scraper job.
+       *
+       * @returns A completed outcome.
+       */
+      handler: async () => undefined,
+      limit: 1,
+    });
+
+    await expect(enqueueScraperJobs(queues.images, [job])).resolves.toBe(1);
+    await queues.close();
   });
 });

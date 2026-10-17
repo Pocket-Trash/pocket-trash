@@ -5,6 +5,7 @@
 *
 
 !.railwayignore
+!railpack.json
 !package.json
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
@@ -16,6 +17,7 @@
 !patches/**
 
 !scripts/
+!scripts/pnpm-install.sh
 !scripts/security-audit.mjs
 
 !apps/
@@ -35,6 +37,8 @@
 !packages/logger/**
 !packages/markdown/
 !packages/markdown/**
+!packages/queue/
+!packages/queue/**
 !packages/services/
 !packages/services/**
 !packages/tsconfig/

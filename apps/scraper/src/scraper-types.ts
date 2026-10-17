@@ -36,7 +36,7 @@ export type GrimsmoKnifeSourceName =
 export type GrimsmoSourceName = GrimsmoKnifeSourceName | GrimsmoPenSourceName;
 
 /**
- * Stable BullMQ queue names for item normalization and image storage.
+ * Stable physical queue names for item normalization and image storage.
  */
 export const scraperQueueNames = {
   images: "scraper-images",

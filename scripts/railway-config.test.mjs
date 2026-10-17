@@ -45,6 +45,8 @@ for (const environment of ["production", "preview"]) {
       "patches/**",
       ".railway/**",
       ".railwayignore",
+      "railpack.json",
+      "scripts/pnpm-install.sh",
       "scripts/security-audit.mjs",
       "security-audit-exceptions.json",
       "turbo.json",
@@ -106,6 +108,16 @@ test("rejects unrelated projects and unknown environments", () => {
       /Link/,
     );
   }
+});
+
+test("authenticates native Railpack installs from source", () => {
+  const config = JSON.parse(
+    readFileSync(new URL("../railpack.json", import.meta.url), "utf8"),
+  );
+
+  assert.deepEqual(config.steps.install.commands, [
+    "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+  ]);
 });
 
 test("keeps one authoring file without secrets or Railway identities", () => {

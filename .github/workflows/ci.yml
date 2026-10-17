@@ -444,6 +444,8 @@ jobs:
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
+      - name: Install Redis test server
+        run: sudo apt-get update && sudo apt-get install --yes redis-server
       - name: Run tests
         run: pnpm test:ci
 

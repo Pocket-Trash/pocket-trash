@@ -241,7 +241,7 @@ export function getGrimsmoVariationBatchJobId(input: {
 }
 
 /**
- * Encodes stable job identity parts into a BullMQ-safe identifier.
+ * Encodes stable job identity parts into a transport-safe identifier.
  *
  * @param parts - Stable job identity segments in hierarchy order.
  *

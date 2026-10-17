@@ -201,6 +201,11 @@ const changeClassificationRules = [
     ],
   },
   {
+    category: "shared-queue",
+    prefixes: ["packages/queue/"],
+    domains: ["scraper", "preview", "validation"],
+  },
+  {
     category: "validation-tooling",
     prefixes: [
       "packages/github-discord-notifier/",
@@ -255,9 +260,11 @@ const changeClassificationRules = [
   {
     category: "railway",
     paths: [
+      "railpack.json",
       "railway.json",
       ".railwayignore",
       ".github/workflows/railway-config.yml",
+      "scripts/pnpm-install.sh",
     ],
     prefixes: [".railway/"],
     domains: ["scraper", "preview", "validation"],
