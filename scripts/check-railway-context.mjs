@@ -25,11 +25,12 @@ const packagesByName = new Map(
 const rootManifest = JSON.parse(
   readFileSync(join(repoRoot, "package.json"), "utf8"),
 );
-/** Directories required by the root manifest, scraper, and workspace dependencies. */
+/** Directories required by the root manifest, Railway apps, and workspace dependencies. */
 const requiredPackageDirectories = new Set();
 /** Workspace package names pending dependency traversal. */
 const pendingPackageNames = [
   "@app/scraper",
+  "@app/discord-bot",
   ...getWorkspaceDependencyNames(rootManifest),
 ];
 
@@ -69,7 +70,7 @@ const requiredBuildFiles = [
     (directory) => `${directory}/package.json`,
   ),
 ];
-/** Tracked files required to build the scraper service. */
+/** Tracked files required to build every Railway service. */
 const requiredFiles = execFileSync(
   "git",
   [
@@ -122,7 +123,7 @@ if (![0, 1].includes(ignored.status)) {
 
 if (ignored.status === 0) {
   throw new Error(
-    `Railway excludes required scraper files:\n${ignored.stdout.trim()}`,
+    `Railway excludes required service files:\n${ignored.stdout.trim()}`,
   );
 }
 

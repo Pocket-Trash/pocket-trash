@@ -85,7 +85,7 @@ jobs:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           if ! node scripts/classify-changes.mjs; then
-            for domain in api scraper web database_validation storybook preview safe_e2e mutation_e2e validation; do
+            for domain in api discord_bot scraper web database_validation storybook preview safe_e2e mutation_e2e validation; do
               echo "$domain=true" >> "$GITHUB_OUTPUT"
             done
             echo 'mutation_e2e_specs=["e2e/collection-covers.spec.ts","e2e/collection-lifecycle.spec.ts","e2e/collection-selection.spec.ts","e2e/public-collections.spec.ts","e2e/mutation.spec.ts","e2e/makers.spec.ts","e2e/authenticated.spec.ts"]' >> "$GITHUB_OUTPUT"

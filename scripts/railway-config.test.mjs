@@ -14,7 +14,14 @@ for (const environment of ["production", "preview"]) {
       project,
     );
     const scraper = definition.resources.find(
-      (resource) => resource.type === "service",
+      (resource) =>
+        resource.name ===
+        (environment === "production"
+          ? "pocket-trash"
+          : "pocket-trash (preview)"),
+    );
+    const discordBot = definition.resources.find(
+      (resource) => resource.name === "discord-bot",
     );
     const queue = definition.resources.find(
       (resource) => resource.address === "database.pocket-trash-queue",
@@ -83,15 +90,29 @@ for (const environment of ["production", "preview"]) {
       if (name === "RAILPACK_INSTALL_CMD") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
+    const expectedAddresses = [
+      "database.pocket-trash-queue",
+      "database.scraper-queue",
+      `service.${scraper.name}`,
+      "volume.redis-volume",
+    ];
+    if (environment === "production")
+      expectedAddresses.push("service.discord-bot");
     assert.deepEqual(
       definition.resources.map((resource) => resource.address).sort(),
-      [
-        "database.pocket-trash-queue",
-        "database.scraper-queue",
-        `service.${scraper.name}`,
-        "volume.redis-volume",
-      ],
+      expectedAddresses.sort(),
     );
+    if (environment === "production") {
+      assert.equal(discordBot.deploy.healthcheckPath, "/health");
+      assert.equal(discordBot.deploy.overlapSeconds, 0);
+      assert.equal(
+        discordBot.variables.REDIS_URL.resource,
+        "database.pocket-trash-queue",
+      );
+      assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
+    } else {
+      assert.equal(discordBot, undefined);
+    }
     assert.equal(queue.name, "pocket-trash-queue");
     assert.match(queue.deploy.startCommand, /--save 60 1/);
     assert.match(queue.deploy.startCommand, /--appendonly yes/);
@@ -152,10 +173,20 @@ test("checks both templates without applying changes or exposing secrets to fork
   assert.match(job.if, /head.repo.full_name == github.repository/);
   const run = job.steps.find((step) => step.name === "Check Railway drift").run;
   assert.match(run, /config plan --detailed-exit-code/);
+  assert.match(run, /GITHUB_EVENT_NAME.*pull_request/);
   assert.doesNotMatch(run, /config apply|show-values|include-variables/);
   assert.match(run, /railway link --project/);
   assert.match(run, /--environment/);
-  for (const environment of job.strategy.matrix.environment) {
+  /**
+   * Execute the workflow step with a simulated Railway plan result.
+   *
+   * @param {{ environment: string; eventName: string; planExitCode: number }} root0 - Simulation inputs.
+   * @param {string} root0.environment - Railway environment name.
+   * @param {string} root0.eventName - GitHub event name.
+   * @param {number} root0.planExitCode - Simulated Railway plan exit code.
+   * @returns {Buffer} Command output.
+   */
+  const runWorkflow = ({ environment, eventName, planExitCode }) =>
     execFileSync(
       "bash",
       [
@@ -164,7 +195,7 @@ test("checks both templates without applying changes or exposing secrets to fork
       pnpm() {
         case "$3" in
           link) test "$5" = expected-project && test "$7" = "$RAILWAY_ENVIRONMENT" ;;
-          config) test -z "\${RAILWAY_PROJECT_ID+x}" ;;
+          config) test -z "\${RAILWAY_PROJECT_ID+x}" && return "$PLAN_EXIT_CODE" ;;
           *) return 1 ;;
         esac
       }
@@ -177,10 +208,26 @@ test("checks both templates without applying changes or exposing secrets to fork
           RAILWAY_API_TOKEN: "test-token",
           RAILWAY_PROJECT_ID: "expected-project",
           RAILWAY_ENVIRONMENT: environment,
+          GITHUB_EVENT_NAME: eventName,
+          PLAN_EXIT_CODE: String(planExitCode),
         },
       },
     );
+
+  for (const environment of job.strategy.matrix.environment) {
+    runWorkflow({ environment, eventName: "schedule", planExitCode: 0 });
+    runWorkflow({ environment, eventName: "pull_request", planExitCode: 2 });
   }
+
+  assert.throws(
+    () =>
+      runWorkflow({
+        environment: "production",
+        eventName: "schedule",
+        planExitCode: 2,
+      }),
+    (error) => error.status === 2,
+  );
 });
 
 test("classifies IaC as scraper infrastructure and its guide as documentation", () => {

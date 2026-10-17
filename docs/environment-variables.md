@@ -7,6 +7,7 @@ that consumes them:
 - [Web browser environment](../apps/web/src/env/client.schema.ts)
 - [API Worker bindings](../apps/api/src/app.ts)
 - [Scraper environment](../apps/scraper/src/env.schema.ts)
+- [Discord bot environment](../apps/discord-bot/src/env.ts)
 - [Database package environment](../packages/database/src/env.schema.ts)
 - [Web build-time aliases](../apps/web/vite.config.ts)
 

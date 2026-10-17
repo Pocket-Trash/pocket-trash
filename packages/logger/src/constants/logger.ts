@@ -165,6 +165,12 @@ export const loggerMessages = {
       syncFromClerk: "database.users.syncFromClerk",
     },
   },
+  discordBot: {
+    queueEvent: "discordBot.queue.event",
+    serverFailed: "discordBot.server.failed",
+    serverListening: "discordBot.server.listening",
+    serverStopping: "discordBot.server.stopping",
+  },
   featureFlags: {
     evaluationFailedClosed: "featureFlags.evaluation.failedClosed",
   },
@@ -271,6 +277,7 @@ export const loggerValues = {
   apps: {
     api: "api",
     ci: "ci",
+    discordBot: "discord-bot",
     scraper: "scraper",
     web: "web",
   },

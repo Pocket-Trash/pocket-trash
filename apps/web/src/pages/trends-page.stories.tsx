@@ -384,7 +384,11 @@ export const Populated: Story = {
       name: "Product type",
     });
     productTypeFilter.focus();
-    await userEvent.keyboard("{Enter}{End}{Enter}");
+    await userEvent.keyboard("{Enter}");
+    await within(canvasElement.ownerDocument.body).findByRole("option", {
+      name: "Spinner",
+    });
+    await userEvent.keyboard("{End}{Enter}");
     await expect(productTypeFilter).not.toHaveTextContent("all");
     await userEvent.keyboard("{Escape}");
 

@@ -13,6 +13,9 @@ prod [color: green, label: "Production"] {
   prod_Ingestion [label: "Ingestion"] {
     prod_scraper [color: purple, icon: server, label: "apps/scraper\nRailway service"]
   }
+  prod_Notifications [label: "Notifications"] {
+    prod_discord_bot [color: purple, icon: server, label: "apps/discord-bot\nRailway service"]
+  }
   prod_Data [label: "Data"] {
     prod_neon [color: green, icon: postgresql, label: "Neon production branch"]
     prod_queue [color: purple, icon: server, label: "pocket-trash-queue\nRDB + AOF"]
@@ -25,6 +28,9 @@ prod [color: green, label: "Production"] {
   }
   prod_Identity [label: "Identity"] {
     prod_clerk [color: purple, icon: lock, label: "Clerk auth"]
+  }
+  prod_External [label: "External"] {
+    prod_discord [color: indigo, icon: message-circle, label: "Discord guild"]
   }
   prod_Automation [label: "Automation"] {
     prod_github_actions [color: gray, icon: github, label: "release workflows"]
@@ -39,6 +45,10 @@ prod_web > prod_axiom: server and browser logs
 prod_scraper > prod_neon: write product data
 prod_scraper > prod_queue: scraper-images / scraper-items
 prod_scraper > prod_axiom: service logs
+prod_discord_bot > prod_queue: notification delivery
+prod_discord_bot > prod_discord: gateway and messages
+prod_discord_bot > prod_axiom: service logs
+prod_infisical > prod_discord_bot: bot secrets
 
 preview [color: yellow, label: "Preview"] {
   preview_Web [label: "Web"] {
@@ -87,6 +97,7 @@ dev_scraper > dev_queue: scraper queues
 
 shared_packages [label: "Shared packages and detected runtime links", color: "gray"] {
   app_api [icon: box, label: "@app/api\napps/api"]
+  app_discord_bot [icon: box, label: "@app/discord-bot\napps/discord-bot"]
   app_scraper [icon: box, label: "@app/scraper\napps/scraper"]
   app_web [icon: box, label: "@app/web\napps/web"]
   package_database [icon: package, label: "@package/database\npackages/database"]
@@ -109,6 +120,8 @@ shared_packages [label: "Shared packages and detected runtime links", color: "gr
 app_api > package_database: workspace dependency
 app_api > package_logger: workspace dependency
 app_api > package_services: workspace dependency
+app_discord_bot > package_logger: workspace dependency
+app_discord_bot > package_queue: workspace dependency
 app_scraper > package_database: workspace dependency
 app_scraper > package_logger: workspace dependency
 app_scraper > package_markdown: workspace dependency

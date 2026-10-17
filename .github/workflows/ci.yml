@@ -22,6 +22,7 @@ jobs:
       id-token: write
     outputs:
       api: ${{ steps.classify.outputs.api }}
+      discord_bot: ${{ steps.classify.outputs.discord_bot }}
       scraper: ${{ steps.classify.outputs.scraper }}
       web: ${{ steps.classify.outputs.web }}
       database_validation: ${{ steps.classify.outputs.database_validation }}
@@ -69,7 +70,7 @@ jobs:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           if ! node scripts/classify-changes.mjs; then
-            for domain in api scraper web database_validation storybook preview safe_e2e mutation_e2e validation; do
+            for domain in api discord_bot scraper web database_validation storybook preview safe_e2e mutation_e2e validation; do
               echo "$domain=true" >> "$GITHUB_OUTPUT"
             done
             echo 'mutation_e2e_specs=["e2e/collection-covers.spec.ts","e2e/collection-lifecycle.spec.ts","e2e/collection-selection.spec.ts","e2e/public-collections.spec.ts","e2e/mutation.spec.ts","e2e/makers.spec.ts","e2e/authenticated.spec.ts"]' >> "$GITHUB_OUTPUT"
@@ -252,6 +253,54 @@ jobs:
 
       - name: Build scraper artifact
         run: pnpm --filter @app/scraper... build
+
+  discord-bot-artifact:
+    name: Discord Bot Artifact
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.discord_bot == 'true'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
+      - name: Install dependencies
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
+
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
+
+      - name: Validate Railway upload context
+        run: node scripts/check-railway-context.mjs
+
+      - name: Build Discord bot artifact
+        run: pnpm --filter @app/discord-bot... build
 
   api-artifact:
     name: API Artifact

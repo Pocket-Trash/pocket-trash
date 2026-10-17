@@ -113,7 +113,64 @@ export default defineRailway((ctx) => {
     },
   );
 
+  const discordBot = production
+    ? service("discord-bot", {
+        source: github("Pocket-Trash/pocket-trash"),
+        build: {
+          builder: "RAILPACK",
+          buildCommand:
+            "pnpm security:audit && pnpm --filter @app/discord-bot... build",
+          watchPatterns: [
+            "apps/discord-bot/**",
+            "packages/logger/**",
+            "packages/queue/**",
+            "package.json",
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
+            "patches/**",
+            ".railway/**",
+            ".railwayignore",
+            "scripts/security-audit.mjs",
+            "security-audit-exceptions.json",
+            "turbo.json",
+          ],
+        },
+        start: "pnpm --filter @app/discord-bot start",
+        deploy: {
+          healthcheckPath: "/health",
+          healthcheckTimeout: 30,
+          overlapSeconds: 0,
+          restartPolicyMaxRetries: 10,
+          restartPolicyType: "ON_FAILURE",
+        },
+        replicas: { "us-east4-eqdc4a": 1 },
+        env: {
+          APP_ENV: "production",
+          AXIOM_DATASET: preserve(),
+          AXIOM_EDGE_DOMAIN: preserve(),
+          AXIOM_TOKEN: preserve(),
+          DISCORD_APPLICATION_ID: preserve(),
+          DISCORD_GUILD_ID: preserve(),
+          DISCORD_MODERATOR_ROLE_ID: preserve(),
+          DISCORD_OWNER_ROLE_ID: preserve(),
+          DISCORD_TOKEN: preserve(),
+          LOGGER: preserve(),
+          LOG_DEPLOYMENT_ID: preserve(),
+          LOG_DEPLOYMENT_TARGET: preserve(),
+          LOG_LEVEL: preserve(),
+          RAILWAY_ENVIRONMENT_NAME: preserve(),
+          REDIS_URL: sharedQueue.env.REDIS_URL,
+        },
+      })
+    : undefined;
+
   return project("Pocket Trash", {
-    resources: [legacyScraperQueue, sharedQueue, scraper, redisVolume],
+    resources: [
+      legacyScraperQueue,
+      sharedQueue,
+      scraper,
+      redisVolume,
+      ...(discordBot ? [discordBot] : []),
+    ],
   });
 });

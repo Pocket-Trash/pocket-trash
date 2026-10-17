@@ -19,7 +19,7 @@ import { parse } from "yaml";
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 
 /**
- * Creates a tracked scraper build fixture with a complete upload allowlist.
+ * Creates a tracked Railway build fixture with a complete upload allowlist.
  *
  * @param context - Test context owning temporary directory cleanup.
  * @returns Fixture directory.
@@ -30,7 +30,7 @@ function createFixture(context) {
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const files = {
     ".railwayignore":
-      "*\n!.railwayignore\n!railpack.json\n!package.json\n!pnpm-lock.yaml\n!pnpm-workspace.yaml\n!tsconfig.json\n!turbo.json\n!security-audit-exceptions.json\n!scripts/\n!scripts/pnpm-install.sh\n!scripts/security-audit.mjs\n!patches/\n!patches/**\n!apps/\n!apps/scraper/\n!apps/scraper/**\n!packages/\n!packages/database/\n!packages/database/**\n!packages/lint/\n!packages/lint/**\n",
+      "*\n!.railwayignore\n!railpack.json\n!package.json\n!pnpm-lock.yaml\n!pnpm-workspace.yaml\n!tsconfig.json\n!turbo.json\n!security-audit-exceptions.json\n!scripts/\n!scripts/pnpm-install.sh\n!scripts/security-audit.mjs\n!patches/\n!patches/**\n!apps/\n!apps/scraper/\n!apps/scraper/**\n!apps/discord-bot/\n!apps/discord-bot/**\n!packages/\n!packages/database/\n!packages/database/**\n!packages/lint/\n!packages/lint/**\n!packages/queue/\n!packages/queue/**\n",
     "railpack.json":
       '{"steps":{"install":{"commands":["./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline"]}}}\n',
     "package.json": JSON.stringify({
@@ -52,9 +52,15 @@ function createFixture(context) {
       dependencies: { "@package/database": "workspace:*" },
     }),
     "apps/scraper/src/index.ts": "export {};\n",
+    "apps/discord-bot/package.json": JSON.stringify({
+      name: "@app/discord-bot",
+      dependencies: { "@package/queue": "workspace:*" },
+    }),
+    "apps/discord-bot/src/index.ts": "export {};\n",
     "packages/database/package.json": '{"name":"@package/database"}\n',
     "packages/lint/package.json": '{"name":"@package/lint"}\n',
     "packages/lint/index.mjs": "export {};\n",
+    "packages/queue/package.json": '{"name":"@package/queue"}\n',
   };
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(directory, path)), { recursive: true });
@@ -146,10 +152,10 @@ test("rejects an excluded root workspace dependency", (context) => {
 test("accepts a complete tracked upload context", (context) => {
   const result = runChecker(createFixture(context));
   assert.equal(result.status, 0, result.output);
-  assert.match(result.output, /16 tracked files across 3 workspace packages/);
+  assert.match(result.output, /19 tracked files across 5 workspace packages/);
 });
 
-test("rejects missing audit and tracked scraper source files", (context) => {
+test("rejects missing audit and tracked service source files", (context) => {
   const directory = createFixture(context);
   for (const path of [
     "scripts/security-audit.mjs",

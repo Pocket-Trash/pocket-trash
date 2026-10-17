@@ -82,6 +82,7 @@ test("classifies representative application paths", () => {
       "apps/api/src/index.ts",
       ["api", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
+    ["apps/discord-bot/src/index.ts", ["discord_bot", "validation"]],
     ["apps/scraper/src/index.ts", ["scraper", "preview", "validation"]],
     [
       "apps/web/src/components/product-card.tsx",
@@ -169,7 +170,10 @@ test("classifies package paths by affected domains", () => {
       "packages/markdown/src/index.ts",
       ["scraper", "web", "storybook", "preview", "safe_e2e", "validation"],
     ],
-    ["packages/queue/src/index.ts", ["scraper", "preview", "validation"]],
+    [
+      "packages/queue/src/index.ts",
+      ["discord_bot", "scraper", "preview", "validation"],
+    ],
     ["packages/json-data/autmog.json", ["validation"]],
     ["packages/lint/index.mjs", ["validation"]],
   ]) {
@@ -265,7 +269,9 @@ test("authenticates and clears private package access around every workflow inst
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = job.steps ?? [];
       const installIndex = steps.findIndex((step) =>
-        step.run?.includes("scripts/pnpm-install.sh"),
+        /(?:^|\n)\s*(?:\.\/)?(?:scripts\/pnpm-install\.sh|pnpm install)\b/u.test(
+          step.run ?? "",
+        ),
       );
       if (installIndex === -1) continue;
 
@@ -774,6 +780,7 @@ test("root build and lint policy select safe checks without mutation isolation",
     classifyChanges(["turbo.json"]),
     expected([
       "api",
+      "discord_bot",
       "scraper",
       "web",
       "storybook",
