@@ -50,7 +50,7 @@ describe("web client env", () => {
 describe("web client env aliases", () => {
   it("maps unprefixed log variables to their Vite client names", () => {
     const runtimeEnv: Record<string, string | undefined> = {
-      ASSET_FOLDER_PREFIX: "assets",
+      BUNNY_ASSET_FOLDER_PREFIX: "assets",
       BUNNY_CDN_BASE_URL: "https://cdn.pocket-trash.app",
       LOG_DEPLOYMENT_ID: "development",
       LOG_DEPLOYMENT_TARGET: "web-client",
@@ -101,7 +101,7 @@ describe("web client env aliases", () => {
 describe("web server env", () => {
   it("validates required server variables", () => {
     const env = createWebServerEnv({
-      ASSET_FOLDER_PREFIX: "assets",
+      BUNNY_ASSET_FOLDER_PREFIX: "assets",
       AXIOM_DATASET: "development",
       AXIOM_EDGE_DOMAIN: "api.axiom.co",
       AXIOM_TOKEN: "xaat-example",
@@ -123,7 +123,7 @@ describe("web server env", () => {
     });
 
     expect(env.AXIOM_DATASET).toBe("development");
-    expect(env.ASSET_FOLDER_PREFIX).toBe("assets");
+    expect(env.BUNNY_ASSET_FOLDER_PREFIX).toBe("assets");
     expect(env.AXIOM_EDGE_DOMAIN).toBe("api.axiom.co");
     expect(env.AXIOM_TOKEN).toBe("xaat-example");
     expect(env.CLERK_SECRET_KEY).toBe("sk_test_example");

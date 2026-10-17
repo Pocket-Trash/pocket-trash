@@ -435,9 +435,9 @@ describe("secret path policy", () => {
     expect(
       getSecretPaths({
         allowServerSecrets: false,
-        paths: ["/apps/web", "/shared", "/apps/web"],
+        paths: ["/apps/web", "/tools/github/logger-live", "/apps/web"],
       }),
-    ).toEqual(["/apps/web", "/shared"]);
+    ).toEqual(["/apps/web", "/tools/github/logger-live"]);
   });
 
   it("rejects server-only paths for client commands", () => {

@@ -23,11 +23,11 @@ and the scraper on Railway.
 | `/apps/web` | Web development, builds, tests, and database commands; deploy workflows copy required values to Vercel |
 | `/apps/api` | Local API development and Cloudflare Worker deployment |
 | `/apps/scraper` | Local scraper commands and Railway services |
-| `/shared` | Values imported by applications and fetched by shared GitHub workflows |
 | `/local/database` | Optional developer-specific database URLs |
-| `/local/bunny` | Bunny account audits |
 | `/tools/package-manager` | Local package installation credentials |
 | `/tools/logger-axiom-test` | Local live Axiom integration test |
+| `/tools/github/logger-live` | Preview Axiom credentials used by Logger Live |
+| `/tools/github/preview-cleanup` | Preview Bunny Storage credentials used by infrastructure cleanup |
 | `tools/github/secrets` | GitHub Actions values fetched at runtime through OIDC |
 | `tools/github/infisical-connection` | Bootstrap values synchronized into GitHub repository secrets |
 
@@ -35,9 +35,10 @@ Use the same path names in every Infisical environment that needs them. Values
 remain environment-specific.
 
 `AXIOM_MANAGEMENT_TOKEN` belongs only in `/tools/logger-axiom-test` and
-`tools/github/secrets`. Give it dataset map-field management permission without
-placing it in any application runtime path. Runtime `AXIOM_TOKEN` values remain
-limited to ingest, plus query access where the logger live test requires it.
+`/tools/github/logger-live`. Give it dataset map-field management permission
+without placing it in any application runtime path. Runtime `AXIOM_TOKEN`
+values remain limited to ingest, plus query access where the logger live test
+requires it.
 
 ## Cross-Runtime Constraints
 
@@ -83,6 +84,9 @@ Browser-visible values must reach Vercel at build time. Shared server values
 are copied to their `VITE_` aliases only by
 [`applyWebClientEnvAliases`](../apps/web/vite.config.ts); do not expose other
 server secrets to the browser bundle.
+
+Store `BUNNY_ASSET_FOLDER_PREFIX` directly in `/apps/web`. The build copies it
+to the browser-facing `VITE_ASSET_FOLDER_PREFIX` alias.
 
 ### Font Awesome package token
 

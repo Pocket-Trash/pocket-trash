@@ -49,7 +49,27 @@ for (const environment of ["production", "preview"]) {
       "security-audit-exceptions.json",
       "turbo.json",
     ]);
-    assert.equal(Object.keys(scraper.variables).length, 31);
+    assert.deepEqual(Object.keys(scraper.variables).sort(), [
+      "APP_ENV",
+      "AXIOM_DATASET",
+      "AXIOM_TOKEN",
+      "BUNNY_CDN_BASE_URL",
+      "BUNNY_IMAGE_FOLDER_PREFIX",
+      "BUNNY_STORAGE_ACCESS_KEY",
+      "BUNNY_STORAGE_ENDPOINT",
+      "BUNNY_STORAGE_ZONE_NAME",
+      "DATABASE_URL",
+      "FONTAWESOME_PACKAGE_TOKEN",
+      "LOG_DEPLOYMENT_ID",
+      "LOG_DEPLOYMENT_TARGET",
+      "LOG_LEVEL",
+      "RAILPACK_INSTALL_CMD",
+      "REDIS_URL",
+      "SCRAPER_CRON_ENABLED",
+      "SCRAPER_IMAGE_BATCH_SIZE",
+      "SCRAPER_ITEM_BATCH_SIZE",
+      "SCRAPER_QUEUE_CONCURRENCY",
+    ]);
     assert.deepEqual(scraper.variables.RAILPACK_INSTALL_CMD, {
       type: "literal",
       value: "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
@@ -58,17 +78,6 @@ for (const environment of ["production", "preview"]) {
       if (name === "RAILPACK_INSTALL_CMD") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
-    assert.ok(scraper.variables.DATABASE_URL);
-    assert.ok(scraper.variables.BUNNY_CDN_TOKEN_KEY);
-    assert.ok(scraper.variables.BUNNY_RESOURCE_FOLDER_PREFIX);
-    assert.ok(scraper.variables.CLERK_SECRET_KEY);
-    assert.ok(scraper.variables.ERASURE_HMAC_SECRET);
-    assert.ok(scraper.variables.FONTAWESOME_PACKAGE_TOKEN);
-    assert.ok(scraper.variables.LOG_PROXY_CLIENT_KEY);
-    assert.ok(scraper.variables.REDIS_URL);
-    assert.ok(scraper.variables.SCRAPER_CRON_ENABLED);
-    assert.ok(scraper.variables.LOG_DEPLOYMENT_ID);
-    assert.ok(scraper.variables.IMAGE_KIT_FOLDER_PREFIX);
     assert.deepEqual(
       definition.resources.map((resource) => resource.address).sort(),
       [
