@@ -9,7 +9,7 @@ repository secrets only bootstrap that connection.
 | --- | --- |
 | `tools/github/infisical-connection` | Secrets Sync source for GitHub repository bootstrap secrets. |
 | `tools/github/secrets` | Runtime workflow values fetched by GitHub Actions through OIDC. |
-| `/tools/github/logger-live` | Preview Axiom credentials used by Logger Live. |
+| `/tools/github/logger-live` | Preview Axiom credentials used by Logger Live and the management token used by deployment map-field checks. |
 | `/tools/github/preview-cleanup` | Preview Bunny Storage credentials used by infrastructure cleanup. |
 
 Configure `tools/github/infisical-connection` in Infisical production and sync
@@ -23,8 +23,9 @@ these values to GitHub repository secrets:
 Store common workflow runtime values in `tools/github/secrets` with normalized
 names in each Infisical environment. Use `preview` for pull request, refresh,
 and Discord jobs. Use `prod` for release and manual main deploy jobs. Logger
-Live reads its Axiom values from `/tools/github/logger-live`; preview
-infrastructure cleanup reads its Bunny Storage values from
+Live reads its Axiom values from preview `/tools/github/logger-live`; deploy
+jobs fetch only `AXIOM_MANAGEMENT_TOKEN` from that path for dataset map-field
+checks. Preview infrastructure cleanup reads its Bunny Storage values from
 `/tools/github/preview-cleanup`.
 
 | Value | Preview | Prod |

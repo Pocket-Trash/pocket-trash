@@ -62,7 +62,8 @@ application runtime.
 Additional operational paths:
 
 - Local live test: environment `dev`, path `/tools/logger-axiom-test`
-- CI live test: environment `preview`, path `/tools/github/logger-live`
+- CI live test and deploy map-field management: environment `preview`, path
+  `/tools/github/logger-live`
 
 GitHub Actions authenticates to Infisical through OIDC. See
 [GitHub Infisical OIDC](./github-infisical.md) for that bootstrap configuration.

@@ -26,7 +26,7 @@ and the scraper on Railway.
 | `/local/database` | Optional developer-specific database URLs |
 | `/tools/package-manager` | Local package installation credentials |
 | `/tools/logger-axiom-test` | Local live Axiom integration test |
-| `/tools/github/logger-live` | Preview Axiom credentials used by Logger Live |
+| `/tools/github/logger-live` | Preview Axiom credentials used by Logger Live, plus the management token used by deployment map-field checks |
 | `/tools/github/preview-cleanup` | Preview Bunny Storage credentials used by infrastructure cleanup |
 | `tools/github/secrets` | GitHub Actions values fetched at runtime through OIDC |
 | `tools/github/infisical-connection` | Bootstrap values synchronized into GitHub repository secrets |
@@ -34,11 +34,12 @@ and the scraper on Railway.
 Use the same path names in every Infisical environment that needs them. Values
 remain environment-specific.
 
-`AXIOM_MANAGEMENT_TOKEN` belongs only in `/tools/logger-axiom-test` and
-`/tools/github/logger-live`. Give it dataset map-field management permission
-without placing it in any application runtime path. Runtime `AXIOM_TOKEN`
-values remain limited to ingest, plus query access where the logger live test
-requires it.
+`AXIOM_MANAGEMENT_TOKEN` belongs only in `/tools/logger-axiom-test` and the
+preview `/tools/github/logger-live` path. Deploy workflows fetch only that
+secret from the logger tooling path to enforce the development, preview, and
+production dataset map fields without placing it in an application runtime or
+`tools/github/secrets`. Runtime `AXIOM_TOKEN` values remain limited to ingest,
+plus query access where the logger live test requires it.
 
 ## Cross-Runtime Constraints
 
