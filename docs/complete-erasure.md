@@ -67,6 +67,9 @@ at the start of a request. Only the subject HMAC may remain on the receipt.
 | `resource_downloads.user_clerk_id` for surviving resources | Restricted account-linked activity | Delete the subject's rows | Delete by `user_clerk_id`; verify no matching identifier remains | None |
 | `resource_versions.anonymous_download_count` and other aggregate metrics | Anonymous aggregate with no account identifier | Preserve | Confirm the aggregate cannot identify or single out an account | None; adding an identifier changes this matrix first |
 | `scraper_runs`, scraper queue jobs, temporary scraper tables, makers, materials, mechanisms, and product types | Shared catalog/operations data; no account link in current schema | Preserve | Schema and queued-payload scan must find no subject field | None |
+| Discord notification queue jobs and failed-job records | Restricted operational events; normalized logger fields can contain account-linked attributes or context | Delete subject-linked jobs | Scan the app-owned payload schema for captured identifiers, remove matching waiting/delayed/completed/failed jobs, and verify no matching payload remains | Successful jobs expire after 24 hours and 1,000 retained entries; failures expire after 14 days, but erasure does not wait for expiry |
+| Discord ticket-operation records and finalized thread-to-Linear mappings | Restricted support workflow; Discord IDs, usernames, text/file metadata, Linear IDs, and asset URLs can identify the subject | Delete subject-linked records after repairing or cancelling in-flight work | Search by captured Discord user/thread/message IDs and Linear issue/comment IDs, remove matching keys, and verify the corresponding Linear ticket and comments follow the support-record disposition | Finalized mappings expire after 90 days, but erasure does not wait for expiry |
+| Axiom intake reconciliation cursor | Restricted operational checkpoint containing only a Discord message ID | Preserve unless the referenced message itself must be removed | Verify the cursor contains no payload or subject field; deleting a source message does not require rewinding the shared cursor | Replaced as reconciliation advances; no subject-data exception |
 | Clerk user, email/phone, external accounts, sessions, MFA, metadata, and profile image | Private identity-provider account data | Delete | Revoke sessions, delete the Clerk user last, and verify the Backend API returns not found/already absent | Full provider deletion within 3 days; Clerk log bound below |
 | Erasure request/receipt | Restricted privacy operations record | Preserve the minimum receipt temporarily | Store request ID, verification result, decision, timestamps, step results/error categories, subject HMAC, and exception expiries; never store raw ID, email, name, content, or object path after active deletion | Privacy-ops access only; delete 30 days after active-system completion and after every exception expires |
 | Support/privacy request source message | May contain direct identity and free text | Delete or redact to the minimum receipt | Delete the source message/attachment after verification; verify by provider search and operator attestation | No general support-record exception is approved |
@@ -97,7 +100,12 @@ account-linked copy:
 - No support, email, or incident-management system is configured by the app.
   The intake provider must be named on each request, and its source record is
   covered by the support/manual-artifact rows above.
-- Railway Redis contains shared scraper jobs only. It is not a user cache.
+- Railway Redis is shared by the scraper and Discord bot. It contains scraper
+  jobs, normalized notification jobs, the Axiom intake cursor, and recoverable
+  ticket-operation records. Notification jobs exclude authentication headers,
+  secrets, stacks, causes, console settings, and raw payloads. Ticket operations
+  can contain Discord thread/message/user identifiers, usernames, text, allowed
+  file metadata, and durable Linear asset URLs.
 
 The exact production Bunny namespaces are
 `images/products/{id}/{sha256}.{ext}`,
@@ -127,7 +135,7 @@ configuration that is less strict than this table is a release blocker.
 | Vercel runtime logs | Hobby retention is 1 hour; no log drain is configured | Keep application payloads out of stdout/request URLs and verify no drain duplicates them | 1 hour |
 | Vercel build logs/deployments | Build logs can outlive runtime logs; deployments are retained for rollback | Account data is prohibited from builds and generated artifacts. If an incident puts it there, delete the affected deployment before completing the request | No account-data exception |
 | Railway scraper deploy/build logs | The deployed workload is the catalog scraper; Railway captures stdout/stderr | Keep account data out of scraper jobs and logs. If a future workload contains it, apply the workspace plan's log window and update this matrix | No current account data; maximum supported log window is 90 days |
-| Railway `scraper-queue` Redis volume and backups | Persistent 5 GB volume; current queue is catalog-only | Verify queued payloads contain no account data. If account data is introduced, remove keys and every volume backup before completion | No current account data; no exception approved |
+| Railway `pocket-trash-queue` Redis volume and backups | Persistent 5 GB shared queue with RDB and AOF; Discord ticket operations can contain account data | Remove subject-linked notification jobs and ticket-operation keys before completion, without deleting unrelated shared queue work. Inventory and expire every volume backup containing the subject. The Axiom cursor is a Discord message checkpoint and is not a subject record | Completed notification jobs: 24 hours/1,000; failed jobs: 14 days; finalized ticket mappings: 90 days; no backup exception approved |
 | Clerk application logs | The production dashboard exposes a 30-day searchable window | Provider-only operational access; do not export. Recheck the window after any plan change | 30 days |
 | Clerk CSV exports | Dashboard exports can contain full profiles and credential material | Search export history and approved download locations; delete files and record operator attestation | None |
 
@@ -140,7 +148,7 @@ configuration that is less strict than this table is a release blocker.
 | Axiom | `cloud.us-east-1.aws` | Provider-managed replication only; no customer restore workflow is approved. The public DPA governs provider processing |
 | Cloudflare | Worker and CDN processing are global | Logs/traces are provider-managed and expire; KV is development-only and contains no user payload |
 | Vercel | Global edge; no application region override is checked in | Deployments/build artifacts must contain no account data; no account-data recovery copy is approved |
-| Railway | Production scraper and Redis run in `us-east4-eqdc4a` | Redis is catalog-only. The live volume backup schedule is not exposed by the checked CLI output; introducing account data is blocked until every backup is inventoried |
+| Railway | Production scraper, Discord bot, and shared Redis run in `us-east4-eqdc4a` | RDB and AOF share `redis-volume` and are recovery copies, not independent durable truth. The live volume backup schedule is not exposed by the checked CLI output; Discord ticket processing cannot launch until every backup is inventoried and its erasure procedure is verified |
 | Clerk | Provider-managed identity service; Clerk confirms full user deletion within 3 days | Delete the user last, verify immediate API absence, and retain the three-day provider expiry in the erasure receipt |
 
 Provider references: [Neon history](https://neon.com/docs/postgres/backup-restore/history-window),

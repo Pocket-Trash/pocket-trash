@@ -174,7 +174,7 @@ describe("scraper env", () => {
       BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
       REDIS: "redis://localhost:4008",
-      REDIS_URL: "$" + "{{scraper-queue.REDIS_PUBLIC_URL}}",
+      REDIS_URL: "$" + "{{pocket-trash-queue.REDIS_URL}}",
     });
 
     expect(env.REDIS_URL).toBe("redis://localhost:4008");
@@ -186,7 +186,7 @@ describe("scraper env", () => {
         BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
         DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
         REDIS: "$" + "{{shared.REDIS}}",
-        REDIS_URL: "$" + "{{scraper-queue.REDIS_PUBLIC_URL}}",
+        REDIS_URL: "$" + "{{pocket-trash-queue.REDIS_URL}}",
       }),
     ).toThrow("Invalid environment variables: REDIS_URL");
   });

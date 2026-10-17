@@ -15,6 +15,7 @@ prod [color: green, label: "Production"] {
   }
   prod_Data [label: "Data"] {
     prod_neon [color: green, icon: postgresql, label: "Neon production branch"]
+    prod_queue [color: purple, icon: server, label: "pocket-trash-queue\nRDB + AOF"]
   }
   prod_Secrets [label: "Secrets"] {
     prod_infisical [color: purple, icon: lock, label: "Infisical prod secrets"]
@@ -36,6 +37,7 @@ prod_github_actions > prod_neon: run migrations
 prod_web > prod_neon: read/write
 prod_web > prod_axiom: server and browser logs
 prod_scraper > prod_neon: write product data
+prod_scraper > prod_queue: scraper-images / scraper-items
 prod_scraper > prod_axiom: service logs
 
 preview [color: yellow, label: "Preview"] {
@@ -47,6 +49,7 @@ preview [color: yellow, label: "Preview"] {
   }
   preview_Data [label: "Data"] {
     preview_neon [color: green, icon: postgresql, label: "Neon preview branch"]
+    preview_queue [color: purple, icon: server, label: "pocket-trash-queue preview"]
   }
   preview_Secrets [label: "Secrets"] {
     preview_infisical [color: purple, icon: lock, label: "Infisical preview secrets"]
@@ -59,6 +62,7 @@ preview [color: yellow, label: "Preview"] {
 preview_web > preview_neon: branch DATABASE_URL
 preview_web > preview_axiom: same-origin log ingestion
 preview_scraper > preview_neon: isolated data writes
+preview_scraper > preview_queue: scraper queues
 
 dev [color: blue, label: "Local Development"] {
   dev_Web [label: "Web"] {
@@ -69,6 +73,7 @@ dev [color: blue, label: "Local Development"] {
   }
   dev_Data [label: "Data"] {
     dev_neon [color: green, icon: postgresql, label: "developer database"]
+    dev_queue [color: purple, icon: server, label: "local Redis queue"]
   }
   dev_Secrets [label: "Secrets"] {
     dev_infisical [color: purple, icon: lock, label: "Infisical dev secrets"]
@@ -78,6 +83,7 @@ dev [color: blue, label: "Local Development"] {
 dev_infisical > dev_web: local env
 dev_infisical > dev_scraper: local env
 dev_web > dev_neon: read/write
+dev_scraper > dev_queue: scraper queues
 
 shared_packages [label: "Shared packages and detected runtime links", color: "gray"] {
   app_api [icon: box, label: "@app/api\napps/api"]
@@ -87,6 +93,7 @@ shared_packages [label: "Shared packages and detected runtime links", color: "gr
   package_feature_flags [icon: package, label: "@package/feature-flags\npackages/feature-flags"]
   package_logger [icon: package, label: "@package/logger\npackages/logger"]
   package_markdown [icon: package, label: "@package/markdown\npackages/markdown"]
+  package_queue [icon: package, label: "@package/queue\npackages/queue"]
   package_services [icon: package, label: "@package/services\npackages/services"]
   package_storage [icon: package, label: "@package/storage\npackages/storage"]
   service_github_actions [color: gray, icon: github, label: "GitHub Actions"]
@@ -105,6 +112,7 @@ app_api > package_services: workspace dependency
 app_scraper > package_database: workspace dependency
 app_scraper > package_logger: workspace dependency
 app_scraper > package_markdown: workspace dependency
+app_scraper > package_queue: workspace dependency
 app_scraper > package_services: workspace dependency
 app_web > package_feature_flags: workspace dependency
 app_web > package_logger: workspace dependency

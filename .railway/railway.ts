@@ -22,14 +22,29 @@ export default defineRailway((ctx) => {
     );
   }
 
-  /** Existing Redis queue; its credentials and managed image remain in Railway. */
-  const scraperQueue = redis("scraper-queue", { region: "us-east4-eqdc4a" });
-  scraperQueue.deploy = {
+  /** Legacy queue retained until the separately approved migration cleanup. */
+  const legacyScraperQueue = redis("scraper-queue", {
+    region: "us-east4-eqdc4a",
+  });
+  legacyScraperQueue.deploy = {
     startCommand:
       '/bin/sh -c "rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH"',
   };
-  scraperQueue.networking = {
+  legacyScraperQueue.networking = {
     privateNetworkEndpoint: "redis",
+    tcpProxies: { "6379": {} },
+  };
+
+  /** Shared Redis queue provisioned additively for the migration. */
+  const sharedQueue = redis("pocket-trash-queue", {
+    region: "us-east4-eqdc4a",
+  });
+  sharedQueue.deploy = {
+    startCommand:
+      '/bin/sh -c "rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --appendonly yes --appendfsync everysec --dir $RAILWAY_VOLUME_MOUNT_PATH"',
+  };
+  sharedQueue.networking = {
+    privateNetworkEndpoint: "pocket-trash-queue",
     tcpProxies: { "6379": {} },
   };
   /** Existing database volume, retained without resizing or changing its mount. */
@@ -99,6 +114,6 @@ export default defineRailway((ctx) => {
   );
 
   return project("Pocket Trash", {
-    resources: [scraperQueue, scraper, redisVolume],
+    resources: [legacyScraperQueue, sharedQueue, scraper, redisVolume],
   });
 });
