@@ -4,9 +4,17 @@ import { createDiscordBotEnv } from "./env.js";
 /** Complete valid runtime environment used by validation tests. */
 const validEnv = {
   DISCORD_APPLICATION_ID: "123456789012345678",
+  DISCORD_AXIOM_INTAKE_CHANNEL_ID: "323456789012345678",
+  DISCORD_AXIOM_INTAKE_WEBHOOK_ID: "423456789012345678",
+  DISCORD_BUG_TAG_ID: "523456789012345678",
+  DISCORD_FEATURE_REQUEST_TAG_ID: "623456789012345678",
+  DISCORD_GITHUB_CHANNEL_ID: "723456789012345678",
+  DISCORD_GITHUB_ERRORS_CHANNEL_ID: "823456789012345678",
   DISCORD_GUILD_ID: "223456789012345678",
+  DISCORD_LOGGER_CHANNEL_ID: "923456789012345678",
   DISCORD_MODERATOR_ROLE_ID: "1560130642623074334",
   DISCORD_OWNER_ROLE_ID: "1522834871649829079",
+  DISCORD_SUPPORT_FORUM_ID: "133456789012345678",
   DISCORD_TOKEN: "discord-token",
   LINEAR_API_KEY: "linear-api-key",
   REDIS_URL: "redis://localhost:6379",
@@ -27,6 +35,12 @@ describe("Discord bot environment", () => {
     expect(() =>
       createDiscordBotEnv({ ...validEnv, LINEAR_API_KEY: "" }),
     ).toThrow("LINEAR_API_KEY");
+    expect(() =>
+      createDiscordBotEnv({
+        ...validEnv,
+        DISCORD_AXIOM_INTAKE_WEBHOOK_ID: undefined,
+      }),
+    ).toThrow("DISCORD_AXIOM_INTAKE_WEBHOOK_ID");
   });
 
   it("rejects unresolved and non-Redis queue URLs", () => {
