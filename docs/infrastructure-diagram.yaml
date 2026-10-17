@@ -20,7 +20,6 @@ scope:
   excludedPackages:
     - "@package/lint"
     - "@package/tsconfig"
-    - "@package/github-discord-notifier"
     - "@package/infisical-runner"
 services:
   - id: "github_actions"

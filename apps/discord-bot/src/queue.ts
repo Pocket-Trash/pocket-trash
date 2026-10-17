@@ -5,13 +5,45 @@ import type {
 } from "@package/queue";
 import { z } from "zod";
 
+/** Serializable renderer action stored in the delivery queue. */
+const queuedActionSchema = z.object({
+  label: z.string().min(1).max(80),
+  url: z.url(),
+});
+
+/** Serializable renderer input stored in the delivery queue. */
+export const queuedNotificationSchema = z.object({
+  actions: z.array(queuedActionSchema).max(5).optional(),
+  description: z.string().min(1).max(4_000),
+  diagnostics: z.array(z.string().min(1).max(1_000)).max(5).optional(),
+  occurredAt: z.iso.datetime(),
+  provenance: z.string().min(1).max(300),
+  source: z.string().min(1).max(100),
+  status: z.string().min(1).max(200),
+  tags: z.array(z.string().min(1).max(100)).max(10),
+  title: z.string().min(1).max(300),
+  titleUrl: z.url().optional(),
+  tone: z.enum(["success", "info", "warning", "error"]),
+});
+
+/** Serializable renderer input stored in the delivery queue. */
+export type QueuedNotification = z.infer<typeof queuedNotificationSchema>;
+
 /** Minimal transport-neutral delivery envelope owned by the bot. */
-export const deliveryJobSchema = z.object({
+const baseDeliveryJobSchema = z.object({
   deliveryId: z.string().min(1).max(200),
   destinationChannelId: z.string().regex(/^[1-9]\d{16,19}$/u),
-  kind: z.enum(["github", "logger", "system"]),
   version: z.literal(1),
 });
+
+/** Validated delivery envelope accepted by the bot queue. */
+export const deliveryJobSchema = z.discriminatedUnion("kind", [
+  baseDeliveryJobSchema.extend({
+    kind: z.literal("github"),
+    notification: queuedNotificationSchema,
+  }),
+  baseDeliveryJobSchema.extend({ kind: z.enum(["logger", "system"]) }),
+]);
 
 /** Validated job accepted by the bot delivery queue. */
 export type DeliveryJob = z.infer<typeof deliveryJobSchema>;

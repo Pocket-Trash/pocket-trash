@@ -307,33 +307,6 @@ describe("buildInfisicalRunArgs", () => {
     ]);
   });
 
-  it("builds GitHub Discord notification args", () => {
-    expect(
-      buildInfisicalRunArgs({
-        app: "github",
-        command: "discord-notify",
-        commandArgs: [
-          "pnpm",
-          "--filter",
-          "@package/github-discord-notifier",
-          "notify",
-        ],
-        repoRoot: "/repo",
-      }),
-    ).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=tools/github/secrets",
-      "--",
-      "pnpm",
-      "--filter",
-      "@package/github-discord-notifier",
-      "notify",
-    ]);
-  });
-
   it("builds database migrate args with the database URL user override", () => {
     const args = buildInfisicalRunArgs({
       app: "database",
