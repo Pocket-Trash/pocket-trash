@@ -113,6 +113,18 @@ for (const environment of ["production", "preview"]) {
         type: "preserve",
       });
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
+      for (const variable of [
+        "DISCORD_AXIOM_INTAKE_CHANNEL_ID",
+        "DISCORD_AXIOM_INTAKE_WEBHOOK_ID",
+        "DISCORD_BUG_TAG_ID",
+        "DISCORD_FEATURE_REQUEST_TAG_ID",
+        "DISCORD_GITHUB_CHANNEL_ID",
+        "DISCORD_GITHUB_ERRORS_CHANNEL_ID",
+        "DISCORD_LOGGER_CHANNEL_ID",
+        "DISCORD_SUPPORT_FORUM_ID",
+      ]) {
+        assert.deepEqual(discordBot.variables[variable], { type: "preserve" });
+      }
     } else {
       assert.equal(discordBot, undefined);
     }

@@ -8,6 +8,7 @@ that consumes them:
 - [API Worker bindings](../apps/api/src/app.ts)
 - [Scraper environment](../apps/scraper/src/env.schema.ts)
 - [Discord bot environment](../apps/discord-bot/src/env.ts)
+- [Discord bot operations](./discord-bot.md)
 - [Database package environment](../packages/database/src/env.schema.ts)
 - [Web build-time aliases](../apps/web/vite.config.ts)
 
