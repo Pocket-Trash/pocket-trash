@@ -131,6 +131,22 @@ describe("buildInfisicalRunArgs", () => {
     });
   });
 
+  it("builds Discord bot dev args with Discord bot secrets", () => {
+    expect(
+      buildInfisicalRunArgs({
+        app: "discord-bot",
+        command: "dev",
+        commandArgs: ["tsx", "watch", "src/index.ts"],
+        repoRoot: "/repo",
+      }),
+    ).toEqual([
+      ...quietRunArgs("/apps/discord-bot"),
+      "tsx",
+      "watch",
+      "src/index.ts",
+    ]);
+  });
+
   it.each([
     "scrape:autmog",
     "scrape:grimsmo-fjell",

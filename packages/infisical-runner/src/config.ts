@@ -11,6 +11,8 @@ const clerkLocalSecretPath = "/local/clerk";
 const cloudflareToolsSecretPath = "/tools/cloudflare";
 /** The Infisical path for personal database URLs. */
 const databaseLocalSecretPath = "/local/database";
+/** The Infisical path for Discord bot application secrets. */
+const discordBotSecretPath = "/apps/discord-bot";
 /** The Infisical path for scraper application secrets. */
 const scraperSecretPath = "/apps/scraper";
 /** The Infisical path for web application secrets. */
@@ -108,6 +110,12 @@ export const commandSecrets = {
       allowServerSecrets: true,
       environmentSlug: "preview",
       paths: [webSecretPath, githubSecretsPath],
+    },
+  },
+  "discord-bot": {
+    dev: {
+      allowServerSecrets: true,
+      paths: [discordBotSecretPath],
     },
   },
   github: {
