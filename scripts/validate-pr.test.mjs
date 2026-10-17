@@ -54,6 +54,7 @@ test("selects validation, build, and Storybook checks by domain", () => {
   const plan = createValidationPlan({
     api: true,
     database_validation: true,
+    discord_bot: true,
     scraper: false,
     safe_e2e: true,
     storybook: true,
@@ -75,6 +76,7 @@ test("selects validation, build, and Storybook checks by domain", () => {
     "test",
     "database-chain",
     "api-build",
+    "discord-bot-build",
     "local-e2e",
     "storybook-test",
     "storybook-build",

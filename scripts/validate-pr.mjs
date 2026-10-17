@@ -159,6 +159,15 @@ export function createValidationPlan(domains) {
       reason: "no API-domain changes",
     },
     {
+      id: "discord-bot-build",
+      label: "Discord bot build",
+      command: "pnpm",
+      args: ["exec", "turbo", "run", "build", "--filter=@app/discord-bot"],
+      selected: domains.discord_bot,
+      requiresCredentials: false,
+      reason: "no Discord-bot-domain changes",
+    },
+    {
       id: "scraper-build",
       label: "Scraper build",
       command: "pnpm",
