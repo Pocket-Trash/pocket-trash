@@ -67,4 +67,12 @@ jobs:
           pnpm exec railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT"
           # Use the saved link's project name in the IaC context.
           unset RAILWAY_PROJECT_ID
+          set +e
           pnpm exec railway config plan --detailed-exit-code
+          plan_status=$?
+          set -e
+          if [ "$plan_status" -eq 2 ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "::notice::Railway configuration changes are pending review."
+            exit 0
+          fi
+          exit "$plan_status"

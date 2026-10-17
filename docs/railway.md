@@ -101,7 +101,9 @@ Install the locked SDK with `pnpm install --frozen-lockfile`.
 The [Railway Configuration workflow](../.github/workflows/railway-config.yml)
 checks production and the preview template daily, on demand, and on IaC PRs. It
 uses the existing Infisical GitHub secrets and skips fork PRs. Exit code `0` means
-no drift; `2` means changes are pending. It never applies configuration. Native
+no drift; `2` means changes are pending. Pull requests report pending changes as
+a successful review plan, while scheduled and manually dispatched checks fail
+until deployed configuration matches `main`. It never applies configuration. Native
 PR environments inherit the preview template; the Deploy workflow still stages
 each preview's database, image prefix, cron flag, and logging metadata. Keep
 real scraping disabled on shared-database previews.
