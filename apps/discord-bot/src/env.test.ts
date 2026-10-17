@@ -8,6 +8,7 @@ const validEnv = {
   DISCORD_MODERATOR_ROLE_ID: "1560130642623074334",
   DISCORD_OWNER_ROLE_ID: "1522834871649829079",
   DISCORD_TOKEN: "discord-token",
+  LINEAR_API_KEY: "linear-api-key",
   REDIS_URL: "redis://localhost:6379",
 };
 
@@ -23,6 +24,9 @@ describe("Discord bot environment", () => {
     expect(() =>
       createDiscordBotEnv({ ...validEnv, DISCORD_TOKEN: "" }),
     ).toThrow("DISCORD_TOKEN");
+    expect(() =>
+      createDiscordBotEnv({ ...validEnv, LINEAR_API_KEY: "" }),
+    ).toThrow("LINEAR_API_KEY");
   });
 
   it("rejects unresolved and non-Redis queue URLs", () => {

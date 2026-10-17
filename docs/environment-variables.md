@@ -49,6 +49,28 @@ password, or public endpoint into Infisical. Sharing this credential also shares
 capacity and outage scope, while stable app-specific queue names and payload
 schemas prevent logical overlap.
 
+### Linear bot credential
+
+Store `LINEAR_API_KEY` in `/apps/discord-bot` for both `dev` and `prod`. The key
+must belong to the standard `Pocket Trash Discord Bot` member
+(`linear-discord-bot@pocket-trash.app`) in the Pocket Trash workspace. Restrict
+it to the Engineering team and grant the issue, comment, state, priority,
+label, and attachment access required by the Feature Requests and Bug tracker
+projects. Bot-created Linear activity is therefore attributed to that member.
+
+The bot validates the actor, workspace, Engineering team, and both target
+projects before starting its Discord gateway. A missing, invalid, or wrongly
+owned key fails startup. Revisit OAuth before allowing the bot to connect to a
+second Linear workspace.
+
+To rotate the key, create the replacement while signed in as the dedicated bot
+member, replace only `LINEAR_API_KEY` in both Infisical environments, validate
+local startup, and deploy the reviewed release with explicit production
+approval. Revoke the previous key from the bot member's Linear **Security &
+access** settings only after the replacement is live. To revoke access without
+replacement, delete the Infisical values, revoke the Linear key, and stop the
+service; it will refuse to start without the credential.
+
 ## Cross-Runtime Constraints
 
 ### Erasure subject secret
