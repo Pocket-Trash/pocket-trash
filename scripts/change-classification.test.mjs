@@ -269,7 +269,9 @@ test("authenticates and clears private package access around every workflow inst
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = job.steps ?? [];
       const installIndex = steps.findIndex((step) =>
-        step.run?.includes("scripts/pnpm-install.sh"),
+        /(?:^|\n)\s*(?:\.\/)?(?:scripts\/pnpm-install\.sh|pnpm install)\b/u.test(
+          step.run ?? "",
+        ),
       );
       if (installIndex === -1) continue;
 

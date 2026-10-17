@@ -263,6 +263,9 @@ jobs:
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.discord_bot == 'true'
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -277,8 +280,21 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
 
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
+
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
 
       - name: Validate Railway upload context
         run: node scripts/check-railway-context.mjs
