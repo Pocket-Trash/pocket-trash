@@ -323,6 +323,35 @@ test("passes the preview package token only to Vercel's install process", () => 
   );
 });
 
+test("fetches only the dedicated Axiom management token before deploy checks", () => {
+  for (const jobName of ["preview", "development-api", "production"]) {
+    const steps = deployWorkflow.jobs[jobName].steps;
+    const fetchIndex = steps.findIndex(
+      (step) =>
+        step.uses === "Infisical/secrets-action@v1.0.17" &&
+        step.with?.["env-slug"] === "preview" &&
+        step.with?.["secret-path"] === "/tools/github/logger-live" &&
+        step.with?.["secret-name"] === "AXIOM_MANAGEMENT_TOKEN",
+    );
+    const validateIndex = steps.findIndex((step) =>
+      step.name?.startsWith("Validate API"),
+    );
+    const ensureIndex = steps.findIndex(
+      (step) =>
+        step.name?.startsWith("Ensure") &&
+        step.name.includes("Axiom map fields"),
+    );
+
+    assert.ok(fetchIndex >= 0 && fetchIndex < validateIndex, jobName);
+    assert.match(
+      steps[validateIndex].run,
+      /for name in [^\n]*AXIOM_MANAGEMENT_TOKEN/u,
+      jobName,
+    );
+    assert.ok(validateIndex < ensureIndex, jobName);
+  }
+});
+
 test("syncs Font Awesome authentication into Railway before source builds", () => {
   for (const [jobName, environment, configureName, clearName] of [
     [

@@ -43,7 +43,7 @@ jobs:
           env-slug: preview
           secret-path: tools/github/secrets
 
-      - name: Fetch shared secrets from Infisical
+      - name: Fetch preview cleanup secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
           method: oidc
@@ -52,7 +52,7 @@ jobs:
           domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
-          secret-path: /shared
+          secret-path: /tools/github/preview-cleanup
 
       - name: Enable Corepack
         run: corepack enable

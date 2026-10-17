@@ -9,7 +9,8 @@ repository secrets only bootstrap that connection.
 | --- | --- |
 | `tools/github/infisical-connection` | Secrets Sync source for GitHub repository bootstrap secrets. |
 | `tools/github/secrets` | Runtime workflow values fetched by GitHub Actions through OIDC. |
-| `/shared` | Shared application and workflow values fetched by GitHub Actions through OIDC. |
+| `/tools/github/logger-live` | Preview Axiom credentials used by Logger Live and the management token used by deployment map-field checks. |
+| `/tools/github/preview-cleanup` | Preview Bunny Storage credentials used by infrastructure cleanup. |
 
 Configure `tools/github/infisical-connection` in Infisical production and sync
 these values to GitHub repository secrets:
@@ -19,20 +20,17 @@ these values to GitHub repository secrets:
 - optional `INFISICAL_DOMAIN`
 - optional `INFISICAL_OIDC_AUDIENCE`
 
-Store workflow runtime values in `tools/github/secrets` with normalized names in
-each Infisical environment. Use `preview` for pull request, cleanup, refresh,
-logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
-Logger Live fetches `AXIOM_DATASET`, `AXIOM_TOKEN`, and
-`LOG_PROXY_CLIENT_KEY` from `/shared` and `AXIOM_MANAGEMENT_TOKEN` from
-`tools/github/secrets` in the `preview` environment.
-Preview infrastructure cleanup fetches its Bunny Storage values from the same
-path.
+Store common workflow runtime values in `tools/github/secrets` with normalized
+names in each Infisical environment. Use `preview` for pull request, refresh,
+and Discord jobs. Use `prod` for release and manual main deploy jobs. Logger
+Live reads its Axiom values from preview `/tools/github/logger-live`; deploy
+jobs fetch only `AXIOM_MANAGEMENT_TOKEN` from that path for dataset map-field
+checks. Preview infrastructure cleanup reads its Bunny Storage values from
+`/tools/github/preview-cleanup`.
 
 | Value | Preview | Prod |
 | --- | --- | --- |
 | `AXIOM_EDGE_DOMAIN` | Optional | Optional |
-| `AXIOM_MANAGEMENT_TOKEN` | Required | Required |
-| `ASSET_FOLDER_PREFIX` | Required | Required |
 | `BUNNY_API_KEY` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_CDN_TOKEN_KEY` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_PULL_ZONE_ID` | Required for complete erasure | Required for complete erasure |
@@ -69,8 +67,8 @@ cannot run successfully.
 
 Create one Infisical machine identity with GitHub OIDC auth for
 `Pocket-Trash/pocket-trash`. Grant it read access to `tools/github/secrets` in
-the `preview` and `prod` environments and `/shared` in the `preview`
-environment.
+the `preview` and `prod` environments, plus `/tools/github/logger-live` and
+`/tools/github/preview-cleanup` in the `preview` environment.
 
 Restrict the OIDC subject to the contexts this repo uses:
 
@@ -83,8 +81,8 @@ Use `https://github.com/Pocket-Trash` as the audience unless
 
 ## GitHub Cleanup
 
-Before opening the PR, confirm both Infisical paths are populated and the
-bootstrap sync has run. Then delete legacy provider secrets from GitHub so
+Before opening the PR, confirm the required Infisical paths are populated and
+the bootstrap sync has run. Then delete legacy provider secrets from GitHub so
 workflow failures expose missing Infisical values immediately.
 
 Keep only:

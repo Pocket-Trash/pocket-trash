@@ -140,6 +140,18 @@ jobs:
           env-slug: preview
           secret-path: /apps/api
 
+      - name: Fetch Axiom management token from Infisical
+        uses: Infisical/secrets-action@v1.0.17
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: /tools/github/logger-live
+          secret-name: AXIOM_MANAGEMENT_TOKEN
+
       - name: Detect database changes
         id: db_changes
         shell: bash
@@ -1137,6 +1149,18 @@ jobs:
           env-slug: dev
           secret-path: /apps/api
 
+      - name: Fetch Axiom management token from Infisical
+        uses: Infisical/secrets-action@v1.0.17
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: /tools/github/logger-live
+          secret-name: AXIOM_MANAGEMENT_TOKEN
+
       - name: Enable Corepack
         run: corepack enable
 
@@ -1326,6 +1350,18 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: prod
           secret-path: /apps/api
+
+      - name: Fetch Axiom management token from Infisical
+        uses: Infisical/secrets-action@v1.0.17
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: /tools/github/logger-live
+          secret-name: AXIOM_MANAGEMENT_TOKEN
 
       - name: Enable Corepack
         run: corepack enable

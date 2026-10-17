@@ -31,7 +31,7 @@ function envValue(env: MutableEnv, key: string) {
  * @param env - Mutable environment map; defaults to the current process environment.
  */
 export function applyWebClientEnvAliases(env: MutableEnv = process.env) {
-  const assetFolderPrefix = envValue(env, "ASSET_FOLDER_PREFIX");
+  const assetFolderPrefix = envValue(env, "BUNNY_ASSET_FOLDER_PREFIX");
   const cdnBaseUrl = envValue(env, "BUNNY_CDN_BASE_URL");
   const logDeploymentId = envValue(env, "LOG_DEPLOYMENT_ID");
   const logDeploymentTarget = envValue(env, "LOG_DEPLOYMENT_TARGET");
@@ -99,7 +99,7 @@ export default defineConfig(async ({ mode }) => {
       VITE_API_URL: process.env.VITE_API_URL,
     });
     createWebServerEnv({
-      ASSET_FOLDER_PREFIX: process.env.ASSET_FOLDER_PREFIX,
+      BUNNY_ASSET_FOLDER_PREFIX: process.env.BUNNY_ASSET_FOLDER_PREFIX,
       AXIOM_DATASET: process.env.AXIOM_DATASET,
       AXIOM_EDGE_DOMAIN: process.env.AXIOM_EDGE_DOMAIN,
       AXIOM_TOKEN: process.env.AXIOM_TOKEN,

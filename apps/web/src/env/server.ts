@@ -3,7 +3,7 @@ import { createWebServerEnv } from "./server.schema";
 
 /** Validated server configuration sourced from the process environment. */
 export const serverEnv = createWebServerEnv({
-  ASSET_FOLDER_PREFIX: process.env.ASSET_FOLDER_PREFIX,
+  BUNNY_ASSET_FOLDER_PREFIX: process.env.BUNNY_ASSET_FOLDER_PREFIX,
   AXIOM_DATASET: process.env.AXIOM_DATASET,
   AXIOM_EDGE_DOMAIN: process.env.AXIOM_EDGE_DOMAIN,
   AXIOM_TOKEN: process.env.AXIOM_TOKEN,

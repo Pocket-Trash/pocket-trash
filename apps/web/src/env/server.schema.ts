@@ -4,7 +4,7 @@ import { z } from "zod";
 /** Unvalidated process values used by the web server runtime. */
 export type WebServerRuntimeEnv = {
   /** CDN folder containing static application assets. */
-  ASSET_FOLDER_PREFIX?: string;
+  BUNNY_ASSET_FOLDER_PREFIX?: string;
   /** Axiom dataset receiving server logs. */
   AXIOM_DATASET?: string;
   /** Optional Axiom edge-ingestion domain. */
@@ -60,7 +60,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
     emptyStringAsUndefined: true,
     isServer: true,
     runtimeEnvStrict: {
-      ASSET_FOLDER_PREFIX: runtimeEnv.ASSET_FOLDER_PREFIX,
+      BUNNY_ASSET_FOLDER_PREFIX: runtimeEnv.BUNNY_ASSET_FOLDER_PREFIX,
       AXIOM_DATASET: runtimeEnv.AXIOM_DATASET,
       AXIOM_EDGE_DOMAIN: runtimeEnv.AXIOM_EDGE_DOMAIN,
       AXIOM_TOKEN: runtimeEnv.AXIOM_TOKEN,
@@ -81,7 +81,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       BUNNY_STORAGE_ZONE_NAME: runtimeEnv.BUNNY_STORAGE_ZONE_NAME,
     },
     server: {
-      ASSET_FOLDER_PREFIX: z.literal("assets").optional(),
+      BUNNY_ASSET_FOLDER_PREFIX: z.literal("assets").optional(),
       AXIOM_DATASET: z.string().min(1).optional(),
       AXIOM_EDGE_DOMAIN: z.string().min(1).optional(),
       AXIOM_TOKEN: z.string().min(1).optional(),

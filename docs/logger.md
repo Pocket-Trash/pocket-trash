@@ -62,7 +62,8 @@ application runtime.
 Additional operational paths:
 
 - Local live test: environment `dev`, path `/tools/logger-axiom-test`
-- CI live test: environment `preview`, path `/shared`
+- CI live test and deploy map-field management: environment `preview`, path
+  `/tools/github/logger-live`
 
 GitHub Actions authenticates to Infisical through OIDC. See
 [GitHub Infisical OIDC](./github-infisical.md) for that bootstrap configuration.
@@ -138,4 +139,4 @@ stored event data.
 [Logger Live](../.github/workflows/logger-live.yml) runs the same check for
 same-repository pull requests that touch logger-relevant files and by manual
 workflow dispatch. CI expects the `preview` dataset and reads its secrets from
-`/shared`, including `LOG_PROXY_CLIENT_KEY`.
+`/tools/github/logger-live`, including `LOG_PROXY_CLIENT_KEY`.
