@@ -109,6 +109,9 @@ for (const environment of ["production", "preview"]) {
         discordBot.variables.REDIS_URL.resource,
         "database.pocket-trash-queue",
       );
+      assert.deepEqual(discordBot.variables.LINEAR_API_KEY, {
+        type: "preserve",
+      });
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
     } else {
       assert.equal(discordBot, undefined);

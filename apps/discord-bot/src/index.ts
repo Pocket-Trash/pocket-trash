@@ -10,6 +10,7 @@ import {
   discordGatewayIntents,
   registerGatewayReadinessListeners,
 } from "./gateway.js";
+import { createLinearApiKeyAuthentication } from "./linear.js";
 import { createDiscordBotLogger } from "./logger.js";
 import { createDeliveryQueueRuntime } from "./queue.js";
 import { createReadiness } from "./readiness.js";
@@ -42,6 +43,10 @@ const componentRegistry = createInteractionRegistry([]);
 const modalRegistry = createInteractionRegistry([]);
 /** Empty trusted-message registry populated by the Axiom adapter ticket. */
 const messageRegistry = createMessageRegistry([]);
+/** Dedicated Linear bot-member credential boundary. */
+const linearAuthentication = createLinearApiKeyAuthentication({
+  apiKey: env.LINEAR_API_KEY,
+});
 /** Shared Redis adapter hidden behind the queue package. */
 const queueAdapter = createBullMqQueueAdapter({
   /**
@@ -128,6 +133,7 @@ void start().catch(fail);
 
 /** Starts the queue worker and Discord gateway. */
 async function start() {
+  await linearAuthentication.validateAccess();
   await deliveryQueue.start();
   readiness.setWorkerStarted(true);
   await client.login(env.DISCORD_TOKEN);

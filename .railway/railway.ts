@@ -154,6 +154,7 @@ export default defineRailway((ctx) => {
           DISCORD_MODERATOR_ROLE_ID: preserve(),
           DISCORD_OWNER_ROLE_ID: preserve(),
           DISCORD_TOKEN: preserve(),
+          LINEAR_API_KEY: preserve(),
           LOGGER: preserve(),
           LOG_DEPLOYMENT_ID: preserve(),
           LOG_DEPLOYMENT_TARGET: preserve(),
