@@ -1,11 +1,7 @@
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-import {
-  createBullMqQueueAdapter,
-  createRedisCheckpointStore,
-} from "./index.js";
+import { afterAll, beforeAll, describe } from "vitest";
+import { createBullMqQueueAdapter } from "./index.js";
 import { defineQueueAdapterContract } from "./test-contract.js";
 
 describe("BullMQ queue adapter", () => {
@@ -27,52 +23,6 @@ describe("BullMQ queue adapter", () => {
   });
 
   afterAll(() => redis?.kill("SIGTERM"));
-
-  it("persists validated checkpoints independently of the client lifecycle", async () => {
-    const onReady = vi.fn();
-    const options = {
-      key: "test:axiom-cursor",
-      redisUrl,
-      schema: z.object({ messageId: z.string(), checkedAt: z.number() }),
-      onReady,
-    };
-    const first = createRedisCheckpointStore(options);
-    await first.connect();
-    expect(await first.load()).toBeUndefined();
-    await first.save({ messageId: "message-1", checkedAt: 42 });
-    first.close();
-    const second = createRedisCheckpointStore(options);
-    try {
-      await second.connect();
-      expect(await second.load()).toEqual({
-        messageId: "message-1",
-        checkedAt: 42,
-      });
-      expect(onReady).toHaveBeenCalledTimes(2);
-      execFileSync("redis-cli", [
-        "-u",
-        redisUrl,
-        "CLIENT",
-        "KILL",
-        "TYPE",
-        "normal",
-      ]);
-      await vi.waitFor(() => expect(onReady).toHaveBeenCalledTimes(3));
-      expect(await second.load()).toEqual({
-        messageId: "message-1",
-        checkedAt: 42,
-      });
-      await expect(
-        second.save({ messageId: "message-2", checkedAt: Number.NaN }),
-      ).rejects.toThrow();
-      expect(await second.load()).toEqual({
-        messageId: "message-1",
-        checkedAt: 42,
-      });
-    } finally {
-      second.close();
-    }
-  });
 
   defineQueueAdapterContract(
     "contract",

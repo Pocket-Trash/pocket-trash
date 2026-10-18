@@ -1,13 +1,10 @@
 import { serve } from "@hono/node-server";
 import { loggerMessages } from "@package/logger";
-import {
-  createBullMqQueueAdapter,
-  createRedisCheckpointStore,
-} from "@package/queue";
+import { createBullMqQueueAdapter } from "@package/queue";
 import { Client, Events } from "discord.js";
-import { z } from "zod";
 import { createApp, createWebhookIntake } from "./app.js";
 import type { AuthorizedInteraction } from "./authorization.js";
+import { createAxiomCursorStore } from "./axiom-cursor.js";
 import { createAxiomReconciler } from "./axiom-fallback.js";
 import { createDiscordBotEnv } from "./env.js";
 import {
@@ -92,13 +89,10 @@ const deliveryQueue = createDeliveryQueueRuntime({
 /** Health state shared by the HTTP endpoint and runtime lifecycle. */
 const readiness = createReadiness(deliveryQueue.counts);
 /** Durable cursor scoped to this guild and private intake channel. */
-const axiomCursor = createRedisCheckpointStore({
-  key: `discord-bot:axiom-cursor:${env.DISCORD_GUILD_ID}:${env.DISCORD_AXIOM_INTAKE_CHANNEL_ID}`,
+const axiomCursor = createAxiomCursorStore({
+  guildId: env.DISCORD_GUILD_ID,
+  channelId: env.DISCORD_AXIOM_INTAKE_CHANNEL_ID,
   redisUrl: env.REDIS_URL,
-  schema: z.object({
-    messageId: z.string().regex(/^[1-9]\d{16,19}$/u),
-    checkedAt: z.number().int().nonnegative(),
-  }),
   /** Requests a scan when Redis becomes available again. */
   onReady() {
     if (deliveryQueue.started()) void reconcileAxiom();

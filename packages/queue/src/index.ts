@@ -1,7 +1,6 @@
 import type { z } from "zod";
 
 export { createBullMqQueueAdapter } from "./bullmq.js";
-export { createRedisCheckpointStore } from "./checkpoint.js";
 
 /** Result of enqueueing one stable queue job. */
 export type QueueEnqueueResult = {

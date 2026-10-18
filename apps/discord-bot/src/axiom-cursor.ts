@@ -1,23 +1,30 @@
 import { Redis } from "ioredis";
-import type { z } from "zod";
+import { z } from "zod";
+import type { AxiomCursor } from "./axiom-fallback.js";
+
+/** Bot-owned cursor persisted only after its preceding intake work is durable. */
+const cursorSchema = z.object({
+  messageId: z.string().regex(/^[1-9]\d{16,19}$/u),
+  checkedAt: z.number().int().nonnegative(),
+});
 
 /**
- * Opens a validated durable checkpoint beside the application queues.
+ * Opens the bot-local durable Axiom intake cursor.
  *
- * @template T - Serializable checkpoint value.
- * @param options - Connection, namespaced key, validator, and recovery callback.
- * @returns Redis-backed checkpoint lifecycle without exposing its connection.
+ * @param options - Connection, intake identities, and recovery callback.
+ * @returns Redis-backed cursor lifecycle without exposing its connection.
  */
-export function createRedisCheckpointStore<T>(options: {
-  /** Application-owned namespaced Redis key. */
-  key: string;
+export function createAxiomCursorStore(options: {
+  /** Guild whose intake history is tracked. */
+  guildId: string;
+  /** Private Axiom intake channel. */
+  channelId: string;
   /** Redis connection shared with the application's queues. */
   redisUrl: string;
-  /** Runtime checkpoint validator. */
-  schema: z.ZodType<T>;
   /** Called when a Redis connection becomes ready, including after outages. */
   onReady(): void;
 }) {
+  const key = `discord-bot:axiom-cursor:${options.guildId}:${options.channelId}`;
   const connection = new Redis(options.redisUrl, {
     connectTimeout: 5_000,
     enableOfflineQueue: false,
@@ -40,11 +47,9 @@ export function createRedisCheckpointStore<T>(options: {
      * @returns Validated checkpoint, or undefined before the first save.
      * @rejects When Redis is unavailable or persisted data is malformed.
      */
-    async load(): Promise<T | undefined> {
-      const value = await connection.get(options.key);
-      return value === null
-        ? undefined
-        : options.schema.parse(JSON.parse(value));
+    async load(): Promise<AxiomCursor | undefined> {
+      const value = await connection.get(key);
+      return value === null ? undefined : cursorSchema.parse(JSON.parse(value));
     },
     /**
      * Validates and atomically replaces the checkpoint without expiring it.
@@ -53,11 +58,8 @@ export function createRedisCheckpointStore<T>(options: {
      * @returns Redis acknowledgement.
      * @rejects When validation or persistence fails.
      */
-    async save(value: T): Promise<void> {
-      await connection.set(
-        options.key,
-        JSON.stringify(options.schema.parse(value)),
-      );
+    async save(value: AxiomCursor): Promise<void> {
+      await connection.set(key, JSON.stringify(cursorSchema.parse(value)));
     },
     /**
      * Closes the checkpoint connection and stops reconnect attempts.
