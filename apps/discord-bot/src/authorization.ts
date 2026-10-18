@@ -4,6 +4,13 @@ import { formatTranslation } from "@pocket-trash/localizations";
 export type AuthorizedInteraction = {
   /** Discord roles held by the interacting guild member. */
   memberRoleIds: readonly string[];
+  /** Optional chat-input values exposed only to an authorized command handler. */
+  commandOptions?: {
+    /** Selected help topic slug. */
+    topic: string | null;
+    /** Optional explicitly selected Discord user. */
+    userId: string | null;
+  };
   /**
    * Sends an interaction response.
    *
@@ -15,6 +22,13 @@ export type AuthorizedInteraction = {
     content: string;
     /** Whether only the interacting member can see the response. */
     ephemeral: boolean;
+    /** Restricts mentions to the explicitly selected user. */
+    allowedMentions?: {
+      /** Never automatically resolve roles, everyone, or text mentions. */
+      parse: [];
+      /** Explicit user IDs allowed to receive a mention. */
+      users: string[];
+    };
   }): Promise<unknown> | unknown;
 };
 

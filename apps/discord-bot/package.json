@@ -6,11 +6,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "dev": "tsx ../../packages/infisical-runner/src/cli.ts discord-bot dev -- tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "build:ci": "tsc -p tsconfig.json",
+    "dev": "pnpm generate:help && tsx ../../packages/infisical-runner/src/cli.ts discord-bot dev -- tsx watch src/index.ts",
+    "generate:help": "tsx scripts/generate-help-topics.mjs",
+    "build": "pnpm generate:help --check && tsc -p tsconfig.json",
+    "build:ci": "pnpm generate:help --check && tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "pnpm generate:help --check && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude \"dist/**\"",
     "test:ci": "vitest run --exclude \"dist/**\"",
     "test:watch": "vitest --exclude \"dist/**\""

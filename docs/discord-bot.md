@@ -33,6 +33,21 @@ Settings > Integrations**. Restrict staff commands and ticket actions to the
 Owners role; allow the Owners and Moderator roles to use `/help-link`. These
 settings improve visibility but do not replace the bot's runtime role checks.
 
+## Staff help links
+
+`/help-link topic:<choice> user:<optional member>` posts the English help title
+and its visible canonical URL publicly. Only the configured Owners and Moderator
+roles may invoke it; server administrator status alone does not grant access.
+The optional member is the only allowed mention in the response.
+
+Startup bulk-registers the command in the configured guild. Topic choices come
+from the installed localization package's English MDX documents, not a network
+request or arbitrary user input. After updating that package, run
+`pnpm --filter @app/discord-bot generate:help` and commit the generated topic
+list. Builds and type checks reject missing metadata, stale generated choices,
+or more than Discord's 25 choices. This does not deploy or register commands in
+production until the bot is released by the operator.
+
 ## Required configuration
 
 Store these values in both the `dev` and `prod` Infisical environments:
