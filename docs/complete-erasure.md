@@ -139,6 +139,33 @@ configuration that is less strict than this table is a release blocker.
 | Clerk application logs | The production dashboard exposes a 30-day searchable window | Provider-only operational access; do not export. Recheck the window after any plan change | 30 days |
 | Clerk CSV exports | Dashboard exports can contain full profiles and credential material | Search export history and approved download locations; delete files and record operator attestation | None |
 
+### Discord ticket inference processor — ZDR-only owner approval
+
+The owner approved Cheaper Inference ZDR-only processing of real support threads
+and attachments on 18 Oct 2026, after reviewing the metadata-retention and
+unnamed-upstream risks below. This does not authorize non-ZDR routes, Infisical
+changes, or deployment. The evaluation used only synthetic fixtures; production
+launch still requires verified erasure and backup safeguards.
+
+Its [privacy policy](https://api.cheaperinference.com/legal/privacy) says prompt
+and response bodies are not stored in its application database or used to train
+Keak models. It retains individual inference metadata for 45 days before daily
+aggregation and generally retains product/security logs for 12 months; upstream
+retention depends on the serving provider. Temporary vision uploads expire after
+one hour and download links after 15 minutes. The evaluation avoids those uploads
+and requires `zdr: true` on every request, with confirmed ZDR billing.
+
+The [subprocessor list](https://api.cheaperinference.com/legal/subprocessors)
+currently identifies itself as an unreviewed draft, not a contractual commitment,
+and does not name its primary marketplace upstream. Provider regions and a
+verified subject-deletion procedure therefore remain unresolved. The
+[DPA](https://api.cheaperinference.com/legal/dpa) must be reviewed for the actual
+account agreement; a ZDR routing flag is not evidence that all operational
+metadata is erased. Owner processor approval is recorded in the
+[ENG-504 evaluation](https://linear.app/pocket-trash/document/eng-504-synthetic-ticket-model-evaluation-2026-10-18-d23c16d6d776).
+Complete deletion verification before enabling production ticket inference. No
+fallback to ordinary-retention routes is allowed.
+
 ### Processing regions and recovery copies
 
 | Processor | Region / delivery | Recovery-copy behavior |

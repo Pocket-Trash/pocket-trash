@@ -172,6 +172,81 @@ notifiers, secrets, or deployments. Build the bot first. The observer never star
 the bot worker or dispatches interactions. Captured content is represented by the
 redacted fixture in `src/fixtures/axiom-match.json`.
 
+## Synthetic ticket-summary evaluation
+
+The evaluation tool never reads Discord conversations. Its five checked-in
+synthetic cases cover a text bug, a feature request with an adversarial text
+attachment, an image, a text PDF with corrected counts, and a scanned PDF with
+adversarial instructions. The model must return the exact structured schema,
+preserve required evidence, and leave unsupported facts unknown. Review every
+output for invented claims and useful open questions; keyword checks alone are
+not a quality decision.
+
+Run offline fixture validation with:
+
+```sh
+node apps/discord-bot/integration/evaluate-summary.mjs --check
+```
+
+With the existing development credential, run an explicitly selected model:
+
+```sh
+infisical run --env dev --path /services/cheaper-inference -- \
+  node apps/discord-bot/integration/evaluate-summary.mjs gemma-3-4b-it
+```
+
+It uses `AI_PROVIDER=cheaper-inference`, configurable `AI_MODEL` (when no model
+argument is given), and `AI_BASE_URL=https://api.cheaperinference.com/v1`.
+The tool restricts the route to that provider host, requires the current ZDR
+vision catalog, sends `zdr: true`, validates confirmed ZDR billing, and never
+retries through a non-ZDR route or another provider. JSONL output records quoted
+prices, actual billed usage, latency, structured results, and failures; failed
+models must not be silently accepted. Inference is a paid manual test, not CI.
+
+The gateway has no verified raw-PDF contract. This evaluation uses local
+`pdftotext` and rendered PNG pages through its tested image input. Regenerate
+fixtures using `integration/generate-summary-fixtures.py` from the bot
+directory with ReportLab and Poppler installed. These tools are evaluation
+prerequisites, not an implemented production attachment pipeline. Actual support
+processing remains gated on the processor/retention review in the complete-
+erasure inventory and the model decision recorded in ENG-504.
+
+## Synthetic request-classification evaluation
+
+Jev is adopted for advisory classification, separately from the title/summary
+model. See the [accepted decision](../decisions/product/p-eng-30-advisory-support-classification.md)
+for staff-control, failure, privacy, and integration requirements. Runtime
+integration belongs to ENG-506 and is not shipped by the evaluation tools.
+The fixed corpus in
+`integration/evaluate-classification.mjs` contains 20 synthetic requests with
+prewritten labels for bug/feature/question/other, ticket readiness, and suggested
+bug priority. It includes corrections, resolved bugs, injection attempts, missing
+attachment evidence, multilingual requests, outages, data loss, and privacy
+incidents. It sends text only; it does not read Discord or inspect attachments.
+
+```sh
+node apps/discord-bot/integration/evaluate-classification.mjs --check
+infisical run --env dev --path /services/cheaper-inference -- \
+  node apps/discord-bot/integration/evaluate-classification.mjs --live
+```
+
+Only `--live` permits paid requests: two rounds, 40 calls, with no automatic
+retries. The tool checks current catalog prices, sends `zdr: true` to
+`/v1/decisions`, requires each settled receipt to confirm ZDR, and stops before
+another call when accumulated batch charges reach USD 0.01. That local stop is
+not an account-wide spending limit or an exact final-charge cap. Offline checks
+and CI never make inference calls. JSONL records labels, full probabilities,
+latency, actual billing and request IDs; readiness uses a fixed 0.5 threshold.
+
+The default catalog quotes non-ZDR pricing; `GET /models?zdr=true` explicitly
+selects the ZDR pricing scope. The harness requires that scope and checks each
+receipt rather than interpreting the default listing as ZDR availability.
+See ENG-504's evaluation document for results and limitations. Classification
+remains advisory: buttons stay visible,
+staff choose the ticket type and bug priority, and features receive no priority.
+This evaluation does not implement a runtime classifier or change production
+configuration.
+
 ## Verification
 
 Before a release, verify each environment independently:
