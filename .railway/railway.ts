@@ -1,4 +1,5 @@
 import {
+  database,
   defineRailway,
   github,
   preserve,
@@ -36,12 +37,31 @@ export default defineRailway((ctx) => {
   };
 
   /** Shared Redis queue provisioned additively for the migration. */
-  const sharedQueue = redis("pocket-trash-queue", {
+  const sharedQueue = database("pocket-trash-queue", "redis", {
+    image: "redis:8.2",
+    defaultMountPath: "/data",
     region: "us-east4-eqdc4a",
   });
   sharedQueue.deploy = {
     startCommand:
-      '/bin/sh -c "rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --appendonly yes --appendfsync everysec --dir $RAILWAY_VOLUME_MOUNT_PATH"',
+      '/bin/sh -c \'exec docker-entrypoint.sh redis-server --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD is required}" --save 60 1 --appendonly yes --appendfsync everysec --dir "$RAILWAY_VOLUME_MOUNT_PATH"\'',
+  };
+  sharedQueue.variables = {
+    REDIS_PASSWORD: preserve(),
+    REDIS_URL: {
+      type: "literal",
+      value:
+        "redis://default:${{REDIS_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:6379",
+    },
+    REDIS_PUBLIC_URL: {
+      type: "literal",
+      value:
+        "redis://default:${{REDIS_PASSWORD}}@${{RAILWAY_TCP_PROXY_DOMAIN}}:${{RAILWAY_TCP_PROXY_PORT}}",
+    },
+    REDISHOST: preserve(),
+    REDISPASSWORD: preserve(),
+    REDISPORT: preserve(),
+    REDISUSER: preserve(),
   };
   sharedQueue.networking = {
     privateNetworkEndpoint: "pocket-trash-queue",

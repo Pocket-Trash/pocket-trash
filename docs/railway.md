@@ -144,7 +144,15 @@ Migration requires separate, explicitly approved stages:
    `pocket-trash-queue` without deleting or detaching `scraper-queue` or
    `redis-volume`.
 2. Enable RDB snapshots and AOF (`appendonly yes`, `appendfsync everysec`) on the
-   new resource, then verify both persistence modes after a restart test.
+   new resource, then verify both persistence modes after a restart test. The
+   shared queue uses the official `redis:8.2` image and a `/data` volume, not the
+   helper's default image. On initial provisioning, generate a unique Redis
+   password directly in the new environment's Railway `REDIS_PASSWORD` setting
+   before starting Redis; `preserve()` retains it but does not generate it.
+   Never reuse another environment's password or store it in source. IaC declares
+   both private and public connection expressions; the public URL is required by
+   the PR handoff. Verify the mounted path and authenticated ping, not only the
+   deployment status.
 3. Pause scraper cron and every producer/consumer using the old connection. Drain
    `scraper-images` and `scraper-items`; inspect active, waiting, delayed, paused,
    prioritized, repeatable, waiting-children, failed, and completed state. Reconcile
