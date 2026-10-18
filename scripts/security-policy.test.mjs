@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -408,8 +409,10 @@ async function installFixture(
  * @throws When the registry cannot start.
  */
 async function startRegistry(t, packages) {
+  // A unique URL prevents stale metadata reuse when the OS recycles a port.
+  const registryPath = `/${randomUUID()}/`;
   const server = createServer((request, response) => {
-    const name = decodeURIComponent(request.url.slice(1));
+    const name = decodeURIComponent(request.url.slice(registryPath.length));
     const entry = packages[name];
 
     if (!entry) {
@@ -448,7 +451,7 @@ async function startRegistry(t, packages) {
       }),
   );
 
-  return `http://127.0.0.1:${server.address().port}`;
+  return `http://127.0.0.1:${server.address().port}${registryPath}`;
 }
 
 /**

@@ -46,7 +46,10 @@ For the production Discord bot service:
 - Keep one replica and zero deployment overlap so only one process owns the
   gateway session and continuous worker.
 - Use `/health`; it returns healthy only after the Discord gateway and worker
-  start and Redis answers a live queue-count request.
+  start, the first Axiom history reconciliation completes, and Redis answers a
+  live queue-count request. Custom-domain target ports must match Railway's
+  injected `PORT` (currently `8080`); the local fallback `4009` does not override
+  Railway's runtime port.
 - Load application-owned values from Infisical `/apps/discord-bot`. Keep
   `REDIS_URL` as the Railway reference to `pocket-trash-queue`.
 

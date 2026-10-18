@@ -76,6 +76,21 @@ function pullRequestPayload(fullName = repository.full_name) {
 }
 
 describe("GitHub webhook intake", () => {
+  it.each([
+    "requested",
+    "in_progress",
+  ])("ignores the normal workflow_run %s lifecycle action", async (action) => {
+    const enqueue = vi.fn();
+    const handle = createWebhookIntake({
+      enqueue,
+      normalize: createGitHubWebhookNormalizer(destinations),
+    });
+    expect(
+      await handle(githubRequest("workflow_run", { action })),
+    ).toMatchObject({ status: 204 });
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
   it("authenticates and queues a normalized pull-request delivery", async () => {
     const enqueue = vi.fn().mockResolvedValue({ accepted: true });
     const handle = createWebhookIntake({

@@ -1,0 +1,18 @@
+{
+  "content": "",
+  "embeds": [
+    {
+      "type": "rich",
+      "title": "Alert Triggered",
+      "fields": [
+        {
+          "value": "​",
+          "name": "Triggered: Pocket Trash logger fallback",
+          "inline": false
+        }
+      ],
+      "description": "```{\n    \"app\": \"api\",\n    \"attributes\": {\n        \"calibration\": \"eng502-calibration-redacted\",\n        \"count\": 42\n    },\n    \"context\": {\n        \"runId\": \"eng502-calibration-redacted\",\n        \"source\": \"axiom-fallback-calibration\"\n    },\n    \"deploymentId\": \"eng502-calibration-redacted\",\n    \"deploymentTarget\": \"calibration\",\n    \"environment\": \"production\",\n    \"errorMessage\": \"Synthetic error for ENG-502; no production failure\",\n    \"errorName\": \"CalibrationError\",\n    \"eventId\": \"eng502-calibration-redacted-error\",\n    \"level\": \"error\",\n    \"message\": \"eng502-calibration-redacted.error\",\n    \"timestamp\": \"2026-10-18T05:24:40.888Z\"\n}```",
+      "color": 7560656
+    }
+  ]
+}
