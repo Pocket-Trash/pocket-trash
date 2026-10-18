@@ -91,9 +91,11 @@ describe("AppShell", () => {
     const language = html.indexOf("language-control");
     const theme = html.indexOf("theme-control");
     const account = html.indexOf("account-control");
+    const search = html.indexOf('aria-label="Open search"');
 
     expect(language).toBeGreaterThan(-1);
     expect(language).toBeLessThan(theme);
     expect(theme).toBeLessThan(account);
+    expect(account).toBeLessThan(search);
   });
 });

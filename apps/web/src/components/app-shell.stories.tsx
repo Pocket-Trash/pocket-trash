@@ -57,6 +57,10 @@ export const Default: Story = {
     await expect(
       canvas.getByRole("heading", { name: "Pocket Trash" }),
     ).toBeVisible();
+    await canvas.getByRole("button", { name: "Open search" }).click();
+    await expect(
+      canvas.getByRole("dialog", { name: "Search Pocket Trash" }),
+    ).toBeVisible();
   },
 };
 
