@@ -54,6 +54,7 @@ import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserResourcesRouteImport } from './routes/user.resources'
 import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as UserTrendsRouteImport } from './routes/user.trends'
+import { Route as UsersUsernameRouteImport } from './routes/users.$username_'
 import { Route as AdminAuditExportRouteImport } from './routes/admin.audit.export'
 import { Route as AdminConfigIndexRouteImport } from './routes/admin.config.index'
 import { Route as AdminConfigProductsRouteImport } from './routes/admin.config.products'
@@ -316,6 +317,11 @@ const UserTrendsRoute = UserTrendsRouteImport.update({
   path: '/trends',
   getParentRoute: () => UserRoute,
 } as any)
+const UsersUsernameRoute = UsersUsernameRouteImport.update({
+  id: '/users/$username_',
+  path: '/users/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminAuditExportRoute = AdminAuditExportRouteImport.update({
   id: '/export',
   path: '/export',
@@ -542,6 +548,7 @@ export interface FileRoutesByFullPath {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/user/trends': typeof UserTrendsRoute
+  '/users/$username': typeof UsersUsernameRoute
   '/admin/': typeof AdminIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
   '/collections/': typeof CollectionsIndexRoute
@@ -620,6 +627,7 @@ export interface FileRoutesByTo {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/user/trends': typeof UserTrendsRoute
+  '/users/$username': typeof UsersUsernameRoute
   '/admin': typeof AdminIndexRoute
   '/changelog': typeof ChangelogIndexRoute
   '/collections': typeof CollectionsIndexRoute
@@ -703,6 +711,7 @@ export interface FileRoutesById {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings_': typeof UserSettingsRoute
   '/user/trends': typeof UserTrendsRoute
+  '/users/$username_': typeof UsersUsernameRoute
   '/admin/': typeof AdminIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
   '/collections/': typeof CollectionsIndexRoute
@@ -787,6 +796,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/user/trends'
+    | '/users/$username'
     | '/admin/'
     | '/changelog/'
     | '/collections/'
@@ -865,6 +875,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/user/trends'
+    | '/users/$username'
     | '/admin'
     | '/changelog'
     | '/collections'
@@ -947,6 +958,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings_'
     | '/user/trends'
+    | '/users/$username_'
     | '/admin/'
     | '/changelog/'
     | '/collections/'
@@ -1016,6 +1028,7 @@ export interface RootRouteChildren {
   ProductsAddRoute: typeof ProductsAddRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
+  UsersUsernameRoute: typeof UsersUsernameRoute
   ChangelogIndexRoute: typeof ChangelogIndexRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
   HelpIndexRoute: typeof HelpIndexRoute
@@ -1347,6 +1360,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/user/trends'
       preLoaderRoute: typeof UserTrendsRouteImport
       parentRoute: typeof UserRoute
+    }
+    '/users/$username_': {
+      id: '/users/$username_'
+      path: '/users/$username'
+      fullPath: '/users/$username'
+      preLoaderRoute: typeof UsersUsernameRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/audit/export': {
       id: '/admin/audit/export'
@@ -1756,6 +1776,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsAddRoute: ProductsAddRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
+  UsersUsernameRoute: UsersUsernameRoute,
   ChangelogIndexRoute: ChangelogIndexRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,
   HelpIndexRoute: HelpIndexRoute,

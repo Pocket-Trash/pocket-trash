@@ -42,6 +42,14 @@ export type UsersService = {
    */
   getByClerkId(clerkId: string): Promise<User | null>;
   /**
+   * Loads a public user by exact username.
+   *
+   * @param username - Public username to load.
+   * @returns Stored user, or null when absent.
+   * @rejects When the username is blank or persistence fails.
+   */
+  getByUsername(username: string): Promise<User | null>;
+  /**
    * Lists every stored Clerk identifier.
    *
    * @returns Every stored Clerk identifier.
@@ -265,6 +273,23 @@ export function createUsersService(
           },
         },
       );
+    },
+    /**
+     * Loads a user by exact public username.
+     *
+     * @param username - Public username to load.
+     * @returns Stored user, or `null` when absent.
+     * @rejects When the username is blank or persistence fails.
+     */
+    async getByUsername(username) {
+      const normalizedUsername = username.trim();
+      if (!normalizedUsername) throw new Error("username is required.");
+      const [user] = await db
+        .select()
+        .from(schema.user)
+        .where(eq(schema.user.username, normalizedUsername))
+        .limit(1);
+      return user ?? null;
     },
     /**
      * Lists every stored Clerk user identifier.

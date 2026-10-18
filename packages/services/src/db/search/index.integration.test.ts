@@ -18,6 +18,7 @@ describe("public search integration", () => {
       ),
     });
     await client.exec(`
+      INSERT INTO users (clerk_id, username) VALUES ('search-person', 'SearchPerson');
       INSERT INTO makers (name, slug) VALUES ('Café Search Maker', 'cafe-search-maker');
       INSERT INTO product_types (name, slug) VALUES ('Search Writing Tool', 'search-writing-tool');
       INSERT INTO product (
@@ -74,5 +75,24 @@ describe("public search integration", () => {
     await expect(
       service.search({ query: "bolt", surface: "page" }),
     ).resolves.toMatchObject({ items: [{ title: "Bolt Action" }], total: 1 });
+  });
+
+  it("finds public people by username", async () => {
+    await expect(
+      service.search({
+        group: "people",
+        query: "searchperson",
+        surface: "page",
+      }),
+    ).resolves.toMatchObject({
+      items: [
+        {
+          href: "/users/SearchPerson",
+          kind: "person",
+          title: "SearchPerson",
+        },
+      ],
+      total: 1,
+    });
   });
 });

@@ -33,6 +33,7 @@ function createUsersServiceMock(): UsersService {
     }),
     getBanState: vi.fn(),
     getByClerkId: vi.fn(),
+    getByUsername: vi.fn(),
     listClerkIds: vi.fn(),
     setBanState: vi.fn(),
     syncFromClerk: vi.fn(),
