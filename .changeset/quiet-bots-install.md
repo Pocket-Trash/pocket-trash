@@ -2,4 +2,4 @@
 "@app/discord-bot": patch
 ---
 
-Provide the private package token to Railpack install steps.
+Provide Railpack's private package token and validate the Axiom intake webhook URL.

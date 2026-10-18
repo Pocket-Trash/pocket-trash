@@ -120,8 +120,8 @@ for (const environment of ["production", "preview"]) {
       );
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
       for (const variable of [
+        "AXIOM_INTAKE_WEBHOOK_URL",
         "DISCORD_AXIOM_INTAKE_CHANNEL_ID",
-        "DISCORD_AXIOM_INTAKE_WEBHOOK_ID",
         "DISCORD_BUG_TAG_ID",
         "DISCORD_FEATURE_REQUEST_TAG_ID",
         "DISCORD_GITHUB_CHANNEL_ID",
