@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createApiServices } from "./services.js";
+import { describe, expect, it, vi } from "vitest";
+import { createApiLogger, createApiServices } from "./services.js";
 
 describe("API services factory", () => {
   it("isolates requests and lets webhooks run without storage bindings", () => {
@@ -27,5 +27,24 @@ describe("API services factory", () => {
     );
     expect(uploads.services.storage).toBeDefined();
     expect(uploads.services.resources).toBeDefined();
+  });
+
+  it.each([
+    "production",
+    "preview",
+  ])("uses the %s APP_ENV label for notification policy", async (environment) => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetch);
+    const logger = createApiLogger({
+      APP_ENV: environment,
+      AXIOM_DATASET: "development",
+      AXIOM_TOKEN: "token",
+    });
+    logger.error("api.environment.test");
+    await logger.flush();
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body[0].environment).toBe(environment);
+    vi.unstubAllGlobals();
   });
 });

@@ -23,6 +23,8 @@ export function readProcessScraperRuntimeEnv() {
     LOG_DEPLOYMENT_ID: process.env.LOG_DEPLOYMENT_ID,
     LOG_DEPLOYMENT_TARGET: process.env.LOG_DEPLOYMENT_TARGET,
     LOG_LEVEL: process.env.LOG_LEVEL,
+    LOGGER_NOTIFICATION_TOKEN: process.env.LOGGER_NOTIFICATION_TOKEN,
+    LOGGER_NOTIFICATION_URL: process.env.LOGGER_NOTIFICATION_URL,
     PORT: process.env.PORT,
     RAILWAY_ENVIRONMENT_NAME: process.env.RAILWAY_ENVIRONMENT_NAME,
     REDIS: process.env.REDIS,

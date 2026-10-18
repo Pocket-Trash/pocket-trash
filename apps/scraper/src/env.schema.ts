@@ -65,6 +65,10 @@ export type ScraperRuntimeEnv = {
    * Minimum emitted log level.
    */
   LOG_LEVEL?: string;
+  /** App-bound bearer token used by direct logger notifications. */
+  LOGGER_NOTIFICATION_TOKEN?: string;
+  /** Discord bot logger intake endpoint. */
+  LOGGER_NOTIFICATION_URL?: string;
   /**
    * HTTP port before numeric coercion.
    */
@@ -170,6 +174,8 @@ const scraperServerSchema = {
   LOG_DEPLOYMENT_ID: z.string().min(1).optional(),
   LOG_DEPLOYMENT_TARGET: z.string().min(1).optional(),
   LOG_LEVEL: z.string().min(1).optional(),
+  LOGGER_NOTIFICATION_TOKEN: z.string().min(32).optional(),
+  LOGGER_NOTIFICATION_URL: z.string().url().optional(),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4007),
   RAILWAY_ENVIRONMENT_NAME: z.string().min(1).optional(),
 } as const;
@@ -300,6 +306,8 @@ function getScraperRuntimeEnvStrict(runtimeEnv: ScraperRuntimeEnv) {
     LOG_DEPLOYMENT_ID: runtimeEnv.LOG_DEPLOYMENT_ID,
     LOG_DEPLOYMENT_TARGET: runtimeEnv.LOG_DEPLOYMENT_TARGET,
     LOG_LEVEL: runtimeEnv.LOG_LEVEL,
+    LOGGER_NOTIFICATION_TOKEN: runtimeEnv.LOGGER_NOTIFICATION_TOKEN,
+    LOGGER_NOTIFICATION_URL: runtimeEnv.LOGGER_NOTIFICATION_URL,
     PORT: runtimeEnv.PORT,
     RAILWAY_ENVIRONMENT_NAME: runtimeEnv.RAILWAY_ENVIRONMENT_NAME,
     REDIS_URL: selectRedisUrl(runtimeEnv),

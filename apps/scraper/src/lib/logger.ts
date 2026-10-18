@@ -2,6 +2,7 @@ import {
   createAxiomTransport,
   createConsoleTransport,
   createLogger,
+  createLoggerNotificationTransport,
   type Logger,
   loggerValues,
   normalizeConsoleTransportMode,
@@ -44,6 +45,10 @@ export type ScraperLoggerConfig = {
    * Minimum log level accepted by the shared logger normalizer.
    */
   logLevel?: string;
+  /** App-bound bearer token used by direct logger notifications. */
+  notificationToken?: string;
+  /** Discord bot logger intake endpoint. */
+  notificationUrl?: string;
   /**
    * Railway environment fallback for deployment metadata.
    */
@@ -58,7 +63,7 @@ export type ScraperLoggerConfig = {
  */
 export function createScraperLogger(config: ScraperLoggerConfig): Logger {
   const hasAxiomConfig = Boolean(config.axiomToken && config.axiomDataset);
-  const environment = config.axiomDataset ?? config.appEnv ?? "development";
+  const environment = config.appEnv ?? "development";
   const deploymentTarget =
     config.deploymentTarget ??
     (config.railwayEnvironmentName ? "railway" : "local");
@@ -74,6 +79,14 @@ export function createScraperLogger(config: ScraperLoggerConfig): Logger {
             dataset: config.axiomDataset ?? "",
             edgeDomain: config.axiomEdgeDomain,
             token: config.axiomToken ?? "",
+          }),
+        ]
+      : []),
+    ...(config.notificationToken && config.notificationUrl
+      ? [
+          createLoggerNotificationTransport({
+            endpoint: config.notificationUrl,
+            token: config.notificationToken,
           }),
         ]
       : []),

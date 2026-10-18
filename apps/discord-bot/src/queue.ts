@@ -42,7 +42,10 @@ export const deliveryJobSchema = z.discriminatedUnion("kind", [
     kind: z.literal("github"),
     notification: queuedNotificationSchema,
   }),
-  baseDeliveryJobSchema.extend({ kind: z.enum(["logger", "system"]) }),
+  baseDeliveryJobSchema.extend({
+    kind: z.enum(["logger", "system"]),
+    notification: queuedNotificationSchema,
+  }),
 ]);
 
 /** Validated job accepted by the bot delivery queue. */

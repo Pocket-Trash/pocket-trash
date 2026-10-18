@@ -100,6 +100,8 @@ export default defineRailway((ctx) => {
         DATABASE_URL: preserve(),
         FONTAWESOME_PACKAGE_TOKEN: preserve(),
         LOG_LEVEL: preserve(),
+        LOGGER_NOTIFICATION_TOKEN: preserve(),
+        LOGGER_NOTIFICATION_URL: preserve(),
         REDIS_URL: preserve(),
         RAILPACK_INSTALL_CMD:
           "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
@@ -164,6 +166,9 @@ export default defineRailway((ctx) => {
           DISCORD_TOKEN: preserve(),
           GITHUB_WEBHOOK_SECRET: preserve(),
           LINEAR_API_KEY: preserve(),
+          LOGGER_NOTIFICATION_API_TOKEN: preserve(),
+          LOGGER_NOTIFICATION_SCRAPER_TOKEN: preserve(),
+          LOGGER_NOTIFICATION_WEB_TOKEN: preserve(),
           LOGGER: preserve(),
           LOG_DEPLOYMENT_ID: preserve(),
           LOG_DEPLOYMENT_TARGET: preserve(),

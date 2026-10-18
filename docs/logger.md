@@ -24,7 +24,7 @@ Use one dataset per environment:
 | Production | `production` |
 
 Keep routing and deployment dimensions as ordinary top-level fields:
-`app`, `environment`, `deploymentTarget`, `deploymentId`, `level`,
+`eventId`, `app`, `environment`, `deploymentTarget`, `deploymentId`, `level`,
 `message`, and `timestamp`. Operation names, outcomes, and durations remain
 inside `attributes` with other variable application fields.
 
@@ -86,6 +86,14 @@ GitHub Actions authenticates to Infisical through OIDC. See
   terminals. Leave it unset for compact output.
 - Keep `app`, deployment fields, and environment accurate so an event can be
   traced to its runtime.
+- Generate `eventId` once at the original emitter and preserve it through the
+  browser proxy, Axiom, direct notification transport, and Discord queue.
+
+Production `error` and `fatal` events from `api`, `web`, and `scraper` also use
+the filtered server-only notification transport. It projects only the version,
+event identity, routing metadata, stable message, error name/message,
+attributes, and context; console options, raw payloads, stacks, and causes stay
+out of the bot request and Redis queue.
 
 To inspect recent failures across an environment:
 
