@@ -1,11 +1,5 @@
-import {
-  faChevronLeft,
-  faChevronRight,
-} from "@fortawesome/pro-light-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { type ReactNode, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useCatalogCopy } from "@/lib/catalog-copy";
+import { Pagination } from "@/components/pagination";
 
 /**
  * Properties shared by paginated catalog card lists.
@@ -75,7 +69,6 @@ export function PaginatedCards<T>({
   page: controlledPage,
   widePageSize,
 }: PaginatedCardsProps<T>) {
-  const t = useCatalogCopy();
   const [pageSize, setPageSize] = useState(12);
   const [viewportMeasured, setViewportMeasured] = useState(false);
   const [renderedItems, setRenderedItems] = useState(items);
@@ -125,37 +118,12 @@ export function PaginatedCards<T>({
     <>
       {children(items.slice(page * pageSize, (page + 1) * pageSize))}
       {pageCount > 1 ? (
-        <nav
-          aria-label={ariaLabel}
-          className="flex items-center justify-center gap-3 px-3 pb-6"
-        >
-          <Button
-            aria-label={t("web.collections.gallery.previousPage")}
-            disabled={page === 0}
-            onClick={() => changePage(page - 1)}
-            size="icon"
-            type="button"
-            variant="outline"
-          >
-            <FontAwesomeIcon aria-hidden="true" icon={faChevronLeft} />
-          </Button>
-          <output aria-live="polite" className="text-sm">
-            {t("web.collections.gallery.pageStatus", {
-              page: page + 1,
-              pageCount,
-            })}
-          </output>
-          <Button
-            aria-label={t("web.collections.gallery.nextPage")}
-            disabled={page === pageCount - 1}
-            onClick={() => changePage(page + 1)}
-            size="icon"
-            type="button"
-            variant="outline"
-          >
-            <FontAwesomeIcon aria-hidden="true" icon={faChevronRight} />
-          </Button>
-        </nav>
+        <Pagination
+          ariaLabel={ariaLabel}
+          onPageChange={(nextPage) => changePage(nextPage - 1)}
+          page={page + 1}
+          pageCount={pageCount}
+        />
       ) : null}
     </>
   );
