@@ -1,6 +1,7 @@
 import { formatTranslation } from "@pocket-trash/localizations";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { listResourceDirectory } from "@/lib/resources";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/search-constants";
 import {
   ResourceDirectoryStatusPage,
   ResourcesPage,
@@ -32,13 +33,22 @@ export const Route = createFileRoute("/resources/")({
      * Optional resource-category slug filters.
      */
     category?: string[];
+    /** Optional public resource query. */
+    q?: string;
   } => {
     const value = search.category;
     const categories = (
       Array.isArray(value) ? value : value === undefined ? [] : [value]
     ).filter((category): category is string => typeof category === "string");
 
-    return categories.length > 0 ? { category: [...new Set(categories)] } : {};
+    const q =
+      typeof search.q === "string"
+        ? search.q.trim().slice(0, SEARCH_QUERY_MAX_LENGTH).trim()
+        : "";
+    return {
+      ...(categories.length > 0 ? { category: [...new Set(categories)] } : {}),
+      ...(q ? { q } : {}),
+    };
   },
   /**
    * Selects normalized search state that invalidates the route loader.
@@ -75,8 +85,23 @@ export const Route = createFileRoute("/resources/")({
  */
 function ResourceDirectoryRoute() {
   const directory = Route.useLoaderData();
-  const { category = [] } = Route.useSearch();
+  const navigate = useNavigate();
+  const { category = [], q = "" } = Route.useSearch();
   return (
-    <ResourcesPage directory={directory} selectedCategorySlugs={category} />
+    <ResourcesPage
+      directory={directory}
+      onQueryChange={(query) =>
+        void navigate({
+          replace: true,
+          search: {
+            ...(category.length ? { category } : {}),
+            ...(query ? { q: query } : {}),
+          },
+          to: "/resources",
+        })
+      }
+      query={q}
+      selectedCategorySlugs={category}
+    />
   );
 }

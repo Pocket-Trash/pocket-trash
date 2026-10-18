@@ -73,8 +73,9 @@ export const Route = createFileRoute("/collections_/$userId/$collectionId")({
 function PublicCollectionRoute() {
   const navigate = useNavigate();
   const data = Route.useLoaderData();
+  const search = Route.useSearch();
   const [filters, setFilters] = useCatalogFilters(
-    Route.useSearch(),
+    search,
     (search) =>
       void navigate({
         params: {
@@ -95,6 +96,7 @@ function PublicCollectionRoute() {
       onFiltersChange={setFilters}
       ownerImageUrl={data.ownerImageUrl}
       ownerUsername={data.ownerUsername}
+      publicSearchQuery={search.q ?? ""}
     />
   );
 }

@@ -1,9 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { listPublicMaterials } from "@/lib/catalog-api";
+import { parseDirectorySearch } from "@/lib/directory-search";
 import { MaterialsPage } from "@/pages/material-pages";
 
 /** Shows the public A-Z materials directory. */
 export const Route = createFileRoute("/materials/")({
+  validateSearch: parseDirectorySearch,
   /**
    * Loads every public material summary.
    *
@@ -19,5 +21,19 @@ export const Route = createFileRoute("/materials/")({
  * @returns The public materials directory route.
  */
 function MaterialsRoute() {
-  return <MaterialsPage materials={Route.useLoaderData()} />;
+  const navigate = useNavigate();
+  const { q = "" } = Route.useSearch();
+  return (
+    <MaterialsPage
+      materials={Route.useLoaderData()}
+      onQueryChange={(query) =>
+        void navigate({
+          replace: true,
+          search: query ? { q: query } : {},
+          to: "/materials",
+        })
+      }
+      query={q}
+    />
+  );
 }

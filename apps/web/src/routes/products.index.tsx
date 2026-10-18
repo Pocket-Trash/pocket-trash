@@ -54,6 +54,7 @@ function ProductsRoute() {
       aliases={Route.useLoaderData().aliases}
       productTypes={Route.useLoaderData().productTypes}
       products={Route.useLoaderData().products}
+      searchQuery={catalogSearch.q ?? ""}
       view={view === "all" ? "products" : "directory"}
     />
   );

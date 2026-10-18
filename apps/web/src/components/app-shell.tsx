@@ -9,6 +9,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import type * as React from "react";
 import { toast } from "sonner";
+import { GlobalSearch } from "@/components/global-search";
 import { LanguageSelect } from "@/components/language-select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -245,6 +246,7 @@ function AppShellControls() {
       />
       <ThemeToggle />
       <UserMenu />
+      <GlobalSearch />
     </div>
   );
 }

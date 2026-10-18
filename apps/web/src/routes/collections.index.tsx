@@ -35,8 +35,9 @@ export const Route = createFileRoute("/collections/")({
  */
 function CollectionsRoute() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const [filters, setFilters] = useCatalogFilters(
-    Route.useSearch(),
+    search,
     (search) => void navigate({ replace: true, search, to: "/collections" }),
   );
   return (
@@ -45,6 +46,7 @@ function CollectionsRoute() {
       onFiltersChange={setFilters}
       aliases={Route.useLoaderData().aliases}
       owners={Route.useLoaderData().owners}
+      searchQuery={search.q ?? ""}
     />
   );
 }

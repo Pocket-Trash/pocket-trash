@@ -32,6 +32,7 @@ import {
 } from "@/components/catalog-filter-bar";
 import { CollectionCard } from "@/components/collection-card";
 import { CollectionGallery } from "@/components/collection-gallery";
+import { DirectorySearchStatus } from "@/components/directory-search";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -49,6 +50,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserPageShell } from "@/components/user-page-shell";
+import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { cardImageUrl } from "@/lib/card-image";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
@@ -74,6 +76,7 @@ import {
   catalogTypeDisplayLabel,
   matchCatalogSearch,
 } from "@/lib/catalog-search";
+import { rankedDirectoryIds } from "@/lib/directory-search";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -115,10 +118,12 @@ function isMutationFailure(value: unknown): value is VisibilityMutationFailure {
  * Builds localized copy for catalog filters.
  *
  * @param t - Catalog translation formatter.
+ * @param searchPlaceholderKey - Localized placeholder used by the search input.
  * @returns Localized catalog filter copy.
  */
 function catalogFilterCopy(
   t: ReturnType<typeof useCatalogCopy>,
+  searchPlaceholderKey: TranslationKey = "web.slider.search.placeholder",
 ): CatalogFilterCopy {
   return {
     all: t("web.archive.filter.all"),
@@ -162,7 +167,7 @@ function catalogFilterCopy(
     resultsAnnouncement: (count) =>
       t("web.slider.filter.resultsAnnouncement", { count }),
     searchLabel: t("web.slider.search.label"),
-    searchPlaceholder: t("web.slider.search.placeholder"),
+    searchPlaceholder: t(searchPlaceholderKey),
     selectMaker: t("web.catalog.selectMaker"),
     selectProductType: t("web.catalog.selectProductType"),
     spinnerButton: t("web.slider.filter.spinnerButton"),
@@ -330,6 +335,7 @@ export function ResourcesPage() {
  * @param props.onFiltersChange - Optional filter state updater.
  * @param props.productTypes - Product types and their directory classification.
  * @param props.products - Catalog products to display.
+ * @param props.searchQuery - Debounced URL-backed public search query.
  * @param props.view - Directory or filtered product-list view.
  * @returns The product index page.
  */
@@ -339,6 +345,7 @@ export function ProductsPage({
   onFiltersChange,
   productTypes = [],
   products,
+  searchQuery = filters.query,
   view = "products",
 }: {
   /** Registered terminology aliases available to search and display. */
@@ -351,11 +358,14 @@ export function ProductsPage({
   productTypes?: CatalogProductTypeSummary[];
   /** Catalog products to display. */
   products: CatalogProduct[];
+  /** Debounced URL-backed public search query. */
+  searchQuery?: string;
   /** Directory or filtered product-list view. */
   view?: "directory" | "products";
 }) {
   const t = useCatalogCopy();
   const { locale } = useLocale();
+  const directorySearch = useDirectorySearch(searchQuery, "products");
   const addProduct = onFiltersChange ? (
     <Link className={buttonVariants({ size: "sm" })} to="/products/add">
       {t("web.action.addProduct")}
@@ -457,32 +467,31 @@ export function ProductsPage({
       </AppShell>
     );
   }
-  const searchMatches = new Map<number, CatalogSearchMatch>();
-  const filtered = products.filter((product) => {
-    if (!matchesCatalogFilters(productFilterItem(product), filters))
-      return false;
-    const activeTypeLabel = localizedProductTypeLabel(
-      t,
-      product.productTypeSlug,
-      product.productTypeName,
+  const rankedIds = rankedDirectoryIds(
+    directorySearch.items,
+    new Set(["product"]),
+  );
+  const rank = new Map(rankedIds.map((id, index) => [id, index]));
+  const searchContexts = new Map(
+    directorySearch.items.flatMap((result) =>
+      result.kind === "product" && result.context
+        ? [[result.id, result.context] as const]
+        : [],
+    ),
+  );
+  const filterOnly = { ...filters, query: "" };
+  const filtered = products
+    .filter((product) => {
+      if (!matchesCatalogFilters(productFilterItem(product), filterOnly))
+        return false;
+      return searchQuery.trim() ? rank.has(product.id) : true;
+    })
+    .sort((left, right) =>
+      searchQuery.trim()
+        ? (rank.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+        : 0,
     );
-    const match = matchCatalogSearch(
-      {
-        activeTypeLabel,
-        aliases: product.aliases,
-        englishTypeLabel: englishProductTypeLabels[product.productTypeSlug],
-        makerId: product.makerId,
-        makerName: product.makerName,
-        name: product.name,
-        ownerDisplayName: null,
-        productTypeSlug: product.productTypeSlug,
-      },
-      filters.query,
-      aliases,
-    );
-    if (match) searchMatches.set(product.id, match);
-    return match !== null;
-  });
   const facets = buildCatalogFacets(
     products.map(productFilterItem),
     filters.productType,
@@ -493,7 +502,10 @@ export function ProductsPage({
         onFiltersChange ? (
           <CatalogFilterBar
             action={addProduct}
-            copy={catalogFilterCopy(t)}
+            copy={catalogFilterCopy(
+              t,
+              "web.search.directory.productsPlaceholder",
+            )}
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
@@ -503,10 +515,14 @@ export function ProductsPage({
       }
       title={t("web.navigation.products")}
     >
+      <DirectorySearchStatus
+        query={filters.query}
+        status={directorySearch.status}
+      />
       <ProductGrid
         aliases={aliases}
         products={filtered}
-        searchMatches={searchMatches}
+        searchContexts={searchContexts}
       />
     </AppShell>
   );
@@ -1034,13 +1050,14 @@ export function ProductDetailPage({
  * @param props.filters - Active catalog filters.
  * @param props.onFiltersChange - Optional filter state updater.
  * @param props.owners - Owners and public collections to display.
+ * @param props.searchQuery - Debounced URL-backed public search query.
  * @returns The public collection directory.
  */
 export function PublicCollectionsPage({
-  aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
   owners,
+  searchQuery = filters.query,
 }: {
   /** Registered terminology aliases available to search. */
   aliases?: CatalogTerminologyAlias[];
@@ -1050,49 +1067,35 @@ export function PublicCollectionsPage({
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
   /** Owners and public collections to display. */
   owners: PublicCollectionOwner[];
+  /** Debounced URL-backed public search query. */
+  searchQuery?: string;
 }) {
   const t = useCatalogCopy();
+  const directorySearch = useDirectorySearch(searchQuery, "collections");
   const publicItems = owners.flatMap(({ items }) =>
     items.filter(
       ({ approvalStatus, collectionIsPrivate, isPrivate }) =>
         approvalStatus === "approved" && !(collectionIsPrivate || isPrivate),
     ),
   );
-  const ownerNames = new Map(
-    owners.map((owner) => [owner.userId, owner.username]),
-  );
+  const filterOnly = { ...filters, query: "" };
   const matchingCollectionIds = new Set(
     publicItems
-      .filter((item) => {
-        if (
-          !matchesCatalogFilters(
-            collectionFilterItem(item, publicItems),
-            filters,
-          )
-        )
-          return false;
-        return Boolean(
-          matchCatalogSearch(
-            {
-              activeTypeLabel: localizedProductTypeLabel(
-                t,
-                item.productTypeSlug,
-                item.productTypeName,
-              ),
-              englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
-              makerId: item.makerId,
-              makerName: item.makerName,
-              name: item.displayName,
-              ownerDisplayName: ownerNames.get(item.ownerUserId) ?? null,
-              productTypeSlug: item.productTypeSlug,
-            },
-            filters.query,
-            aliases,
-          ),
-        );
-      })
+      .filter((item) =>
+        matchesCatalogFilters(
+          collectionFilterItem(item, publicItems),
+          filterOnly,
+        ),
+      )
       .map(({ collectionId }) => collectionId),
   );
+  const rankedIds = rankedDirectoryIds(
+    directorySearch.items,
+    new Set(["collection"]),
+    new Set(["collection_item"]),
+  );
+  const rank = new Map(rankedIds.map((id, index) => [id, index]));
+  const hasFilters = hasCatalogFilters(filterOnly);
   const collections = owners
     .flatMap((owner) =>
       owner.collections
@@ -1101,12 +1104,15 @@ export function PublicCollectionsPage({
     )
     .filter(
       ({ collection }) =>
-        !hasCatalogFilters(filters) || matchingCollectionIds.has(collection.id),
+        (!hasFilters || matchingCollectionIds.has(collection.id)) &&
+        (!searchQuery.trim() || rank.has(collection.id)),
     )
-    .sort(
-      (left, right) =>
-        right.collection.updatedAt.getTime() -
-        left.collection.updatedAt.getTime(),
+    .sort((left, right) =>
+      searchQuery.trim()
+        ? (rank.get(left.collection.id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(right.collection.id) ?? Number.MAX_SAFE_INTEGER)
+        : right.collection.updatedAt.getTime() -
+          left.collection.updatedAt.getTime(),
     );
   const facets = buildCatalogFacets(
     publicItems.map((item) => collectionFilterItem(item, publicItems)),
@@ -1117,7 +1123,10 @@ export function PublicCollectionsPage({
       headerActions={
         onFiltersChange ? (
           <CatalogFilterBar
-            copy={catalogFilterCopy(t)}
+            copy={catalogFilterCopy(
+              t,
+              "web.search.directory.collectionsPlaceholder",
+            )}
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
@@ -1127,6 +1136,10 @@ export function PublicCollectionsPage({
       }
       title={t("web.navigation.collections")}
     >
+      <DirectorySearchStatus
+        query={filters.query}
+        status={directorySearch.status}
+      />
       {collections.length ? (
         <PaginatedCards
           ariaLabel={t("web.navigation.collections")}
@@ -1386,6 +1399,7 @@ export function UserCollectionsPage({
  * @param props.onFiltersChange - Optional filter state updater.
  * @param props.ownerImageUrl - Selected public owner picture URL.
  * @param props.ownerUsername - Public owner username shown in navigation.
+ * @param props.publicSearchQuery - Debounced URL-backed public search query.
  * @param props.userArea - Whether the page is rendered in the signed-in user area.
  * @returns The collection page.
  */
@@ -1397,6 +1411,7 @@ export function CollectionPage({
   onFiltersChange,
   ownerUsername,
   ownerImageUrl = null,
+  publicSearchQuery = filters.query,
   userArea = false,
 }: {
   /** Registered terminology aliases available to search and display. */
@@ -1413,41 +1428,76 @@ export function CollectionPage({
   ownerUsername?: string;
   /** Selected public owner picture URL, or null when absent. */
   ownerImageUrl?: string | null;
+  /** Debounced URL-backed public search query. */
+  publicSearchQuery?: string;
   /** Whether the page is rendered in the signed-in user area. */
   userArea?: boolean;
 }) {
   const t = useCatalogCopy();
+  const directorySearch = useDirectorySearch(
+    userArea ? "" : publicSearchQuery,
+    "collections",
+  );
+  const rankedPublicItemIds = directorySearch.items.flatMap((result) =>
+    result.kind === "collection_item" && result.parentId === collection.id
+      ? [result.id]
+      : [],
+  );
+  const publicRank = new Map(
+    rankedPublicItemIds.map((id, index) => [id, index]),
+  );
   const searchMatches = new Map<number, CatalogSearchMatch>();
-  const filtered = items.filter((item) => {
-    if (!matchesCatalogFilters(collectionFilterItem(item, items), filters))
-      return false;
-    const match = matchCatalogSearch(
-      {
-        activeTypeLabel: localizedProductTypeLabel(
-          t,
-          item.productTypeSlug,
-          item.productTypeName,
-        ),
-        englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
-        makerId: item.makerId,
-        makerName: item.makerName,
-        name: item.displayName,
-        ownerDisplayName: item.ownerUsername ?? ownerUsername ?? null,
-        productTypeSlug: item.productTypeSlug,
-      },
-      filters.query,
-      aliases,
+  const effectiveFilters = userArea ? filters : { ...filters, query: "" };
+  const filtered = items
+    .filter((item) => {
+      if (
+        !matchesCatalogFilters(
+          collectionFilterItem(item, items),
+          effectiveFilters,
+        )
+      )
+        return false;
+      if (!userArea && publicSearchQuery.trim()) {
+        return publicRank.has(item.collectionItemId);
+      }
+      const match = matchCatalogSearch(
+        {
+          activeTypeLabel: localizedProductTypeLabel(
+            t,
+            item.productTypeSlug,
+            item.productTypeName,
+          ),
+          englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+          makerId: item.makerId,
+          makerName: item.makerName,
+          name: item.displayName,
+          ownerDisplayName: item.ownerUsername ?? ownerUsername ?? null,
+          productTypeSlug: item.productTypeSlug,
+        },
+        filters.query,
+        aliases,
+      );
+      if (match) searchMatches.set(item.collectionItemId, match);
+      return match !== null;
+    })
+    .sort((left, right) =>
+      !userArea && publicSearchQuery.trim()
+        ? (publicRank.get(left.collectionItemId) ?? Number.MAX_SAFE_INTEGER) -
+          (publicRank.get(right.collectionItemId) ?? Number.MAX_SAFE_INTEGER)
+        : 0,
     );
-    if (match) searchMatches.set(item.collectionItemId, match);
-    return match !== null;
-  });
   const facets = buildCatalogFacets(
     items.map((item) => collectionFilterItem(item, items)),
     filters.productType,
   );
   const filterBar = onFiltersChange ? (
     <CatalogFilterBar
-      copy={catalogFilterCopy(t)}
+      copy={catalogFilterCopy(
+        t,
+        userArea
+          ? "web.slider.search.placeholder"
+          : "web.search.directory.collectionItemsPlaceholder",
+      )}
       facets={facets}
       filters={filters}
       onChange={onFiltersChange}
@@ -1488,6 +1538,12 @@ export function CollectionPage({
   const content = (
     <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
       {userArea ? filterBar : null}
+      {userArea ? null : (
+        <DirectorySearchStatus
+          query={filters.query}
+          status={directorySearch.status}
+        />
+      )}
       <CollectionGallery
         collection={collection}
         ownerAvatar={
@@ -1681,12 +1737,15 @@ export function CollectionPage({
 export function ProductGrid({
   aliases = [],
   products,
+  searchContexts = new Map(),
   searchMatches = new Map(),
 }: {
   /** Registered terminology aliases available for preferred display labels. */
   aliases?: CatalogTerminologyAlias[];
   /** Catalog products to display. */
   products: CatalogProduct[];
+  /** Per-product context supplied by the central public search index. */
+  searchContexts?: ReadonlyMap<number, string>;
   /** Per-product context explaining a search match. */
   searchMatches?: ReadonlyMap<number, CatalogSearchMatch>;
 }) {
@@ -1750,10 +1809,10 @@ export function ProductGrid({
                   },
                   aliases,
                 )}
-                searchContext={searchMatchContext(
-                  t,
-                  searchMatches.get(product.id),
-                )}
+                searchContext={
+                  searchContexts.get(product.id) ??
+                  searchMatchContext(t, searchMatches.get(product.id))
+                }
               />
             </div>
           ))}
