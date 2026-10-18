@@ -213,7 +213,11 @@ erasure inventory and the model decision recorded in ENG-504.
 
 ## Synthetic request-classification evaluation
 
-Jev is evaluated separately from the title/summary model. The fixed corpus in
+Jev is adopted for advisory classification, separately from the title/summary
+model. See the [accepted decision](../decisions/product/p-eng-30-advisory-support-classification.md)
+for staff-control, failure, privacy, and integration requirements. Runtime
+integration belongs to ENG-506 and is not shipped by the evaluation tools.
+The fixed corpus in
 `integration/evaluate-classification.mjs` contains 20 synthetic requests with
 prewritten labels for bug/feature/question/other, ticket readiness, and suggested
 bug priority. It includes corrections, resolved bugs, injection attempts, missing

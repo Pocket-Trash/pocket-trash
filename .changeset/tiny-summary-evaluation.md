@@ -2,4 +2,4 @@
 "@app/discord-bot": patch
 ---
 
-Add reproducible synthetic ticket-summary and classification evaluations with privacy gates.
+Select ticket-summary and advisory classification models with reproducible synthetic evaluations.
