@@ -1479,6 +1479,14 @@ jobs:
             '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
             pnpm exec wrangler secret bulk --env=""
 
+          if [[ -n "${LOGGER_NOTIFICATION_TOKEN:-}" && -n "${LOGGER_NOTIFICATION_URL:-}" ]]; then
+            jq -cn \
+              --arg token "$LOGGER_NOTIFICATION_TOKEN" \
+              --arg url "$LOGGER_NOTIFICATION_URL" \
+              '{LOGGER_NOTIFICATION_TOKEN: $token, LOGGER_NOTIFICATION_URL: $url}' | \
+              pnpm exec wrangler secret bulk --env=""
+          fi
+
           curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
             --silent --show-error "https://api.pocket-trash.app/api/v0/health" | \
             jq -e '.ok == true and .service == "api"' >/dev/null

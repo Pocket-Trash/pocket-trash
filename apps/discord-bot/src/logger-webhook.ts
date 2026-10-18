@@ -73,14 +73,28 @@ export function createLoggerWebhookNormalizer(options: {
 
     return {
       id: parsed.data.eventId,
-      payload: {
-        deliveryId: parsed.data.eventId,
-        destinationChannelId: options.channelId,
-        kind: "logger",
-        notification: renderInput(parsed.data),
-        version: 1,
-      },
+      payload: createLoggerDelivery(parsed.data, options.channelId),
     };
+  };
+}
+
+/**
+ * Creates the identical safe queue envelope for direct and Axiom delivery.
+ *
+ * @param event - Validated projected event.
+ * @param channelId - Final notification channel.
+ * @returns Serializable delivery without original source payloads.
+ */
+export function createLoggerDelivery(
+  event: LoggerNotificationEvent,
+  channelId: string,
+): DeliveryJob {
+  return {
+    deliveryId: event.eventId,
+    destinationChannelId: channelId,
+    kind: "logger",
+    notification: renderInput(event),
+    version: 1,
   };
 }
 
@@ -117,17 +131,17 @@ function authenticateApp(
  * @returns The bounded container-card input.
  */
 function renderInput(event: LoggerNotificationEvent): QueuedNotification {
-  const errorTitle = event.error?.message ?? event.message;
+  const errorTitle = (event.error?.message ?? event.message).slice(0, 300);
   return {
     description: `A ${event.level} event was reported by ${event.app}.`,
     diagnostics: event.error
-      ? [`${event.error.name}: ${event.error.message}`]
+      ? [`${event.error.name}: ${event.error.message}`.slice(0, 1_000)]
       : undefined,
     occurredAt: event.timestamp,
     provenance: event.deploymentId ?? event.deploymentTarget ?? event.eventId,
     source: "Logger",
     status: `${event.environment} ${event.level}`,
-    tags: [event.app, event.environment, event.message],
+    tags: [event.app, event.environment, event.message.slice(0, 100)],
     title: errorTitle,
     tone: "error",
   };

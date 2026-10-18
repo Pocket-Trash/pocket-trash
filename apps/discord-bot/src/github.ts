@@ -356,6 +356,12 @@ function normalizeWorkflowRun(
   payload: unknown,
   destinationChannelId: string,
 ): GitHubDeliveryFields | undefined {
+  const lifecycle = z.object({ action: z.string() }).safeParse(payload);
+  if (
+    lifecycle.success &&
+    ["requested", "in_progress"].includes(lifecycle.data.action)
+  )
+    return undefined;
   const event = parsePayload(workflowRunPayloadSchema, payload);
   const run = event.workflow_run;
   if (

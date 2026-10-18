@@ -3,6 +3,11 @@
 The Pocket Trash Discord bot uses separate development and production Discord
 applications. Runtime authorization and routing use Discord IDs, never names.
 Environment-specific values live in Infisical at `/apps/discord-bot`.
+Discord/logger service-owned values live at `/services/pocket-trash/discord-bot`
+and are imported into the matching `dev` or `prod` application path. The
+production application path is synchronized into Railway's production bot
+service. Do not require a separate webhook-ID secret: derive its identity from
+`AXIOM_INTAKE_WEBHOOK_URL`.
 
 ## Application setup
 
@@ -84,15 +89,16 @@ repository webhook in `Pocket-Trash/pocket-trash`:
 - Secret: the exact `GITHUB_WEBHOOK_SECRET` value stored in the matching bot
   environment
 - SSL verification: enabled
-- Events: pull requests, pull request reviews, workflow runs, and workflow
-  dispatches
+- Events: pull requests, pull request reviews, and workflow runs. Manually
+  dispatched Actions workflows also emit workflow-run events; GitHub does not
+  offer a separate Workflow dispatches checkbox for repository webhooks.
 
 The bot accepts only the configured pull-request actions, failed `CI` and
 `Logger Live` runs, and manual tests. It ignores successful workflows and
 fork-origin events. GitHub's `X-GitHub-Delivery` value is the queue job ID, so a
 redelivery cannot create a second notification while the retained job exists.
 Delivery retries five times with exponential backoff starting at 30 seconds.
-Completed jobs are retained for 24 hours (up to 1,000), and exhausted jobs are
+Completed jobs are retained for 24 hours (up to 100,000), and exhausted jobs are
 retained for 14 days and logged as structured errors without creating another
 Discord notification.
 
@@ -112,6 +118,60 @@ or oversized payloads return `400`, and unavailable queue storage returns
 `503`. Queue payloads exclude raw payloads, console options, stacks, causes,
 and authentication headers.
 
+## Axiom Discord fallback
+
+The trusted source is the exact private intake channel and webhook identity
+derived from `AXIOM_INTAKE_WEBHOOK_URL`. Own-bot messages and other sources are
+rejected before inspecting content. Webhook-authored messages also have Discord's
+`author.bot` flag, so that flag alone must not reject the trusted notifier.
+
+The live-calibrated contract is empty message content and exactly one embed whose
+description contains a triple-backtick-fenced JSON object. No alternative content
+or embed-field layouts are guessed. The projection maps `errorName` and
+`errorMessage` back to the safe notification error object. It validates the full
+shape before applying the same production rules as the direct transport, then
+enqueues under the same `eventId`. Invalid trusted messages always enqueue a
+parser-health notification under `axiom-parser-error:<message-id>`, even when a
+direct copy already exists. Raw Discord content and secrets are not echoed.
+Physical BullMQ IDs are URI-escaped because BullMQ rejects colon-containing IDs;
+the delivery envelope retains the original stable identity.
+
+History reconciliation runs at startup, every five minutes, on gateway resume or
+new readiness, on new intake messages, and when Redis reconnects. Each trigger
+uses the same serialized history scan. Pages are read newest-first and processed
+oldest-first. A cursor advances only after successful durable enqueue, retained
+duplicate acceptance, intentional policy exclusion, untrusted-source rejection,
+or durable parser-health reporting. Redis failure stops progress; replay uses the
+same queue identities. `/health` stays unready until the first scan completes.
+
+The cursor key is
+`discord-bot:axiom-cursor:<guild-id>:<intake-channel-id>`. Its JSON contains only
+`messageId` and `checkedAt` (Unix milliseconds). It has no expiration, so downtime
+beyond 24 hours remains detectable. A stale cursor queues an operational warning
+and stops automatic recovery. After manual review of source messages and queue
+retention, an operator may reset that exact cursor to an explicitly reviewed
+message ID and current `checkedAt`; do not clear it blindly or replay older data.
+Individual events older than the retained identity window are also reported
+instead of automatically delivered again.
+
+[Axiom match monitors](https://axiom.co/docs/monitor-data/match-monitors.md) allow
+10 notifications per minute and 500 per day. Every candidate consumes the limit,
+including copies of directly delivered events. Review volume approaching either
+limit as degraded fallback coverage and revise filtering, polling, or paid
+webhook delivery before relying on it. Discord embed-size truncation is also a
+parser-health failure, never a partial logger event.
+
+The reproducible live calibration tool is
+`apps/discord-bot/integration/calibrate-axiom.mjs`. It emits two clearly labeled
+production synthetic events through the logger's Axiom transport, opens a
+temporary gateway observer, and asserts every projected field through the finished
+parser. It also verifies HTTP 202 and final Discord delivery for one direct event.
+Run it only as a deliberate live test with the production API Axiom ingestion
+credential and production bot environment injected; it does not change monitors,
+notifiers, secrets, or deployments. Build the bot first. The observer never starts
+the bot worker or dispatches interactions. Captured content is represented by the
+redacted fixture in `src/fixtures/axiom-match.json`.
+
 ## Verification
 
 Before a release, verify each environment independently:
@@ -125,6 +185,6 @@ Before a release, verify each environment independently:
    gateway event exposes its content and embeds.
 5. Fetch the same message from channel history and remove the test message.
 
-Do not start a local process with the production token. Keep the Railway service
+Do not start the local application/worker with the production token. Keep the Railway service
 at one replica with zero deployment overlap, and obtain separate approval before
 any production deployment.

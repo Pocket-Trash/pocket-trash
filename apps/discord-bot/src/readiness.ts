@@ -7,6 +7,7 @@
 export function createReadiness(queueCounts: () => Promise<unknown>) {
   let gatewayReady = false;
   let workerStarted = false;
+  let reconcilerStarted = false;
 
   return {
     /**
@@ -15,7 +16,8 @@ export function createReadiness(queueCounts: () => Promise<unknown>) {
      * @returns Current process readiness.
      */
     async check() {
-      if (!gatewayReady || !workerStarted) return { ok: false } as const;
+      if (!gatewayReady || !workerStarted || !reconcilerStarted)
+        return { ok: false } as const;
       try {
         await queueCounts();
         return { ok: true } as const;
@@ -38,6 +40,14 @@ export function createReadiness(queueCounts: () => Promise<unknown>) {
      */
     setWorkerStarted(value: boolean) {
       workerStarted = value;
+    },
+    /**
+     * Records successful startup of durable Axiom history reconciliation.
+     *
+     * @param value - Whether startup reconciliation completed.
+     */
+    setReconcilerStarted(value: boolean) {
+      reconcilerStarted = value;
     },
   };
 }
