@@ -36,6 +36,14 @@ describe("user ban management", () => {
       );
       const owner = await services.users.getByClerkId(input.clerkId);
       expect(owner?.imageUrl).toBe(input.imageUrl);
+      await expect(
+        services.users.getByUsername(input.username),
+      ).resolves.toEqual(owner);
+      await expect(services.users.getByUsername("unknown")).resolves.toBeNull();
+      await db.insert(schema.user).values({ clerkId: "user_without_username" });
+      await expect(
+        services.users.getByUsername("user_without_username"),
+      ).resolves.toBeNull();
       if (!owner) throw new Error("Missing picture owner.");
       await db.insert(schema.userCollection).values({
         name: "Public",
