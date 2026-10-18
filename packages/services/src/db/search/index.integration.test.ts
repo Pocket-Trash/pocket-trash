@@ -59,6 +59,18 @@ describe("public search integration", () => {
     await expect(
       service.search({ query: "smør", surface: "modal" }),
     ).resolves.toMatchObject({ items: [{ title: "Smør Pen" }], total: 1 });
+    await expect(
+      service.search({
+        group: "products",
+        query: "bolt",
+        surface: "directory",
+      }),
+    ).resolves.toMatchObject({
+      items: [{ title: "Bolt" }, { title: "Bolt Action" }],
+      page: 1,
+      pageSize: 2,
+      total: 2,
+    });
   });
 
   it("supports phrases and exclusions without exposing private records", async () => {

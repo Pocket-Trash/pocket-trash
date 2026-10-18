@@ -75,8 +75,8 @@ export type SearchInput = {
   page?: number;
   /** User-entered web-search query. */
   query: string;
-  /** Calling UI, which determines page size. */
-  surface: "modal" | "page";
+  /** Calling UI, which determines result limits. */
+  surface: "directory" | "modal" | "page";
 };
 
 /** Database-backed public search operations. */
@@ -208,8 +208,12 @@ export function createSearchService(db: Database): SearchService {
     async search(input) {
       const query = input.query.trim();
       const group = input.group ?? "all";
-      const page = Math.max(1, Math.trunc(input.page ?? 1));
-      const pageSize = input.surface === "modal" ? 7 : 10;
+      const page =
+        input.surface === "directory"
+          ? 1
+          : Math.max(1, Math.trunc(input.page ?? 1));
+      const pageSize =
+        input.surface === "directory" ? 0 : input.surface === "modal" ? 7 : 10;
       if (query.length < 2) {
         return { counts: emptyCounts(), items: [], page, pageSize, total: 0 };
       }
@@ -223,6 +227,10 @@ export function createSearchService(db: Database): SearchService {
       const groupFilter =
         group === "all" ? sql`true` : sql`search_group = ${group}`;
       const offset = (page - 1) * pageSize;
+      const pagination =
+        input.surface === "directory"
+          ? sql``
+          : sql`limit ${pageSize} offset ${offset}`;
 
       const [resultRows, countRows] = await Promise.all([
         db.execute(sql<SearchRow>`
@@ -240,7 +248,7 @@ export function createSearchService(db: Database): SearchService {
             (normalize_search_text(title) like normalize_search_text(${query}) || '%') desc,
             ts_rank_cd(search_vector, query.value) desc,
             normalize_search_text(title), kind, source_id
-          limit ${pageSize} offset ${offset}
+          ${pagination}
         `),
         db.execute(sql<CountRow>`
           with query as (select ${queryExpression} as value)
@@ -270,7 +278,8 @@ export function createSearchService(db: Database): SearchService {
           title: row.title,
         })),
         page,
-        pageSize,
+        pageSize:
+          input.surface === "directory" ? resultRows.rows.length : pageSize,
         total: counts[group],
       };
     },

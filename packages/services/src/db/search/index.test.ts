@@ -70,4 +70,22 @@ describe("public search", () => {
     ).resolves.toMatchObject({ items: [], pageSize: 10, total: 0 });
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it("returns every ranked directory match without pagination", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const service = createSearchService({ execute } as unknown as Database);
+
+    await expect(
+      service.search({
+        group: "makers",
+        page: 9,
+        query: "maker",
+        surface: "directory",
+      }),
+    ).resolves.toMatchObject({ page: 1, pageSize: 0 });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
 });
