@@ -27,7 +27,7 @@ env:
   DB_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-db-preview -->"
   RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME: "pocket-trash (preview)"
   RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME: "pocket-trash"
-  RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME: "scraper-queue"
+  RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME: "pocket-trash-queue"
 
 jobs:
   classify-changes:

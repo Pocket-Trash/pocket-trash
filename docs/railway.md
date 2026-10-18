@@ -120,15 +120,23 @@ uploads still use the tag release workflow; applying a plan is not a release.
 
 ### Shared Redis migration
 
-The initial production and preview rename plans inspected on 2026-10-16 both
-reported exactly `1 to add, 0 to change, 1 to destroy`: create database
-`pocket-trash-queue` and delete database `scraper-queue`. The IaC rename is
-therefore a replacement, not an in-place rename. The checked-in migration stage
-retains both resources. After adding the production-only bot service, the
-reviewed production plan reports `2 to add, 0 to change, 0 to destroy` (the
-queue and bot), while preview reports `1 to add, 0 to change, 0 to destroy`
-(the queue only). Do not apply either additive plan without express user
-permission.
+The checked-in cutover stage retains both Redis resources but explicitly points
+the scraper and production bot at `pocket-trash-queue`. This is an additive
+migration, not an in-place rename. The preview workflow also uses the new queue;
+provision it in the preview template before running that workflow. Generate fresh
+plans for both templates; never reuse earlier provisioning plans.
+
+| Consumer | Production | Preview / PR environments | Development |
+| --- | --- | --- | --- |
+| Scraper and its checkpoint store | New queue's private `REDIS_URL` | Template's private URL; PR workflow hands off the environment-local `REDIS_PUBLIC_URL` | Configured `REDIS_URL`, otherwise isolated local Redis |
+| Discord bot notifications, Axiom cursor, ticket state | New queue's private `REDIS_URL` | No bot service is provisioned | Its configured `REDIS_URL`; verify separately from production |
+| API and web | HTTP logger forwarding, not Redis consumers | Same | Same |
+
+The shared queue package accepts the caller's connection; it does not choose an
+environment. Do not add Redis credentials to API or web. Keep BullMQ queue names
+(`scraper-images`, `scraper-items`, `discord-notifications`) and job identities
+unchanged. An old `REDIS` alias or an Infisical-imported URL must not override the
+effective `REDIS_URL`; inspect targets without printing credentials.
 
 Migration requires separate, explicitly approved stages:
 
@@ -137,20 +145,35 @@ Migration requires separate, explicitly approved stages:
    `redis-volume`.
 2. Enable RDB snapshots and AOF (`appendonly yes`, `appendfsync everysec`) on the
    new resource, then verify both persistence modes after a restart test.
-3. Pause producers, drain `scraper-images` and `scraper-items`, and verify their
-   active, waiting, delayed, and failed counts. Copy any required Redis-local
-   scraper checkpoints.
+3. Pause scraper cron and every producer/consumer using the old connection. Drain
+   `scraper-images` and `scraper-items`; inspect active, waiting, delayed, paused,
+   prioritized, repeatable, waiting-children, failed, and completed state. Reconcile
+   checkpoints and deduplication records as well as any bot cursor/ticket state
+   before switching. Completed jobs can carry job-ID deduplication history: an
+   empty waiting list alone is not permission to discard Redis data. Preserve a
+   recoverable snapshot and copy required state without flushing either database.
 4. Switch the scraper and Discord bot `REDIS_URL` references, resume consumers,
    and verify queue processing, deduplication, the Axiom cursor, and ticket
    operations before resuming producers.
 5. Observe at least one complete scraper schedule and the Discord health checks.
-   Roll back references to `scraper-queue` if verification fails.
+   If verification fails, pause producers again and reconcile any work accepted
+   by the new queue before restoring old references under a separately approved
+   rollback. Simply switching back can strand or duplicate work.
 6. Remove `scraper-queue` and its obsolete data only in a later cleanup with
    separate user approval and a fresh plan proving the exact deletion.
 
 Provisioning, switching, deployment, and cleanup are production actions. This
 repository change records the desired state and plan result only; it authorizes
 none of those actions.
+
+Repeat the inventory for retained PR environments: existing snapshots do not
+inherit template updates. Reconcile them or close them with approval; never point
+a preview at production Redis. Verify a fresh PR queue deployment and E2E check,
+one complete production scraper cycle, bot health and synthetic notification
+deduplication, and persistence recovery. Paid inference and production ticket
+activation are not part of this cutover. Record sanitized live evidence in
+ENG-538; retain the legacy service and volume until ENG-539's separate deletion
+approval, backup disposition, and post-removal checks are complete.
 
 ### Legacy cutover
 
@@ -294,9 +317,10 @@ the workflow:
    `--skip-deploys`.
 3. Redeploys the active queue from its configured image source so Redis is online.
 
-Until the separately approved provisioning and cutover stages are complete, the
-preview workflow continues to use `scraper-queue`. Switch this handoff to
-`pocket-trash-queue` only as part of the approved cutover.
+The handoff and queue redeployment both target `pocket-trash-queue` in that PR's
+environment. The preview template must already contain this service and its own
+persistent volume before the workflow runs. Keep the legacy service until its
+data and clients have been reconciled and its removal separately approved.
 
 - Mutation-relevant PRs use the isolated `preview-pr-<number>` branch;
   DB-changing PRs also apply committed migrations before deployment.

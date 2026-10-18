@@ -63,10 +63,14 @@ for (const environment of ["production", "preview"]) {
     ]);
     assert.deepEqual(Object.keys(scraper.variables).sort(), [
       "APP_ENV",
+      "ASSET_FOLDER_PREFIX",
       "AXIOM_DATASET",
       "AXIOM_TOKEN",
+      "BUNNY_ASSET_FOLDER_PREFIX",
       "BUNNY_CDN_BASE_URL",
       "BUNNY_IMAGE_FOLDER_PREFIX",
+      "BUNNY_PULL_ZONE_ID",
+      "BUNNY_RESOURCE_FOLDER_PREFIX",
       "BUNNY_STORAGE_ACCESS_KEY",
       "BUNNY_STORAGE_ENDPOINT",
       "BUNNY_STORAGE_ZONE_NAME",
@@ -89,9 +93,14 @@ for (const environment of ["production", "preview"]) {
       value: "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
     });
     for (const [name, value] of Object.entries(scraper.variables)) {
-      if (name === "RAILPACK_INSTALL_CMD") continue;
+      if (name === "RAILPACK_INSTALL_CMD" || name === "REDIS_URL") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
+    assert.equal(
+      scraper.variables.REDIS_URL.resource,
+      "database.pocket-trash-queue",
+    );
+    assert.equal(scraper.variables.REDIS_URL.output, "REDIS_URL");
     const expectedAddresses = [
       "database.pocket-trash-queue",
       "database.scraper-queue",
@@ -120,6 +129,7 @@ for (const environment of ["production", "preview"]) {
       );
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
       for (const variable of [
+        "CHEAPERINFERENCE_API_KEY",
         "AXIOM_INTAKE_WEBHOOK_URL",
         "DISCORD_AXIOM_INTAKE_CHANNEL_ID",
         "DISCORD_BUG_TAG_ID",
@@ -149,6 +159,24 @@ for (const environment of ["production", "preview"]) {
     assert.equal(volume.config.region, "us-east4-eqdc4a");
   });
 }
+
+test("hands native previews to their environment-local shared queue", () => {
+  const workflow = parse(readFileSync(".github/workflows/deploy.yml", "utf8"));
+  assert.equal(
+    workflow.env.RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME,
+    "pocket-trash-queue",
+  );
+  const source = readFileSync(".github/workflows/deploy.yml", "utf8");
+  assert.match(
+    source,
+    /\$\{RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME\}\.REDIS_PUBLIC_URL/,
+  );
+  assert.match(
+    source,
+    /--service "\$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME"/,
+  );
+  assert.doesNotMatch(source, /["']scraper-queue["']/);
+});
 
 test("rejects unrelated projects and unknown environments", () => {
   for (const context of [
