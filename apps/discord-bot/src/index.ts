@@ -4,6 +4,7 @@ import { createBullMqQueueAdapter } from "@package/queue";
 import { Client, Events } from "discord.js";
 import { createApp, createWebhookIntake } from "./app.js";
 import type { AuthorizedInteraction } from "./authorization.js";
+import { registerGuildCommands } from "./commands.js";
 import { createDiscordBotEnv } from "./env.js";
 import {
   assertGatewayDisconnectAllowed,
@@ -11,6 +12,7 @@ import {
   registerGatewayReadinessListeners,
 } from "./gateway.js";
 import { createGitHubWebhookNormalizer } from "./github.js";
+import { createHelpLinkCommand } from "./help-link.js";
 import { createLinearApiKeyAuthentication } from "./linear.js";
 import { createDiscordBotLogger } from "./logger.js";
 import { createLoggerWebhookNormalizer } from "./logger-webhook.js";
@@ -38,8 +40,13 @@ const logger = createDiscordBotLogger({
 });
 /** Discord gateway client. */
 const client = new Client({ intents: [...discordGatewayIntents] });
-/** Empty command registry populated by later feature tickets. */
-const commandRegistry = createInteractionRegistry([]);
+/** Single English staff command compiled from published help content. */
+const helpLinkCommand = createHelpLinkCommand({
+  ownerRoleId: env.DISCORD_OWNER_ROLE_ID,
+  moderatorRoleId: env.DISCORD_MODERATOR_ROLE_ID,
+});
+/** Staff command registry with authoritative runtime role checks. */
+const commandRegistry = createInteractionRegistry([helpLinkCommand.handler]);
 /** Empty component registry populated by later feature tickets. */
 const componentRegistry = createInteractionRegistry([]);
 /** Empty modal registry populated by later feature tickets. */
@@ -163,6 +170,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     : [...(interaction.member?.roles.cache.keys() ?? [])];
   const guardedInteraction: AuthorizedInteraction = {
     memberRoleIds,
+    ...(interaction.isChatInputCommand() &&
+    interaction.commandName === "help-link"
+      ? {
+          commandOptions: {
+            topic: interaction.options.getString("topic"),
+            userId: interaction.options.getUser("user")?.id ?? null,
+          },
+        }
+      : {}),
     /**
      * Sends the role guard response through Discord.
      *
@@ -203,6 +219,12 @@ void start().catch(fail);
 async function start() {
   await linearAuthentication.validateAccess();
   await client.login(env.DISCORD_TOKEN);
+  await registerGuildCommands(
+    client.rest,
+    env.DISCORD_APPLICATION_ID,
+    env.DISCORD_GUILD_ID,
+    [helpLinkCommand.definition],
+  );
   await deliveryQueue.start();
   readiness.setWorkerStarted(true);
   logger.info(loggerMessages.discordBot.serverListening, {
