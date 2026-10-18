@@ -1,5 +1,5 @@
 import { ChannelType, type Client } from "discord.js";
-import { readBounded } from "./http.js";
+import { ResponseLimitError, readBounded } from "./http.js";
 import { type TicketFile, ticketSnapshotSchema } from "./model.js";
 import type { TicketReader } from "./persistence.js";
 
@@ -198,7 +198,11 @@ export function createTicketReader(options: {
       const bytes = await readBounded(
         response,
         Math.min(file.size, 10_000_000),
-      );
+      ).catch((error: unknown) => {
+        if (error instanceof ResponseLimitError) return null;
+        throw error;
+      });
+      if (!bytes) return "Attachment content exceeds the allowed size.";
       const signature = Buffer.from(bytes.subarray(0, 8));
       if (
         signature.subarray(0, 2).toString() === "MZ" ||

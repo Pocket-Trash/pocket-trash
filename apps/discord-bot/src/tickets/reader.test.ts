@@ -130,4 +130,9 @@ it("limits actual streamed bytes even when Content-Length is missing", async () 
   expect(ticketFileType("a.svg", "image/svg+xml")).toBeNull();
   expect(ticketFileType("a.png", "application/zip")).toBeNull();
   expect(ticketFileType("a.txt", null)).toBe("text/plain");
+  const f = fixture();
+  f.http.mockResolvedValueOnce(new Response("too large"));
+  expect(await f.reader.readFile(f.file, scope.threadId)).toContain(
+    "exceeds the allowed size",
+  );
 });
