@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "is_profile_public" boolean DEFAULT false NOT NULL;

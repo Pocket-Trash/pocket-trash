@@ -10,6 +10,7 @@ const settings: UserSettingsState = {
   hasSavedSettings: true,
   settings: {
     currencyCode: "USD",
+    isProfilePublic: false,
     measurementSystem: "metric",
     locale: "en-US",
     publishTrends: false,

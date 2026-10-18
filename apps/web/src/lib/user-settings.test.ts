@@ -98,3 +98,51 @@ describe("public Trends setting", () => {
     });
   });
 });
+
+describe("profile visibility setting", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("defaults profiles to private", () => {
+    expect(defaultUserSettings.isProfilePublic).toBe(false);
+  });
+
+  it("persists a strict boolean for the authenticated owner", async () => {
+    auth.mockResolvedValueOnce({ isAuthenticated: true, userId: "user_123" });
+    patchForClerkId.mockResolvedValueOnce({
+      ...defaultUserSettings,
+      isProfilePublic: true,
+      userId: 1000,
+    });
+
+    await expect(
+      patchCurrentUserSettings({ data: { isProfilePublic: true } }),
+    ).resolves.toEqual({ ...defaultUserSettings, isProfilePublic: true });
+    expect(patchForClerkId).toHaveBeenCalledWith("user_123", {
+      isProfilePublic: true,
+    });
+  });
+
+  it("always applies visibility changes to the authenticated account", async () => {
+    auth.mockResolvedValueOnce({ isAuthenticated: true, userId: "user_123" });
+    patchForClerkId.mockResolvedValueOnce({
+      ...defaultUserSettings,
+      isProfilePublic: true,
+      userId: 1000,
+    });
+
+    await patchCurrentUserSettings({
+      data: { isProfilePublic: true, targetUserId: "user_other" },
+    });
+
+    expect(patchForClerkId).toHaveBeenCalledWith("user_123", {
+      isProfilePublic: true,
+    });
+  });
+
+  it("rejects non-boolean profile visibility", () => {
+    expect(() =>
+      patchCurrentUserSettings({ data: { isProfilePublic: "true" } }),
+    ).toThrow("Expected a user settings object.");
+    expect(auth).not.toHaveBeenCalled();
+  });
+});

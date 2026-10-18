@@ -1,4 +1,4 @@
-import { faQuestionCircle } from "@fortawesome/pro-light-svg-icons";
+import { faQuestionCircle, faUserLock } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogApprovalAction,
@@ -9,7 +9,7 @@ import type {
   CatalogProductTypeSummary,
   CatalogTerminologyAlias,
   EffectiveSliderSetup,
-  PublicCollectionOwner,
+  PublicUserCollectionItem,
   SliderMagnetConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
@@ -57,6 +57,7 @@ import {
   decideCatalogProductApproval,
   decideCollectionItemApproval,
   deleteCatalogProduct,
+  type PublicCollectionOwnerWithItems,
   setCollectionItemVisibility,
   setCollectionVisibility,
   setProductVisibility,
@@ -591,7 +592,7 @@ export function ProductDetailPage({
   product,
 }: {
   /** Collection items matching the product. */
-  collectionItems?: UserCollectionItem[];
+  collectionItems?: PublicUserCollectionItem[];
   /** Catalog product to display. */
   product: CatalogProduct;
 }) {
@@ -981,14 +982,17 @@ export function ProductDetailPage({
                       <h3 className="font-semibold">{item.collectionName}</h3>
                       <p className="text-sm text-muted-foreground">
                         {item.displayName}
-                        {item.ownerUsername ? (
+                        {item.ownerUsername || !item.ownerIsProfilePublic ? (
                           <span className="inline-flex items-center gap-1">
                             <span aria-hidden="true"> · </span>
                             <PublicProfileAvatar
                               imageUrl={item.ownerImageUrl}
+                              isPrivate={!item.ownerIsProfilePublic}
                               username={item.ownerUsername}
                             />
-                            {item.ownerUsername}
+                            {item.ownerIsProfilePublic
+                              ? item.ownerUsername
+                              : t("web.profiles.privateUser")}
                           </span>
                         ) : null}
                       </p>
@@ -1066,7 +1070,7 @@ export function PublicCollectionsPage({
   /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
   /** Owners and public collections to display. */
-  owners: PublicCollectionOwner[];
+  owners: PublicCollectionOwnerWithItems[];
   /** Debounced URL-backed public search query. */
   searchQuery?: string;
 }) {
@@ -1167,8 +1171,10 @@ export function PublicCollectionsPage({
                       count: collection.itemCount,
                     })}
                     ownerImageUrl={owner.imageUrl}
+                    ownerIsProfilePublic={owner.isProfilePublic}
                     ownerName={owner.username}
                     privateLabel={t("web.resources.visibility.private")}
+                    privateUserLabel={t("web.profiles.privateUser")}
                   />
                 </Link>
               ))}
@@ -1195,16 +1201,19 @@ export function PublicCollectionPage({
   owner,
 }: {
   /** Owner and collections to display. */
-  owner: PublicCollectionOwner;
+  owner: PublicCollectionOwnerWithItems;
 }) {
   const t = useCatalogCopy();
+  const ownerName = owner.isProfilePublic
+    ? owner.username
+    : t("web.profiles.privateUser");
   return (
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
       ]}
       headerActions={
-        owner.publishTrends ? (
+        owner.publishTrends && owner.username ? (
           <Link
             className="underline underline-offset-4"
             params={{ username: owner.username }}
@@ -1218,13 +1227,14 @@ export function PublicCollectionPage({
         <span className="flex items-center gap-2">
           <PublicProfileAvatar
             imageUrl={owner.imageUrl}
+            isPrivate={!owner.isProfilePublic}
             username={owner.username}
             size="lg"
           />
           {t("web.collections.directory.itemCount", { count: owner.itemCount })}
         </span>
       }
-      title={owner.username}
+      title={ownerName ?? ""}
     >
       <PaginatedCards
         ariaLabel={t("web.navigation.collections")}
@@ -1398,6 +1408,7 @@ export function UserCollectionsPage({
  * @param props.items - Collection items to display.
  * @param props.onFiltersChange - Optional filter state updater.
  * @param props.ownerImageUrl - Selected public owner picture URL.
+ * @param props.ownerIsProfilePublic - Whether public attribution may identify the owner.
  * @param props.ownerUsername - Public owner username shown in navigation.
  * @param props.publicSearchQuery - Debounced URL-backed public search query.
  * @param props.userArea - Whether the page is rendered in the signed-in user area.
@@ -1411,6 +1422,7 @@ export function CollectionPage({
   onFiltersChange,
   ownerUsername,
   ownerImageUrl = null,
+  ownerIsProfilePublic = true,
   publicSearchQuery = filters.query,
   userArea = false,
 }: {
@@ -1421,13 +1433,15 @@ export function CollectionPage({
   /** Active catalog filters. */
   filters?: CatalogFilters;
   /** Collection items to display. */
-  items: UserCollectionItem[];
+  items: PublicUserCollectionItem[];
   /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
   /** Public owner username shown in navigation. */
   ownerUsername?: string;
   /** Selected public owner picture URL, or null when absent. */
   ownerImageUrl?: string | null;
+  /** Whether public attribution may identify the owner. @default true */
+  ownerIsProfilePublic?: boolean;
   /** Debounced URL-backed public search query. */
   publicSearchQuery?: string;
   /** Whether the page is rendered in the signed-in user area. */
@@ -1547,11 +1561,12 @@ export function CollectionPage({
       <CollectionGallery
         collection={collection}
         ownerAvatar={
-          ownerUsername ? (
+          ownerUsername || !ownerIsProfilePublic ? (
             <PublicProfileAvatar
               imageUrl={ownerImageUrl}
+              isPrivate={!ownerIsProfilePublic}
               size="lg"
-              username={ownerUsername}
+              username={ownerUsername ?? null}
             />
           ) : undefined
         }
@@ -1566,9 +1581,14 @@ export function CollectionPage({
           }),
           nextImage: t("web.resources.action.nextImage"),
           nextPage: t("web.collections.gallery.nextPage"),
-          owner: ownerUsername
-            ? t("web.collections.gallery.owner", { owner: ownerUsername })
-            : undefined,
+          owner:
+            ownerUsername || !ownerIsProfilePublic
+              ? t("web.collections.gallery.owner", {
+                  owner: ownerIsProfilePublic
+                    ? (ownerUsername ?? "")
+                    : t("web.profiles.privateUser"),
+                })
+              : undefined,
           /**
            * Formats collection gallery pagination status.
            *
@@ -1984,17 +2004,17 @@ export function CollectionItemDetailPage({
   product = null,
 }: {
   /** Installed spinner button, when present. */
-  installedButton?: UserCollectionItem | null;
+  installedButton?: PublicUserCollectionItem | null;
   /** Installed slider insert, when present. */
-  installedInsert?: UserCollectionItem | null;
+  installedInsert?: PublicUserCollectionItem | null;
   /** Installed Pen parts. */
-  installedPenParts?: UserCollectionItem[];
+  installedPenParts?: PublicUserCollectionItem[];
   /** Installed slider plate, when present. */
-  installedPlate?: UserCollectionItem | null;
+  installedPlate?: PublicUserCollectionItem | null;
   /** Installed Pen refill model, when present. */
   installedRefill?: CatalogProduct | null;
   /** Collection item to display. */
-  item: UserCollectionItem;
+  item: PublicUserCollectionItem;
   /** Live catalog facts for the exact owned product. */
   product?: CatalogProduct | null;
 }) {
@@ -2023,7 +2043,7 @@ export function CollectionItemDetailPage({
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
-        ...(item.ownerUsername
+        ...(item.ownerUsername && item.ownerIsProfilePublic
           ? [
               {
                 label: item.ownerUsername,
@@ -2032,7 +2052,10 @@ export function CollectionItemDetailPage({
               },
               { label: item.collectionName },
             ]
-          : []),
+          : [
+              { label: t("web.profiles.privateUser") },
+              { label: item.collectionName },
+            ]),
       ]}
       headerActions={
         item.canEdit ? (
@@ -2065,6 +2088,14 @@ export function CollectionItemDetailPage({
             />
           </div>
         ) : null
+      }
+      meta={
+        item.ownerIsProfilePublic ? undefined : (
+          <span className="inline-flex items-center gap-2">
+            <FontAwesomeIcon aria-hidden="true" icon={faUserLock} />
+            {t("web.profiles.privateUser")}
+          </span>
+        )
       }
       title={item.displayName}
     >

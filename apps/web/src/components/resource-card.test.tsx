@@ -48,6 +48,7 @@ const resource = {
   isPrivate: false,
   name: "Pocket clip",
   privateReason: null,
+  uploaderIsProfilePublic: true,
   uploaderUsername: "roy",
 } satisfies ResourceCardItem;
 
@@ -68,5 +69,34 @@ describe("resource card", () => {
     expect(multiple).toContain('data-icon="file-zipper"');
     expect(multiple).toContain(">Download</button>");
     expect(multiple).toContain("Downloads: 4");
+  });
+
+  it("replaces private uploader attribution with a lock label", () => {
+    const html = renderToStaticMarkup(
+      <ResourceCard
+        resource={{
+          ...resource,
+          uploaderIsProfilePublic: false,
+          uploaderUsername: null,
+        }}
+      />,
+    );
+
+    expect(html).toContain('data-icon="user-lock"');
+    expect(html).toContain("Private user");
+    expect(html).not.toContain("roy");
+  });
+
+  it("keeps the owner's attribution visible in resource management", () => {
+    const html = renderToStaticMarkup(
+      <ResourceCard
+        mode="owned"
+        resource={{ ...resource, uploaderIsProfilePublic: false }}
+      />,
+    );
+
+    expect(html).toContain("roy");
+    expect(html).not.toContain("Private user");
+    expect(html).not.toContain('data-icon="user-lock"');
   });
 });

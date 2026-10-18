@@ -15,6 +15,7 @@ import type {
   PublicCollectionItemTrends,
   PublicCollectionLifecycleTrends,
   PublicCollectionMakerProductTrends,
+  PublicCollectionOwner,
   PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterialSummary,
@@ -23,6 +24,7 @@ import type {
   PublicProductTypeTrend,
   PublicSliderTrends,
   PublicSpinnerTrends,
+  PublicUserCollectionItem,
   SliderMagnetPreset,
   TrendsProductTypeConfiguration,
   UserActivityTrends,
@@ -66,6 +68,21 @@ import { getResourceViewer } from "./resources";
  * Localization key used for missing required catalog input.
  */
 const requiredMessage = "web.catalog.error.required";
+
+/** Public collection owner with redacted nested items. */
+export type PublicCollectionOwnerWithItems = Omit<
+  PublicCollectionOwner,
+  "items"
+> & {
+  /** Public collection items with internal owner identifiers removed. */
+  items: PublicUserCollectionItem[];
+};
+
+/** Public maker detail with redacted collection items. */
+export type PublicMakerPage = Omit<PublicMakerDetail, "collectionItems"> & {
+  /** Related public collection items. */
+  collectionItems: PublicUserCollectionItem[];
+};
 
 /** Compact row-major slider magnet snapshot accepted by forms. */
 export const sliderMagnetConfigurationSchema = z.object({
@@ -1560,7 +1577,7 @@ export const listCatalogProducts = createServerFn({ method: "GET" })
     const { s } = await import("@/lib/services");
     const viewer = await getResourceViewer();
     if (data?.productTypeSlug) {
-      return await signCatalogProducts(
+      return await signPublicCatalogProducts(
         await s.db.catalog.listProducts(data.productTypeSlug, viewer),
       );
     }
@@ -1569,7 +1586,7 @@ export const listCatalogProducts = createServerFn({ method: "GET" })
         s.db.catalog.listProducts(type, viewer),
       ),
     );
-    return await signCatalogProducts(
+    return await signPublicCatalogProducts(
       products.flat().sort((a, b) => a.name.localeCompare(b.name)),
     );
   });
@@ -1590,7 +1607,9 @@ export const getCatalogProduct = createServerFn({ method: "GET" })
       data.productSlug,
       viewer,
     );
-    return product ? ((await signCatalogProducts([product]))[0] ?? null) : null;
+    return product
+      ? ((await signPublicCatalogProducts([product]))[0] ?? null)
+      : null;
   });
 
 /**
@@ -1608,7 +1627,7 @@ export const getCatalogProductDetail = createServerFn({ method: "GET" })
       /**
        * Visible collection items containing the product.
        */
-      collectionItems: UserCollectionItem[];
+      collectionItems: PublicUserCollectionItem[];
       /**
        * Requested catalog product.
        */
@@ -1623,13 +1642,13 @@ export const getCatalogProductDetail = createServerFn({ method: "GET" })
       );
       if (!product) return null;
       const [signedProduct, collectionItems] = await Promise.all([
-        signCatalogProducts([product]),
+        signPublicCatalogProducts([product]),
         s.db.collections.listProductItems(product.id, viewer),
       ]);
       if (!signedProduct[0]) return null;
       return {
         collectionItems: await Promise.all(
-          collectionItems.map(signCollectionItem),
+          collectionItems.map(signPublicCollectionItem),
         ),
         product: signedProduct[0],
       };
@@ -1722,14 +1741,14 @@ export const getPublicMakerDetail = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ slug: z.string().regex(slugPattern) }).parse(input),
   )
-  .handler(async ({ data }): Promise<PublicMakerDetail | null> => {
+  .handler(async ({ data }): Promise<PublicMakerPage | null> => {
     const { s } = await import("@/lib/services");
     const maker = await s.db.catalog.getPublicMakerDetail(data.slug);
     if (!maker) return null;
     const [images, products, collectionItems] = await Promise.all([
       signCatalogImageUrls(maker.images),
-      signCatalogProducts(maker.products),
-      Promise.all(maker.collectionItems.map(signCollectionItem)),
+      signPublicCatalogProducts(maker.products),
+      Promise.all(maker.collectionItems.map(signPublicCollectionItem)),
     ]);
     return { ...maker, collectionItems, images, products };
   });
@@ -1874,8 +1893,8 @@ export const getPublicMaterial = createServerFn({ method: "GET" })
     if (!material) return null;
     const [images, products, collectionItems] = await Promise.all([
       signCatalogImageUrls(material.images),
-      signCatalogProducts(material.products),
-      Promise.all(material.collectionItems.map(signCollectionItem)),
+      signPublicCatalogProducts(material.products),
+      Promise.all(material.collectionItems.map(signPublicCollectionItem)),
     ]);
     return {
       ...material,
@@ -2439,11 +2458,11 @@ export const getPublishedUserTrends = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
-    return (
+    const owner =
       (await s.db.collections.listOwners(await getResourceViewer())).find(
         (owner) => owner.publishTrends && owner.username === data.username,
-      ) ?? null
-    );
+      ) ?? null;
+    return owner ? ((await signCollectionOwners([owner]))[0] ?? null) : null;
   });
 
 /**
@@ -2518,25 +2537,25 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
       : null;
     return {
       installedButton: installedButton
-        ? await signCollectionItem(installedButton)
+        ? await signPublicCollectionItem(installedButton)
         : null,
       installedInsert: installedInsert
-        ? await signCollectionItem(installedInsert)
+        ? await signPublicCollectionItem(installedInsert)
         : null,
       installedPlate: installedPlate
-        ? await signCollectionItem(installedPlate)
+        ? await signPublicCollectionItem(installedPlate)
         : null,
       installedPenParts: await Promise.all(
         installedPenParts
           .filter((part): part is NonNullable<typeof part> => part !== null)
-          .map(signCollectionItem),
+          .map(signPublicCollectionItem),
       ),
       installedRefill: installedRefill
-        ? ((await signCatalogProducts([installedRefill]))[0] ?? null)
+        ? ((await signPublicCatalogProducts([installedRefill]))[0] ?? null)
         : null,
-      item: await signCollectionItem(item),
+      item: await signPublicCollectionItem(item),
       product: product
-        ? ((await signCatalogProducts([product]))[0] ?? null)
+        ? ((await signPublicCatalogProducts([product]))[0] ?? null)
         : null,
     };
   });
@@ -2721,8 +2740,9 @@ export const getPublicCollection = createServerFn({ method: "GET" })
     if (!signedCollection) return null;
     return {
       collection: signedCollection,
-      items: await Promise.all(items.map(signCollectionItem)),
+      items: await Promise.all(items.map(signPublicCollectionItem)),
       ownerImageUrl: matchingOwner?.imageUrl ?? null,
+      ownerIsProfilePublic: matchingOwner?.isProfilePublic ?? false,
       ownerUsername: matchingOwner?.username,
     };
   });
@@ -3342,6 +3362,43 @@ async function signCatalogProducts(products: CatalogProduct[]) {
 }
 
 /**
+ * Signs public product images and removes internal contributor identifiers.
+ *
+ * @param products - Public catalog products to serialize.
+ * @returns Signed products without serialized Clerk identifiers.
+ * @rejects If image URL signing fails.
+ */
+async function signPublicCatalogProducts(
+  products: CatalogProduct[],
+): Promise<CatalogProduct[]> {
+  return await Promise.all(
+    products.map(async (product) => {
+      const signed = {
+        ...product,
+        images: await signCatalogImageUrls(product.images),
+      };
+      // shortcut: public UI types still consume CatalogProduct; split the DTO when they need contributor identity.
+      return redactPublicCatalogProduct(signed) as CatalogProduct;
+    }),
+  );
+}
+
+/**
+ * Removes the internal contributor identifier from a public catalog product.
+ *
+ * @param product - Product containing internal contributor identity.
+ * @returns A copy without the Clerk identifier.
+ * @template T - Product shape preserved by the operation.
+ */
+export function redactPublicCatalogProduct<
+  T extends Pick<CatalogProduct, "ownerClerkId">,
+>(product: T): Omit<T, "ownerClerkId"> {
+  const publicProduct = { ...product };
+  Reflect.deleteProperty(publicProduct, "ownerClerkId");
+  return publicProduct;
+}
+
+/**
  * Returns a collection-item copy with item and product image URLs signed when configured.
  *
  * @param item - Collection item whose image URLs should be signed.
@@ -3364,6 +3421,41 @@ async function signCollectionItem<
     signCatalogImageUrls(item.productImages),
   ]);
   return { ...item, images, productImages };
+}
+
+/**
+ * Signs a public collection item while removing private account identity.
+ *
+ * @param item - Public item with internal owner fields.
+ * @returns Signed item with no serialized Clerk identifier and masked private attribution.
+ * @rejects If image URL signing fails.
+ */
+async function signPublicCollectionItem(
+  item: UserCollectionItem,
+): Promise<PublicUserCollectionItem> {
+  return redactPublicCollectionOwner(await signCollectionItem(item));
+}
+
+/**
+ * Removes private account identity from a collection item at the public boundary.
+ *
+ * @param item - Collection item containing internal owner identity.
+ * @returns A copy without the Clerk identifier and with private attribution masked.
+ * @template T - Collection-item shape preserved by the operation.
+ */
+export function redactPublicCollectionOwner<
+  T extends Pick<
+    UserCollectionItem,
+    "ownerClerkId" | "ownerImageUrl" | "ownerIsProfilePublic" | "ownerUsername"
+  >,
+>(item: T): Omit<T, "ownerClerkId"> {
+  const publicItem = { ...item };
+  Reflect.deleteProperty(publicItem, "ownerClerkId");
+  return {
+    ...publicItem,
+    ownerImageUrl: item.ownerIsProfilePublic ? item.ownerImageUrl : null,
+    ownerUsername: item.ownerIsProfilePublic ? item.ownerUsername : null,
+  };
 }
 
 /**
@@ -3396,32 +3488,15 @@ async function signCollectionSummaries(
  * @param owners - Public collection owners to sign.
  * @returns Owner copies with conditionally signed nested image URLs.
  * @rejects If nested collection or item image signing fails.
- * @template T - Collection-owner shape preserved by the operation.
  */
-async function signCollectionOwners<
-  T extends {
-    /**
-     * Collection summaries owned by the user.
-     */
-    collections: UserCollectionSummary[];
-    /**
-     * Collection items owned by the user.
-     */
-    items: Array<{
-      /**
-       * Images owned by the collection item.
-       */
-      images: CatalogImage[];
-      /** Images inherited from the catalog product. */
-      productImages: CatalogImage[];
-    }>;
-  },
->(owners: T[]): Promise<T[]> {
+async function signCollectionOwners(
+  owners: PublicCollectionOwner[],
+): Promise<PublicCollectionOwnerWithItems[]> {
   return await Promise.all(
     owners.map(async (owner) => ({
       ...owner,
       collections: await signCollectionSummaries(owner.collections),
-      items: await Promise.all(owner.items.map(signCollectionItem)),
+      items: await Promise.all(owner.items.map(signPublicCollectionItem)),
     })),
   );
 }

@@ -2,8 +2,7 @@ import { faArrowUpRightFromSquare } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogProduct,
-  PublicMakerDetail,
-  UserCollectionItem,
+  PublicUserCollectionItem,
 } from "@package/services";
 import { Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
@@ -12,6 +11,7 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCombinationLinks } from "@/components/material-link";
 import { ProductCard } from "@/components/product-card";
 import { buttonVariants } from "@/components/ui/button";
+import type { PublicMakerPage } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
 import { cn } from "@/lib/utils";
 import { PaginatedCards } from "./catalog-pages";
@@ -27,7 +27,7 @@ interface MakerDetailPageProps {
   /** Zero-based collection-items page from the URL. */
   collectionItemsPage: number;
   /** Public maker profile and related catalog data. */
-  maker: PublicMakerDetail;
+  maker: PublicMakerPage;
   /**
    * Updates the collection-items page in the URL.
    *
@@ -214,7 +214,7 @@ function RelatedProducts({
 /** Properties for a controlled related collection-items grid. */
 interface RelatedCollectionItemsProps {
   /** Public collection items to display. */
-  items: UserCollectionItem[];
+  items: PublicUserCollectionItem[];
   /**
    * Handles controlled page changes.
    *
@@ -275,7 +275,7 @@ function RelatedCollectionItems({
 /** Properties for one related collection-item card. */
 interface CollectionItemCardProps {
   /** Public collection item displayed by the card. */
-  item: UserCollectionItem;
+  item: PublicUserCollectionItem;
 }
 
 /**

@@ -109,6 +109,7 @@ describe("resource detail", () => {
           name: "Pocket clip",
           privateReason: "Inappropriate content",
           privatedAt: createdAt,
+          uploaderIsProfilePublic: true,
           uploaderUsername: "roy",
           versions: [version],
         }}

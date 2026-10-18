@@ -1,3 +1,5 @@
+import { faUserLock } from "@fortawesome/pro-light-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 /**
@@ -33,21 +35,30 @@ export function publicProfileImageUrl(
  */
 export function PublicProfileAvatar({
   imageUrl,
+  isPrivate = false,
   username,
   size = "sm",
 }: {
   /** Selected Clerk picture URL, or null when absent. */
   imageUrl: string | null;
+  /** Whether the public attribution must suppress identity. @default false */
+  isPrivate?: boolean;
   /** Visible username used for the initials fallback. */
-  username: string;
+  username: string | null;
   /** Avatar primitive size. @default "sm" */
   size?: "sm" | "lg";
 }) {
-  const src = publicProfileImageUrl(imageUrl, size);
+  const src = isPrivate ? undefined : publicProfileImageUrl(imageUrl, size);
   return (
     <Avatar aria-hidden="true" size={size}>
       {src ? <AvatarImage alt="" src={src} /> : null}
-      <AvatarFallback>{username.slice(0, 1).toUpperCase()}</AvatarFallback>
+      <AvatarFallback>
+        {isPrivate ? (
+          <FontAwesomeIcon aria-hidden="true" icon={faUserLock} />
+        ) : (
+          username?.slice(0, 1).toUpperCase()
+        )}
+      </AvatarFallback>
     </Avatar>
   );
 }
