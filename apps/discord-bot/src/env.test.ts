@@ -16,6 +16,7 @@ const validEnv = {
   DISCORD_OWNER_ROLE_ID: "1522834871649829079",
   DISCORD_SUPPORT_FORUM_ID: "133456789012345678",
   DISCORD_TOKEN: "discord-token",
+  GITHUB_WEBHOOK_SECRET: "github-webhook-secret-at-least-32-characters",
   LINEAR_API_KEY: "linear-api-key",
   REDIS_URL: "redis://localhost:6379",
 };

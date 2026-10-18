@@ -38,7 +38,6 @@ request titles only, not the individual commits already present on the branch.
 | `packages` | Multiple packages or the `packages/` root |
 | `database` | `packages/database/` |
 | `lint` | `packages/lint/` |
-| `github-discord-notifier` | `packages/github-discord-notifier/` |
 | `infisical-runner` | `packages/infisical-runner/` |
 | `logger` | `packages/logger/` |
 | `services` | `packages/services/` |

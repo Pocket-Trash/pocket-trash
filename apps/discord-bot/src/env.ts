@@ -29,6 +29,7 @@ const discordBotEnvSchema = z.object({
   DISCORD_OWNER_ROLE_ID: snowflakeSchema,
   DISCORD_SUPPORT_FORUM_ID: snowflakeSchema,
   DISCORD_TOKEN: z.string().min(1),
+  GITHUB_WEBHOOK_SECRET: z.string().min(32),
   LOGGER: z.string().min(1).optional(),
   LINEAR_API_KEY: z.string().min(1),
   LOG_DEPLOYMENT_ID: z.string().min(1).optional(),

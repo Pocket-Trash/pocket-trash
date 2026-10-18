@@ -416,6 +416,7 @@ class BullMqDefinedQueue<TPayload> implements DefinedQueue<TPayload> {
     });
     worker.on("failed", (job) => {
       this.#onEvent?.({
+        exhausted: (job?.attemptsMade ?? 0) >= (job?.opts.attempts ?? 1),
         jobId: job?.id,
         queue: this.#definition.name,
         type: "failed",

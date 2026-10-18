@@ -122,6 +122,7 @@ for (const environment of ["production", "preview"]) {
         "DISCORD_GITHUB_ERRORS_CHANNEL_ID",
         "DISCORD_LOGGER_CHANNEL_ID",
         "DISCORD_SUPPORT_FORUM_ID",
+        "GITHUB_WEBHOOK_SECRET",
       ]) {
         assert.deepEqual(discordBot.variables[variable], { type: "preserve" });
       }

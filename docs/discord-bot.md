@@ -47,12 +47,41 @@ Store these values in both the `dev` and `prod` Infisical environments:
 | `DISCORD_SUPPORT_FORUM_ID` | Support forum parent channel |
 | `DISCORD_BUG_TAG_ID` | Pre-provisioned `Bug` forum tag |
 | `DISCORD_FEATURE_REQUEST_TAG_ID` | Pre-provisioned `Feature Request` forum tag |
+| `GITHUB_WEBHOOK_SECRET` | Random secret shared only with the GitHub repository webhook |
 
 `AXIOM_INTAKE_WEBHOOK_URL` is secret. The other Discord IDs are stable routing
 or authorization inputs, but remain environment-specific configuration.
 
 Railway owns `REDIS_URL` as a reference to `pocket-trash-queue`; do not copy its
 password or public endpoint into Infisical.
+
+## GitHub webhook
+
+After the bot version containing the native intake is deployed, create one
+repository webhook in `Pocket-Trash/pocket-trash`:
+
+- Payload URL: the public Discord bot service URL followed by
+  `/webhooks/github`
+- Content type: `application/json`
+- Secret: the exact `GITHUB_WEBHOOK_SECRET` value stored in the matching bot
+  environment
+- SSL verification: enabled
+- Events: pull requests, pull request reviews, workflow runs, and workflow
+  dispatches
+
+The bot accepts only the configured pull-request actions, failed `CI` and
+`Logger Live` runs, and manual tests. It ignores successful workflows and
+fork-origin events. GitHub's `X-GitHub-Delivery` value is the queue job ID, so a
+redelivery cannot create a second notification while the retained job exists.
+Delivery retries five times with exponential backoff starting at 30 seconds.
+Completed jobs are retained for 24 hours (up to 1,000), and exhausted jobs are
+retained for 14 days and logged as structured errors without creating another
+Discord notification.
+
+Do not enable the repository webhook before this version is live. A successful
+accepted delivery returns `202`; an intentionally ignored event returns `204`;
+invalid signatures return `401`; and unavailable queue storage returns `503` so
+GitHub can redeliver it.
 
 ## Verification
 

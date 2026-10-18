@@ -162,6 +162,7 @@ export default defineRailway((ctx) => {
           DISCORD_OWNER_ROLE_ID: preserve(),
           DISCORD_SUPPORT_FORUM_ID: preserve(),
           DISCORD_TOKEN: preserve(),
+          GITHUB_WEBHOOK_SECRET: preserve(),
           LINEAR_API_KEY: preserve(),
           LOGGER: preserve(),
           LOG_DEPLOYMENT_ID: preserve(),
