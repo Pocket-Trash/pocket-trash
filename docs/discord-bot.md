@@ -247,6 +247,49 @@ staff choose the ticket type and bug priority, and features receive no priority.
 This evaluation does not implement a runtime classifier or change production
 configuration.
 
+## Recoverable ticket persistence
+
+`src/tickets/runtime.ts` composes the Discord reader, bot-local Redis store,
+dedicated-member Linear adapter and ZDR-only structured summarizer. Construction
+does not connect Redis, register controls, or invoke inference. ENG-506 owns the
+forum controls and lifecycle integration; this engine alone does not enable
+production ticket creation. Linear headings and transcript metadata are English,
+as directed by the owner; they do not use Discord interface localization.
+
+Call `connect()` before serving ticket actions and `close()` during shutdown.
+Only invoke `persist()` after the Owners role guard; the first durable staff
+intent wins. Repeated calls resume its stable issue/comment UUIDs. Call
+`finalize()` only after Discord buttons, tag and issue link have been repaired.
+`lookup()` never creates an issue. Redis leases fence stale state writes and
+allow interrupted operations to resume without exposing the queue transport.
+
+Canonical transcripts exclude bots and webhooks, fetch at most 100 messages per
+page, and are bounded to 10,000 examined messages / 8 MB of snapshot data. They
+do not retain signed URLs. Each download refetches the source attachment and
+checks its original name, size, type and authorized CDN path. Allowed types are
+PNG/JPEG/WebP/GIF, PDF and UTF-8 text/log/Markdown/CSV/JSON; active SVG, executables
+and archives are rejected. File limits are decimal 10 MB each and 25 MB total.
+Rejected uploads leave explicit omission metadata rather than losing the ticket.
+Every allocated asset attempt is discoverable for erasure through the completed
+source attachment's metadata; no duplicate visible file link is added.
+
+AI input is separately bounded. Images are limited to 40 million decoded pixels
+and normalized to 1280-pixel JPEGs; PDF analysis covers the first 10 pages using
+Poppler text extraction and rendered pages. Text evidence is capped at 100,000
+characters per attachment. Unreadable, truncated or context-budget-excluded
+evidence is explicitly identified to the model. Original allowed files are still
+uploaded to Linear. Temporary PDF files are removed after every attempt.
+The request body is capped below the gateway's 4.5 MB wire limit, output at 8,000
+tokens and the inference call at 60 seconds. Missing ZDR confirmation, refusal,
+truncated output or schema failure rejects the attempt without a provider retry.
+
+The shared root `railpack.json` includes runtime `poppler-utils`; it therefore
+adds these tools to all services using that config on their next approved build.
+CI installs Poppler beside its disposable Redis test server. Local tests need
+both tools. This change does not apply Railway configuration or deploy services.
+For privacy and backup launch requirements, see
+[complete erasure](complete-erasure.md#recoverable-discord-ticket-operations).
+
 ## Verification
 
 Before a release, verify each environment independently:

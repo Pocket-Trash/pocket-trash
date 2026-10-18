@@ -1,6 +1,7 @@
 {
   "$schema": "https://schema.railpack.com",
   "secrets": ["FONTAWESOME_PACKAGE_TOKEN"],
+  "deploy": { "aptPackages": ["...", "poppler-utils"] },
   "steps": {
     "install": {
       "commands": [
