@@ -114,6 +114,7 @@ describe("SearchPage", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.useRealTimers();
   });
 
   /**
@@ -130,13 +131,25 @@ describe("SearchPage", () => {
   it("supports direct empty navigation without requesting search", () => {
     render({});
 
+    expect(container.textContent).not.toContain(
+      "Enter at least 2 characters to search.",
+    );
+    expect(container.textContent).not.toContain(
+      "No results match this search.",
+    );
+    expect(searchPublic).not.toHaveBeenCalled();
+  });
+
+  it("shows minimum-length guidance without requesting search", () => {
+    render({ q: "b" });
+
     expect(container.textContent).toContain(
       "Enter at least 2 characters to search.",
     );
     expect(searchPublic).not.toHaveBeenCalled();
   });
 
-  it("renders counts, editorial rows, and pushes tab and query changes", async () => {
+  it("renders counts and rows, pushes tabs, and replaces typed queries", async () => {
     searchPublic.mockResolvedValue(response);
     render({ q: "bolt" });
     await act(async () => Promise.resolve());
@@ -164,19 +177,19 @@ describe("SearchPage", () => {
     const input = container.querySelector(
       'input[aria-label="Search Pocket Trash"]',
     ) as HTMLInputElement;
+    expect(input.maxLength).toBe(256);
+    vi.useFakeTimers();
     act(() => {
       Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
         "value",
       )?.set?.call(input, "maker");
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.form?.dispatchEvent(
-        new SubmitEvent("submit", { bubbles: true, cancelable: true }),
-      );
     });
+    act(() => vi.advanceTimersByTime(300));
     expect(onNavigate).toHaveBeenLastCalledWith(
       { q: "maker" },
-      { replace: false },
+      { replace: true },
     );
   });
 

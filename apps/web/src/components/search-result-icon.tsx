@@ -9,7 +9,8 @@ import {
   faUser,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { SearchKind } from "@package/services";
+import type { SearchKind, SearchResult } from "@package/services";
+import { Fragment } from "react";
 
 /** Search result icons keyed by public result kind. */
 const resultIcons = {
@@ -57,4 +58,31 @@ export function SearchResultIcon({ className, kind }: SearchResultIconProps) {
       icon={resultIcons[kind]}
     />
   );
+}
+
+/** Properties for safe structured search-result highlights. */
+type SearchHighlightsProps = {
+  /** Structured highlight segments returned by public search. */
+  highlights: SearchResult["highlights"];
+};
+
+/**
+ * Renders escaped search-result highlights.
+ *
+ * @param props - Search highlight properties.
+ * @returns Search text with matched segments emphasized.
+ */
+export function SearchHighlights({ highlights }: SearchHighlightsProps) {
+  let offset = 0;
+  return highlights.map((highlight) => {
+    const key = `${offset}-${highlight.matched}`;
+    offset += highlight.text.length;
+    return highlight.matched ? (
+      <strong className="font-semibold text-foreground" key={key}>
+        {highlight.text}
+      </strong>
+    ) : (
+      <Fragment key={key}>{highlight.text}</Fragment>
+    );
+  });
 }

@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   SearchCounts,
   SearchGroup,
+  SearchKind,
   SearchResponse,
   SearchResult,
 } from "@package/services";
@@ -14,6 +15,7 @@ import * as React from "react";
 import { AppShell } from "@/components/app-shell";
 import { Pagination } from "@/components/pagination";
 import {
+  SearchHighlights,
   SearchResultIcon,
   searchResultTypeKeys,
 } from "@/components/search-result-icon";
@@ -23,6 +25,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { searchPublic } from "@/lib/search";
+import {
+  SEARCH_QUERY_DELAY_MS,
+  SEARCH_QUERY_MAX_LENGTH,
+  SEARCH_QUERY_MIN_LENGTH,
+} from "@/lib/search-constants";
 import { useLocale } from "@/providers/locale-provider";
 
 /** URL-backed state accepted by the public search page. */
@@ -65,6 +72,16 @@ const groups = [
   "resources",
 ] as const satisfies SearchGroup[];
 
+/** Representative result icons shown on filtered tabs. */
+const groupIconKinds = {
+  collections: "collection",
+  makers: "maker",
+  materials: "material",
+  people: "person",
+  products: "product",
+  resources: "resource",
+} as const satisfies Record<Exclude<SearchGroup, "all">, SearchKind>;
+
 /** Empty counts shown before a query completes. */
 const emptyCounts: SearchCounts = {
   all: 0,
@@ -103,14 +120,32 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
   React.useEffect(() => setInputValue(search.q ?? ""), [search.q]);
 
   React.useEffect(() => {
+    const q = inputValue.trim();
+    if (q === (search.q ?? "")) return;
+    const timer = window.setTimeout(
+      () =>
+        onNavigate(
+          {
+            ...(q ? { q } : {}),
+            ...(q && group !== "all" ? { type: group } : {}),
+          },
+          { replace: true },
+        ),
+      SEARCH_QUERY_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [group, inputValue, onNavigate, search.q]);
+
+  React.useEffect(() => {
     const query = search.q?.trim() ?? "";
     const currentRequest = ++request.current;
-    if (query.length < 2) {
+    if (query.length < SEARCH_QUERY_MIN_LENGTH) {
       setResponse(undefined);
       setState("idle");
       return;
     }
 
+    setResponse(undefined);
     setState("loading");
     void searchPublic({
       data: { group, page, query, surface: "page" },
@@ -154,7 +189,7 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
         ...(q ? { q } : {}),
         ...(q && group !== "all" ? { type: group } : {}),
       },
-      { replace: false },
+      { replace: true },
     );
   };
 
@@ -172,6 +207,7 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
         <form className="flex gap-2" onSubmit={submit} role="search">
           <Input
             aria-label={t("web.search.label")}
+            maxLength={SEARCH_QUERY_MAX_LENGTH}
             onChange={(event) => setInputValue(event.target.value)}
             placeholder={t("web.search.placeholder")}
             value={inputValue}
@@ -199,6 +235,14 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
             <TabsList aria-label={t("web.search.title")}>
               {groups.map((searchGroup) => (
                 <TabsTrigger key={searchGroup} value={searchGroup}>
+                  {searchGroup === "all" ? (
+                    <FontAwesomeIcon
+                      aria-hidden="true"
+                      icon={faMagnifyingGlass}
+                    />
+                  ) : (
+                    <SearchResultIcon kind={groupIconKinds[searchGroup]} />
+                  )}
                   {t(`web.search.tabs.${searchGroup}` as TranslationKey)}{" "}
                   <span>{counts[searchGroup]}</span>
                 </TabsTrigger>
@@ -207,9 +251,11 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
           </div>
           <TabsContent value={group}>
             {state === "idle" ? (
-              <p className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
-                {t("web.search.minimumLength")}
-              </p>
+              (search.q?.length ?? 0) > 0 ? (
+                <p className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+                  {t("web.search.minimumLength")}
+                </p>
+              ) : null
             ) : state === "loading" ? (
               <SearchLoading label={t("web.search.loading")} />
             ) : state === "error" ? (
@@ -296,7 +342,6 @@ function SearchResults({ items, t }: SearchResultsProps) {
   return (
     <ul className="grid gap-3">
       {items.map((result) => {
-        let highlightOffset = 0;
         return (
           <li key={`${result.kind}-${result.id}`}>
             <a
@@ -333,22 +378,7 @@ function SearchResults({ items, t }: SearchResultsProps) {
                   </p>
                 ) : null}
                 <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                  {result.highlights.map((highlight) => {
-                    const key = `${highlightOffset}-${highlight.matched}`;
-                    highlightOffset += highlight.text.length;
-                    return highlight.matched ? (
-                      <strong
-                        className="font-semibold text-foreground"
-                        key={key}
-                      >
-                        {highlight.text}
-                      </strong>
-                    ) : (
-                      <React.Fragment key={key}>
-                        {highlight.text}
-                      </React.Fragment>
-                    );
-                  })}
+                  <SearchHighlights highlights={result.highlights} />
                 </p>
               </div>
             </a>

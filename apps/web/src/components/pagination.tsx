@@ -1,6 +1,6 @@
 import {
-  faAnglesLeft,
-  faAnglesRight,
+  faArrowLeftToLine,
+  faArrowRightToLine,
   faChevronLeft,
   faChevronRight,
 } from "@fortawesome/pro-light-svg-icons";
@@ -98,7 +98,7 @@ export function Pagination({
         type="button"
         variant="outline"
       >
-        <FontAwesomeIcon aria-hidden="true" icon={faAnglesLeft} />
+        <FontAwesomeIcon aria-hidden="true" icon={faArrowLeftToLine} />
       </Button>
       <Button
         aria-label={t("web.search.pagination.previousPage")}
@@ -143,7 +143,7 @@ export function Pagination({
         type="button"
         variant="outline"
       >
-        <FontAwesomeIcon aria-hidden="true" icon={faAnglesRight} />
+        <FontAwesomeIcon aria-hidden="true" icon={faArrowRightToLine} />
       </Button>
       <output className="sr-only">
         {t("web.search.pagination.pageStatus", { page, pageCount })}
