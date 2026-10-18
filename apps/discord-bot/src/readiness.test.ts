@@ -14,6 +14,8 @@ describe("bot readiness", () => {
     expect(await readiness.check()).toEqual({ ok: false });
     readiness.setGatewayReady(true);
     readiness.setWorkerStarted(true);
+    expect(await readiness.check()).toEqual({ ok: false });
+    readiness.setReconcilerStarted(true);
     expect(await readiness.check()).toEqual({ ok: true });
 
     queueCounts.mockRejectedValueOnce(new Error("Redis unavailable"));

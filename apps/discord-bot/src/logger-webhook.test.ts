@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createLoggerWebhookNormalizer } from "./logger-webhook.js";
+import { deliveryJobSchema } from "./queue.js";
 
 /** App-bound credentials used by webhook tests. */
 const tokens = {
@@ -24,6 +25,21 @@ describe("logger webhook", () => {
   const normalize = createLoggerWebhookNormalizer({
     channelId: "1560141390510428210",
     tokens,
+  });
+
+  it("bounds valid long event text to the delivery queue contract", async () => {
+    const delivery = await normalize(
+      request(
+        {
+          ...event,
+          message: "m".repeat(500),
+          error: { name: "n".repeat(200), message: "e".repeat(1_000) },
+        },
+        tokens.api,
+      ),
+    );
+    expect(deliveryJobSchema.safeParse(delivery?.payload).success).toBe(true);
+    expect(delivery?.payload.notification.title).toHaveLength(300);
   });
 
   it("binds bearer authentication to the event app", async () => {

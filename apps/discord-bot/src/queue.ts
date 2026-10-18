@@ -73,7 +73,7 @@ export function createDeliveryQueueRuntime(options: {
     mode: "continuous",
     name: "discord-notifications",
     retention: {
-      completed: { ageSeconds: 60 * 60 * 24, count: 1_000 },
+      completed: { ageSeconds: 60 * 60 * 24, count: 100_000 },
       failed: { ageSeconds: 60 * 60 * 24 * 14 },
     },
     retry: {
@@ -106,7 +106,8 @@ export function createDeliveryQueueRuntime(options: {
      * @param input - Stable job identity, name, and payload.
      * @returns The enqueue disposition.
      */
-    enqueue: (input: QueueEnqueueInput<DeliveryJob>) => queue.enqueue(input),
+    enqueue: (input: QueueEnqueueInput<DeliveryJob>) =>
+      queue.enqueue({ ...input, id: encodeURIComponent(input.id) }),
     /**
      * Starts the continuous worker exactly once.
      *

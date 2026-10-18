@@ -3,6 +3,52 @@ import { describe, expect, it, vi } from "vitest";
 import { createDeliveryQueueRuntime } from "./queue.js";
 
 describe("delivery queue runtime", () => {
+  it("escapes operational IDs for BullMQ without conflating literal escapes", async () => {
+    const adapter = createInMemoryQueueAdapter();
+    const define = adapter.define.bind(adapter);
+    const ids: string[] = [];
+    vi.spyOn(adapter, "define").mockImplementation((definition) => {
+      const queue = define(definition);
+      const enqueue = queue.enqueue.bind(queue);
+      vi.spyOn(queue, "enqueue").mockImplementation((input) => {
+        ids.push(input.id);
+        return enqueue(input);
+      });
+      return queue;
+    });
+    const runtime = createDeliveryQueueRuntime({ adapter, deliver: vi.fn() });
+    const notification = {
+      description: "test",
+      occurredAt: new Date().toISOString(),
+      provenance: "test",
+      source: "test",
+      status: "test",
+      tags: [],
+      title: "test",
+      tone: "warning" as const,
+    };
+    for (const id of [
+      "axiom-parser-error:message",
+      "axiom-parser-error%3Amessage",
+    ]) {
+      await runtime.enqueue({
+        id,
+        name: "health",
+        payload: {
+          deliveryId: id,
+          destinationChannelId: "123456789012345678",
+          kind: "system",
+          notification,
+          version: 1,
+        },
+      });
+    }
+    expect(ids).toEqual([
+      "axiom-parser-error%3Amessage",
+      "axiom-parser-error%253Amessage",
+    ]);
+    await runtime.close();
+  });
   it("starts continuously and closes its worker, queue, and adapter", async () => {
     const adapter = createInMemoryQueueAdapter();
     const pendingDelivery = { resolve: undefined as (() => void) | undefined };

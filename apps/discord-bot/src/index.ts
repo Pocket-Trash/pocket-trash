@@ -1,9 +1,14 @@
 import { serve } from "@hono/node-server";
 import { loggerMessages } from "@package/logger";
-import { createBullMqQueueAdapter } from "@package/queue";
+import {
+  createBullMqQueueAdapter,
+  createRedisCheckpointStore,
+} from "@package/queue";
 import { Client, Events } from "discord.js";
+import { z } from "zod";
 import { createApp, createWebhookIntake } from "./app.js";
 import type { AuthorizedInteraction } from "./authorization.js";
+import { createAxiomReconciler } from "./axiom-fallback.js";
 import { createDiscordBotEnv } from "./env.js";
 import {
   assertGatewayDisconnectAllowed,
@@ -16,10 +21,7 @@ import { createDiscordBotLogger } from "./logger.js";
 import { createLoggerWebhookNormalizer } from "./logger-webhook.js";
 import { createDeliveryQueueRuntime } from "./queue.js";
 import { createReadiness } from "./readiness.js";
-import {
-  createInteractionRegistry,
-  createMessageRegistry,
-} from "./registries.js";
+import { createInteractionRegistry } from "./registries.js";
 import { renderDiscordNotification } from "./renderer.js";
 
 /** Validated process configuration. */
@@ -44,8 +46,6 @@ const commandRegistry = createInteractionRegistry([]);
 const componentRegistry = createInteractionRegistry([]);
 /** Empty modal registry populated by later feature tickets. */
 const modalRegistry = createInteractionRegistry([]);
-/** Empty trusted-message registry populated by the Axiom adapter ticket. */
-const messageRegistry = createMessageRegistry([]);
 /** Dedicated Linear bot-member credential boundary. */
 const linearAuthentication = createLinearApiKeyAuthentication({
   apiKey: env.LINEAR_API_KEY,
@@ -90,6 +90,77 @@ const deliveryQueue = createDeliveryQueueRuntime({
 });
 /** Health state shared by the HTTP endpoint and runtime lifecycle. */
 const readiness = createReadiness(deliveryQueue.counts);
+/** Durable cursor scoped to this guild and private intake channel. */
+const axiomCursor = createRedisCheckpointStore({
+  key: `discord-bot:axiom-cursor:${env.DISCORD_GUILD_ID}:${env.DISCORD_AXIOM_INTAKE_CHANNEL_ID}`,
+  redisUrl: env.REDIS_URL,
+  schema: z.object({
+    messageId: z.string().regex(/^[1-9]\d{16,19}$/u),
+    checkedAt: z.number().int().nonnegative(),
+  }),
+  /** Requests a scan when Redis becomes available again. */
+  onReady() {
+    if (deliveryQueue.started()) void reconcileAxiom();
+  },
+});
+/** History-based fallback shared by all live and recovery triggers. */
+const axiomReconciler = createAxiomReconciler({
+  channelId: env.DISCORD_AXIOM_INTAKE_CHANNEL_ID,
+  webhookId: new URL(env.AXIOM_INTAKE_WEBHOOK_URL).pathname.split("/")[3] ?? "",
+  botUserId: env.DISCORD_APPLICATION_ID,
+  destinationChannelId: env.DISCORD_LOGGER_CHANNEL_ID,
+  cursor: axiomCursor,
+  /**
+   * Fetches newest-first pages from the configured private intake only.
+   *
+   * @param before - Oldest message from the previous page.
+   * @returns Source metadata and lazily accessed Discord content.
+   * @rejects When the configured channel cannot be read.
+   */
+  async fetchPage(before) {
+    const channel = await client.channels.fetch(
+      env.DISCORD_AXIOM_INTAKE_CHANNEL_ID,
+    );
+    if (!channel?.isTextBased() || !channel.isSendable())
+      throw new Error("Invalid Axiom intake channel.");
+    const messages = await channel.messages.fetch({
+      limit: 100,
+      ...(before ? { before } : {}),
+    });
+    return [...messages.values()].map((message) => ({
+      id: message.id,
+      channelId: message.channelId,
+      webhookId: message.webhookId,
+      authorId: message.author.id,
+      createdTimestamp: message.createdTimestamp,
+      /**
+       * Reads source-authorized content.
+       * @returns Content after authorization.
+       */
+      get content() {
+        return message.content;
+      },
+      /**
+       * Reads source-authorized embeds.
+       * @returns Calibrated embed fields.
+       */
+      get embeds() {
+        return message.embeds;
+      },
+    }));
+  },
+  /**
+   * Persists fallback and health messages in the existing shared-ID queue.
+   *
+   * @param id - Stable event or operational notification identity.
+   * @param payload - Validated notification envelope.
+   * @returns Queue deduplication outcome.
+   */
+  enqueue: (id, payload) =>
+    deliveryQueue.enqueue({ id, name: "axiom-notification", payload }),
+});
+/** Periodic history scan timer, initialized after gateway and Redis startup. */
+let axiomTimer: ReturnType<typeof setInterval> | undefined;
 /** Authenticated GitHub webhook intake backed by the delivery queue. */
 const githubWebhook = createWebhookIntake({
   /**
@@ -179,19 +250,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await modalRegistry.dispatch(interaction.customId, guardedInteraction);
   }
 });
-client.on(Events.MessageCreate, async (message) => {
-  await messageRegistry.dispatch({
-    channelId: message.channelId,
-    /**
-     * Reads message content only after the source registry accepts its IDs.
-     *
-     * @returns Discord message content.
-     */
-    get content() {
-      return message.content;
-    },
-    webhookId: message.webhookId,
-  });
+client.on(Events.MessageCreate, (message) => {
+  if (message.channelId === env.DISCORD_AXIOM_INTAKE_CHANNEL_ID)
+    void reconcileAxiom();
+});
+client.on(Events.ShardResume, () => void reconcileAxiom());
+client.on(Events.ClientReady, () => {
+  if (deliveryQueue.started()) void reconcileAxiom();
 });
 
 process.once("SIGINT", () => void shutdown("SIGINT"));
@@ -202,12 +267,29 @@ void start().catch(fail);
 /** Starts the queue worker and Discord gateway. */
 async function start() {
   await linearAuthentication.validateAccess();
+  await axiomCursor.connect();
   await client.login(env.DISCORD_TOKEN);
   await deliveryQueue.start();
   readiness.setWorkerStarted(true);
+  await reconcileAxiom();
+  axiomTimer = setInterval(() => void reconcileAxiom(), 5 * 60 * 1_000);
   logger.info(loggerMessages.discordBot.serverListening, {
     attributes: { port: env.PORT },
   });
+}
+
+/** Runs a durable history scan and records readiness without crashing gateway callbacks. */
+async function reconcileAxiom() {
+  if (shuttingDown || !client.isReady() || !deliveryQueue.started()) return;
+  try {
+    await axiomReconciler.reconcile();
+    readiness.setReconcilerStarted(axiomReconciler.started());
+  } catch (error) {
+    readiness.setReconcilerStarted(false);
+    logger.error(loggerMessages.discordBot.axiomReconciliationFailed, {
+      error,
+    });
+  }
 }
 
 /**
@@ -231,6 +313,9 @@ async function shutdown(signal: string) {
   shuttingDown = true;
   readiness.setGatewayReady(false);
   readiness.setWorkerStarted(false);
+  readiness.setReconcilerStarted(false);
+  clearInterval(axiomTimer);
+  axiomCursor.close();
   logger.info(loggerMessages.discordBot.serverStopping, {
     attributes: { signal },
   });

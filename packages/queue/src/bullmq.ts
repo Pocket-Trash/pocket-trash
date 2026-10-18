@@ -38,10 +38,10 @@ export function createBullMqQueueAdapter(options: {
      * Limits Redis reconnect attempts during startup and outages.
      *
      * @param times - Consecutive reconnect attempt number.
-     * @returns Delay before reconnecting, or null to stop.
+     * @returns Bounded delay before reconnecting throughout an outage.
      */
     retryStrategy(times) {
-      return times <= 3 ? Math.min(times * 250, 1_000) : null;
+      return Math.min(times * 250, 10_000);
     },
   });
   const queues = new Set<BullMqDefinedQueue<unknown>>();
