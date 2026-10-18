@@ -19,6 +19,7 @@ import {
   createFeedbackService,
   type FeedbackService,
 } from "./feedback/index.js";
+import { createSearchService, type SearchService } from "./search/index.js";
 import { createTrendsService, type TrendsService } from "./trends/index.js";
 import {
   createUserSettingsService,
@@ -41,6 +42,8 @@ export type DbServices = {
   feedback: FeedbackService;
   /** Privacy-safe public Trends service. */
   trends: TrendsService;
+  /** Public full-text search service. */
+  search: SearchService;
   /** User settings service. */
   userSettings: UserSettingsService;
   /** Application user service. */
@@ -76,6 +79,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
     collections: createCollectionsService(db, users, audit, logger),
     erasure: createErasureService(db, logger, undefined, audit),
     feedback: createFeedbackService(db, logger, audit),
+    search: createSearchService(db),
     trends: createTrendsService(db),
     userSettings: createUserSettingsService(db, users, logger),
     users,
@@ -215,6 +219,17 @@ export {
   FeedbackStateError,
   FeedbackSubmissionLimitError,
 } from "./feedback/index.js";
+export type {
+  SearchCounts,
+  SearchGroup,
+  SearchHighlight,
+  SearchInput,
+  SearchKind,
+  SearchResponse,
+  SearchResult,
+  SearchService,
+} from "./search/index.js";
+export { createSearchService, parseSearchHighlight } from "./search/index.js";
 export type {
   ActivityTrendPoint,
   ActivityTrendRange,
