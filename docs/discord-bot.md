@@ -207,7 +207,7 @@ The gateway has no verified raw-PDF contract. This evaluation uses local
 `pdftotext` and rendered PNG pages through its tested image input. Regenerate
 fixtures using `integration/generate-summary-fixtures.py` from the bot
 directory with ReportLab and Poppler installed. These tools are evaluation
-prerequisites, not an implemented production attachment pipeline. Actual support
+prerequisites; the runtime attachment pipeline is described below. Actual support
 processing remains gated on the processor/retention review in the complete-
 erasure inventory and the model decision recorded in ENG-504.
 
@@ -252,7 +252,7 @@ configuration.
 `src/tickets/runtime.ts` composes the Discord reader, bot-local Redis store,
 dedicated-member Linear adapter and ZDR-only structured summarizer. Construction
 does not connect Redis, register controls, or invoke inference. ENG-506 owns the
-forum controls and lifecycle integration; this engine alone does not enable
+forum controls and lifecycle integration described below; the engine alone does not enable
 production ticket creation. Linear headings and transcript metadata are English,
 as directed by the owner; they do not use Discord interface localization.
 
@@ -262,6 +262,52 @@ intent wins. Repeated calls resume its stable issue/comment UUIDs. Call
 `finalize()` only after Discord buttons, tag and issue link have been repaired.
 `lookup()` never creates an issue. Redis leases fence stale state writes and
 allow interrupted operations to resume without exposing the queue transport.
+
+## Forum controls and activation
+
+`DISCORD_TICKETS_ENABLED` defaults to `false`; enabling it requires
+`CHEAPERINFERENCE_API_KEY` on the bot. Optional
+`DISCORD_TICKET_SUMMARY_PROVIDER`, `DISCORD_TICKET_SUMMARY_MODEL` and
+`DISCORD_TICKET_INFERENCE_BASE_URL` configure the existing reviewed summary
+boundary. Defaults remain Cheaper Inference / `gpt-6-luna` / its reviewed HTTPS
+endpoint; Jev stays fixed to `jev-1.13` Decisions. No Infisical or deployment
+changes are made by this implementation. Activation still requires owner
+approval and the existing processor, erasure and backup/restore launch gates.
+
+New active public support-forum threads receive a bounded V2 container with both
+ticket buttons. Only Owners may open or submit modals; moderators do not suffice.
+Discord-only copy explicitly uses English catalog keys; Linear uses English
+directly. Bug priority is a select including `No priority`; features always use
+priority zero. Modal opening uses only cached advice, without a network lookup.
+Submission defers privately before reading modal values or running persistence.
+The first durable staff request wins on every retry.
+
+Finalization preserves unrelated tags, applies the ticket tag, disables both
+buttons and publishes the Linear URL in the control message. A full five-tag
+thread fails rather than dropping unrelated tags. Partial Discord failures leave
+Redis uncompacted for startup, shard-resume or five-minute repair scans. Recovery
+never creates issues, classifies history, fetches archived threads or reopens
+them. Control-history pages contain at most 100 messages, capped at 10,000 total.
+
+Human thread activity triggers ten-second-debounced advisory precomputation.
+Edits/deletions invalidate hints immediately. Jev receives only the latest
+16,000 characters of human text, with URL tokens removed: no attachment metadata,
+bytes or private modal notes. Up to 500 threads retain only revision hashes and
+advisory values for 15 minutes. Unchanged revisions reuse results, including
+unavailable results. Only an already cached priority may prefill a bug modal;
+later advice cannot overwrite opened or submitted forms. Type and readiness
+never hide buttons or authorize/block actions.
+
+The classifier permits two concurrent calls and 60 calls/hour/process, with a
+15-second timeout, no retries and no provider/non-ZDR fallback. This is not an
+account-wide dollar cap and resets on restart. Accepted responses require
+settled ZDR billing, typed answers, complete unique option sets and normalized
+probability distributions. Failure leaves manual controls available. All routine
+tests mock inference and spend no credits. Protocol references:
+[Discord components](https://docs.discord.com/developers/components/reference)
+and [Cheaper Inference Decisions](https://api.cheaperinference.com/docs).
+
+## Runtime attachment bounds
 
 Canonical transcripts exclude bots and webhooks, fetch at most 100 messages per
 page, and are bounded to 10,000 examined messages / 8 MB of snapshot data. They

@@ -168,6 +168,15 @@ fallback to ordinary-retention routes is allowed.
 
 ### Recoverable Discord ticket operations
 
+Advisory Jev classification uses bounded human text with URL tokens removed;
+it receives no attachment metadata/bytes or private modal notes. The process-local
+cache retains at most 500 thread IDs, text revision hashes and advisory values,
+usable for 15 minutes; it stores no transcript or provider response body. Erasure
+must stop support processing and restart the bot to clear this in-memory cache
+before negative verification. ZDR receipts do not waive provider metadata-erasure
+verification. Logs record only a centralized ticket-failure event, not source
+content, model responses or private staff notes.
+
 The bot-local Redis namespace is `discord-bot:ticket:<threadId>`, with a short
 renewable `:lease` key. Processing records hold the frozen human transcript,
 staff note, summary, file metadata, stable issue/comment UUIDs, upload outcomes

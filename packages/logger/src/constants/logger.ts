@@ -167,6 +167,7 @@ export const loggerMessages = {
   },
   discordBot: {
     axiomReconciliationFailed: "discordBot.axiom.reconciliation.failed",
+    ticketOperationFailed: "discordBot.ticket.operation.failed",
     queueEvent: "discordBot.queue.event",
     serverFailed: "discordBot.server.failed",
     serverListening: "discordBot.server.listening",

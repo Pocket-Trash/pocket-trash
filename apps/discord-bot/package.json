@@ -20,7 +20,7 @@
     "@hono/node-server": "^2.1.1",
     "@package/logger": "workspace:*",
     "@package/queue": "workspace:*",
-    "@pocket-trash/localizations": "^0.43.1",
+    "@pocket-trash/localizations": "^0.45.0",
     "discord.js": "^14.24.2",
     "hono": "^4.13.9",
     "ioredis": "^5.11.1",
