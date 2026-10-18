@@ -4,9 +4,9 @@ import { createBullMqQueueAdapter } from "@package/queue";
 import { Client, Events } from "discord.js";
 import { createApp, createWebhookIntake } from "./app.js";
 import type { AuthorizedInteraction } from "./authorization.js";
-import { registerGuildCommands } from "./commands.js";
 import { createAxiomCursorStore } from "./axiom-cursor.js";
 import { createAxiomReconciler } from "./axiom-fallback.js";
+import { registerGuildCommands } from "./commands.js";
 import { createDiscordBotEnv } from "./env.js";
 import {
   assertGatewayDisconnectAllowed,
