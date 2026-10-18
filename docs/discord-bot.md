@@ -172,6 +172,45 @@ notifiers, secrets, or deployments. Build the bot first. The observer never star
 the bot worker or dispatches interactions. Captured content is represented by the
 redacted fixture in `src/fixtures/axiom-match.json`.
 
+## Synthetic ticket-summary evaluation
+
+The evaluation tool never reads Discord conversations. Its five checked-in
+synthetic cases cover a text bug, a feature request with an adversarial text
+attachment, an image, a text PDF with corrected counts, and a scanned PDF with
+adversarial instructions. The model must return the exact structured schema,
+preserve required evidence, and leave unsupported facts unknown. Review every
+output for invented claims and useful open questions; keyword checks alone are
+not a quality decision.
+
+Run offline fixture validation with:
+
+```sh
+node apps/discord-bot/integration/evaluate-summary.mjs --check
+```
+
+With the existing development credential, run an explicitly selected model:
+
+```sh
+infisical run --env dev --path /services/cheaper-inference -- \
+  node apps/discord-bot/integration/evaluate-summary.mjs gemma-3-4b-it
+```
+
+It uses `AI_PROVIDER=cheaper-inference`, configurable `AI_MODEL` (when no model
+argument is given), and `AI_BASE_URL=https://api.cheaperinference.com/v1`.
+The tool restricts the route to that provider host, requires the current ZDR
+vision catalog, sends `zdr: true`, validates confirmed ZDR billing, and never
+retries through a non-ZDR route or another provider. JSONL output records quoted
+prices, actual billed usage, latency, structured results, and failures; failed
+models must not be silently accepted. Inference is a paid manual test, not CI.
+
+The gateway has no verified raw-PDF contract. This evaluation uses local
+`pdftotext` and rendered PNG pages through its tested image input. Regenerate
+fixtures using `integration/generate-summary-fixtures.py` from the bot
+directory with ReportLab and Poppler installed. These tools are evaluation
+prerequisites, not an implemented production attachment pipeline. Actual support
+processing remains gated on the processor/retention review in the complete-
+erasure inventory and the model decision recorded in ENG-504.
+
 ## Verification
 
 Before a release, verify each environment independently:
