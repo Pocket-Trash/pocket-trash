@@ -21,7 +21,7 @@ it("stops on a non-ZDR receipt without a retry or real network access", () => {
     globalThis.fetch = async () => {
       if (++calls > 2) throw new Error("Unexpected retry");
       return new Response(JSON.stringify(calls === 1
-        ? { data: [{ id: "jev-1.13", supported_endpoints: ["/v1/decisions"], pricing: { input_per_million: "0.0273" } }] }
+        ? { data: [{ id: "jev-1.13", supported_endpoints: ["/v1/decisions"], pricing: { input_per_million: "0.0315", zero_data_retention: true } }] }
         : { billing: { status: "settled", zero_data_retention: false, billed_cost_usd: "0.00001" } }
       ), { status: 200 });
     };`;

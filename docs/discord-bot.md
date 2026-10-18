@@ -234,10 +234,11 @@ not an account-wide spending limit or an exact final-charge cap. Offline checks
 and CI never make inference calls. JSONL records labels, full probabilities,
 latency, actual billing and request IDs; readiness uses a fixed 0.5 threshold.
 
-The catalog's Jev ZDR flag disagreed with successful ZDR request receipts during
-evaluation. This remains an unresolved provider-contract inconsistency, not
-proof of upstream retention behavior. See ENG-504's evaluation document for
-results and limitations. Classification remains advisory: buttons stay visible,
+The default catalog quotes non-ZDR pricing; `GET /models?zdr=true` explicitly
+selects the ZDR pricing scope. The harness requires that scope and checks each
+receipt rather than interpreting the default listing as ZDR availability.
+See ENG-504's evaluation document for results and limitations. Classification
+remains advisory: buttons stay visible,
 staff choose the ticket type and bug priority, and features receive no priority.
 This evaluation does not implement a runtime classifier or change production
 configuration.

@@ -203,16 +203,17 @@ const headers = {
   "content-type": "application/json",
 };
 /** Current pricing and availability are checked before any billed request. */
-const catalogResponse = await fetch(`${baseUrl}/models`, {
+const catalogResponse = await fetch(`${baseUrl}/models?zdr=true`, {
   headers,
   signal: AbortSignal.timeout(30_000),
 });
 assert.equal(catalogResponse.status, 200);
-/** Account-visible catalog, which may disagree with per-request ZDR receipts. */
+/** Account-visible prices for the same ZDR scope requested during inference. */
 const catalog = await catalogResponse.json();
 /** One explicitly selected decision model; never substitutes a text model. */
 const model = catalog.data.find(({ id }) => id === "jev-1.13");
 assert.ok(model?.supported_endpoints.includes("/v1/decisions"));
+assert.equal(model.pricing.zero_data_retention, true);
 assert.ok(Number(model.pricing.input_per_million) <= 0.042);
 process.stdout.write(
   `${JSON.stringify({ type: "catalog", at: new Date().toISOString(), model })}\n`,
