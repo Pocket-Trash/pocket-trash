@@ -158,7 +158,20 @@ describe("SearchPage", () => {
       data: { group: "all", page: 1, query: "bolt", surface: "page" },
     });
     expect(container.textContent).toContain("Results: 2");
-    expect(container.textContent).toContain("Products 1");
+    expect(
+      Array.from(
+        container.querySelectorAll('[role="tab"]'),
+        (tab) => tab.textContent,
+      ),
+    ).toEqual([
+      "All 2",
+      "Products 1",
+      "Collections 0",
+      "Makers 1",
+      "People 0",
+      "Materials 0",
+      "Resources 0",
+    ]);
     expect(
       container.querySelector('img[src="https://example.com/bolt.jpg"]'),
     ).not.toBeNull();
@@ -174,10 +187,28 @@ describe("SearchPage", () => {
       { replace: false },
     );
 
+    for (const type of [
+      "collections",
+      "makers",
+      "people",
+      "materials",
+      "resources",
+    ] as const) {
+      const tab = Array.from(container.querySelectorAll('[role="tab"]')).find(
+        (candidate) => candidate.textContent?.toLowerCase().startsWith(type),
+      );
+      act(() => (tab as HTMLButtonElement).click());
+      expect(onNavigate).toHaveBeenLastCalledWith(
+        { q: "bolt", type },
+        { replace: false },
+      );
+    }
+
     const input = container.querySelector(
       'input[aria-label="Search Pocket Trash"]',
     ) as HTMLInputElement;
     expect(input.maxLength).toBe(256);
+    onNavigate.mockClear();
     vi.useFakeTimers();
     act(() => {
       Object.getOwnPropertyDescriptor(
@@ -186,7 +217,9 @@ describe("SearchPage", () => {
       )?.set?.call(input, "maker");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(299));
+    expect(onNavigate).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
     expect(onNavigate).toHaveBeenLastCalledWith(
       { q: "maker" },
       { replace: true },
