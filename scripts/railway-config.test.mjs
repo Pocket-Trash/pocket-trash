@@ -172,6 +172,8 @@ test("authenticates native Railpack installs from source", () => {
   assert.deepEqual(config.steps.install.commands, [
     "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
   ]);
+  assert.deepEqual(config.secrets, ["FONTAWESOME_PACKAGE_TOKEN"]);
+  assert.deepEqual(config.steps.install.secrets, ["FONTAWESOME_PACKAGE_TOKEN"]);
 });
 
 test("keeps one authoring file without secrets or Railway identities", () => {
