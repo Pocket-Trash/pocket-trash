@@ -211,6 +211,37 @@ prerequisites, not an implemented production attachment pipeline. Actual support
 processing remains gated on the processor/retention review in the complete-
 erasure inventory and the model decision recorded in ENG-504.
 
+## Synthetic request-classification evaluation
+
+Jev is evaluated separately from the title/summary model. The fixed corpus in
+`integration/evaluate-classification.mjs` contains 20 synthetic requests with
+prewritten labels for bug/feature/question/other, ticket readiness, and suggested
+bug priority. It includes corrections, resolved bugs, injection attempts, missing
+attachment evidence, multilingual requests, outages, data loss, and privacy
+incidents. It sends text only; it does not read Discord or inspect attachments.
+
+```sh
+node apps/discord-bot/integration/evaluate-classification.mjs --check
+infisical run --env dev --path /services/cheaper-inference -- \
+  node apps/discord-bot/integration/evaluate-classification.mjs --live
+```
+
+Only `--live` permits paid requests: two rounds, 40 calls, with no automatic
+retries. The tool checks current catalog prices, sends `zdr: true` to
+`/v1/decisions`, requires each settled receipt to confirm ZDR, and stops before
+another call when accumulated batch charges reach USD 0.01. That local stop is
+not an account-wide spending limit or an exact final-charge cap. Offline checks
+and CI never make inference calls. JSONL records labels, full probabilities,
+latency, actual billing and request IDs; readiness uses a fixed 0.5 threshold.
+
+The catalog's Jev ZDR flag disagreed with successful ZDR request receipts during
+evaluation. This remains an unresolved provider-contract inconsistency, not
+proof of upstream retention behavior. See ENG-504's evaluation document for
+results and limitations. Classification remains advisory: buttons stay visible,
+staff choose the ticket type and bug priority, and features receive no priority.
+This evaluation does not implement a runtime classifier or change production
+configuration.
+
 ## Verification
 
 Before a release, verify each environment independently:
