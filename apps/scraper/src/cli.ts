@@ -76,6 +76,8 @@ async function main() {
       deploymentTarget: env.LOG_DEPLOYMENT_TARGET,
       loggerMode: env.LOGGER,
       logLevel: env.LOG_LEVEL,
+      notificationToken: env.LOGGER_NOTIFICATION_TOKEN,
+      notificationUrl: env.LOGGER_NOTIFICATION_URL,
       railwayEnvironmentName: env.RAILWAY_ENVIRONMENT_NAME,
     });
 

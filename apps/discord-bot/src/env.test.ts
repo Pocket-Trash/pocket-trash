@@ -18,6 +18,9 @@ const validEnv = {
   DISCORD_TOKEN: "discord-token",
   GITHUB_WEBHOOK_SECRET: "github-webhook-secret-at-least-32-characters",
   LINEAR_API_KEY: "linear-api-key",
+  LOGGER_NOTIFICATION_API_TOKEN: "a".repeat(32),
+  LOGGER_NOTIFICATION_SCRAPER_TOKEN: "s".repeat(32),
+  LOGGER_NOTIFICATION_WEB_TOKEN: "w".repeat(32),
   REDIS_URL: "redis://localhost:6379",
 };
 

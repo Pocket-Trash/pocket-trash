@@ -72,6 +72,8 @@ for (const environment of ["production", "preview"]) {
       "BUNNY_STORAGE_ZONE_NAME",
       "DATABASE_URL",
       "FONTAWESOME_PACKAGE_TOKEN",
+      "LOGGER_NOTIFICATION_TOKEN",
+      "LOGGER_NOTIFICATION_URL",
       "LOG_DEPLOYMENT_ID",
       "LOG_DEPLOYMENT_TARGET",
       "LOG_LEVEL",
@@ -123,6 +125,9 @@ for (const environment of ["production", "preview"]) {
         "DISCORD_LOGGER_CHANNEL_ID",
         "DISCORD_SUPPORT_FORUM_ID",
         "GITHUB_WEBHOOK_SECRET",
+        "LOGGER_NOTIFICATION_API_TOKEN",
+        "LOGGER_NOTIFICATION_SCRAPER_TOKEN",
+        "LOGGER_NOTIFICATION_WEB_TOKEN",
       ]) {
         assert.deepEqual(discordBot.variables[variable], { type: "preserve" });
       }

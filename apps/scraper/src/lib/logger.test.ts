@@ -8,7 +8,7 @@ describe("createScraperLogger", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uses AXIOM_DATASET for the logged environment instead of APP_ENV", async () => {
+  it("uses APP_ENV for policy while keeping AXIOM_DATASET as the destination", async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -17,7 +17,7 @@ describe("createScraperLogger", () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     const logger = createScraperLogger({
-      appEnv: "development",
+      appEnv: "production",
       axiomDataset: "production",
       axiomToken: "token",
     });
@@ -46,5 +46,22 @@ describe("createScraperLogger", () => {
         message: loggerMessages.scraper.run.started,
       }),
     ]);
+  });
+
+  it("preserves the preview policy label even when the dataset is shared", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetch);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const logger = createScraperLogger({
+      appEnv: "preview",
+      axiomDataset: "development",
+      axiomToken: "token",
+    });
+
+    logger.error("scraper.preview.error");
+    await logger.flush();
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body[0].environment).toBe("preview");
   });
 });

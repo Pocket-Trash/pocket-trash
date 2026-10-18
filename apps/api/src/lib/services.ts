@@ -2,6 +2,7 @@ import {
   createAxiomTransport,
   createConsoleTransport,
   createLogger,
+  createLoggerNotificationTransport,
   loggerValues,
   normalizeConsoleTransportMode,
   normalizeLogLevel,
@@ -24,6 +25,14 @@ export function createApiLogger(env: ApiBindings) {
             dataset: env.AXIOM_DATASET as string,
             edgeDomain: env.AXIOM_EDGE_DOMAIN,
             token: env.AXIOM_TOKEN as string,
+          }),
+        ]
+      : []),
+    ...(env.LOGGER_NOTIFICATION_TOKEN && env.LOGGER_NOTIFICATION_URL
+      ? [
+          createLoggerNotificationTransport({
+            endpoint: env.LOGGER_NOTIFICATION_URL,
+            token: env.LOGGER_NOTIFICATION_TOKEN,
           }),
         ]
       : []),

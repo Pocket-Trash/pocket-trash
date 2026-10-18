@@ -50,6 +50,14 @@ password, or public endpoint into Infisical. Sharing this credential also shares
 capacity and outage scope, while stable app-specific queue names and payload
 schemas prevent logical overlap.
 
+The direct logger transport uses one app-bound `LOGGER_NOTIFICATION_TOKEN` in
+each of `/apps/api`, `/apps/web`, and `/apps/scraper`. Store the matching values
+as `LOGGER_NOTIFICATION_API_TOKEN`, `LOGGER_NOTIFICATION_WEB_TOKEN`, and
+`LOGGER_NOTIFICATION_SCRAPER_TOKEN` in `/apps/discord-bot`. Never reuse a token
+between apps or environments. `LOGGER_NOTIFICATION_URL` is the bot's public
+`/webhooks/logger` URL and is server-only; browser logs continue through the
+existing API proxy.
+
 ### Linear bot credential
 
 Store `LINEAR_API_KEY` in `/apps/discord-bot` for both `dev` and `prod`. The key

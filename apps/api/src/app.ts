@@ -72,6 +72,10 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   LOG_LEVEL?: string;
   /** Shared key accepted by the client log proxy. */
   LOG_PROXY_CLIENT_KEY?: string;
+  /** App-bound bearer token used by direct logger notifications. */
+  LOGGER_NOTIFICATION_TOKEN?: string;
+  /** Discord bot logger intake endpoint. */
+  LOGGER_NOTIFICATION_URL?: string;
   /**
    * Secret used to verify Linear webhook signatures.
    * Production uses the production endpoint value; development and preview share the development endpoint value.
@@ -292,6 +296,7 @@ const ClientLogEventSchema = z
     deploymentId: z.string().min(1).max(64).optional(),
     deploymentTarget: z.string().min(1).max(64).optional(),
     environment: z.string().min(1).max(64),
+    eventId: z.string().min(1).max(200),
     error: z.record(z.string(), z.unknown()).optional(),
     level: z.enum(logLevels),
     message: z.string().min(1).max(500),

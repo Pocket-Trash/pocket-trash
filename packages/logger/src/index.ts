@@ -13,6 +13,16 @@ export {
   serializeAxiomEvent,
 } from "./axiom.js";
 export { loggerMessages, loggerValues } from "./constants/logger.js";
+export {
+  createLoggerNotificationTransport,
+  type LoggerNotificationEvent,
+  type LoggerNotificationRule,
+  type LoggerNotificationTransportConfig,
+  loggerNotificationEventSchema,
+  loggerNotificationRules,
+  matchesLoggerNotificationRules,
+  toLoggerNotificationEvent,
+} from "./notification.js";
 
 /** Numeric severity thresholds for supported log levels. */
 export const logLevelWeights = {
@@ -62,6 +72,8 @@ export type LogEvent = {
   deploymentTarget?: string;
   /** Runtime environment that emitted the event. */
   environment: string;
+  /** Stable identity shared by every transport for this event. */
+  eventId: string;
   /** Serialized failure associated with the event. */
   error?: SerializedError;
   /** Event severity. */
@@ -560,6 +572,7 @@ export function createLogger(config: LoggerConfig): Logger {
       deploymentId: config.deploymentId,
       deploymentTarget: config.deploymentTarget,
       environment: config.environment,
+      eventId: globalThis.crypto.randomUUID(),
       level: eventLevel,
       message,
       timestamp: new Date().toISOString(),
@@ -616,6 +629,7 @@ export function createLogger(config: LoggerConfig): Logger {
       deploymentId: inputEvent.deploymentId,
       deploymentTarget: inputEvent.deploymentTarget,
       environment: String(inputEvent.environment),
+      eventId: String(inputEvent.eventId),
       level: inputEvent.level,
       message: String(inputEvent.message),
       timestamp: String(inputEvent.timestamp),
@@ -1008,6 +1022,10 @@ function normalizeClientLogEvent(event: unknown):
     return { error: "Log event environment must be a string.", ok: false };
   }
 
+  if (!isShortString(event.eventId, 200)) {
+    return { error: "Log event eventId must be a string.", ok: false };
+  }
+
   if (
     event.deploymentTarget !== undefined &&
     !isShortString(event.deploymentTarget)
@@ -1051,6 +1069,7 @@ function normalizeClientLogEvent(event: unknown):
     deploymentId: event.deploymentId,
     deploymentTarget: event.deploymentTarget,
     environment: event.environment,
+    eventId: event.eventId,
     level: event.level,
     message: event.message,
     timestamp: event.timestamp ?? new Date().toISOString(),
@@ -1132,6 +1151,7 @@ function compactConsoleEvent(event: LogEvent): LogContext {
       ? { deploymentTarget: event.deploymentTarget }
       : {}),
     environment: event.environment,
+    eventId: event.eventId,
     level: event.level,
     message: event.message,
     timestamp: event.timestamp,

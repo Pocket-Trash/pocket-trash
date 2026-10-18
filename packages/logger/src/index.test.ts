@@ -204,6 +204,7 @@ describe("logger", () => {
         deploymentId: "pr-27",
         deploymentTarget: "web-client",
         environment: "preview",
+        eventId: "client-event-1",
         error: {
           message: "Client failed",
           name: "TypeError",
@@ -260,6 +261,7 @@ describe("logger", () => {
         {
           app: "web",
           environment: "test",
+          eventId: "client-event-1",
           level: "info",
           message: "client.clicked",
         },
@@ -272,6 +274,7 @@ describe("logger", () => {
         {
           app: "web",
           environment: "test",
+          eventId: "client-event-1",
           level: "info",
           message: "client.clicked",
         },
@@ -380,6 +383,7 @@ describe("transports", () => {
       deploymentId: "development",
       deploymentTarget: "local",
       environment: "development",
+      eventId: "event-1",
       error: {
         message: "Boom",
         name: "TypeError",
@@ -402,6 +406,7 @@ describe("transports", () => {
       deploymentTarget: "local",
       durationMs: 12,
       environment: "development",
+      eventId: "event-1",
       error: {
         message: "Boom",
         name: "TypeError",
@@ -435,6 +440,7 @@ describe("transports", () => {
         route: "/health",
       },
       environment: "development",
+      eventId: "event-1",
       level: "warn",
       message: "api.warned",
       rawPayload: {
@@ -450,6 +456,7 @@ describe("transports", () => {
         route: "/health",
       },
       environment: "development",
+      eventId: "event-1",
       level: "warn",
       levelWeight: 50,
       message: "api.warned",
@@ -478,6 +485,7 @@ describe("transports", () => {
         mode: "verbose",
       },
       environment: "preview",
+      eventId: "event-1",
       level: "info",
       message: "web.preview.derived",
       timestamp: "2026-01-01T00:00:00.000Z",
@@ -491,6 +499,7 @@ describe("transports", () => {
         pullRequestId: "27",
       },
       environment: "preview",
+      eventId: "event-1",
       level: "info",
       levelWeight: 40,
       message: "web.preview.derived",
@@ -527,6 +536,7 @@ describe("transports", () => {
       deploymentId: "deploy-1",
       deploymentTarget: "worker",
       environment: "test",
+      eventId: "event-1",
       error: { message: "safe", name: "Error" },
       level: "info",
       message: "hello",
@@ -545,6 +555,7 @@ describe("transports", () => {
             deploymentId: "deploy-1",
             deploymentTarget: "worker",
             environment: "test",
+            eventId: "event-1",
             level: "info",
             message: "hello",
             timestamp: "2026-01-01T00:00:00.000Z",
@@ -580,6 +591,7 @@ describe("transports", () => {
         mode: "verbose",
       },
       environment: "test",
+      eventId: "event-1",
       level: "info",
       message: "clicked",
       timestamp: "2026-01-01T00:00:00.000Z",
@@ -591,6 +603,7 @@ describe("transports", () => {
           {
             app: "web",
             environment: "test",
+            eventId: "event-1",
             level: "info",
             message: "clicked",
             timestamp: "2026-01-01T00:00:00.000Z",
