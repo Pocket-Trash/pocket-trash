@@ -114,6 +114,10 @@ for (const environment of ["production", "preview"]) {
       assert.deepEqual(discordBot.variables.LINEAR_API_KEY, {
         type: "preserve",
       });
+      assert.equal(
+        discordBot.variables.FONTAWESOME_PACKAGE_TOKEN.resource,
+        "service.pocket-trash",
+      );
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
       for (const variable of [
         "DISCORD_AXIOM_INTAKE_CHANNEL_ID",
