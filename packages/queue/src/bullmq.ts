@@ -29,19 +29,25 @@ export function createBullMqQueueAdapter(options: {
   onEvent?: (event: QueueLifecycleEvent) => void;
   /** Redis connection URL owned by this adapter. */
   redisUrl: string;
+  /** Keep a continuous service reconnecting after a prolonged Redis outage. */
+  recoverAfterOutage?: boolean;
 }): QueueAdapter {
   const connection = new Redis(options.redisUrl, {
     connectTimeout: 5_000,
     enableReadyCheck: false,
     maxRetriesPerRequest: null,
     /**
-     * Limits Redis reconnect attempts during startup and outages.
+     * Applies bounded retries for batch apps and continuous recovery for services.
      *
      * @param times - Consecutive reconnect attempt number.
-     * @returns Bounded delay before reconnecting throughout an outage.
+     * @returns Reconnection delay, or null after exhausting batch-app retries.
      */
     retryStrategy(times) {
-      return Math.min(times * 250, 10_000);
+      return options.recoverAfterOutage
+        ? Math.min(times * 250, 10_000)
+        : times <= 3
+          ? Math.min(times * 250, 1_000)
+          : null;
     },
   });
   const queues = new Set<BullMqDefinedQueue<unknown>>();

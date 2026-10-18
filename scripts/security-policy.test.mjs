@@ -392,6 +392,7 @@ async function installFixture(
         "--reporter=append-only",
         `--registry=${registry}`,
         `--store-dir=${path.join(directory, ".pnpm-store")}`,
+        `--cache-dir=${path.join(directory, ".pnpm-cache")}`,
       ],
       directory,
     )),

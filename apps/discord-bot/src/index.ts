@@ -52,6 +52,7 @@ const linearAuthentication = createLinearApiKeyAuthentication({
 });
 /** Shared Redis adapter hidden behind the queue package. */
 const queueAdapter = createBullMqQueueAdapter({
+  recoverAfterOutage: true,
   /**
    * Records queue lifecycle telemetry.
    *
