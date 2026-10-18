@@ -15,13 +15,24 @@ vi.mock("@/hooks/use-mobile", () => ({
    */
   useIsMobile: () => viewport.mobile,
 }));
-vi.mock("@/providers/locale-provider", () => ({
+vi.mock("@/lib/catalog-copy", () => ({
   /**
-   * Returns fixed English locale state.
+   * Returns fixed English pagination copy.
    *
-   * @returns English locale state.
+   * @returns English pagination formatter.
    */
-  useLocale: () => ({ locale: "en-US" }),
+  useCatalogCopy:
+    () =>
+    (key: string, values: Readonly<Record<string, unknown>> = {}) => {
+      const labels: Record<string, string> = {
+        "web.search.pagination.firstPage": "First page",
+        "web.search.pagination.lastPage": "Last page",
+      };
+      if (key === "web.search.pagination.goToPage") {
+        return `Go to page ${String(values.page)}`;
+      }
+      return labels[key] ?? key;
+    },
 }));
 
 import { getVisiblePages, Pagination } from "./pagination";

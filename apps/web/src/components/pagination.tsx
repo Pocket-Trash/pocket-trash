@@ -5,9 +5,8 @@ import {
   faChevronRight,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { formatTranslation } from "@pocket-trash/localizations";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useLocale } from "@/providers/locale-provider";
+import { useCatalogCopy } from "@/lib/catalog-copy";
 import { Button } from "./ui/button";
 
 /** Properties for shared one-based pagination controls. */
@@ -63,27 +62,9 @@ export function Pagination({
   page,
   pageCount,
 }: PaginationProps) {
-  const { locale } = useLocale();
+  const t = useCatalogCopy();
   const mobile = useIsMobile();
   if (pageCount <= 1) return null;
-
-  /**
-   * Formats localized pagination copy.
-   *
-   * @param key - Pagination translation key.
-   * @param values - Translation interpolation values.
-   * @returns Localized pagination copy.
-   */
-  const t = (
-    key:
-      | "web.search.pagination.firstPage"
-      | "web.search.pagination.goToPage"
-      | "web.search.pagination.lastPage"
-      | "web.search.pagination.nextPage"
-      | "web.search.pagination.pageStatus"
-      | "web.search.pagination.previousPage",
-    values: Record<string, string | number> = {},
-  ) => formatTranslation(key, values, locale);
 
   return (
     <nav
