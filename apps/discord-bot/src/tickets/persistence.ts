@@ -372,18 +372,19 @@ export function createTicketPersistence(options: {
         const operation = await transaction.load();
         if (operation) return operation;
         const issue = await options.linear.findByThread(sourceUrl(threadId));
-        return issue
-          ? {
-              version: 1,
-              threadId,
-              issueId: issue.id,
-              issueUrl: issue.url,
-              kind: issue.kind,
-              priority: 0,
-              phase: "persisted",
-              commentIds: [],
-            }
-          : undefined;
+        if (!issue) return undefined;
+        const recovered: TicketOperation = {
+          version: 1,
+          threadId,
+          issueId: issue.id,
+          issueUrl: issue.url,
+          kind: issue.kind,
+          priority: 0,
+          phase: "persisted",
+          commentIds: [],
+        };
+        await transaction.save(recovered);
+        return recovered;
       });
     },
     /**

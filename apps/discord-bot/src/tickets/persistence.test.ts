@@ -377,6 +377,28 @@ describe("recoverable Discord-to-Linear persistence", () => {
     expect(f.reader.snapshot).not.toHaveBeenCalled();
   });
 
+  it("checkpoints a Linear recovery before repairing and finalizing Discord", async () => {
+    const f = fixture();
+    const issue = {
+      id: randomUUID(),
+      url: "https://linear.app/pocket-trash/issue/ENG-9999",
+      kind: "bug" as const,
+    };
+    vi.mocked(f.linear.findByThread).mockResolvedValue(issue);
+    expect(await f.service.lookup(threadId)).toMatchObject({
+      issueId: issue.id,
+      phase: "persisted",
+    });
+    await f.service.finalize(threadId);
+    expect(await f.service.lookup(threadId)).toMatchObject({
+      issueId: issue.id,
+      phase: "finalized",
+    });
+    expect(f.linear.findByThread).toHaveBeenCalledTimes(1);
+    expect(f.linear.createIssue).not.toHaveBeenCalled();
+    expect(f.reader.snapshot).not.toHaveBeenCalled();
+  });
+
   it("splits transcripts deterministically without cutting surrogate pairs or losing text", () => {
     const f = fixture();
     const message = f.snapshot.messages[0];
