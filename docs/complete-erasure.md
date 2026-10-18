@@ -166,6 +166,37 @@ metadata is erased. Owner processor approval is recorded in the
 Complete deletion verification before enabling production ticket inference. No
 fallback to ordinary-retention routes is allowed.
 
+### Recoverable Discord ticket operations
+
+The bot-local Redis namespace is `discord-bot:ticket:<threadId>`, with a short
+renewable `:lease` key. Processing records hold the frozen human transcript,
+staff note, summary, file metadata, stable issue/comment UUIDs, upload outcomes
+and durable Linear asset URLs. Raw file bytes, inference credentials and signed
+Discord/storage URLs are not persisted. PDF conversion uses private temporary
+files removed in a `finally` block; bytes otherwise remain process-local.
+
+In-progress and Linear-persisted operations have no automatic TTL: deleting
+them before safe recovery could create a duplicate ticket. They must be included
+in subject erasure and operational review of abandoned requests. After Discord
+finalization, compaction removes transcript, staff note, summary, file manifest
+and comment bodies, retaining only the thread-to-issue/comment mapping for 90
+days. The mapping's expiry does not delete the Linear issue or its files.
+
+Linear holds the issue description, numbered transcript comments, private file
+uploads and canonical Discord source attachment. Before compaction, all upload
+attempt URLs are copied into that attachment's `ticketAsset<N>` metadata,
+including ambiguous attempts that are not visible transcript links. Erasure
+must capture this metadata, current file links and pending Redis manifests
+before deleting source records. Deleting a Resources attachment link is not
+physical deletion of its stored file. Verify private-file removal separately;
+do not assume issue deletion, unlinking or a Redis TTL purges storage.
+
+Pause source-thread ticket processing during erasure and prevent recovery from
+reintroducing erased content. Scraper/notification work in the shared Redis must
+remain intact. Complete the existing backup, processor-deletion and restore
+verification gates before enabling production ticket inference. This module
+does not claim to implement a complete cross-provider erasure workflow.
+
 ### Processing regions and recovery copies
 
 | Processor | Region / delivery | Recovery-copy behavior |
