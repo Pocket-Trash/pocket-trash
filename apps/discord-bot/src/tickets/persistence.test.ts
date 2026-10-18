@@ -279,6 +279,31 @@ describe("recoverable Discord-to-Linear persistence", () => {
     expect(f.reader.readFile).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps an ambiguous upload attempt discoverable for erasure when a new slot is required", async () => {
+    const f = fixture();
+    vi.mocked(f.linear.putUpload).mockRejectedValueOnce(
+      new Error("Upload response lost before completion"),
+    );
+    await expect(f.service.persist(request)).rejects.toThrow(
+      "Upload response lost",
+    );
+    const replacement = {
+      ...f.slot,
+      assetUrl: "https://uploads.linear.app/synthetic/replacement",
+    };
+    vi.mocked(f.linear.prepareUpload).mockResolvedValueOnce(replacement);
+    await f.service.persist(request);
+    expect(f.linear.linkThread).toHaveBeenCalledWith(
+      expect.any(String),
+      f.snapshot.threadUrl,
+      [f.slot.assetUrl, replacement.assetUrl],
+    );
+    const transcript = [...f.comments.values()].join("\n");
+    expect(transcript).toContain(replacement.assetUrl);
+    expect(transcript).not.toContain(f.slot.assetUrl);
+    expect(f.issues.size).toBe(1);
+  });
+
   it.each([
     "metadata",
     "bytes",
