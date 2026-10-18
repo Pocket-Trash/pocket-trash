@@ -26,6 +26,22 @@ const validEnv = {
 };
 
 describe("Discord bot environment", () => {
+  it("keeps ticket inference disabled until explicitly activated with a credential", () => {
+    expect(createDiscordBotEnv(validEnv).DISCORD_TICKETS_ENABLED).toBe(false);
+    expect(() =>
+      createDiscordBotEnv({ ...validEnv, DISCORD_TICKETS_ENABLED: "true" }),
+    ).toThrow("CHEAPERINFERENCE_API_KEY");
+    expect(
+      createDiscordBotEnv({
+        ...validEnv,
+        DISCORD_TICKETS_ENABLED: "true",
+        CHEAPERINFERENCE_API_KEY: "synthetic",
+      }).DISCORD_TICKETS_ENABLED,
+    ).toBe(true);
+    expect(() =>
+      createDiscordBotEnv({ ...validEnv, DISCORD_TICKETS_ENABLED: "yes" }),
+    ).toThrow("DISCORD_TICKETS_ENABLED");
+  });
   it("validates required secrets and snowflake IDs", () => {
     expect(createDiscordBotEnv(validEnv)).toMatchObject({
       DISCORD_APPLICATION_ID: validEnv.DISCORD_APPLICATION_ID,

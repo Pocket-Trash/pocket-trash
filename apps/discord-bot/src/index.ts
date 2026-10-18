@@ -22,6 +22,7 @@ import { createDeliveryQueueRuntime } from "./queue.js";
 import { createReadiness } from "./readiness.js";
 import { createInteractionRegistry } from "./registries.js";
 import { renderDiscordNotification } from "./renderer.js";
+import { createForumTickets } from "./tickets/forum.js";
 
 /** Validated process configuration. */
 const env = createDiscordBotEnv(process.env);
@@ -39,6 +40,29 @@ const logger = createDiscordBotLogger({
 });
 /** Discord gateway client. */
 const client = new Client({ intents: [...discordGatewayIntents] });
+/** Explicitly gated support-ticket lifecycle; disabled until operators approve activation. */
+const forumTickets = env.DISCORD_TICKETS_ENABLED
+  ? createForumTickets({
+      client,
+      guildId: env.DISCORD_GUILD_ID,
+      forumId: env.DISCORD_SUPPORT_FORUM_ID,
+      ownerRoleId: env.DISCORD_OWNER_ROLE_ID,
+      bugTagId: env.DISCORD_BUG_TAG_ID,
+      featureTagId: env.DISCORD_FEATURE_REQUEST_TAG_ID,
+      redisUrl: env.REDIS_URL,
+      linearApiKey: env.LINEAR_API_KEY,
+      inferenceApiKey: env.CHEAPERINFERENCE_API_KEY ?? "",
+      provider: env.DISCORD_TICKET_SUMMARY_PROVIDER,
+      model: env.DISCORD_TICKET_SUMMARY_MODEL,
+      baseUrl: env.DISCORD_TICKET_INFERENCE_BASE_URL,
+      /** Records repair failures without logging support content or provider errors. */
+      onRepairFailure() {
+        logger.error(loggerMessages.discordBot.ticketOperationFailed);
+      },
+    })
+  : undefined;
+/** Prevents reconciliation before ticket Redis has connected. */
+let ticketsStarted = false;
 /** Single English staff command compiled from published help content. */
 const helpLinkCommand = createHelpLinkCommand({
   ownerRoleId: env.DISCORD_OWNER_ROLE_ID,
@@ -231,6 +255,12 @@ client.on(Events.ShardDisconnect, (event) => {
 });
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isRepliable() || !interaction.inGuild()) return;
+  try {
+    if (await forumTickets?.dispatch(interaction)) return;
+  } catch {
+    logger.error(loggerMessages.discordBot.ticketOperationFailed);
+    return;
+  }
   const memberRoleIds = Array.isArray(interaction.member?.roles)
     ? interaction.member.roles
     : [...(interaction.member?.roles.cache.keys() ?? [])];
@@ -264,8 +294,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.on(Events.MessageCreate, (message) => {
   if (message.channelId === env.DISCORD_AXIOM_INTAKE_CHANNEL_ID)
     void reconcileAxiom();
+  forumTickets?.changed(message);
 });
-client.on(Events.ShardResume, () => void reconcileAxiom());
+client.on(Events.MessageUpdate, (_old, message) =>
+  forumTickets?.changed(message),
+);
+client.on(Events.MessageDelete, (message) => forumTickets?.changed(message));
+client.on(Events.ThreadCreate, (thread, newlyCreated) => {
+  if (ticketsStarted)
+    void forumTickets
+      ?.created(thread, newlyCreated)
+      .catch(() =>
+        logger.error(loggerMessages.discordBot.ticketOperationFailed),
+      );
+});
+client.on(Events.ShardResume, () => {
+  void reconcileAxiom();
+  void reconcileTickets();
+});
 client.on(Events.ClientReady, () => {
   if (deliveryQueue.started()) void reconcileAxiom();
 });
@@ -287,9 +333,17 @@ async function start() {
     [helpLinkCommand.definition],
   );
   await deliveryQueue.start();
+  await forumTickets?.start();
+  ticketsStarted = Boolean(forumTickets);
   readiness.setWorkerStarted(true);
   await reconcileAxiom();
-  axiomTimer = setInterval(() => void reconcileAxiom(), 5 * 60 * 1_000);
+  axiomTimer = setInterval(
+    () => {
+      void reconcileAxiom();
+      void reconcileTickets();
+    },
+    5 * 60 * 1_000,
+  );
   logger.info(loggerMessages.discordBot.serverListening, {
     attributes: { port: env.PORT },
   });
@@ -306,6 +360,16 @@ async function reconcileAxiom() {
     logger.error(loggerMessages.discordBot.axiomReconciliationFailed, {
       error,
     });
+  }
+}
+
+/** Repairs active support threads periodically and after gateway recovery, without inference. */
+async function reconcileTickets() {
+  if (shuttingDown || !client.isReady() || !ticketsStarted) return;
+  try {
+    await forumTickets?.reconcile();
+  } catch {
+    logger.error(loggerMessages.discordBot.ticketOperationFailed);
   }
 }
 
@@ -333,6 +397,7 @@ async function shutdown(signal: string) {
   readiness.setReconcilerStarted(false);
   clearInterval(axiomTimer);
   axiomCursor.close();
+  forumTickets?.close();
   logger.info(loggerMessages.discordBot.serverStopping, {
     attributes: { signal },
   });

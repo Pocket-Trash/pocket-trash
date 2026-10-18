@@ -27,6 +27,7 @@ const discordBotEnvSchema = z.object({
   AXIOM_EDGE_DOMAIN: z.string().min(1).optional(),
   AXIOM_INTAKE_WEBHOOK_URL: discordWebhookUrlSchema,
   AXIOM_TOKEN: z.string().min(1).optional(),
+  CHEAPERINFERENCE_API_KEY: z.string().min(1).optional(),
   DISCORD_APPLICATION_ID: snowflakeSchema,
   DISCORD_AXIOM_INTAKE_CHANNEL_ID: snowflakeSchema,
   DISCORD_BUG_TAG_ID: snowflakeSchema,
@@ -39,6 +40,13 @@ const discordBotEnvSchema = z.object({
   DISCORD_OWNER_ROLE_ID: snowflakeSchema,
   DISCORD_SUPPORT_FORUM_ID: snowflakeSchema,
   DISCORD_TOKEN: z.string().min(1),
+  DISCORD_TICKETS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  DISCORD_TICKET_SUMMARY_PROVIDER: z.string().min(1).optional(),
+  DISCORD_TICKET_SUMMARY_MODEL: z.string().min(1).optional(),
+  DISCORD_TICKET_INFERENCE_BASE_URL: z.url().optional(),
   GITHUB_WEBHOOK_SECRET: z.string().min(32),
   LOGGER: z.string().min(1).optional(),
   LINEAR_API_KEY: z.string().min(1),
@@ -67,7 +75,16 @@ export type DiscordBotRuntimeEnv = Partial<
  */
 export function createDiscordBotEnv(runtimeEnv: DiscordBotRuntimeEnv) {
   const result = discordBotEnvSchema.safeParse(runtimeEnv);
-  if (result.success) return result.data;
+  if (result.success) {
+    if (
+      result.data.DISCORD_TICKETS_ENABLED &&
+      !result.data.CHEAPERINFERENCE_API_KEY
+    )
+      throw new Error(
+        "Invalid environment variables: CHEAPERINFERENCE_API_KEY is required when DISCORD_TICKETS_ENABLED=true",
+      );
+    return result.data;
+  }
 
   const variables = [
     ...new Set(

@@ -158,8 +158,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/queue
       '@pocket-trash/localizations':
-        specifier: ^0.43.1
-        version: 0.43.1
+        specifier: ^0.45.0
+        version: 0.45.0
       discord.js:
         specifier: ^14.24.2
         version: 14.27.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -3053,12 +3053,12 @@ packages:
     resolution: {integrity: sha512-dePJBAlom7oXAbgTUgPpqtWaRkv0mkkctX6YeXzfdqF3ni8v4+LNZ8AYRlFeLXIgEYUcNUph/HHgeKkC1WNtrQ==}
     engines: {node: '>=22.20.0 <23'}
 
-  '@pocket-trash/localizations@0.43.1':
-    resolution: {integrity: sha512-whKzKx08zkL+lySaL/iMp1l+6/bQgiyJxSvQxg8pRfKvZpJrgX/PftH2sIoK7+7JUeRFK1ZikdYI4GdUNMw1Hw==}
-    engines: {node: '>=22.20.0 <23'}
-
   '@pocket-trash/localizations@0.44.0':
     resolution: {integrity: sha512-2XRQpn5wK6mIyPVxzJbDv+hcZP1DBj9EqGAVMsibubaY4DF6YXOouJh/ZTIClSktf42/BqAD35ypsKthFKs5tw==}
+    engines: {node: '>=22.20.0 <23'}
+
+  '@pocket-trash/localizations@0.45.0':
+    resolution: {integrity: sha512-jOHFO2c7t4z5xTUR3xP87RT2UCUQ16vjQjBmknaUGa7mE8ZH/hdLRvOfH/RF1SsVgk9lMIapnJ7x6QcPvkiqZg==}
     engines: {node: '>=22.20.0 <23'}
 
   '@polka/url@1.0.0-next.29':
@@ -10219,9 +10219,9 @@ snapshots:
 
   '@pocket-trash/localizations@0.41.0': {}
 
-  '@pocket-trash/localizations@0.43.1': {}
-
   '@pocket-trash/localizations@0.44.0': {}
+
+  '@pocket-trash/localizations@0.45.0': {}
 
   '@polka/url@1.0.0-next.29': {}
 
