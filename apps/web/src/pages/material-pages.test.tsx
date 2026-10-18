@@ -136,6 +136,16 @@ describe("material pages", () => {
     expect(html).toContain("No products use this material yet.");
     expect(html).toContain("No collection items use this material yet.");
   });
+
+  it("keeps the directory search available when a query has no matches", () => {
+    const html = renderToStaticMarkup(
+      <MaterialsPage materials={[material]} query="zz" />,
+    );
+
+    expect(html).toContain('type="search"');
+    expect(html).toContain('value="zz"');
+    expect(html).toContain("No materials are available yet.");
+  });
 });
 
 describe("material specifics", () => {

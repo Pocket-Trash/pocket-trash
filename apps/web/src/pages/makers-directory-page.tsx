@@ -2,8 +2,14 @@ import { faIndustry } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { PublicMakerSummary } from "@package/services";
 import { AppShell } from "@/components/app-shell";
+import {
+  DirectorySearch,
+  DirectorySearchStatus,
+} from "@/components/directory-search";
+import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
+import { rankedDirectoryIds } from "@/lib/directory-search";
 import { cn } from "@/lib/utils";
 
 /** Ordered table-of-contents labels for maker directory sections. */
@@ -57,13 +63,32 @@ export function makerDirectorySections(
  */
 export function MakersDirectoryPage({
   makers,
+  onQueryChange = () => undefined,
+  query = "",
 }: {
   /** Every public maker directory entry. */
   makers: PublicMakerSummary[];
+  /**
+   * Commits the debounced query to route search state.
+   *
+   * @param query - Normalized directory query.
+   */
+  onQueryChange?(query: string): void;
+  /** Current URL-backed directory query. */
+  query?: string;
 }) {
   const t = useCatalogCopy();
-  const sections = makerDirectorySections(makers);
-  const popular = [...makers]
+  const search = useDirectorySearch(query, "makers");
+  const rankedIds = rankedDirectoryIds(search.items, new Set(["maker"]));
+  const makersById = new Map(makers.map((maker) => [maker.id, maker]));
+  const visibleMakers = query.trim()
+    ? rankedIds.flatMap((id) => {
+        const maker = makersById.get(id);
+        return maker ? [maker] : [];
+      })
+    : makers;
+  const sections = makerDirectorySections(visibleMakers);
+  const popular = [...visibleMakers]
     .sort(
       (a, b) =>
         b.collectionItemCount - a.collectionItemCount ||
@@ -81,6 +106,12 @@ export function MakersDirectoryPage({
           <p className="m-0 text-muted-foreground">
             {t("web.makers.directoryDescription")}
           </p>
+          <DirectorySearch
+            onQueryChange={onQueryChange}
+            placeholderKey="web.search.directory.makersPlaceholder"
+            query={query}
+          />
+          <DirectorySearchStatus query={query} status={search.status} />
         </header>
 
         {popular.length ? (
@@ -129,7 +160,7 @@ export function MakersDirectoryPage({
           )}
         </nav>
 
-        {makers.length ? (
+        {visibleMakers.length ? (
           sections
             .filter(({ makers: entries }) => entries.length)
             .map((section) => (

@@ -12,6 +12,10 @@ import type {
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import {
+  DirectorySearch,
+  DirectorySearchStatus,
+} from "@/components/directory-search";
 import { ImageGallery } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCard } from "@/components/material-card";
@@ -22,8 +26,10 @@ import {
 import { ProductCard } from "@/components/product-card";
 import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Button } from "@/components/ui/button";
+import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
+import { rankedDirectoryIds } from "@/lib/directory-search";
 import {
   clampMaterialPage,
   getMaterialInitial,
@@ -69,24 +75,55 @@ function materialCardCopy(
  */
 export function MaterialsPage({
   materials,
+  onQueryChange = () => undefined,
+  query = "",
 }: {
   /** Every material and its public usage counts. */
   materials: PublicMaterialSummary[];
+  /**
+   * Commits the debounced query to route search state.
+   *
+   * @param query - Normalized directory query.
+   */
+  onQueryChange?(query: string): void;
+  /** Current URL-backed directory query. */
+  query?: string;
 }) {
   const t = useCatalogCopy();
-  const groups = groupMaterials(materials);
-  const populated = new Set(
-    materials.map(({ name }) => getMaterialInitial(name)),
+  const search = useDirectorySearch(query, "materials");
+  const rankedIds = rankedDirectoryIds(
+    search.items,
+    new Set(["material"]),
+    new Set(["material_detail"]),
   );
-  const popular = sortPopularMaterials(materials).slice(0, 8);
+  const materialsById = new Map(
+    materials.map((material) => [material.id, material]),
+  );
+  const visibleMaterials = query.trim()
+    ? rankedIds.flatMap((id) => {
+        const material = materialsById.get(id);
+        return material ? [material] : [];
+      })
+    : materials;
+  const groups = groupMaterials(visibleMaterials);
+  const populated = new Set(
+    visibleMaterials.map(({ name }) => getMaterialInitial(name)),
+  );
+  const popular = sortPopularMaterials(visibleMaterials).slice(0, 8);
 
   return (
     <AppShell
       meta={t("web.materials.directory.description")}
       title={t("web.materials.directory.title")}
     >
-      {materials.length ? (
+      {visibleMaterials.length ? (
         <main className="grid gap-10 p-4 md:p-[18px_22px_22px]">
+          <DirectorySearch
+            onQueryChange={onQueryChange}
+            placeholderKey="web.search.directory.materialsPlaceholder"
+            query={query}
+          />
+          <DirectorySearchStatus query={query} status={search.status} />
           <section aria-labelledby="popular-materials" className="grid gap-4">
             <h2 className="text-xl font-semibold" id="popular-materials">
               {t("web.materials.directory.popular")}
@@ -198,7 +235,13 @@ export function MaterialsPage({
           </section>
         </main>
       ) : (
-        <main className="p-4 md:p-[18px_22px_22px]">
+        <main className="grid gap-10 p-4 md:p-[18px_22px_22px]">
+          <DirectorySearch
+            onQueryChange={onQueryChange}
+            placeholderKey="web.search.directory.materialsPlaceholder"
+            query={query}
+          />
+          <DirectorySearchStatus query={query} status={search.status} />
           <EmptyState>{t("web.materials.directory.empty")}</EmptyState>
         </main>
       )}

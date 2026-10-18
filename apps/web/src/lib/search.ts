@@ -20,7 +20,7 @@ export const searchPublic = createServerFn({ method: "GET" })
           .optional(),
         page: z.number().int().positive().optional(),
         query: z.string().max(SEARCH_QUERY_MAX_LENGTH),
-        surface: z.enum(["modal", "page"]),
+        surface: z.enum(["directory", "modal", "page"]),
       })
       .parse(input),
   )

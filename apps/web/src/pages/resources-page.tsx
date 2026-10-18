@@ -7,8 +7,14 @@ import {
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
+import {
+  DirectorySearch,
+  DirectorySearchStatus,
+} from "@/components/directory-search";
 import { ResourceCard } from "@/components/resource-card";
 import { Button } from "@/components/ui/button";
+import { useDirectorySearch } from "@/hooks/use-directory-search";
+import { rankedDirectoryIds } from "@/lib/directory-search";
 import type { listResourceDirectory } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -25,16 +31,37 @@ type ResourceDirectory = Awaited<ReturnType<typeof listResourceDirectory>>;
  */
 export function ResourcesPage({
   directory,
+  onQueryChange = () => undefined,
+  query = "",
   selectedCategorySlugs,
 }: {
   /** Resources, categories, and invalid filters. */
   directory: ResourceDirectory;
+  /**
+   * Commits the debounced query to route search state.
+   *
+   * @param query - Normalized directory query.
+   */
+  onQueryChange?(query: string): void;
+  /** Current URL-backed directory query. */
+  query?: string;
   /** Active category filter slugs. */
   selectedCategorySlugs: string[];
 }) {
   const { isSignedIn } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
+  const search = useDirectorySearch(query, "resources");
+  const rankedIds = rankedDirectoryIds(search.items, new Set(["resource"]));
+  const resourcesById = new Map(
+    directory.resources.map((resource) => [resource.id, resource]),
+  );
+  const resources = query.trim()
+    ? rankedIds.flatMap((id) => {
+        const resource = resourcesById.get(id);
+        return resource ? [resource] : [];
+      })
+    : directory.resources;
   /**
    * Formats localized resource directory copy.
    *
@@ -54,7 +81,10 @@ export function ResourcesPage({
    */
   function setCategoryFilters(categorySlugs: string[]) {
     void navigate({
-      search: categorySlugs.length > 0 ? { category: categorySlugs } : {},
+      search: {
+        ...(categorySlugs.length > 0 ? { category: categorySlugs } : {}),
+        ...(query ? { q: query } : {}),
+      },
       to: "/resources",
     });
   }
@@ -81,6 +111,12 @@ export function ResourcesPage({
           />
         </aside>
         <main className="grid min-w-0 gap-6">
+          <DirectorySearch
+            onQueryChange={onQueryChange}
+            placeholderKey="web.search.directory.resourcesPlaceholder"
+            query={query}
+          />
+          <DirectorySearchStatus query={query} status={search.status} />
           <p className="m-0 max-w-2xl text-sm leading-6 text-muted-foreground">
             {t("web.resources.directory.description")}
           </p>
@@ -92,7 +128,7 @@ export function ResourcesPage({
             >
               {t("web.resources.directory.invalidFilter")}
             </p>
-          ) : directory.resources.length === 0 ? (
+          ) : resources.length === 0 ? (
             <p className="m-0 rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
               {t(
                 selectedCategorySlugs.length > 0
@@ -102,7 +138,7 @@ export function ResourcesPage({
             </p>
           ) : (
             <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {directory.resources.map((resource) => (
+              {resources.map((resource) => (
                 <ResourceCard key={resource.id} resource={resource} />
               ))}
             </section>

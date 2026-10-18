@@ -5,9 +5,14 @@ import type {
   PublicCollectionOwner,
 } from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductCard } from "@/components/product-card";
 import { emptyCatalogFilters } from "@/lib/catalog-filters";
+
+/** Mocked central directory-search hook. */
+const useDirectorySearch = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-directory-search", () => ({ useDirectorySearch }));
+
 import {
   CollectionItemDetailPage,
   CollectionPage,
@@ -21,6 +26,10 @@ import {
   PublicCollectionsPage,
   UserCollectionsPage,
 } from "./catalog-pages";
+
+beforeEach(() => {
+  useDirectorySearch.mockReturnValue({ items: [], status: "idle" });
+});
 
 describe("HomePage", () => {
   it("renders Products, Collections, Makers, Materials, and Resources in order", () => {
@@ -512,6 +521,24 @@ describe("UserCollectionsPage", () => {
 });
 
 describe("CollectionPage", () => {
+  it("keeps private collection search client-side", () => {
+    const collection = owners[0]?.collections[0];
+    const item = owners[0]?.items[0];
+    if (!collection || !item) throw new Error("Collection fixtures required.");
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), query: item.displayName }}
+        items={[item]}
+        userArea
+      />,
+    );
+
+    expect(html).toContain(item.displayName);
+    expect(useDirectorySearch).toHaveBeenCalledWith("", "collections");
+  });
+
   it("places the owner avatar beside the title in the details card", () => {
     const collection = owners[0]?.collections[0];
     if (!collection) throw new Error("Collection fixture is required.");
@@ -863,6 +890,37 @@ describe("ProductGrid", () => {
 });
 
 describe("ProductsPage", () => {
+  it("intersects product filters with central-index rank order", () => {
+    const first = { ...product, id: 1, name: "First", slug: "first" };
+    const second = { ...product, id: 2, name: "Second", slug: "second" };
+    useDirectorySearch.mockReturnValue({
+      items: [
+        {
+          context: "Ranked context",
+          highlights: [],
+          href: "/products/spinners/second",
+          id: 2,
+          kind: "product",
+          title: "Second",
+        },
+      ],
+      status: "ready",
+    });
+
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        filters={{ ...emptyCatalogFilters(), query: "second" }}
+        products={[first, second]}
+        searchQuery="second"
+      />,
+    );
+
+    expect(html).toContain("Second");
+    expect(html).toContain("Ranked context");
+    expect(html).not.toContain(">First<");
+    expect(useDirectorySearch).toHaveBeenCalledWith("second", "products");
+  });
+
   it("groups visible product types and links into the product list", () => {
     const productTypes: CatalogProductTypeSummary[] = [
       {
