@@ -196,6 +196,9 @@ describe("recoverable Discord-to-Linear persistence", () => {
       phase: "finalized",
       commentIds: result.commentIds,
     });
+    const write = vi.spyOn(f.states, "set");
+    await f.service.finalize(threadId);
+    expect(write).not.toHaveBeenCalled();
   });
 
   it("forces feature priority to none and retains the first durable intent on retry", async () => {

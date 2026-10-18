@@ -396,6 +396,7 @@ export function createTicketPersistence(options: {
         const operation = await transaction.load();
         if (!operation || operation.phase === "processing")
           throw new Error("Ticket is not ready for Discord finalization.");
+        if (operation.phase === "finalized") return;
         await transaction.save({
           version: 1,
           threadId,
