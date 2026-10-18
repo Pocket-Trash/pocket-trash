@@ -67,7 +67,8 @@ export function GlobalSearch() {
   const seeAll = React.useRef<HTMLAnchorElement>(null);
   const trigger = React.useRef<HTMLButtonElement>(null);
   const request = React.useRef(0);
-  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const presentation = React.useRef(isMobile);
+  const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [selected, setSelected] = React.useState(0);
@@ -83,11 +84,10 @@ export function GlobalSearch() {
 
   /** Opens the responsive search surface. */
   const open = React.useCallback(() => {
-    if (isMobile) setMobileOpen(true);
-    else {
-      dialog.current?.showModal();
-      requestAnimationFrame(() => input.current?.focus());
-    }
+    setIsOpen(true);
+    if (isMobile) return;
+    dialog.current?.showModal();
+    requestAnimationFrame(() => input.current?.focus());
   }, [isMobile]);
 
   React.useEffect(() => {
@@ -108,20 +108,28 @@ export function GlobalSearch() {
   /** Clears modal state and restores focus to the header trigger. */
   const finishClose = React.useCallback(() => {
     request.current += 1;
+    setIsOpen(false);
     setQuery("");
     setResults([]);
     setSelected(0);
     setState("idle");
     trigger.current?.focus();
-  }, []);
+    if (isMobile) window.setTimeout(() => trigger.current?.focus());
+  }, [isMobile]);
 
   /** Closes the active search presentation. */
   const close = React.useCallback(() => {
-    if (isMobile) {
-      setMobileOpen(false);
-      finishClose();
-    } else dialog.current?.close();
+    if (isMobile) finishClose();
+    else dialog.current?.close();
   }, [finishClose, isMobile]);
+
+  React.useEffect(() => {
+    if (presentation.current === isMobile) return;
+    presentation.current = isMobile;
+    if (!isOpen) return;
+    if (dialog.current?.open) dialog.current.close();
+    else finishClose();
+  }, [finishClose, isMobile, isOpen]);
 
   React.useEffect(() => {
     const trimmed = query.trim();
@@ -358,14 +366,18 @@ export function GlobalSearch() {
       {isMobile ? (
         <Drawer
           onOpenChange={(nextOpen) => {
-            setMobileOpen(nextOpen);
+            setIsOpen(nextOpen);
             if (!nextOpen) finishClose();
           }}
-          open={mobileOpen}
+          open={isOpen}
         >
           <DrawerContent
             className="h-[92svh] max-h-[92svh]"
             data-presentation="drawer"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              trigger.current?.focus();
+            }}
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               input.current?.focus();
