@@ -16,6 +16,8 @@ const logger = createScraperLogger({
   deploymentTarget: scraperEnv.LOG_DEPLOYMENT_TARGET,
   loggerMode: scraperEnv.LOGGER,
   logLevel: scraperEnv.LOG_LEVEL,
+  notificationToken: scraperEnv.LOGGER_NOTIFICATION_TOKEN,
+  notificationUrl: scraperEnv.LOGGER_NOTIFICATION_URL,
   railwayEnvironmentName: scraperEnv.RAILWAY_ENVIRONMENT_NAME,
 });
 

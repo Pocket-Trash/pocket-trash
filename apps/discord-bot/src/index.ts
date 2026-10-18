@@ -13,6 +13,7 @@ import {
 import { createGitHubWebhookNormalizer } from "./github.js";
 import { createLinearApiKeyAuthentication } from "./linear.js";
 import { createDiscordBotLogger } from "./logger.js";
+import { createLoggerWebhookNormalizer } from "./logger-webhook.js";
 import { createDeliveryQueueRuntime } from "./queue.js";
 import { createReadiness } from "./readiness.js";
 import {
@@ -75,9 +76,6 @@ const deliveryQueue = createDeliveryQueueRuntime({
    * @rejects When the delivery kind or Discord destination is invalid.
    */
   async deliver(payload) {
-    if (payload.kind !== "github") {
-      throw new Error(`Unsupported Discord delivery kind: ${payload.kind}`);
-    }
     const channel = await client.channels.fetch(payload.destinationChannelId);
     if (!channel?.isSendable()) {
       throw new Error("Configured Discord destination is not sendable.");
@@ -112,11 +110,37 @@ const githubWebhook = createWebhookIntake({
     secret: env.GITHUB_WEBHOOK_SECRET,
   }),
 });
+/** App-authenticated direct logger intake backed by the delivery queue. */
+const loggerWebhook = createWebhookIntake({
+  /**
+   * Persists one authenticated logger event under its stable event ID.
+   *
+   * @param delivery - Authenticated normalized logger delivery.
+   * @returns Queue enqueue disposition.
+   */
+  enqueue: (delivery) =>
+    deliveryQueue.enqueue({
+      id: delivery.id,
+      name: "logger-notification",
+      payload: delivery.payload,
+    }),
+  normalize: createLoggerWebhookNormalizer({
+    channelId: env.DISCORD_LOGGER_CHANNEL_ID,
+    tokens: {
+      api: env.LOGGER_NOTIFICATION_API_TOKEN,
+      scraper: env.LOGGER_NOTIFICATION_SCRAPER_TOKEN,
+      web: env.LOGGER_NOTIFICATION_WEB_TOKEN,
+    },
+  }),
+});
 /** Hono HTTP server used by Railway health checks and authenticated webhooks. */
 const server = serve({
   fetch: createApp({
     readiness,
-    webhookRoutes: [{ handle: githubWebhook, path: "/webhooks/github" }],
+    webhookRoutes: [
+      { handle: githubWebhook, path: "/webhooks/github" },
+      { handle: loggerWebhook, path: "/webhooks/logger" },
+    ],
   }).fetch,
   port: env.PORT,
 });

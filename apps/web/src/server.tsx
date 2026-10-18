@@ -34,19 +34,22 @@ function createServerEntry(entry: ServerEntry): ServerEntry {
      */
     async fetch(...args) {
       const [request] = args;
+      try {
+        if (
+          request.method === "POST" &&
+          new URL(request.url).pathname === "/api/v0/logs"
+        ) {
+          return await handleLogIngestionRequest({
+            clientLogKey: serverEnv.LOG_PROXY_CLIENT_KEY,
+            logger: s.logger,
+            request,
+          });
+        }
 
-      if (
-        request.method === "POST" &&
-        new URL(request.url).pathname === "/api/v0/logs"
-      ) {
-        return await handleLogIngestionRequest({
-          clientLogKey: serverEnv.LOG_PROXY_CLIENT_KEY,
-          logger: s.logger,
-          request,
-        });
+        return await entry.fetch(...args);
+      } finally {
+        await s.logger.flush();
       }
-
-      return await entry.fetch(...args);
     },
   };
 }

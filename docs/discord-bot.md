@@ -48,6 +48,9 @@ Store these values in both the `dev` and `prod` Infisical environments:
 | `DISCORD_BUG_TAG_ID` | Pre-provisioned `Bug` forum tag |
 | `DISCORD_FEATURE_REQUEST_TAG_ID` | Pre-provisioned `Feature Request` forum tag |
 | `GITHUB_WEBHOOK_SECRET` | Random secret shared only with the GitHub repository webhook |
+| `LOGGER_NOTIFICATION_API_TOKEN` | Bearer token accepted only for API logger events |
+| `LOGGER_NOTIFICATION_SCRAPER_TOKEN` | Bearer token accepted only for scraper logger events |
+| `LOGGER_NOTIFICATION_WEB_TOKEN` | Bearer token accepted only for web logger events |
 
 `AXIOM_INTAKE_WEBHOOK_URL` is secret. The other Discord IDs are stable routing
 or authorization inputs, but remain environment-specific configuration.
@@ -82,6 +85,17 @@ Do not enable the repository webhook before this version is live. A successful
 accepted delivery returns `202`; an intentionally ignored event returns `204`;
 invalid signatures return `401`; and unavailable queue storage returns `503` so
 GitHub can redeliver it.
+
+## Direct logger webhook
+
+The API, web server, and scraper post selected production `error` and `fatal`
+events to `/webhooks/logger`. Each app has a distinct bearer token, and the bot
+rejects payloads whose `app` does not match that token. Accepted events return
+`202` only after Redis accepts the stable `eventId`; filtered preview or lower-
+severity events return `204`, invalid authentication returns `401`, malformed
+or oversized payloads return `400`, and unavailable queue storage returns
+`503`. Queue payloads exclude raw payloads, console options, stacks, causes,
+and authentication headers.
 
 ## Verification
 

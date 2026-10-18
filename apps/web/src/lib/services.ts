@@ -2,15 +2,20 @@ import process from "node:process";
 import {
   createAxiomTransport,
   createConsoleTransport,
+  createLoggerNotificationTransport,
   loggerValues,
   normalizeConsoleTransportMode,
   normalizeLogLevel,
 } from "@package/logger";
 import services from "@package/services";
 import { serverEnv } from "@/env/server";
+import { resolveWebEnvironment } from "@/env/server.schema";
 
 /** Active server runtime environment. */
-const environment = process.env.NODE_ENV ?? "development";
+const environment = resolveWebEnvironment(
+  serverEnv.VERCEL_ENV,
+  process.env.NODE_ENV,
+);
 /** Whether the web server is running in development mode. */
 const isDevelopment = environment === "development";
 /** Console transport configured from the server logger mode. */
@@ -31,6 +36,14 @@ const transports = [
     : []),
   ...(isDevelopment || !(serverEnv.AXIOM_TOKEN && serverEnv.AXIOM_DATASET)
     ? [consoleTransport]
+    : []),
+  ...(serverEnv.LOGGER_NOTIFICATION_TOKEN && serverEnv.LOGGER_NOTIFICATION_URL
+    ? [
+        createLoggerNotificationTransport({
+          endpoint: serverEnv.LOGGER_NOTIFICATION_URL,
+          token: serverEnv.LOGGER_NOTIFICATION_TOKEN,
+        }),
+      ]
     : []),
 ];
 

@@ -35,6 +35,7 @@ describe("handleLogIngestionRequest", () => {
             {
               app: "web",
               environment: "test",
+              eventId: "client-event-1",
               level: "info",
               message: "client.clicked",
               timestamp: "2026-01-01T00:00:00.000Z",

@@ -91,6 +91,7 @@ describe("api", () => {
         app: "web",
         attributes: { token: "secret" },
         environment: "test",
+        eventId: "client-event-1",
         level: "info",
         message: "client.clicked",
       }),

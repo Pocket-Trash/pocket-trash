@@ -65,6 +65,7 @@ export function serializeAxiomEvent(event: LogEvent): LogContext {
       ? {}
       : { deploymentTarget: event.deploymentTarget }),
     environment: event.environment,
+    eventId: event.eventId,
     level: event.level,
     message: event.message,
     timestamp: event.timestamp,

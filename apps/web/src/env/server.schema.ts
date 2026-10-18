@@ -32,6 +32,12 @@ export type WebServerRuntimeEnv = {
   LOG_LEVEL?: string;
   /** Shared key accepted by the server log proxy. */
   LOG_PROXY_CLIENT_KEY?: string;
+  /** App-bound bearer token used by direct logger notifications. */
+  LOGGER_NOTIFICATION_TOKEN?: string;
+  /** Discord bot logger intake endpoint. */
+  LOGGER_NOTIFICATION_URL?: string;
+  /** Vercel deployment environment used for logger policy. */
+  VERCEL_ENV?: string;
   /** Public Bunny CDN origin. */
   BUNNY_CDN_BASE_URL?: string;
   /** Bunny token-authentication key. */
@@ -45,6 +51,20 @@ export type WebServerRuntimeEnv = {
   /** Bunny storage-zone name. */
   BUNNY_STORAGE_ZONE_NAME?: string;
 };
+
+/**
+ * Resolves the policy environment without conflating Vercel previews with production mode.
+ *
+ * @param vercelEnv - Vercel's deployment classification.
+ * @param nodeEnv - Runtime mode used only outside Vercel.
+ * @returns The environment label used by logger notification rules.
+ */
+export function resolveWebEnvironment(
+  vercelEnv: string | undefined,
+  nodeEnv: string | undefined,
+) {
+  return vercelEnv ?? nodeEnv ?? "development";
+}
 
 /**
  * Validates and normalizes process environment values for the web server.
@@ -73,6 +93,9 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       LOG_DEPLOYMENT_TARGET: runtimeEnv.LOG_DEPLOYMENT_TARGET,
       LOG_LEVEL: runtimeEnv.LOG_LEVEL,
       LOG_PROXY_CLIENT_KEY: runtimeEnv.LOG_PROXY_CLIENT_KEY,
+      LOGGER_NOTIFICATION_TOKEN: runtimeEnv.LOGGER_NOTIFICATION_TOKEN,
+      LOGGER_NOTIFICATION_URL: runtimeEnv.LOGGER_NOTIFICATION_URL,
+      VERCEL_ENV: runtimeEnv.VERCEL_ENV,
       BUNNY_CDN_BASE_URL: runtimeEnv.BUNNY_CDN_BASE_URL,
       BUNNY_CDN_TOKEN_KEY: runtimeEnv.BUNNY_CDN_TOKEN_KEY,
       BUNNY_RESOURCE_FOLDER_PREFIX: runtimeEnv.BUNNY_RESOURCE_FOLDER_PREFIX,
@@ -99,6 +122,9 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
         .enum(["trace", "debug", "verbose", "info", "warn", "error", "fatal"])
         .optional(),
       LOG_PROXY_CLIENT_KEY: z.string().min(1).optional(),
+      LOGGER_NOTIFICATION_TOKEN: z.string().min(32).optional(),
+      LOGGER_NOTIFICATION_URL: z.url().optional(),
+      VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
       BUNNY_CDN_BASE_URL: z.string().url().optional(),
       BUNNY_CDN_TOKEN_KEY: z.string().min(1).optional(),
       BUNNY_RESOURCE_FOLDER_PREFIX: z

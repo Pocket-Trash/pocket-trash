@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyWebClientEnvAliases } from "../../vite.config";
 import { createWebClientEnv } from "./client.schema";
-import { createWebServerEnv } from "./server.schema";
+import { createWebServerEnv, resolveWebEnvironment } from "./server.schema";
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -99,6 +99,13 @@ describe("web client env aliases", () => {
 });
 
 describe("web server env", () => {
+  it("distinguishes Vercel production and preview despite NODE_ENV", () => {
+    expect(resolveWebEnvironment("production", "production")).toBe(
+      "production",
+    );
+    expect(resolveWebEnvironment("preview", "production")).toBe("preview");
+  });
+
   it("validates required server variables", () => {
     const env = createWebServerEnv({
       BUNNY_ASSET_FOLDER_PREFIX: "assets",
@@ -114,6 +121,9 @@ describe("web server env", () => {
       LOG_DEPLOYMENT_TARGET: "web-server",
       LOG_LEVEL: "debug",
       LOG_PROXY_CLIENT_KEY: "client-key",
+      LOGGER_NOTIFICATION_TOKEN: "n".repeat(32),
+      LOGGER_NOTIFICATION_URL: "https://bot.example/webhooks/logger",
+      VERCEL_ENV: "preview",
       BUNNY_CDN_BASE_URL: "https://cdn.pocket-trash.app",
       BUNNY_CDN_TOKEN_KEY: "cdn-token-key",
       BUNNY_RESOURCE_FOLDER_PREFIX: "resources/preview/pr-52",
@@ -139,6 +149,7 @@ describe("web server env", () => {
     expect(env.LOG_DEPLOYMENT_TARGET).toBe("web-server");
     expect(env.LOG_LEVEL).toBe("debug");
     expect(env.LOG_PROXY_CLIENT_KEY).toBe("client-key");
+    expect(env.VERCEL_ENV).toBe("preview");
     expect(env.BUNNY_CDN_BASE_URL).toBe("https://cdn.pocket-trash.app");
     expect(env.BUNNY_CDN_TOKEN_KEY).toBe("cdn-token-key");
     expect(env.BUNNY_RESOURCE_FOLDER_PREFIX).toBe("resources/preview/pr-52");

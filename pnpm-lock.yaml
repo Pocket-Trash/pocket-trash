@@ -500,6 +500,10 @@ importers:
         version: 8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.2)
 
   packages/logger:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@package/tsconfig':
         specifier: workspace:*
