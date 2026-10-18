@@ -3,9 +3,10 @@ import { createDiscordBotEnv } from "./env.js";
 
 /** Complete valid runtime environment used by validation tests. */
 const validEnv = {
+  AXIOM_INTAKE_WEBHOOK_URL:
+    "https://discord.com/api/webhooks/423456789012345678/webhook-token",
   DISCORD_APPLICATION_ID: "123456789012345678",
   DISCORD_AXIOM_INTAKE_CHANNEL_ID: "323456789012345678",
-  DISCORD_AXIOM_INTAKE_WEBHOOK_ID: "423456789012345678",
   DISCORD_BUG_TAG_ID: "523456789012345678",
   DISCORD_FEATURE_REQUEST_TAG_ID: "623456789012345678",
   DISCORD_GITHUB_CHANNEL_ID: "723456789012345678",
@@ -42,9 +43,15 @@ describe("Discord bot environment", () => {
     expect(() =>
       createDiscordBotEnv({
         ...validEnv,
-        DISCORD_AXIOM_INTAKE_WEBHOOK_ID: undefined,
+        AXIOM_INTAKE_WEBHOOK_URL: undefined,
       }),
-    ).toThrow("DISCORD_AXIOM_INTAKE_WEBHOOK_ID");
+    ).toThrow("AXIOM_INTAKE_WEBHOOK_URL");
+    expect(() =>
+      createDiscordBotEnv({
+        ...validEnv,
+        AXIOM_INTAKE_WEBHOOK_URL: "https://example.com/not-discord",
+      }),
+    ).toThrow("AXIOM_INTAKE_WEBHOOK_URL");
   });
 
   it("rejects unresolved and non-Redis queue URLs", () => {

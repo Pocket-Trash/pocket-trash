@@ -120,8 +120,8 @@ for (const environment of ["production", "preview"]) {
       );
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
       for (const variable of [
+        "AXIOM_INTAKE_WEBHOOK_URL",
         "DISCORD_AXIOM_INTAKE_CHANNEL_ID",
-        "DISCORD_AXIOM_INTAKE_WEBHOOK_ID",
         "DISCORD_BUG_TAG_ID",
         "DISCORD_FEATURE_REQUEST_TAG_ID",
         "DISCORD_GITHUB_CHANNEL_ID",
@@ -172,6 +172,8 @@ test("authenticates native Railpack installs from source", () => {
   assert.deepEqual(config.steps.install.commands, [
     "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
   ]);
+  assert.deepEqual(config.secrets, ["FONTAWESOME_PACKAGE_TOKEN"]);
+  assert.deepEqual(config.steps.install.secrets, ["FONTAWESOME_PACKAGE_TOKEN"]);
 });
 
 test("keeps one authoring file without secrets or Railway identities", () => {

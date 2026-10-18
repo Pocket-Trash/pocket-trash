@@ -43,7 +43,7 @@ Store these values in both the `dev` and `prod` Infisical environments:
 | `DISCORD_GITHUB_ERRORS_CHANNEL_ID` | GitHub workflow error/status destination |
 | `DISCORD_LOGGER_CHANNEL_ID` | Logger and Axiom notification destination |
 | `DISCORD_AXIOM_INTAKE_CHANNEL_ID` | Private Axiom fallback intake channel |
-| `DISCORD_AXIOM_INTAKE_WEBHOOK_ID` | Only trusted Axiom intake webhook |
+| `AXIOM_INTAKE_WEBHOOK_URL` | Secret URL for the trusted Axiom intake webhook |
 | `DISCORD_SUPPORT_FORUM_ID` | Support forum parent channel |
 | `DISCORD_BUG_TAG_ID` | Pre-provisioned `Bug` forum tag |
 | `DISCORD_FEATURE_REQUEST_TAG_ID` | Pre-provisioned `Feature Request` forum tag |
@@ -52,8 +52,8 @@ Store these values in both the `dev` and `prod` Infisical environments:
 | `LOGGER_NOTIFICATION_SCRAPER_TOKEN` | Bearer token accepted only for scraper logger events |
 | `LOGGER_NOTIFICATION_WEB_TOKEN` | Bearer token accepted only for web logger events |
 
-`AXIOM_INTAKE_WEBHOOK_URL` is secret. The other Discord IDs are stable routing
-or authorization inputs, but remain environment-specific configuration.
+The Discord webhook URL is secret. The Discord IDs are stable routing or
+authorization inputs, but remain environment-specific configuration.
 
 Railway owns `REDIS_URL` as a reference to `pocket-trash-queue`; do not copy its
 password or public endpoint into Infisical.

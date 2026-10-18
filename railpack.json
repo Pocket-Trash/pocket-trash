@@ -1,10 +1,12 @@
 {
   "$schema": "https://schema.railpack.com",
+  "secrets": ["FONTAWESOME_PACKAGE_TOKEN"],
   "steps": {
     "install": {
       "commands": [
         "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline"
-      ]
+      ],
+      "secrets": ["FONTAWESOME_PACKAGE_TOKEN"]
     }
   }
 }

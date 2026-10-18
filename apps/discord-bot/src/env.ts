@@ -10,15 +10,25 @@ const redisUrlSchema = z
     (value) => value.startsWith("redis://") || value.startsWith("rediss://"),
   );
 
+/** Discord webhook URL containing the trusted webhook identifier and token. */
+const discordWebhookUrlSchema = z.url().refine((value) => {
+  const url = new URL(value);
+  return (
+    url.protocol === "https:" &&
+    ["discord.com", "discordapp.com"].includes(url.hostname) &&
+    /^\/api\/webhooks\/[1-9]\d{16,19}\/[^/]+$/u.test(url.pathname)
+  );
+});
+
 /** Validated Discord bot process configuration. */
 const discordBotEnvSchema = z.object({
   APP_ENV: z.string().min(1).default("development"),
   AXIOM_DATASET: z.string().min(1).optional(),
   AXIOM_EDGE_DOMAIN: z.string().min(1).optional(),
+  AXIOM_INTAKE_WEBHOOK_URL: discordWebhookUrlSchema,
   AXIOM_TOKEN: z.string().min(1).optional(),
   DISCORD_APPLICATION_ID: snowflakeSchema,
   DISCORD_AXIOM_INTAKE_CHANNEL_ID: snowflakeSchema,
-  DISCORD_AXIOM_INTAKE_WEBHOOK_ID: snowflakeSchema,
   DISCORD_BUG_TAG_ID: snowflakeSchema,
   DISCORD_FEATURE_REQUEST_TAG_ID: snowflakeSchema,
   DISCORD_GITHUB_CHANNEL_ID: snowflakeSchema,
