@@ -23,6 +23,7 @@ import { searchPublic } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { Button } from "./ui/button";
+import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { Input } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
 
@@ -66,6 +67,7 @@ export function GlobalSearch() {
   const seeAll = React.useRef<HTMLAnchorElement>(null);
   const trigger = React.useRef<HTMLButtonElement>(null);
   const request = React.useRef(0);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [selected, setSelected] = React.useState(0);
@@ -79,27 +81,14 @@ export function GlobalSearch() {
     [locale],
   );
 
-  /** Opens the search surface and focuses its input. */
+  /** Opens the responsive search surface. */
   const open = React.useCallback(() => {
-    dialog.current?.showModal();
-    requestAnimationFrame(() => input.current?.focus());
-  }, []);
-
-  React.useEffect(() => {
-    /**
-     * Opens search from the platform-standard command shortcut.
-     *
-     * @param event - Global keyboard event.
-     */
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        open();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+    if (isMobile) setMobileOpen(true);
+    else {
+      dialog.current?.showModal();
+      requestAnimationFrame(() => input.current?.focus());
+    }
+  }, [isMobile]);
 
   React.useEffect(() => {
     const currentDialog = dialog.current;
@@ -114,7 +103,25 @@ export function GlobalSearch() {
     };
     currentDialog.addEventListener("click", onBackdropClick);
     return () => currentDialog.removeEventListener("click", onBackdropClick);
+  }, [isMobile]);
+
+  /** Clears modal state and restores focus to the header trigger. */
+  const finishClose = React.useCallback(() => {
+    request.current += 1;
+    setQuery("");
+    setResults([]);
+    setSelected(0);
+    setState("idle");
+    trigger.current?.focus();
   }, []);
+
+  /** Closes the active search presentation. */
+  const close = React.useCallback(() => {
+    if (isMobile) {
+      setMobileOpen(false);
+      finishClose();
+    } else dialog.current?.close();
+  }, [finishClose, isMobile]);
 
   React.useEffect(() => {
     const trimmed = query.trim();
@@ -126,6 +133,8 @@ export function GlobalSearch() {
       return;
     }
 
+    setResults([]);
+    setSelected(0);
     setState("loading");
     const timer = window.setTimeout(() => {
       void searchPublic({
@@ -150,7 +159,7 @@ export function GlobalSearch() {
   const searchHref = query.trim()
     ? `/search?q=${encodeURIComponent(query.trim())}`
     : "/search";
-  const activeResult = results[selected];
+  const activeResult = state === "ready" ? results[selected] : undefined;
 
   /**
    * Handles input-only result navigation and open shortcuts.
@@ -161,13 +170,22 @@ export function GlobalSearch() {
     if (event.key === "Tab" && event.shiftKey) {
       event.preventDefault();
       seeAll.current?.focus();
-    } else if (event.key === "ArrowDown" && results.length) {
+    } else if (
+      state === "ready" &&
+      event.key === "ArrowDown" &&
+      results.length
+    ) {
       event.preventDefault();
       setSelected((value) => Math.min(value + 1, results.length - 1));
-    } else if (event.key === "ArrowUp" && results.length) {
+    } else if (state === "ready" && event.key === "ArrowUp" && results.length) {
       event.preventDefault();
       setSelected((value) => Math.max(value - 1, 0));
-    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    } else if (
+      event.key === "Enter" &&
+      (/Mac|iPhone|iPad|iPod/u.test(navigator.platform)
+        ? event.metaKey
+        : event.ctrlKey)
+    ) {
       event.preventDefault();
       seeAll.current?.click();
     } else if (event.key === "Enter" && activeResult) {
@@ -188,157 +206,192 @@ export function GlobalSearch() {
     }
   };
 
+  const panel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center gap-2 border-b border-border p-3">
+        <FontAwesomeIcon
+          aria-hidden="true"
+          className="ml-1 size-4 text-muted-foreground"
+          icon={faMagnifyingGlassLight}
+        />
+        <Input
+          aria-activedescendant={
+            activeResult ? `global-search-result-${selected}` : undefined
+          }
+          aria-autocomplete="list"
+          aria-controls={
+            state === "ready" && results.length > 0
+              ? "global-search-results"
+              : undefined
+          }
+          aria-expanded={state === "ready" && results.length > 0}
+          aria-label={t("web.search.label")}
+          className="border-0 shadow-none focus-visible:ring-[3px]"
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={onInputKeyDown}
+          placeholder={t("web.search.placeholder")}
+          ref={input}
+          role="combobox"
+          value={query}
+        />
+        <Button
+          aria-label={formatTranslation("web.action.close", {}, locale)}
+          onClick={close}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
+          <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
+        </Button>
+      </div>
+
+      <div
+        aria-busy={state === "loading"}
+        aria-live="polite"
+        className="min-h-0 flex-1 overflow-y-auto p-2"
+      >
+        {state === "loading" ? (
+          <div
+            aria-label={t("web.search.loading")}
+            className="grid gap-2"
+            role="status"
+          >
+            {Array.from({ length: 4 }, (_, index) => (
+              <Skeleton className="h-14" key={index} />
+            ))}
+          </div>
+        ) : state === "error" ? (
+          <p className="p-4 text-sm text-destructive" role="alert">
+            {t("web.search.error")}
+          </p>
+        ) : state === "ready" && results.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">
+            {t("web.search.noResults")}
+          </p>
+        ) : state === "ready" ? (
+          <div id="global-search-results" role="listbox">
+            {results.map((result, index) => {
+              let highlightOffset = 0;
+              return (
+                <a
+                  aria-selected={index === selected}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 outline-none",
+                    index === selected && "bg-accent",
+                  )}
+                  href={result.href}
+                  id={`global-search-result-${index}`}
+                  key={`${result.kind}-${result.id}`}
+                  role="option"
+                  tabIndex={-1}
+                >
+                  <FontAwesomeIcon
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-muted-foreground"
+                    icon={resultIcons[result.kind]}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
+                      {t(
+                        `web.search.types.${resultTypeKeys[result.kind]}` as TranslationKey,
+                      )}
+                    </span>
+                    <span className="block truncate text-sm font-medium">
+                      {result.title}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {result.context ? `${result.context} · ` : null}
+                      {result.highlights.map((highlight) => {
+                        const key = `${highlightOffset}-${highlight.matched}`;
+                        highlightOffset += highlight.text.length;
+                        return highlight.matched ? (
+                          <strong
+                            className="font-semibold text-foreground/80"
+                            key={key}
+                          >
+                            {highlight.text}
+                          </strong>
+                        ) : (
+                          <React.Fragment key={key}>
+                            {highlight.text}
+                          </React.Fragment>
+                        );
+                      })}
+                    </span>
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-3" aria-hidden="true">
+          <span>↑↓ {t("web.search.modal.navigate")}</span>
+          <span>↵ {t("web.search.modal.openResults")}</span>
+        </span>
+        <a
+          className="font-medium text-foreground hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          href={searchHref}
+          onKeyDown={onSeeAllKeyDown}
+          ref={seeAll}
+        >
+          {t("web.search.modal.seeAllResults")}
+        </a>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <Button
         aria-label={t("web.search.modal.openSearch")}
         onClick={open}
-        size="icon"
         ref={trigger}
+        size="icon"
         type="button"
         variant="ghost"
       >
         <FontAwesomeIcon aria-hidden="true" icon={faMagnifyingGlass} />
       </Button>
-      <dialog
-        aria-label={t("web.search.label")}
-        className="m-auto max-h-[min(42rem,calc(100svh-2rem))] w-[min(42rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/55 backdrop:backdrop-blur-sm max-sm:mt-auto max-sm:mb-0 max-sm:h-[92svh] max-sm:max-h-[92svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-xl max-sm:rounded-b-none"
-        data-presentation={isMobile ? "drawer" : "dialog"}
-        onClose={() => {
-          request.current += 1;
-          setQuery("");
-          setResults([]);
-          setState("idle");
-          trigger.current?.focus();
-        }}
-        ref={dialog}
-      >
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="flex items-center gap-2 border-b border-border p-3">
-            <FontAwesomeIcon
-              aria-hidden="true"
-              className="ml-1 size-4 text-muted-foreground"
-              icon={faMagnifyingGlassLight}
-            />
-            <Input
-              aria-activedescendant={
-                activeResult ? `global-search-result-${selected}` : undefined
-              }
-              aria-autocomplete="list"
-              aria-controls="global-search-results"
-              aria-expanded={results.length > 0}
-              aria-label={t("web.search.label")}
-              className="border-0 shadow-none focus-visible:ring-0"
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={onInputKeyDown}
-              placeholder={t("web.search.placeholder")}
-              ref={input}
-              role="combobox"
-              value={query}
-            />
-            <Button
-              aria-label={formatTranslation("web.action.close", {}, locale)}
-              onClick={() => dialog.current?.close()}
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
-            </Button>
-          </div>
-
-          <div
-            aria-busy={state === "loading"}
-            aria-live="polite"
-            className="min-h-0 flex-1 overflow-y-auto p-2"
+      {isMobile ? (
+        <Drawer
+          onOpenChange={(nextOpen) => {
+            setMobileOpen(nextOpen);
+            if (!nextOpen) finishClose();
+          }}
+          open={mobileOpen}
+        >
+          <DrawerContent
+            className="h-[92svh] max-h-[92svh]"
+            data-presentation="drawer"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              input.current?.focus();
+            }}
           >
-            {state === "loading" ? (
-              <div
-                aria-label={t("web.search.loading")}
-                className="grid gap-2"
-                role="status"
-              >
-                {Array.from({ length: 4 }, (_, index) => (
-                  <Skeleton className="h-14" key={index} />
-                ))}
-              </div>
-            ) : state === "error" ? (
-              <p className="p-4 text-sm text-destructive" role="alert">
-                {t("web.search.error")}
-              </p>
-            ) : state === "ready" && results.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">
-                {t("web.search.noResults")}
-              </p>
-            ) : (
-              <div id="global-search-results" role="listbox">
-                {results.map((result, index) => (
-                  <a
-                    aria-selected={index === selected}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 outline-none",
-                      index === selected && "bg-accent",
-                    )}
-                    href={result.href}
-                    id={`global-search-result-${index}`}
-                    key={`${result.kind}-${result.id}`}
-                    role="option"
-                    tabIndex={-1}
-                  >
-                    <FontAwesomeIcon
-                      aria-hidden="true"
-                      className="size-4 shrink-0 text-muted-foreground"
-                      icon={resultIcons[result.kind]}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
-                        {t(
-                          `web.search.types.${resultTypeKeys[result.kind]}` as TranslationKey,
-                        )}
-                      </span>
-                      <span className="block truncate text-sm font-medium">
-                        {result.title}
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {result.context ? `${result.context} · ` : null}
-                        {result.highlights.map((highlight) =>
-                          highlight.matched ? (
-                            <strong
-                              className="font-semibold text-foreground/80"
-                              key={`matched-${highlight.text}`}
-                            >
-                              {highlight.text}
-                            </strong>
-                          ) : (
-                            <React.Fragment key={`plain-${highlight.text}`}>
-                              {highlight.text}
-                            </React.Fragment>
-                          ),
-                        )}
-                      </span>
-                    </span>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-3" aria-hidden="true">
-              <span>↑↓ {t("web.search.modal.navigate")}</span>
-              <span>↵ {t("web.search.modal.openResults")}</span>
-            </span>
-            <a
-              className="font-medium text-foreground hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              href={searchHref}
-              onKeyDown={onSeeAllKeyDown}
-              ref={seeAll}
-            >
-              {t("web.search.modal.seeAllResults")}
-            </a>
-          </div>
-        </div>
-      </dialog>
+            <DrawerTitle className="sr-only">
+              {t("web.search.label")}
+            </DrawerTitle>
+            {panel}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <dialog
+          aria-label={t("web.search.label")}
+          className="m-auto max-h-[min(42rem,calc(100svh-2rem))] w-[min(42rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/55 backdrop:backdrop-blur-sm"
+          data-presentation="dialog"
+          onCancel={(event) => {
+            event.preventDefault();
+            dialog.current?.close();
+          }}
+          onClose={finishClose}
+          ref={dialog}
+        >
+          {panel}
+        </dialog>
+      )}
     </>
   );
 }

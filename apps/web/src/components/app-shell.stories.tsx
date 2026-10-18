@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect } from "storybook/test";
+import { expect, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { AppShell } from "./app-shell";
 import { Button } from "./ui/button";
@@ -62,6 +62,33 @@ export const Default: Story = {
       canvas.getByRole("dialog", { name: "Search Pocket Trash" }),
     ).toBeVisible();
   },
+};
+
+/** App shell search surface in the compact drawer presentation. */
+export const Mobile: Story = {
+  ...Default,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Verifies search uses the shared drawer at a compact viewport.
+   *
+   * @param context - Storybook play context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Element containing the rendered story.
+   * @returns A promise that resolves after the interaction assertions pass.
+   */
+  play: async ({ canvas, canvasElement }) => {
+    await canvas.getByRole("button", { name: "Open search" }).click();
+    const page = within(canvasElement.ownerDocument.body);
+    await expect(
+      page.getByRole("dialog", { name: "Search Pocket Trash" }),
+    ).toHaveAttribute("data-presentation", "drawer");
+  },
+};
+
+/** App shell and search surface in the dark theme. */
+export const Dark: Story = {
+  ...Default,
+  globals: { theme: "dark" },
 };
 
 /**

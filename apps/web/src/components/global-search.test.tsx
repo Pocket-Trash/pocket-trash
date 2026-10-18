@@ -104,7 +104,7 @@ describe("GlobalSearch", () => {
     act(() => trigger?.click());
     return {
       dialog: container.querySelector("dialog") as HTMLDialogElement,
-      input: container.querySelector(
+      input: document.querySelector(
         'input[role="combobox"]',
       ) as HTMLInputElement,
       trigger: trigger as HTMLButtonElement,
@@ -148,26 +148,21 @@ describe("GlobalSearch", () => {
     expect(dialog.open).toBe(false);
     expect(document.activeElement).toBe(trigger);
 
-    act(() =>
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          bubbles: true,
-          key: "k",
-          metaKey: true,
-        }),
-      ),
-    );
+    act(() => trigger.click());
     expect(dialog.open).toBe(true);
     expect(document.activeElement).toBe(input);
-    act(() => dialog.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    act(() => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
     expect(dialog.open).toBe(false);
     expect(document.activeElement).toBe(trigger);
+  });
 
+  it("uses the shared drawer presentation on compact viewports", () => {
     viewport.mobile = true;
-    act(() => root.render(<GlobalSearch />));
-    expect(container.querySelector("dialog")?.dataset.presentation).toBe(
-      "drawer",
-    );
+    const { input } = openSearch();
+    const drawer = document.querySelector('[data-slot="drawer-content"]');
+    expect(drawer?.getAttribute("data-presentation")).toBe("drawer");
+    expect(drawer?.getAttribute("role")).toBe("dialog");
+    expect(document.activeElement).toBe(input);
   });
 
   it("debounces two-character queries and ignores stale responses", async () => {
@@ -188,13 +183,20 @@ describe("GlobalSearch", () => {
     expect(searchPublic).toHaveBeenCalledWith({
       data: { query: "bolt", surface: "modal" },
     });
+    await act(async () => deferred[0]?.(response));
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
 
     changeInput(input, "maker");
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    expect(input.hasAttribute("aria-activedescendant")).toBe(false);
+    expect(container.querySelector('[role="listbox"]')).toBeNull();
+    act(() => vi.advanceTimersByTime(300));
+    changeInput(input, "maker pen");
     act(() => vi.advanceTimersByTime(300));
     const maker = response.items[1];
     if (!maker) throw new Error("Missing maker fixture");
-    await act(async () => deferred[1]?.({ ...response, items: [maker] }));
-    await act(async () => deferred[0]?.(response));
+    await act(async () => deferred[2]?.({ ...response, items: [maker] }));
+    await act(async () => deferred[1]?.(response));
     expect(container.querySelectorAll('[role="option"]')).toHaveLength(1);
     expect(container.querySelector('[role="option"]')?.textContent).toContain(
       "Bolt Works",
@@ -212,6 +214,14 @@ describe("GlobalSearch", () => {
       "global-search-result-0",
     );
     expect(options[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(options[0]?.className).toContain("bg-accent");
+
+    act(() =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowUp" }),
+      ),
+    );
+    expect(options[0]?.getAttribute("aria-selected")).toBe("true");
 
     act(() =>
       input.dispatchEvent(
@@ -224,6 +234,7 @@ describe("GlobalSearch", () => {
       ),
     );
     expect(options[1]?.getAttribute("aria-selected")).toBe("true");
+    expect(options[1]?.className).toContain("bg-accent");
     act(() =>
       options[1]?.dispatchEvent(
         new KeyboardEvent("keydown", { bubbles: true, key: "ArrowUp" }),
@@ -244,7 +255,7 @@ describe("GlobalSearch", () => {
     expect(destination).toContain("/makers/bolt-works");
   });
 
-  it("uses the exact tab cycle and opens the full search with the platform modifier", () => {
+  it("uses the exact tab cycle and only the platform modifier", () => {
     const { dialog, input } = openSearch();
     changeInput(input, "bolt pen");
     const controls = Array.from(
@@ -282,6 +293,41 @@ describe("GlobalSearch", () => {
       event.preventDefault();
       opened = seeAll.href;
     });
+    const platform = vi.spyOn(navigator, "platform", "get");
+    platform.mockReturnValue("MacIntel");
+    act(() =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "Enter",
+          ctrlKey: true,
+        }),
+      ),
+    );
+    expect(opened).toBe("");
+    act(() =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "Enter",
+          metaKey: true,
+        }),
+      ),
+    );
+    expect(opened).toContain("/search?q=bolt%20pen");
+
+    opened = "";
+    platform.mockReturnValue("Linux x86_64");
+    act(() =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "Enter",
+          metaKey: true,
+        }),
+      ),
+    );
+    expect(opened).toBe("");
     act(() =>
       input.dispatchEvent(
         new KeyboardEvent("keydown", {
