@@ -1,18 +1,10 @@
 import {
-  faAtomSimple,
-  faBox,
-  faBoxesStacked,
-  faCube,
-  faFileLines,
-  faGem,
-  faIndustry,
   faMagnifyingGlass as faMagnifyingGlassLight,
-  faUser,
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { faMagnifyingGlass } from "@fortawesome/pro-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { SearchKind, SearchResult } from "@package/services";
+import type { SearchResult } from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -20,39 +12,22 @@ import {
 import * as React from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { searchPublic } from "@/lib/search";
+import {
+  SEARCH_QUERY_DELAY_MS,
+  SEARCH_QUERY_MAX_LENGTH,
+  SEARCH_QUERY_MIN_LENGTH,
+} from "@/lib/search-constants";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
+import {
+  SearchHighlights,
+  SearchResultIcon,
+  searchResultTypeKeys,
+} from "./search-result-icon";
 import { Button } from "./ui/button";
 import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { Input } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
-
-/** Search result icons keyed by public result kind. */
-const resultIcons = {
-  collection: faBoxesStacked,
-  collection_item: faBox,
-  maker: faIndustry,
-  material: faGem,
-  material_detail: faAtomSimple,
-  person: faUser,
-  product: faCube,
-  resource: faFileLines,
-} satisfies Record<SearchKind, typeof faCube>;
-
-/** Localization suffixes keyed by public result kind. */
-const resultTypeKeys = {
-  collection: "collection",
-  collection_item: "collectionItem",
-  maker: "maker",
-  material: "material",
-  material_detail: "materialDetail",
-  person: "person",
-  product: "product",
-  resource: "resource",
-} as const satisfies Record<SearchKind, string>;
-
-/** Delay before a modal query is sent. */
-const SEARCH_DELAY_MS = 300;
 
 /**
  * Renders the persistent site-wide search trigger and compact search surface.
@@ -134,7 +109,7 @@ export function GlobalSearch() {
   React.useEffect(() => {
     const trimmed = query.trim();
     const currentRequest = ++request.current;
-    if (trimmed.length < 2) {
+    if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
       setResults([]);
       setSelected(0);
       setState("idle");
@@ -160,7 +135,7 @@ export function GlobalSearch() {
           setSelected(0);
           setState("error");
         });
-    }, SEARCH_DELAY_MS);
+    }, SEARCH_QUERY_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [query]);
 
@@ -235,6 +210,7 @@ export function GlobalSearch() {
           aria-expanded={state === "ready" && results.length > 0}
           aria-label={t("web.search.label")}
           className="border-0 shadow-none focus-visible:ring-[3px]"
+          maxLength={SEARCH_QUERY_MAX_LENGTH}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onInputKeyDown}
           placeholder={t("web.search.placeholder")}
@@ -279,7 +255,6 @@ export function GlobalSearch() {
         ) : state === "ready" ? (
           <div id="global-search-results" role="listbox">
             {results.map((result, index) => {
-              let highlightOffset = 0;
               return (
                 <a
                   aria-selected={index === selected}
@@ -293,15 +268,14 @@ export function GlobalSearch() {
                   role="option"
                   tabIndex={-1}
                 >
-                  <FontAwesomeIcon
-                    aria-hidden="true"
+                  <SearchResultIcon
                     className="size-4 shrink-0 text-muted-foreground"
-                    icon={resultIcons[result.kind]}
+                    kind={result.kind}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
                       {t(
-                        `web.search.types.${resultTypeKeys[result.kind]}` as TranslationKey,
+                        `web.search.types.${searchResultTypeKeys[result.kind]}` as TranslationKey,
                       )}
                     </span>
                     <span className="block truncate text-sm font-medium">
@@ -309,22 +283,7 @@ export function GlobalSearch() {
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {result.context ? `${result.context} · ` : null}
-                      {result.highlights.map((highlight) => {
-                        const key = `${highlightOffset}-${highlight.matched}`;
-                        highlightOffset += highlight.text.length;
-                        return highlight.matched ? (
-                          <strong
-                            className="font-semibold text-foreground/80"
-                            key={key}
-                          >
-                            {highlight.text}
-                          </strong>
-                        ) : (
-                          <React.Fragment key={key}>
-                            {highlight.text}
-                          </React.Fragment>
-                        );
-                      })}
+                      <SearchHighlights highlights={result.highlights} />
                     </span>
                   </span>
                 </a>

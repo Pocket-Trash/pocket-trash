@@ -13,6 +13,22 @@ vi.mock("@/lib/catalog-copy", () => ({
    */
   useCatalogCopy: () => (key: string) => key,
 }));
+vi.mock("@/hooks/use-mobile", () => ({
+  /**
+   * Returns compact pagination state.
+   *
+   * @returns Compact state.
+   */
+  useIsMobile: () => true,
+}));
+vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns fixed English locale state.
+   *
+   * @returns English locale state.
+   */
+  useLocale: () => ({ locale: "en-US" }),
+}));
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 

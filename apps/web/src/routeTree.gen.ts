@@ -18,6 +18,7 @@ import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as UserRouteImport } from './routes/user'
@@ -134,6 +135,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const ResourcesRoute = ResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
@@ -522,6 +528,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
+  '/search': typeof SearchRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/trends': typeof TrendsRoute
   '/user': typeof UserRouteWithChildren
@@ -602,6 +609,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/notifications': typeof NotificationsRoute
   '/privacy': typeof PrivacyRoute
+  '/search': typeof SearchRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/trends': typeof TrendsRoute
   '/admin/account-erasure': typeof AdminAccountErasureRoute
@@ -685,6 +693,7 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
+  '/search': typeof SearchRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/trends': typeof TrendsRoute
   '/user': typeof UserRouteWithChildren
@@ -770,6 +779,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/privacy'
     | '/resources'
+    | '/search'
     | '/terms-of-service'
     | '/trends'
     | '/user'
@@ -850,6 +860,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/notifications'
     | '/privacy'
+    | '/search'
     | '/terms-of-service'
     | '/trends'
     | '/admin/account-erasure'
@@ -932,6 +943,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/privacy'
     | '/resources'
+    | '/search'
     | '/terms-of-service'
     | '/trends'
     | '/user'
@@ -1016,6 +1028,7 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   PrivacyRoute: typeof PrivacyRoute
   ResourcesRoute: typeof ResourcesRouteWithChildren
+  SearchRoute: typeof SearchRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   TrendsRoute: typeof TrendsRoute
   UserRoute: typeof UserRouteWithChildren
@@ -1107,6 +1120,13 @@ declare module '@tanstack/react-router' {
       path: '/resources'
       fullPath: '/resources'
       preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms-of-service': {
@@ -1764,6 +1784,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   PrivacyRoute: PrivacyRoute,
   ResourcesRoute: ResourcesRouteWithChildren,
+  SearchRoute: SearchRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
   TrendsRoute: TrendsRoute,
   UserRoute: UserRouteWithChildren,
