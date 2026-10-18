@@ -154,15 +154,49 @@ describe("GlobalSearch", () => {
     act(() => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
     expect(dialog.open).toBe(false);
     expect(document.activeElement).toBe(trigger);
+
+    act(() => trigger.click());
+    act(() => dialog.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(dialog.open).toBe(false);
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("uses the shared drawer presentation on compact viewports", () => {
     viewport.mobile = true;
-    const { input } = openSearch();
+    const { input, trigger } = openSearch();
     const drawer = document.querySelector('[data-slot="drawer-content"]');
     expect(drawer?.getAttribute("data-presentation")).toBe("drawer");
     expect(drawer?.getAttribute("role")).toBe("dialog");
     expect(document.activeElement).toBe(input);
+
+    act(() =>
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }),
+      ),
+    );
+    act(() => vi.advanceTimersByTime(0));
+    expect(document.querySelector('[data-slot="drawer-content"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("closes and clears search when its responsive presentation changes", async () => {
+    searchPublic.mockResolvedValue(response);
+    const { input, trigger } = openSearch();
+    changeInput(input, "bolt");
+    await finishSearch();
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
+
+    viewport.mobile = true;
+    act(() => root.render(<GlobalSearch />));
+    act(() => vi.advanceTimersByTime(0));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+
+    act(() => trigger.click());
+    const mobileInput = document.querySelector(
+      'input[role="combobox"]',
+    ) as HTMLInputElement;
+    expect(mobileInput.value).toBe("");
   });
 
   it("debounces two-character queries and ignores stale responses", async () => {
