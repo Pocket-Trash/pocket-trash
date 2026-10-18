@@ -453,19 +453,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/github-discord-notifier:
-    dependencies:
-      '@t3-oss/env-core':
-        specifier: ^0.13.11
-        version: 0.13.11(typescript@6.0.2)(zod@4.4.3)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@package/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/infisical-runner:
     devDependencies:
       '@package/tsconfig':
@@ -11142,7 +11129,7 @@ snapshots:
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.1.0
+      '@types/node': 26.6.5
       pg-protocol: 1.16.0
       pg-types: 2.2.0
 

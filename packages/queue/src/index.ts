@@ -74,6 +74,8 @@ export type QueueRedriveResult = {
 
 /** Queue lifecycle event emitted by an adapter. */
 export type QueueLifecycleEvent = {
+  /** Whether a failed event exhausted all configured attempts. */
+  exhausted?: boolean;
   /** Stable event kind. */
   type: "completed" | "failed" | "started";
   /** Stable job identifier when the event concerns one job. */
@@ -674,6 +676,7 @@ async function processMemoryJobs<TPayload>(input: {
             }
             stats.failed += 1;
             input.onEvent?.({
+              exhausted: job.state === "failed",
               jobId: job.id,
               queue: input.definition.name,
               type: "failed",

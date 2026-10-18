@@ -35,7 +35,6 @@ checks. Preview infrastructure cleanup reads its Bunny Storage values from
 | `BUNNY_CDN_TOKEN_KEY` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_PULL_ZONE_ID` | Required for complete erasure | Required for complete erasure |
 | `CLERK_SECRET_KEY` | Required | Required |
-| `DISCORD_GITHUB_WEBHOOK_URL` | Required | - |
 | `FONTAWESOME_PACKAGE_TOKEN` | Required | Required |
 | `NEON_API_KEY` | Required | Required |
 | `NEON_DATABASE_NAME` | Required | Required |

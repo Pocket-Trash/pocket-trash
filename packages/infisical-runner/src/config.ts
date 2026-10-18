@@ -118,12 +118,6 @@ export const commandSecrets = {
       paths: [discordBotSecretPath],
     },
   },
-  github: {
-    "discord-notify": {
-      allowServerSecrets: true,
-      paths: [githubSecretsPath],
-    },
-  },
   logger: {
     "test:axiom": {
       allowServerSecrets: true,

@@ -1,6 +1,9 @@
 import { expect, it } from "vitest";
 import { z } from "zod";
-import { createInMemoryQueueAdapter } from "./index.js";
+import {
+  createInMemoryQueueAdapter,
+  type QueueLifecycleEvent,
+} from "./index.js";
 import { defineQueueAdapterContract } from "./test-contract.js";
 
 /**
@@ -22,7 +25,18 @@ it("models retry delay and exhaustion deterministically", async () => {
    * @returns Current test time.
    */
   const clock = () => now;
-  const adapter = createInMemoryQueueAdapter({ now: clock });
+  const events: QueueLifecycleEvent[] = [];
+  const adapter = createInMemoryQueueAdapter({
+    now: clock,
+    /**
+     * Captures lifecycle events for exhaustion assertions.
+     *
+     * @param event - Emitted queue lifecycle event.
+     */
+    onEvent(event) {
+      events.push(event);
+    },
+  });
   const queue = adapter.define({
     deduplication: { replaceCompleted: false },
     mode: "bounded",
@@ -59,6 +73,10 @@ it("models retry delay and exhaustion deterministically", async () => {
     delayed: 0,
     failed: 1,
   });
+  expect(events.filter((event) => event.type === "failed")).toEqual([
+    expect.objectContaining({ exhausted: false, jobId: "job" }),
+    expect.objectContaining({ exhausted: true, jobId: "job" }),
+  ]);
   now += 60_001;
   await expect(queue.counts()).resolves.toMatchObject({ failed: 0 });
   await adapter.close();

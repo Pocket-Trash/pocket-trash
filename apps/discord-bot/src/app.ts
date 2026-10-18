@@ -27,7 +27,7 @@ type WebhookRoute = {
  *
  * @template TPayload - Normalized source payload.
  */
-type WebhookDelivery<TPayload> = {
+export type WebhookDelivery<TPayload> = {
   /** Stable delivery identifier. */
   id: string;
   /** Normalized source payload. */
@@ -53,8 +53,26 @@ type WebhookIntakeOptions<TPayload> = {
    * @param request - Untrusted source request.
    * @returns The stable identifier and normalized payload.
    */
-  normalize(request: Request): Promise<WebhookDelivery<TPayload>>;
+  normalize(request: Request): Promise<WebhookDelivery<TPayload> | undefined>;
 };
+
+/** Expected client error raised while authenticating or validating a webhook. */
+export class WebhookIntakeError extends Error {
+  /** HTTP response status returned to the webhook source. */
+  readonly status: 400 | 401;
+
+  /**
+   * Creates an expected webhook intake error.
+   *
+   * @param status - HTTP status exposed to the source.
+   * @param message - Internal diagnostic message.
+   */
+  constructor(status: 400 | 401, message: string) {
+    super(message);
+    this.name = "WebhookIntakeError";
+    this.status = status;
+  }
+}
 
 /**
  * Creates the bot HTTP application and readiness endpoint.
@@ -94,12 +112,15 @@ export function createWebhookIntake<TPayload>(
    * @returns A retriable response unless work was durably queued.
    */
   return async (request: Request) => {
-    let normalized: WebhookDelivery<TPayload>;
+    let normalized: WebhookDelivery<TPayload> | undefined;
     try {
       normalized = await options.normalize(request);
-    } catch {
-      return Response.json({ ok: false }, { status: 400 });
+    } catch (error) {
+      const status = error instanceof WebhookIntakeError ? error.status : 400;
+      return Response.json({ ok: false }, { status });
     }
+
+    if (!normalized) return new Response(null, { status: 204 });
 
     try {
       await options.enqueue(normalized);
