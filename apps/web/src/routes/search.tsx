@@ -2,6 +2,7 @@ import type { SearchGroup } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as React from "react";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/search-constants";
 import {
   type SearchNavigationOptions,
   SearchPage,
@@ -27,7 +28,10 @@ const filteredGroups = new Set<Exclude<SearchGroup, "all">>([
 export function parseSearchPageSearch(
   value: Record<string, unknown>,
 ): SearchPageSearch {
-  const q = typeof value.q === "string" ? value.q.trim() : "";
+  const q =
+    typeof value.q === "string"
+      ? value.q.trim().slice(0, SEARCH_QUERY_MAX_LENGTH).trim()
+      : "";
   const type =
     typeof value.type === "string" &&
     filteredGroups.has(value.type as Exclude<SearchGroup, "all">)

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/search-constants";
 import { parseSearchPageSearch } from "./search";
 
 describe("parseSearchPageSearch", () => {
@@ -13,5 +14,10 @@ describe("parseSearchPageSearch", () => {
     expect(
       parseSearchPageSearch({ page: "1.5", q: "bolt", type: "all" }),
     ).toEqual({ q: "bolt" });
+    expect(
+      parseSearchPageSearch({
+        q: ` ${"x".repeat(SEARCH_QUERY_MAX_LENGTH + 1)} `,
+      }),
+    ).toEqual({ q: "x".repeat(SEARCH_QUERY_MAX_LENGTH) });
   });
 });

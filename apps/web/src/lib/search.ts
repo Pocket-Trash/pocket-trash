@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { SEARCH_QUERY_MAX_LENGTH } from "./search-constants";
 
 /** Runs a validated public search through the shared database service. */
 export const searchPublic = createServerFn({ method: "GET" })
@@ -18,7 +19,7 @@ export const searchPublic = createServerFn({ method: "GET" })
           ])
           .optional(),
         page: z.number().int().positive().optional(),
-        query: z.string().max(256),
+        query: z.string().max(SEARCH_QUERY_MAX_LENGTH),
         surface: z.enum(["modal", "page"]),
       })
       .parse(input),
