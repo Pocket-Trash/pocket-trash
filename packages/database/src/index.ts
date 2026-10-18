@@ -82,6 +82,7 @@ export type {
   ResourceVersion,
   ScraperRun,
   ScraperRunStats,
+  SearchDocument,
   ThemeMode,
   TmpAutmogPen,
   TmpAutmogPenMaterial,
