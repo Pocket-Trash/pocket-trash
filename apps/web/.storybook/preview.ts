@@ -9,6 +9,7 @@ sb.mock(import("../src/lib/resources.ts"));
 sb.mock(import("../src/lib/feedback.ts"), { spy: true });
 sb.mock(import("../src/lib/account-erasure.ts"), { spy: true });
 sb.mock(import("../src/lib/catalog-api.ts"), { spy: true });
+sb.mock(import("../src/lib/search.ts"), { spy: true });
 sb.mock(import("sonner"), { spy: true });
 sb.mock(import("../src/components/markdown-visual-editor.tsx"), { spy: true });
 

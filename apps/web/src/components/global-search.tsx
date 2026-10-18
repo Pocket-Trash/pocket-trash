@@ -1,18 +1,10 @@
 import {
-  faAtomSimple,
-  faBox,
-  faBoxesStacked,
-  faCube,
-  faFileLines,
-  faGem,
-  faIndustry,
   faMagnifyingGlass as faMagnifyingGlassLight,
-  faUser,
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { faMagnifyingGlass } from "@fortawesome/pro-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { SearchKind, SearchResult } from "@package/services";
+import type { SearchResult } from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -22,34 +14,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { searchPublic } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
+import { SearchResultIcon, searchResultTypeKeys } from "./search-result-icon";
 import { Button } from "./ui/button";
 import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { Input } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
-
-/** Search result icons keyed by public result kind. */
-const resultIcons = {
-  collection: faBoxesStacked,
-  collection_item: faBox,
-  maker: faIndustry,
-  material: faGem,
-  material_detail: faAtomSimple,
-  person: faUser,
-  product: faCube,
-  resource: faFileLines,
-} satisfies Record<SearchKind, typeof faCube>;
-
-/** Localization suffixes keyed by public result kind. */
-const resultTypeKeys = {
-  collection: "collection",
-  collection_item: "collectionItem",
-  maker: "maker",
-  material: "material",
-  material_detail: "materialDetail",
-  person: "person",
-  product: "product",
-  resource: "resource",
-} as const satisfies Record<SearchKind, string>;
 
 /** Delay before a modal query is sent. */
 const SEARCH_DELAY_MS = 300;
@@ -293,15 +262,14 @@ export function GlobalSearch() {
                   role="option"
                   tabIndex={-1}
                 >
-                  <FontAwesomeIcon
-                    aria-hidden="true"
+                  <SearchResultIcon
                     className="size-4 shrink-0 text-muted-foreground"
-                    icon={resultIcons[result.kind]}
+                    kind={result.kind}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
                       {t(
-                        `web.search.types.${resultTypeKeys[result.kind]}` as TranslationKey,
+                        `web.search.types.${searchResultTypeKeys[result.kind]}` as TranslationKey,
                       )}
                     </span>
                     <span className="block truncate text-sm font-medium">
