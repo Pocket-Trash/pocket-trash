@@ -18,8 +18,7 @@ Create these resources in the Pocket Trash Railway project:
 | --- | --- | --- |
 | Scraper cron service | `pocket-trash` in production; `pocket-trash (preview)` in previews | Project IaC with no legacy Config File setting |
 | Discord bot service | `discord-bot` in production only | One replica, zero-overlap deploys, `/health` readiness check |
-| Redis | `pocket-trash-queue` | Railway Redis template with `redis-volume` |
-| Legacy Redis during migration | `scraper-queue` | Retained until separately approved cleanup |
+| Redis | `pocket-trash-queue` | Official Redis image with its environment-local `pocket-trash-queue-volume` |
 
 Railway may detect other deployable workspace apps during repository import.
 Skip them: this project deploys only `apps/scraper` and `apps/discord-bot`.
@@ -80,7 +79,7 @@ not used by scraper application code.
 
 Keep one authoring file, [`.railway/railway.ts`](../.railway/railway.ts), and the
 CLI-generated [`.railway/README.md`](../.railway/README.md). The file describes the
-existing scraper, shared Redis queue, and Redis volume. Production uses `pocket-trash`;
+existing scraper and shared Redis queue with its persistent volume. Production uses `pocket-trash`;
 the `preview` template uses `pocket-trash (preview)`. Native PR environments
 inherit the preview template rather than being planned individually. Secrets,
 Redis references, cron enablement, database URLs, and deployment metadata stay
@@ -124,9 +123,10 @@ uploads still use the tag release workflow; applying a plan is not a release.
 
 ### Shared Redis migration
 
-The checked-in cutover stage retains both Redis resources but explicitly points
-the scraper and production bot at `pocket-trash-queue`. This is an additive
-migration, not an in-place rename. The preview workflow also uses the new queue;
+The final desired state contains only `pocket-trash-queue` and points the scraper
+and production bot at it. Legacy service and volume declarations are removed;
+applying this state before the cutover is verified can destroy required data.
+This was an additive migration, not an in-place rename. The preview workflow uses the new queue;
 provision it in the preview template before running that workflow. Generate fresh
 plans for both templates; never reuse earlier provisioning plans.
 
@@ -193,6 +193,29 @@ deduplication, and persistence recovery. Paid inference and production ticket
 activation are not part of this cutover. Record sanitized live evidence in
 ENG-538; retain the legacy service and volume until ENG-539's separate deletion
 approval, backup disposition, and post-removal checks are complete.
+
+### Legacy removal gate
+
+Before applying the final desired state, verify ENG-538's live evidence and
+inspect both environments independently. Resolve current legacy service and
+volume IDs, attached data, TCP endpoints, backup inventories and active clients;
+names alone do not prove ownership. Confirm no retained PR environments or local
+configuration still use the old endpoint. Recheck every pending/failed queue
+state and all cron checkpoints immediately before removal.
+
+Save fresh plans for production and preview. They must delete only the legacy
+`scraper-queue` instance and its obsolete `redis-volume`, without detaching,
+replacing or deleting `pocket-trash-queue-volume` or changing active consumers.
+Ask for explicit approval of that exact service/storage/data scope and backup
+disposition before applying a destructive plan. Keep backups private; record
+their owner, storage location and an explicit retention/expiry decision in
+ENG-539. Do not silently discard backups or leave retention untracked.
+
+After approved removal, verify legacy services, volumes and endpoints are
+absent; new Redis persistence and scraper/bot health remain intact; and a fresh
+PR preview uses only the new queue. A subsequent infrastructure plan must not
+recreate legacy resources. If any prerequisite or approval is missing, leave
+ENG-539 unfinished and do not apply its removal plan.
 
 ### Legacy cutover
 
