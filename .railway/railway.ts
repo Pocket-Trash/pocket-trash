@@ -165,8 +165,6 @@ export default defineRailway((ctx) => {
           healthcheckPath: "/health",
           healthcheckTimeout: 30,
           overlapSeconds: 0,
-          restartPolicyMaxRetries: 10,
-          restartPolicyType: "ON_FAILURE",
         },
         replicas: { "us-east4-eqdc4a": 1 },
         env: {

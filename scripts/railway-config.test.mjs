@@ -116,6 +116,8 @@ for (const environment of ["production", "preview"]) {
     if (environment === "production") {
       assert.equal(discordBot.deploy.healthcheckPath, "/health");
       assert.equal(discordBot.deploy.overlapSeconds, 0);
+      assert.equal(discordBot.deploy.restartPolicyType, undefined);
+      assert.equal(discordBot.deploy.restartPolicyMaxRetries, undefined);
       assert.equal(
         discordBot.variables.REDIS_URL.resource,
         "database.pocket-trash-queue",

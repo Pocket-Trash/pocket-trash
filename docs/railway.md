@@ -45,6 +45,10 @@ For the production Discord bot service:
   same Discord events and queue.
 - Keep one replica and zero deployment overlap so only one process owns the
   gateway session and continuous worker.
+- Keep Railway's [default restart policy](https://docs.railway.com/deployments/restart-policy):
+  `ON_FAILURE`, at most 10 restarts. Verify the effective service settings when
+  changing policy. The serialized environment omits these default fields, so
+  declaring the same defaults in IaC creates a perpetual false diff.
 - Use `/health`; it returns healthy only after the Discord gateway and worker
   start, the first Axiom history reconciliation completes, and Redis answers a
   live queue-count request. Custom-domain target ports must match Railway's
