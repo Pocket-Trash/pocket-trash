@@ -64,7 +64,6 @@ export default defineRailway((ctx) => {
     REDISUSER: preserve(),
   };
   sharedQueue.networking = {
-    privateNetworkEndpoint: "pocket-trash-queue",
     tcpProxies: { "6379": {} },
   };
   /** Existing database volume, retained without resizing or changing its mount. */

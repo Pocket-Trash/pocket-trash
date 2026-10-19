@@ -151,6 +151,7 @@ for (const environment of ["production", "preview"]) {
     assert.equal(queue.name, "pocket-trash-queue");
     assert.equal(queue.image, "redis:8.2");
     assert.equal(queue.defaultMountPath, "/data");
+    assert.equal(queue.networking.privateNetworkEndpoint, undefined);
     assert.deepEqual(queue.variables.REDIS_PASSWORD, { type: "preserve" });
     assert.match(
       queue.variables.REDIS_URL.value,
