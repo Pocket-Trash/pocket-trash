@@ -163,8 +163,9 @@ for (const environment of ["production", "preview"]) {
     assert.match(queue.deploy.startCommand, /REDIS_PASSWORD is required/);
     assert.match(
       queue.deploy.startCommand,
-      /cd .*Persistent volume is required/,
+      /chown redis:redis .*Persistent volume is required/,
     );
+    assert.match(queue.deploy.startCommand, /cd "\$RAILWAY_VOLUME_MOUNT_PATH"/);
     assert.doesNotMatch(queue.deploy.startCommand, /rm -rf/);
     assert.match(queue.deploy.startCommand, /--save 60 1/);
     assert.match(queue.deploy.startCommand, /--appendonly yes/);

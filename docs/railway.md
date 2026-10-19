@@ -149,8 +149,10 @@ Migration requires separate, explicitly approved stages:
    `/data`, not the helper's default image. Keep an existing required mount path
    and its attached volume aligned; the startup command uses the actual
    `RAILWAY_VOLUME_MOUNT_PATH`. Do not detach storage just to normalize its path.
-   Start the official entrypoint in that mounted directory so its normal
-   ownership initialization runs on the persistent files before dropping root.
+   Initialize ownership of the mount directory itself, then start the official
+   entrypoint there. Redis 8.2 skips its automatic ownership repair when it sees
+   `lost+found`; do not delete that directory or recursively change unrelated
+   files to make an empty volume writable.
    On initial provisioning, generate a unique Redis
    password directly in the new environment's Railway `REDIS_PASSWORD` setting
    before starting Redis; `preserve()` retains it but does not generate it.
