@@ -43,9 +43,8 @@ export default defineRailway((ctx) => {
     region: "us-east4-eqdc4a",
   });
   sharedQueue.deploy = {
-    requiredMountPath: "/data",
     startCommand:
-      '/bin/sh -c \'exec docker-entrypoint.sh redis-server --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD is required}" --save 60 1 --appendonly yes --appendfsync everysec --dir "$RAILWAY_VOLUME_MOUNT_PATH"\'',
+      '/bin/sh -c \'cd "${RAILWAY_VOLUME_MOUNT_PATH:?Persistent volume is required}" && exec docker-entrypoint.sh redis-server --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD is required}" --save 60 1 --appendonly yes --appendfsync everysec --dir "$RAILWAY_VOLUME_MOUNT_PATH"\'',
   };
   sharedQueue.variables = {
     REDIS_PASSWORD: preserve(),

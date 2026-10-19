@@ -145,8 +145,13 @@ Migration requires separate, explicitly approved stages:
    `redis-volume`.
 2. Enable RDB snapshots and AOF (`appendonly yes`, `appendfsync everysec`) on the
    new resource, then verify both persistence modes after a restart test. The
-   shared queue uses the official `redis:8.2` image and a `/data` volume, not the
-   helper's default image. On initial provisioning, generate a unique Redis
+   shared queue uses the official `redis:8.2` image and defaults new volumes to
+   `/data`, not the helper's default image. Keep an existing required mount path
+   and its attached volume aligned; the startup command uses the actual
+   `RAILWAY_VOLUME_MOUNT_PATH`. Do not detach storage just to normalize its path.
+   Start the official entrypoint in that mounted directory so its normal
+   ownership initialization runs on the persistent files before dropping root.
+   On initial provisioning, generate a unique Redis
    password directly in the new environment's Railway `REDIS_PASSWORD` setting
    before starting Redis; `preserve()` retains it but does not generate it.
    Never reuse another environment's password or store it in source. IaC declares

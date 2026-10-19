@@ -151,7 +151,6 @@ for (const environment of ["production", "preview"]) {
     assert.equal(queue.name, "pocket-trash-queue");
     assert.equal(queue.image, "redis:8.2");
     assert.equal(queue.defaultMountPath, "/data");
-    assert.equal(queue.deploy.requiredMountPath, "/data");
     assert.deepEqual(queue.variables.REDIS_PASSWORD, { type: "preserve" });
     assert.match(
       queue.variables.REDIS_URL.value,
@@ -162,6 +161,10 @@ for (const environment of ["production", "preview"]) {
       /\$\{\{RAILWAY_TCP_PROXY_PORT\}\}/,
     );
     assert.match(queue.deploy.startCommand, /REDIS_PASSWORD is required/);
+    assert.match(
+      queue.deploy.startCommand,
+      /cd .*Persistent volume is required/,
+    );
     assert.doesNotMatch(queue.deploy.startCommand, /rm -rf/);
     assert.match(queue.deploy.startCommand, /--save 60 1/);
     assert.match(queue.deploy.startCommand, /--appendonly yes/);
