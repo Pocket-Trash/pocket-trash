@@ -103,9 +103,7 @@ for (const environment of ["production", "preview"]) {
     assert.equal(scraper.variables.REDIS_URL.output, "REDIS_URL");
     const expectedAddresses = [
       "database.pocket-trash-queue",
-      "database.scraper-queue",
       `service.${scraper.name}`,
-      "volume.redis-volume",
     ];
     if (environment === "production")
       expectedAddresses.push("service.discord-bot");
@@ -171,13 +169,24 @@ for (const environment of ["production", "preview"]) {
     assert.match(queue.deploy.startCommand, /--save 60 1/);
     assert.match(queue.deploy.startCommand, /--appendonly yes/);
     assert.match(queue.deploy.startCommand, /--appendfsync everysec/);
-    const volume = definition.resources.find(
-      (resource) => resource.type === "volume",
-    );
-    assert.equal(volume.config.sizeMB, 5000);
-    assert.equal(volume.config.region, "us-east4-eqdc4a");
   });
 }
+
+test("does not recreate legacy Redis in active infrastructure or workflows", () => {
+  const paths = [
+    ".railway/railway.ts",
+    ...readdirSync(".github/workflows")
+      .filter((file) => /\.ya?ml$/.test(file))
+      .map((file) => `.github/workflows/${file}`),
+  ];
+  for (const path of paths) {
+    assert.doesNotMatch(
+      readFileSync(path, "utf8"),
+      /\bscraper-queue\b|["']redis-volume["']/,
+      path,
+    );
+  }
+});
 
 test("hands native previews to their environment-local shared queue", () => {
   const workflow = parse(readFileSync(".github/workflows/deploy.yml", "utf8"));
