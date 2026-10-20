@@ -197,6 +197,10 @@ test("hands native previews to their environment-local shared queue", () => {
     /--service "\$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME"/,
   );
   assert.doesNotMatch(source, /["']scraper-queue["']/);
+  assert.match(
+    source,
+    /node scripts\/railway-preview-queue\.mjs "\$railway_environment"/,
+  );
 });
 
 test("rejects unrelated projects and unknown environments", () => {

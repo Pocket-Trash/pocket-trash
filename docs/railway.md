@@ -334,7 +334,16 @@ the workflow:
 2. Stages the selected `DATABASE_URL`, Bunny image prefix, cron flag, deployment
    metadata, and the Redis service reference on `pocket-trash (preview)` with
    `--skip-deploys`.
-3. Redeploys the active queue from its configured image source so Redis is online.
+3. Activates the queue with Railway's `environmentUnskipService` operation when
+   Focused PR Environments skipped its service and inherited volume. A redeploy
+   alone does not activate skipped resources. This is scoped to a verified
+   ephemeral PR environment; existing volumes are never replaced or detached,
+   and the workflow never creates an unrelated replacement volume. The inherited
+   volume must reach Ready at the queue's required mount before redeployment.
+4. Redeploys the queue from its configured image source and waits for an
+   authenticated ping through that queue's own public TCP endpoint. An accepted
+   deployment request or a successful browser smoke test alone is not Redis
+   readiness. Failure blocks the preview workflow.
 
 The handoff and queue redeployment both target `pocket-trash-queue` in that PR's
 environment. The preview template must already contain this service and its own

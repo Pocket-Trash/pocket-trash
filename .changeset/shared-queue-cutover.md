@@ -3,4 +3,4 @@
 "@app/discord-bot": patch
 ---
 
-Route scraper deployments and previews to the shared queue without removing existing service settings.
+Provision persistent preview queues and route scraper deployments to the shared queue without removing existing service settings.
