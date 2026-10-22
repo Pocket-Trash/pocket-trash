@@ -52,6 +52,11 @@ const allDomains = [...validationDomains];
  */
 const changeClassificationRules = [
   {
+    category: "pr-visuals",
+    paths: [".github/pr-visuals.json", ".github/workflows/pr-visuals.yml"],
+    domains: ["validation"],
+  },
+  {
     category: "documentation",
     paths: [
       ".github/pull_request_template.md",

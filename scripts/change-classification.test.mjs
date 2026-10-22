@@ -76,6 +76,93 @@ function expected(
   };
 }
 
+test("PR visuals use only the reviewed Phase 1 caller and existing OIDC bootstrap", () => {
+  const workflow = parse(
+    readFileSync(
+      new URL("../.github/workflows/pr-visuals.yml", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(workflow.on, {
+    pull_request_target: { types: ["opened", "ready_for_review"] },
+    issue_comment: { types: ["created", "edited"] },
+  });
+  assert.deepEqual(workflow.permissions, {
+    actions: "read",
+    contents: "read",
+    "pull-requests": "read",
+    "id-token": "write",
+  });
+  assert.deepEqual(Object.keys(workflow.jobs), ["visuals"]);
+  assert.deepEqual(workflow.jobs.visuals, {
+    if: "vars.PR_VISUALS_ENABLED == 'true' && github.repository == 'Pocket-Trash/pocket-trash'",
+    uses: "Pocket-Trash/pr-review-tool/.github/workflows/review.yml@b8417b5089afe9cf8773735c6a2f7ba4c301329f",
+    with: {
+      task: "visuals",
+      "config-path": ".github/pr-visuals.json",
+      "app-id": "5371542",
+      "app-slug": "pocket-trash-pr-review",
+      "infisical-project-id": JSON.parse(
+        readFileSync(new URL("../.infisical.json", import.meta.url), "utf8"),
+      ).workspaceId,
+      "infisical-environment": "preview",
+      "infisical-path": "/tools/github/pr-review-tool",
+    },
+    secrets: {
+      INFISICAL_GITHUB_IDENTITY_ID:
+        "${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}",
+      INFISICAL_DOMAIN: "${{ secrets.INFISICAL_DOMAIN }}",
+      INFISICAL_OIDC_AUDIENCE: "${{ secrets.INFISICAL_OIDC_AUDIENCE }}",
+    },
+  });
+});
+
+test("trusted PR visual configuration keeps the approved route and source limits", () => {
+  const config = JSON.parse(
+    readFileSync(
+      new URL("../.github/pr-visuals.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(Object.keys(config).sort(), [
+    "generatedFiles",
+    "limits",
+    "model",
+    "prompt",
+    "provider",
+    "skills",
+    "task",
+    "visualPhase",
+  ]);
+  assert.equal(config.task, "visuals");
+  assert.equal(config.visualPhase, 1);
+  assert.equal(config.provider, "openrouter");
+  assert.equal(config.model, "anthropic/claude-sonnet-5.5");
+  assert.deepEqual(config.skills, ["i-have-adhd", "stop-slop"]);
+  assert.match(config.prompt, /frozen source facts/);
+  assert.match(config.prompt, /Do not review code correctness/);
+  assert.deepEqual(config.generatedFiles, [
+    "pnpm-lock.yaml",
+    "**/drizzle/meta/**",
+    "**/drizzle/**/snapshot.json",
+    "**/generated/**",
+  ]);
+  assert.deepEqual(config.limits, {
+    maxFiles: 100,
+    maxBytes: 1048576,
+    maxChangedLines: 20000,
+    maxFileBytes: 524288,
+  });
+});
+
+test("PR visuals wiring validates without deploying or selecting application domains", () => {
+  for (const path of [
+    ".github/workflows/pr-visuals.yml",
+    ".github/pr-visuals.json",
+  ])
+    assert.deepEqual(classifyChanges([path]), expected(["validation"]));
+});
+
 test("classifies representative application paths", () => {
   for (const [path, enabled, details] of [
     [
