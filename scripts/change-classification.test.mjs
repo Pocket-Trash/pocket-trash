@@ -155,9 +155,72 @@ test("trusted PR visual configuration keeps the approved route and source limits
   });
 });
 
+test("the manual credential check reads one masked secret per isolated job without running analysis", () => {
+  const workflow = parse(
+    readFileSync(
+      new URL(
+        "../.github/workflows/pr-visuals-credentials.yml",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  const caller = parse(
+    readFileSync(
+      new URL("../.github/workflows/pr-visuals.yml", import.meta.url),
+      "utf8",
+    ),
+  ).jobs.visuals;
+  assert.deepEqual(workflow.on, { workflow_dispatch: null });
+  assert.deepEqual(workflow.permissions, {
+    contents: "read",
+    "id-token": "write",
+  });
+  assert.deepEqual(Object.keys(workflow.jobs), ["credential"]);
+  const job = workflow.jobs.credential;
+  assert.equal(
+    job.if,
+    "github.repository == 'Pocket-Trash/pocket-trash' && github.ref == 'refs/heads/main'",
+  );
+  assert.equal(job["timeout-minutes"], 3);
+  assert.deepEqual(job.strategy, {
+    "fail-fast": false,
+    matrix: { credential: ["analysis", "publication"] },
+  });
+  assert.equal(job.steps.length, 3);
+  assert.deepEqual(job.steps[0], {
+    uses: "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    with: {
+      repository: "Pocket-Trash/pr-review-tool",
+      ref: caller.uses.split("@")[1],
+      path: "reviewer",
+      "persist-credentials": false,
+    },
+  });
+  assert.deepEqual(job.steps[1], {
+    uses: "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+    with: { "node-version": 22 },
+  });
+  assert.equal(
+    job.steps[2].run,
+    'node reviewer/src/infisical.mjs "$CREDENTIAL_KIND"',
+  );
+  assert.deepEqual(job.steps[2].env, {
+    CREDENTIAL_KIND: "${{ matrix.credential }}",
+    REVIEW_PROVIDER: "openrouter",
+    INFISICAL_GITHUB_IDENTITY_ID: caller.secrets.INFISICAL_GITHUB_IDENTITY_ID,
+    INFISICAL_DOMAIN: caller.secrets.INFISICAL_DOMAIN,
+    INFISICAL_OIDC_AUDIENCE: caller.secrets.INFISICAL_OIDC_AUDIENCE,
+    INFISICAL_PROJECT_ID: caller.with["infisical-project-id"],
+    INFISICAL_ENVIRONMENT: caller.with["infisical-environment"],
+    INFISICAL_SECRET_PATH: caller.with["infisical-path"],
+  });
+});
+
 test("PR visuals wiring validates without deploying or selecting application domains", () => {
   for (const path of [
     ".github/workflows/pr-visuals.yml",
+    ".github/workflows/pr-visuals-credentials.yml",
     ".github/pr-visuals.json",
   ])
     assert.deepEqual(classifyChanges([path]), expected(["validation"]));
