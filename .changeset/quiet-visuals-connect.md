@@ -5,4 +5,4 @@
 "@app/web": patch
 ---
 
-Wire opt-in PR visuals and a manual credential check through the existing Infisical OIDC bootstrap.
+Wire opt-in PR visuals and manual credential checks, and renew the approved temporary development-tooling audit exception.
