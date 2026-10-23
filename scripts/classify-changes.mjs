@@ -272,6 +272,8 @@ const changeClassificationRules = [
       ".railwayignore",
       ".github/workflows/railway-config.yml",
       "scripts/pnpm-install.sh",
+      "scripts/railway-preview-queue.mjs",
+      "scripts/railway-preview-queue.test.mjs",
     ],
     prefixes: [".railway/"],
     domains: ["discord_bot", "scraper", "preview", "validation"],

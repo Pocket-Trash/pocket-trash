@@ -1,4 +1,5 @@
 {
   "extends": "../packages/tsconfig/base.json",
+  "compilerOptions": { "allowImportingTsExtensions": true, "types": ["node"] },
   "files": ["railway.ts"]
 }

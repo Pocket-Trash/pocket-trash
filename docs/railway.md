@@ -18,8 +18,7 @@ Create these resources in the Pocket Trash Railway project:
 | --- | --- | --- |
 | Scraper cron service | `pocket-trash` in production; `pocket-trash (preview)` in previews | Project IaC with no legacy Config File setting |
 | Discord bot service | `discord-bot` in production only | One replica, zero-overlap deploys, `/health` readiness check |
-| Redis | `pocket-trash-queue` | Railway Redis template with `redis-volume` |
-| Legacy Redis during migration | `scraper-queue` | Retained until separately approved cleanup |
+| Redis | `pocket-trash-queue` | Official Redis image with its environment-local `pocket-trash-queue-volume` |
 
 Railway may detect other deployable workspace apps during repository import.
 Skip them: this project deploys only `apps/scraper` and `apps/discord-bot`.
@@ -45,6 +44,10 @@ For the production Discord bot service:
   same Discord events and queue.
 - Keep one replica and zero deployment overlap so only one process owns the
   gateway session and continuous worker.
+- Keep Railway's [default restart policy](https://docs.railway.com/deployments/restart-policy):
+  `ON_FAILURE`, at most 10 restarts. Verify the effective service settings when
+  changing policy. The serialized environment omits these default fields, so
+  declaring the same defaults in IaC creates a perpetual false diff.
 - Use `/health`; it returns healthy only after the Discord gateway and worker
   start, the first Axiom history reconciliation completes, and Redis answers a
   live queue-count request. Custom-domain target ports must match Railway's
@@ -76,7 +79,7 @@ not used by scraper application code.
 
 Keep one authoring file, [`.railway/railway.ts`](../.railway/railway.ts), and the
 CLI-generated [`.railway/README.md`](../.railway/README.md). The file describes the
-existing scraper, shared Redis queue, and Redis volume. Production uses `pocket-trash`;
+existing scraper and shared Redis queue with its persistent volume. Production uses `pocket-trash`;
 the `preview` template uses `pocket-trash (preview)`. Native PR environments
 inherit the preview template rather than being planned individually. Secrets,
 Redis references, cron enablement, database URLs, and deployment metadata stay
@@ -111,8 +114,12 @@ PR environments inherit the preview template; the Deploy workflow still stages
 each preview's database, image prefix, cron flag, and logging metadata. Keep
 real scraping disabled on shared-database previews.
 
-Automation that exports `RAILWAY_PROJECT_ID` must unset it after linking so the
-CLI passes the saved project's name into the IaC context.
+Automation keeps `RAILWAY_PROJECT_ID` and resolves `RAILWAY_ENVIRONMENT_ID`
+through a project-scoped API query. Do not use `railway link` with CI workspace
+tokens: it requests account-level workspace listings and reports Unauthorized
+even when the token can read and deploy this project. The IaC context resolver
+verifies the project and environment names through the same scoped API before
+building the resource graph. Preview queue setup also avoids account listings.
 
 Railway does not read IaC during a source deployment. Apply reviewed configuration
 changes explicitly before deploying code that depends on them. Production source
@@ -120,15 +127,24 @@ uploads still use the tag release workflow; applying a plan is not a release.
 
 ### Shared Redis migration
 
-The initial production and preview rename plans inspected on 2026-10-16 both
-reported exactly `1 to add, 0 to change, 1 to destroy`: create database
-`pocket-trash-queue` and delete database `scraper-queue`. The IaC rename is
-therefore a replacement, not an in-place rename. The checked-in migration stage
-retains both resources. After adding the production-only bot service, the
-reviewed production plan reports `2 to add, 0 to change, 0 to destroy` (the
-queue and bot), while preview reports `1 to add, 0 to change, 0 to destroy`
-(the queue only). Do not apply either additive plan without express user
-permission.
+The final desired state contains only `pocket-trash-queue` and points the scraper
+and production bot at it. Legacy service and volume declarations are removed;
+applying this state before the cutover is verified can destroy required data.
+This was an additive migration, not an in-place rename. The preview workflow uses the new queue;
+provision it in the preview template before running that workflow. Generate fresh
+plans for both templates; never reuse earlier provisioning plans.
+
+| Consumer | Production | Preview / PR environments | Development |
+| --- | --- | --- | --- |
+| Scraper and its checkpoint store | New queue's private `REDIS_URL` | Template's private URL; PR workflow hands off the environment-local `REDIS_PUBLIC_URL` | Configured `REDIS_URL`, otherwise isolated local Redis |
+| Discord bot notifications, Axiom cursor, ticket state | New queue's private `REDIS_URL` | No bot service is provisioned | Its configured `REDIS_URL`; verify separately from production |
+| API and web | HTTP logger forwarding, not Redis consumers | Same | Same |
+
+The shared queue package accepts the caller's connection; it does not choose an
+environment. Do not add Redis credentials to API or web. Keep BullMQ queue names
+(`scraper-images`, `scraper-items`, `discord-notifications`) and job identities
+unchanged. An old `REDIS` alias or an Infisical-imported URL must not override the
+effective `REDIS_URL`; inspect targets without printing credentials.
 
 Migration requires separate, explicitly approved stages:
 
@@ -136,21 +152,74 @@ Migration requires separate, explicitly approved stages:
    `pocket-trash-queue` without deleting or detaching `scraper-queue` or
    `redis-volume`.
 2. Enable RDB snapshots and AOF (`appendonly yes`, `appendfsync everysec`) on the
-   new resource, then verify both persistence modes after a restart test.
-3. Pause producers, drain `scraper-images` and `scraper-items`, and verify their
-   active, waiting, delayed, and failed counts. Copy any required Redis-local
-   scraper checkpoints.
+   new resource, then verify both persistence modes after a restart test. The
+   shared queue uses the official `redis:8.2` image and defaults new volumes to
+   `/data`, not the helper's default image. Keep an existing required mount path
+   and its attached volume aligned; the startup command uses the actual
+   `RAILWAY_VOLUME_MOUNT_PATH`. Do not detach storage just to normalize its path.
+   Initialize ownership of the mount directory itself, then start the official
+   entrypoint there. Redis 8.2 skips its automatic ownership repair when it sees
+   `lost+found`; do not delete that directory or recursively change unrelated
+   files to make an empty volume writable.
+   On initial provisioning, generate a unique Redis
+   password directly in the new environment's Railway `REDIS_PASSWORD` setting
+   before starting Redis; `preserve()` retains it but does not generate it.
+   Never reuse another environment's password or store it in source. IaC declares
+   both private and public connection expressions; the public URL is required by
+   the PR handoff. Verify the mounted path and authenticated ping, not only the
+   deployment status.
+3. Pause scraper cron and every producer/consumer using the old connection. Drain
+   `scraper-images` and `scraper-items`; inspect active, waiting, delayed, paused,
+   prioritized, repeatable, waiting-children, failed, and completed state. Reconcile
+   checkpoints and deduplication records as well as any bot cursor/ticket state
+   before switching. Completed jobs can carry job-ID deduplication history: an
+   empty waiting list alone is not permission to discard Redis data. Preserve a
+   recoverable snapshot and copy required state without flushing either database.
 4. Switch the scraper and Discord bot `REDIS_URL` references, resume consumers,
    and verify queue processing, deduplication, the Axiom cursor, and ticket
    operations before resuming producers.
 5. Observe at least one complete scraper schedule and the Discord health checks.
-   Roll back references to `scraper-queue` if verification fails.
+   If verification fails, pause producers again and reconcile any work accepted
+   by the new queue before restoring old references under a separately approved
+   rollback. Simply switching back can strand or duplicate work.
 6. Remove `scraper-queue` and its obsolete data only in a later cleanup with
    separate user approval and a fresh plan proving the exact deletion.
 
 Provisioning, switching, deployment, and cleanup are production actions. This
 repository change records the desired state and plan result only; it authorizes
 none of those actions.
+
+Repeat the inventory for retained PR environments: existing snapshots do not
+inherit template updates. Reconcile them or close them with approval; never point
+a preview at production Redis. Verify a fresh PR queue deployment and E2E check,
+one complete production scraper cycle, bot health and synthetic notification
+deduplication, and persistence recovery. Paid inference and production ticket
+activation are not part of this cutover. Record sanitized live evidence in
+ENG-538; retain the legacy service and volume until ENG-539's separate deletion
+approval, backup disposition, and post-removal checks are complete.
+
+### Legacy removal gate
+
+Before applying the final desired state, verify ENG-538's live evidence and
+inspect both environments independently. Resolve current legacy service and
+volume IDs, attached data, TCP endpoints, backup inventories and active clients;
+names alone do not prove ownership. Confirm no retained PR environments or local
+configuration still use the old endpoint. Recheck every pending/failed queue
+state and all cron checkpoints immediately before removal.
+
+Save fresh plans for production and preview. They must delete only the legacy
+`scraper-queue` instance and its obsolete `redis-volume`, without detaching,
+replacing or deleting `pocket-trash-queue-volume` or changing active consumers.
+Ask for explicit approval of that exact service/storage/data scope and backup
+disposition before applying a destructive plan. Keep backups private; record
+their owner, storage location and an explicit retention/expiry decision in
+ENG-539. Do not silently discard backups or leave retention untracked.
+
+After approved removal, verify legacy services, volumes and endpoints are
+absent; new Redis persistence and scraper/bot health remain intact; and a fresh
+PR preview uses only the new queue. A subsequent infrastructure plan must not
+recreate legacy resources. If any prerequisite or approval is missing, leave
+ENG-539 unfinished and do not apply its removal plan.
 
 ### Legacy cutover
 
@@ -292,11 +361,21 @@ the workflow:
 2. Stages the selected `DATABASE_URL`, Bunny image prefix, cron flag, deployment
    metadata, and the Redis service reference on `pocket-trash (preview)` with
    `--skip-deploys`.
-3. Redeploys the active queue from its configured image source so Redis is online.
+3. Activates the queue with Railway's `environmentUnskipService` operation when
+   Focused PR Environments skipped its service and inherited volume. A redeploy
+   alone does not activate skipped resources. This is scoped to a verified
+   ephemeral PR environment; existing volumes are never replaced or detached,
+   and the workflow never creates an unrelated replacement volume. The inherited
+   volume must reach Ready at the queue's required mount before redeployment.
+4. Redeploys the queue from its configured image source and waits for an
+   authenticated ping through that queue's own public TCP endpoint. An accepted
+   deployment request or a successful browser smoke test alone is not Redis
+   readiness. Failure blocks the preview workflow.
 
-Until the separately approved provisioning and cutover stages are complete, the
-preview workflow continues to use `scraper-queue`. Switch this handoff to
-`pocket-trash-queue` only as part of the approved cutover.
+The handoff and queue redeployment both target `pocket-trash-queue` in that PR's
+environment. The preview template must already contain this service and its own
+persistent volume before the workflow runs. Keep the legacy service until its
+data and clients have been reconciled and its removal separately approved.
 
 - Mutation-relevant PRs use the isolated `preview-pr-<number>` branch;
   DB-changing PRs also apply committed migrations before deployment.

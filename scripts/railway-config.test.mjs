@@ -63,10 +63,14 @@ for (const environment of ["production", "preview"]) {
     ]);
     assert.deepEqual(Object.keys(scraper.variables).sort(), [
       "APP_ENV",
+      "ASSET_FOLDER_PREFIX",
       "AXIOM_DATASET",
       "AXIOM_TOKEN",
+      "BUNNY_ASSET_FOLDER_PREFIX",
       "BUNNY_CDN_BASE_URL",
       "BUNNY_IMAGE_FOLDER_PREFIX",
+      "BUNNY_PULL_ZONE_ID",
+      "BUNNY_RESOURCE_FOLDER_PREFIX",
       "BUNNY_STORAGE_ACCESS_KEY",
       "BUNNY_STORAGE_ENDPOINT",
       "BUNNY_STORAGE_ZONE_NAME",
@@ -89,14 +93,17 @@ for (const environment of ["production", "preview"]) {
       value: "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
     });
     for (const [name, value] of Object.entries(scraper.variables)) {
-      if (name === "RAILPACK_INSTALL_CMD") continue;
+      if (name === "RAILPACK_INSTALL_CMD" || name === "REDIS_URL") continue;
       assert.deepEqual(value, { type: "preserve" });
     }
+    assert.equal(
+      scraper.variables.REDIS_URL.resource,
+      "database.pocket-trash-queue",
+    );
+    assert.equal(scraper.variables.REDIS_URL.output, "REDIS_URL");
     const expectedAddresses = [
       "database.pocket-trash-queue",
-      "database.scraper-queue",
       `service.${scraper.name}`,
-      "volume.redis-volume",
     ];
     if (environment === "production")
       expectedAddresses.push("service.discord-bot");
@@ -107,6 +114,8 @@ for (const environment of ["production", "preview"]) {
     if (environment === "production") {
       assert.equal(discordBot.deploy.healthcheckPath, "/health");
       assert.equal(discordBot.deploy.overlapSeconds, 0);
+      assert.equal(discordBot.deploy.restartPolicyType, undefined);
+      assert.equal(discordBot.deploy.restartPolicyMaxRetries, undefined);
       assert.equal(
         discordBot.variables.REDIS_URL.resource,
         "database.pocket-trash-queue",
@@ -120,6 +129,7 @@ for (const environment of ["production", "preview"]) {
       );
       assert.equal(discordBot.source.repo, "Pocket-Trash/pocket-trash");
       for (const variable of [
+        "CHEAPERINFERENCE_API_KEY",
         "AXIOM_INTAKE_WEBHOOK_URL",
         "DISCORD_AXIOM_INTAKE_CHANNEL_ID",
         "DISCORD_BUG_TAG_ID",
@@ -139,16 +149,68 @@ for (const environment of ["production", "preview"]) {
       assert.equal(discordBot, undefined);
     }
     assert.equal(queue.name, "pocket-trash-queue");
+    assert.equal(queue.image, "redis:8.2");
+    assert.equal(queue.defaultMountPath, "/data");
+    assert.equal(queue.networking.privateNetworkEndpoint, undefined);
+    assert.deepEqual(queue.variables.REDIS_PASSWORD, { type: "preserve" });
+    assert.match(
+      queue.variables.REDIS_URL.value,
+      /\$\{\{RAILWAY_PRIVATE_DOMAIN\}\}/,
+    );
+    assert.match(
+      queue.variables.REDIS_PUBLIC_URL.value,
+      /\$\{\{RAILWAY_TCP_PROXY_PORT\}\}/,
+    );
+    assert.match(queue.deploy.startCommand, /REDIS_PASSWORD is required/);
+    assert.match(
+      queue.deploy.startCommand,
+      /chown redis:redis .*Persistent volume is required/,
+    );
+    assert.match(queue.deploy.startCommand, /cd "\$RAILWAY_VOLUME_MOUNT_PATH"/);
+    assert.doesNotMatch(queue.deploy.startCommand, /rm -rf/);
     assert.match(queue.deploy.startCommand, /--save 60 1/);
     assert.match(queue.deploy.startCommand, /--appendonly yes/);
     assert.match(queue.deploy.startCommand, /--appendfsync everysec/);
-    const volume = definition.resources.find(
-      (resource) => resource.type === "volume",
-    );
-    assert.equal(volume.config.sizeMB, 5000);
-    assert.equal(volume.config.region, "us-east4-eqdc4a");
   });
 }
+
+test("does not recreate legacy Redis in active infrastructure or workflows", () => {
+  const paths = [
+    ".railway/railway.ts",
+    ...readdirSync(".github/workflows")
+      .filter((file) => /\.ya?ml$/.test(file))
+      .map((file) => `.github/workflows/${file}`),
+  ];
+  for (const path of paths) {
+    assert.doesNotMatch(
+      readFileSync(path, "utf8"),
+      /\bscraper-queue\b|["']redis-volume["']/,
+      path,
+    );
+  }
+});
+
+test("hands native previews to their environment-local shared queue", () => {
+  const workflow = parse(readFileSync(".github/workflows/deploy.yml", "utf8"));
+  assert.equal(
+    workflow.env.RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME,
+    "pocket-trash-queue",
+  );
+  const source = readFileSync(".github/workflows/deploy.yml", "utf8");
+  assert.match(
+    source,
+    /\$\{RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME\}\.REDIS_PUBLIC_URL/,
+  );
+  assert.match(
+    source,
+    /--service "\$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME"/,
+  );
+  assert.doesNotMatch(source, /["']scraper-queue["']/);
+  assert.match(
+    source,
+    /node scripts\/railway-preview-queue\.mjs "\$railway_environment"/,
+  );
+});
 
 test("rejects unrelated projects and unknown environments", () => {
   for (const context of [
@@ -202,8 +264,9 @@ test("checks both templates without applying changes or exposing secrets to fork
   assert.match(run, /config plan --detailed-exit-code/);
   assert.match(run, /GITHUB_EVENT_NAME.*pull_request/);
   assert.doesNotMatch(run, /config apply|show-values|include-variables/);
-  assert.match(run, /railway link --project/);
-  assert.match(run, /--environment/);
+  assert.doesNotMatch(run, /railway link/);
+  assert.match(run, /railway api/);
+  assert.match(run, /export RAILWAY_ENVIRONMENT_ID/);
   /**
    * Execute the workflow step with a simulated Railway plan result.
    *
@@ -221,8 +284,8 @@ test("checks both templates without applying changes or exposing secrets to fork
         `
       pnpm() {
         case "$3" in
-          link) test "$5" = expected-project && test "$7" = "$RAILWAY_ENVIRONMENT" ;;
-          config) test -z "\${RAILWAY_PROJECT_ID+x}" && return "$PLAN_EXIT_CODE" ;;
+          api) printf '%s' '{"data":{"project":{"environments":{"edges":[{"node":{"id":"env-preview","name":"preview"}},{"node":{"id":"env-production","name":"production"}}]}}}}' ;;
+          config) test "$RAILWAY_PROJECT_ID" = expected-project && test "$RAILWAY_ENVIRONMENT_ID" = "env-$RAILWAY_ENVIRONMENT" && return "$PLAN_EXIT_CODE" ;;
           *) return 1 ;;
         esac
       }
