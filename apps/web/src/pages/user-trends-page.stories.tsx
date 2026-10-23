@@ -177,6 +177,7 @@ const baseItem: UserCollectionItem = {
   name: "Product 1",
   ownerClerkId: "user_storybook",
   ownerImageUrl: null,
+  ownerIsProfilePublic: true,
   ownerUserId: 1,
   ownerUsername: "collector",
   productId: 200,

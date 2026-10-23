@@ -19,6 +19,7 @@ export const storySettings: UserSettingsState = {
   hasSavedSettings: true,
   settings: {
     currencyCode: "USD",
+    isProfilePublic: false,
     locale: "en-US",
     measurementSystem: "metric",
     publishTrends: false,

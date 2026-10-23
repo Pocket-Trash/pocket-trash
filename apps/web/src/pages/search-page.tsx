@@ -1,4 +1,7 @@
-import { faMagnifyingGlass } from "@fortawesome/pro-light-svg-icons";
+import {
+  faMagnifyingGlass,
+  faUserLock,
+} from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   SearchCounts,
@@ -372,8 +375,15 @@ function SearchResults({ items, t }: SearchResultsProps) {
                 <h2 className="mt-2 truncate text-base font-semibold group-hover:text-primary">
                   {result.title}
                 </h2>
-                {result.context ? (
+                {result.context || result.ownerIsProfilePublic === false ? (
                   <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {result.ownerIsProfilePublic === false ? (
+                      <>
+                        <FontAwesomeIcon aria-hidden="true" icon={faUserLock} />{" "}
+                        {t("web.profiles.privateUser")}
+                        {result.context ? " · " : null}
+                      </>
+                    ) : null}
                     {result.context}
                   </p>
                 ) : null}

@@ -40,6 +40,7 @@ export type UserSettingsState = {
 /** Default preferences for users without saved settings. */
 export const defaultUserSettings: UserSettingsPreferences = {
   currencyCode: "USD",
+  isProfilePublic: false,
   locale: null,
   measurementSystem: "metric",
   publishTrends: false,
@@ -120,6 +121,13 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
     patch.measurementSystem = value.measurementSystem;
   }
 
+  if ("isProfilePublic" in value) {
+    if (typeof value.isProfilePublic !== "boolean") {
+      throw new Error(formatTranslation("web.error.userSettingsObject"));
+    }
+    patch.isProfilePublic = value.isProfilePublic;
+  }
+
   if ("theme" in value) {
     if (typeof value.theme !== "string" || !isThemeMode(value.theme)) {
       throw new Error(formatTranslation("web.error.invalidTheme"));
@@ -174,6 +182,8 @@ function isSupportedLocale(value: unknown): value is SupportedLocale {
 function toUserSettingsPreferences(settings: {
   /** Preferred ISO currency code. */
   currencyCode: CurrencyCode;
+  /** Whether public surfaces may identify the account and expose its profile. */
+  isProfilePublic: boolean;
   /** App-wide measurement display system. */
   measurementSystem: MeasurementSystem;
   /** Whether privacy-filtered personal Trends are public. */
@@ -185,6 +195,7 @@ function toUserSettingsPreferences(settings: {
 }) {
   return {
     currencyCode: settings.currencyCode,
+    isProfilePublic: settings.isProfilePublic,
     locale: settings.locale ? resolveLocale(settings.locale) : null,
     measurementSystem: settings.measurementSystem,
     publishTrends: settings.publishTrends,

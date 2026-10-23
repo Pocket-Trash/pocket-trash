@@ -1,7 +1,7 @@
 import type {
+  PublicUserCollectionItem,
   UserActivityTrends,
   UserCollectionHistoryTrends,
-  UserCollectionItem,
 } from "@package/services";
 import {
   formatTranslation,
@@ -125,7 +125,7 @@ export function UserTrendsPage({
   /** Active privacy-safe public generations, available only to the owner view. */
   communityTrends?: CommunityTrendsSource;
   /** Currently owned physical items visible only to their owner. */
-  items: UserCollectionItem[];
+  items: PublicUserCollectionItem[];
   /**
    * Updates stable URL filter state.
    *

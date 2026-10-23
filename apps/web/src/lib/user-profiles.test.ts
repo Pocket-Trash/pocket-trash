@@ -7,9 +7,11 @@ type ServerFunctionInput = {
 };
 
 /** Exact username lookup spy. */
-const getByUsername = vi.hoisted(() => vi.fn());
+const getPublicByUsername = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/services", () => ({ s: { db: { users: { getByUsername } } } }));
+vi.mock("@/lib/services", () => ({
+  s: { db: { users: { getPublicByUsername } } },
+}));
 vi.mock("@tanstack/react-start", () => ({
   /**
    * Exposes validated server handlers directly for unit tests.
@@ -48,7 +50,10 @@ describe("getPublicUserProfile", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns only the public username", async () => {
-    getByUsername.mockResolvedValueOnce({ id: 1000, username: "SearchPerson" });
+    getPublicByUsername.mockResolvedValueOnce({
+      id: 1000,
+      username: "SearchPerson",
+    });
 
     await expect(
       getPublicUserProfile({ data: { username: "SearchPerson" } }),
@@ -56,7 +61,7 @@ describe("getPublicUserProfile", () => {
   });
 
   it("returns not-found for a user without a username", async () => {
-    getByUsername.mockResolvedValueOnce({ id: 1000, username: null });
+    getPublicByUsername.mockResolvedValueOnce({ id: 1000, username: null });
 
     await expect(
       getPublicUserProfile({ data: { username: "former-user" } }),

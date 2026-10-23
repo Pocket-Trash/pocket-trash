@@ -1,8 +1,18 @@
-import type { PublicMaterial, PublicMaterialSummary } from "@package/services";
+import type {
+  PublicMaterial,
+  PublicMaterialSummary,
+  PublicUserCollectionItem,
+} from "@package/services";
 import { z } from "zod";
 
+/** Public material detail with redacted collection items. */
+export type PublicMaterialDetail = Omit<PublicMaterial, "collectionItems"> & {
+  /** Public collection items with internal owner identifiers removed. */
+  collectionItems: PublicUserCollectionItem[];
+};
+
 /** Public material route data with a server-resolved canonical URL. */
-export type PublicMaterialPage = PublicMaterial & {
+export type PublicMaterialPage = PublicMaterialDetail & {
   /** Canonical URL retained unchanged during hydration, including on previews. */
   canonicalUrl: string;
 };
