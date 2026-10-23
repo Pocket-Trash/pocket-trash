@@ -215,7 +215,7 @@ does not claim to implement a complete cross-provider erasure workflow.
 | Axiom | `cloud.us-east-1.aws` | Provider-managed replication only; no customer restore workflow is approved. The public DPA governs provider processing |
 | Cloudflare | Worker and CDN processing are global | Logs/traces are provider-managed and expire; KV is development-only and contains no user payload |
 | Vercel | Global edge; no application region override is checked in | Deployments/build artifacts must contain no account data; no account-data recovery copy is approved |
-| Railway | Production scraper, Discord bot, and shared Redis run in `us-east4-eqdc4a` | RDB and AOF share `redis-volume` and are recovery copies, not independent durable truth. The live volume backup schedule is not exposed by the checked CLI output; Discord ticket processing cannot launch until every backup is inventoried and its erasure procedure is verified |
+| Railway | Production scraper, Discord bot, and shared Redis run in `us-east4-eqdc4a` | RDB and AOF share `pocket-trash-queue-volume` and are recovery copies, not independent durable truth. The live volume backup schedule is not exposed by the checked CLI output; Discord ticket processing cannot launch until every backup is inventoried and its erasure procedure is verified |
 | Clerk | Provider-managed identity service; Clerk confirms full user deletion within 3 days | Delete the user last, verify immediate API absence, and retain the three-day provider expiry in the erasure receipt |
 
 Provider references: [Neon history](https://neon.com/docs/postgres/backup-restore/history-window),

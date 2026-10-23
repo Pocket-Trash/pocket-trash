@@ -4,9 +4,7 @@ import {
   github,
   preserve,
   project,
-  redis,
   service,
-  volume,
 } from "railway/iac";
 
 export default defineRailway((ctx) => {
@@ -23,20 +21,7 @@ export default defineRailway((ctx) => {
     );
   }
 
-  /** Legacy queue retained until the separately approved migration cleanup. */
-  const legacyScraperQueue = redis("scraper-queue", {
-    region: "us-east4-eqdc4a",
-  });
-  legacyScraperQueue.deploy = {
-    startCommand:
-      '/bin/sh -c "rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH"',
-  };
-  legacyScraperQueue.networking = {
-    privateNetworkEndpoint: "redis",
-    tcpProxies: { "6379": {} },
-  };
-
-  /** Shared Redis queue provisioned additively for the migration. */
+  /** Shared Redis queue for scraper and Discord state in each environment. */
   const sharedQueue = database("pocket-trash-queue", "redis", {
     image: "redis:8.2",
     defaultMountPath: "/data",
@@ -66,13 +51,6 @@ export default defineRailway((ctx) => {
   sharedQueue.networking = {
     tcpProxies: { "6379": {} },
   };
-  /** Existing database volume, retained without resizing or changing its mount. */
-  const redisVolume = volume("redis-volume", {
-    alerts: { usage: { "100": {}, "80": {}, "95": {} } },
-    allowOnlineResize: true,
-    region: "us-east4-eqdc4a",
-    sizeMB: 5000,
-  });
   /** Scraper service settings shared by production and native PR environments. */
   const scraper = service(
     production ? "pocket-trash" : "pocket-trash (preview)",
@@ -203,12 +181,6 @@ export default defineRailway((ctx) => {
     : undefined;
 
   return project("Pocket Trash", {
-    resources: [
-      legacyScraperQueue,
-      sharedQueue,
-      scraper,
-      redisVolume,
-      ...(discordBot ? [discordBot] : []),
-    ],
+    resources: [sharedQueue, scraper, ...(discordBot ? [discordBot] : [])],
   });
 });
