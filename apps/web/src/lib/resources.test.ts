@@ -7,9 +7,28 @@ import {
   parseResourceUpload,
   parseResourceVersionUpload,
   parseResourceVisibility,
+  redactPublicResourceUploader,
   requireResourceAdmin,
   requireResourceUploader,
 } from "./resources.js";
+
+describe("public resource attribution", () => {
+  it("removes internal identity and masks private attribution", () => {
+    const resource = redactPublicResourceUploader({
+      resourceId: 1000,
+      uploaderClerkId: "user_secret",
+      uploaderIsProfilePublic: false,
+      uploaderUsername: "private-user",
+    });
+
+    expect(resource).toEqual({
+      resourceId: 1000,
+      uploaderIsProfilePublic: false,
+      uploaderUsername: null,
+    });
+    expect(JSON.stringify(resource)).not.toContain("user_secret");
+  });
+});
 
 describe("resource server functions", () => {
   it("rejects unauthenticated uploaders", async () => {

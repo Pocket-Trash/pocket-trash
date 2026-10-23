@@ -1,5 +1,6 @@
 import {
   faMagnifyingGlass as faMagnifyingGlassLight,
+  faUserLock,
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { faMagnifyingGlass } from "@fortawesome/pro-solid-svg-icons";
@@ -282,6 +283,15 @@ export function GlobalSearch() {
                       {result.title}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
+                      {result.ownerIsProfilePublic === false ? (
+                        <>
+                          <FontAwesomeIcon
+                            aria-hidden="true"
+                            icon={faUserLock}
+                          />{" "}
+                          {t("web.profiles.privateUser")} ·{" "}
+                        </>
+                      ) : null}
                       {result.context ? `${result.context} · ` : null}
                       <SearchHighlights highlights={result.highlights} />
                     </span>

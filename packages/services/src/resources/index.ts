@@ -19,7 +19,6 @@ import {
   desc,
   eq,
   ilike,
-  isNotNull,
   isNull,
   type SQL,
   sql,
@@ -170,8 +169,10 @@ export type ResourceDetail = {
   privatedAt: Date | null;
   /** Clerk identifier of the uploader. */
   uploaderClerkId: string;
+  /** Whether public surfaces may identify the uploader. */
+  uploaderIsProfilePublic: boolean;
   /** Public uploader username. */
-  uploaderUsername: string;
+  uploaderUsername: string | null;
   /** Earlier resource versions. */
   versions: ResourceVersionDetail[];
 };
@@ -233,8 +234,10 @@ export type ResourceDirectoryItem = {
   privateReason: string | null;
   /** Clerk identifier of the uploader. */
   uploaderClerkId: string;
+  /** Whether public surfaces may identify the uploader. */
+  uploaderIsProfilePublic: boolean;
   /** Public uploader username. */
-  uploaderUsername: string;
+  uploaderUsername: string | null;
 };
 
 /** Resource notification shown to staff. */
@@ -764,6 +767,7 @@ export function createResourcesService(
           const [record] = await db
             .select({
               resource: schema.resources,
+              uploaderIsProfilePublic: schema.userSettings.isProfilePublic,
               uploaderUsername: schema.user.username,
             })
             .from(schema.resources)
@@ -771,19 +775,19 @@ export function createResourcesService(
               schema.user,
               eq(schema.user.clerkId, schema.resources.uploaderClerkId),
             )
+            .leftJoin(
+              schema.userSettings,
+              eq(schema.userSettings.userId, schema.user.id),
+            )
             .where(
               and(
                 eq(schema.resources.id, resourceId),
                 isNull(schema.resources.deletedAt),
-                isNotNull(schema.user.username),
               ),
             )
             .limit(1);
 
-          if (
-            !record?.uploaderUsername ||
-            !canViewResource(record.resource, viewer)
-          ) {
+          if (!record || !canViewResource(record.resource, viewer)) {
             return null;
           }
           const resource = record.resource;
@@ -909,6 +913,7 @@ export function createResourcesService(
             privateReason: resource.privateReason,
             privatedAt: resource.privatedAt,
             uploaderClerkId: resource.uploaderClerkId,
+            uploaderIsProfilePublic: record.uploaderIsProfilePublic ?? false,
             uploaderUsername: record.uploaderUsername,
             versions: versionDetails.slice(1),
           };
@@ -975,6 +980,7 @@ export function createResourcesService(
               resources.id,
               resources.name,
               resources.uploader_clerk_id as "uploaderClerkId",
+              coalesce(user_settings.is_profile_public, false) as "uploaderIsProfilePublic",
               users.username as "uploaderUsername",
               resources.is_private as "isPrivate",
               resources.private_reason as "privateReason",
@@ -1000,6 +1006,7 @@ export function createResourcesService(
               ) as categories
             from resources
             inner join users on users.clerk_id = resources.uploader_clerk_id
+            left join user_settings on user_settings.user_id = users.id
             inner join lateral (
               select resource_versions.id, resource_versions.version,
                 first_file.id as file_id, first_file.file_name,
@@ -1037,11 +1044,11 @@ export function createResourcesService(
                 or ${hasPermission(viewer, "resources.manage")}
                 or ${schema.resources.uploaderClerkId} = ${viewer?.clerkId ?? ""})
               and ${schema.resources.deletedAt} is null
-              and users.username is not null
               and ${filter}
             group by resources.id, current_version.id, current_version.version,
               current_version.file_count, current_version.file_id,
-              current_version.file_name, cover_image.object_path, users.id
+              current_version.file_name, cover_image.object_path, users.id,
+              user_settings.is_profile_public
             order by resources.created_at desc
           `);
 

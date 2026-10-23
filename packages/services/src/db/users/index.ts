@@ -50,6 +50,14 @@ export type UsersService = {
    */
   getByUsername(username: string): Promise<User | null>;
   /**
+   * Loads an explicitly public user by exact username.
+   *
+   * @param username - Public username to load.
+   * @returns Stored user, or null when absent or private.
+   * @rejects When the username is blank or persistence fails.
+   */
+  getPublicByUsername(username: string): Promise<User | null>;
+  /**
    * Lists every stored Clerk identifier.
    *
    * @returns Every stored Clerk identifier.
@@ -287,6 +295,36 @@ export function createUsersService(
       const [user] = await db
         .select()
         .from(schema.user)
+        .where(eq(schema.user.username, normalizedUsername))
+        .limit(1);
+      return user ?? null;
+    },
+    /**
+     * Loads an explicitly public user by exact username.
+     *
+     * @param username - Public username to load.
+     * @returns Stored user, or `null` when absent or private.
+     * @rejects When the username is blank or persistence fails.
+     */
+    async getPublicByUsername(username) {
+      const normalizedUsername = username.trim();
+      if (!normalizedUsername) throw new Error("username is required.");
+      const [user] = await db
+        .select({
+          clerkId: schema.user.clerkId,
+          clerkUpdatedAt: schema.user.clerkUpdatedAt,
+          id: schema.user.id,
+          imageUrl: schema.user.imageUrl,
+          username: schema.user.username,
+        })
+        .from(schema.user)
+        .innerJoin(
+          schema.userSettings,
+          and(
+            eq(schema.userSettings.userId, schema.user.id),
+            eq(schema.userSettings.isProfilePublic, true),
+          ),
+        )
         .where(eq(schema.user.username, normalizedUsername))
         .limit(1);
       return user ?? null;

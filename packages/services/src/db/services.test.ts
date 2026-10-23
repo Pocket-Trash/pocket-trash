@@ -228,6 +228,7 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const settings: UserSettings = {
       currencyCode: "CAD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       locale: null,
       publishTrends: false,
@@ -270,6 +271,7 @@ describe("database service logging", () => {
     };
     const settings = {
       currencyCode: "USD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       publishTrends: false,
       theme: "system",
@@ -300,6 +302,7 @@ describe("database service logging", () => {
       outcome: "success",
       settingKeys: [
         "currencyCode",
+        "isProfilePublic",
         "measurementSystem",
         "publishTrends",
         "theme",
@@ -315,6 +318,7 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const existingSettings: UserSettings = {
       currencyCode: "CAD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       locale: null,
       publishTrends: false,
@@ -375,6 +379,7 @@ describe("database service logging", () => {
     };
     const patchedSettings: UserSettings = {
       currencyCode: "USD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       locale: null,
       publishTrends: false,
@@ -424,6 +429,7 @@ describe("database service logging", () => {
     };
     const settings: UserSettings = {
       currencyCode: "USD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       locale: null,
       publishTrends: false,
@@ -459,6 +465,7 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const existingSettings: UserSettings = {
       currencyCode: "CAD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       locale: null,
       publishTrends: false,
@@ -507,6 +514,7 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const existingSettings = {
       currencyCode: "USD",
+      isProfilePublic: false,
       measurementSystem: "metric",
       locale: "en",
       publishTrends: false,

@@ -29,4 +29,19 @@ describe("public profile pictures", () => {
     expect(html).toContain("C");
     expect(html).not.toContain("<img");
   });
+
+  it("renders a lock without requesting a private profile image", () => {
+    const html = renderToStaticMarkup(
+      <PublicProfileAvatar
+        imageUrl="https://img.clerk.com/private-picture"
+        isPrivate
+        username={null}
+      />,
+    );
+
+    expect(html).not.toContain("private-picture");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("svg");
+    expect(html).toContain('aria-hidden="true"');
+  });
 });

@@ -95,7 +95,8 @@ function PublicCollectionRoute() {
       items={data.items}
       onFiltersChange={setFilters}
       ownerImageUrl={data.ownerImageUrl}
-      ownerUsername={data.ownerUsername}
+      ownerIsProfilePublic={data.ownerIsProfilePublic}
+      ownerUsername={data.ownerUsername ?? undefined}
       publicSearchQuery={search.q ?? ""}
     />
   );

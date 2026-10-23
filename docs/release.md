@@ -85,7 +85,7 @@ or expired exceptions before pnpm audits dependencies.
 `GHSA-vfj7-8cjw-p6xm` has a temporary exception. No patched `braces` release
 exists, and the affected paths are development tooling. Roy Anger owns the
 exception. [ENG-337](https://linear.app/pocket-trash/issue/ENG-337) tracks its
-removal. The renewed exception expires at `2026-10-29T06:53:17Z`.
+removal. The renewed exception expires at `2026-10-30T02:34:35Z`.
 
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).

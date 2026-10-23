@@ -319,6 +319,14 @@ describe("resources service", () => {
            */
           innerJoin: () => ({
             /**
+             * Adds the settings join used by public attribution.
+             *
+             * @returns The same query stage.
+             */
+            leftJoin() {
+              return this;
+            },
+            /**
              * Applies the configured filter to the select-query stub.
              *
              * @returns Query stage that limits the resource-detail rows.
@@ -342,6 +350,7 @@ describe("resources service", () => {
                     uploaderClerkId: "user_123",
                   },
                   uploaderUsername: "roy",
+                  uploaderIsProfilePublic: true,
                 },
               ],
             }),
@@ -517,6 +526,7 @@ describe("resources service", () => {
       privateReason: null,
       privatedAt: null,
       uploaderClerkId: "user_123",
+      uploaderIsProfilePublic: true,
       uploaderUsername: "roy",
       versions: [],
     });
@@ -537,6 +547,14 @@ describe("resources service", () => {
          */
         innerJoin: () => ({
           /**
+           * Adds the settings join used by public attribution.
+           *
+           * @returns The same query stage.
+           */
+          leftJoin() {
+            return this;
+          },
+          /**
            * Applies the configured filter to the select-query stub.
            *
            * @returns Query stage that limits the private-resource rows.
@@ -555,6 +573,7 @@ describe("resources service", () => {
                   uploaderClerkId: "user_owner",
                 },
                 uploaderUsername: "owner",
+                uploaderIsProfilePublic: true,
               },
             ],
           }),

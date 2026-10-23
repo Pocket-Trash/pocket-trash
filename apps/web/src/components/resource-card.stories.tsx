@@ -24,6 +24,7 @@ const resource = {
   isPrivate: false,
   name: "Spinner model",
   privateReason: null,
+  uploaderIsProfilePublic: true,
   uploaderUsername: "roy",
 } satisfies ResourceCardItem;
 

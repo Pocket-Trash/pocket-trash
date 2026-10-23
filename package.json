@@ -68,7 +68,7 @@
     "@commitlint/config-conventional": "^21.2.3",
     "@package/lint": "workspace:*",
     "@railway/cli": "5.62.1",
-    "@storybook/builder-vite": "10.6.0",
+    "@storybook/builder-vite": "10.6.2",
     "@types/node": "latest",
     "concurrently": "^10.0.5",
     "eslint": "^10.11.0",

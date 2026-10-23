@@ -110,6 +110,7 @@ vi.mock("@/components/app-shell", () => ({
    * @param props.breadcrumbItems - Breadcrumb labels.
    * @param props.children - Nested page content.
    * @param props.headerActions - Header controls.
+   * @param props.meta - Header metadata.
    * @param props.title - Page title.
    * @returns The test shell.
    */
@@ -117,6 +118,7 @@ vi.mock("@/components/app-shell", () => ({
     breadcrumbItems = [],
     children,
     headerActions,
+    meta,
     title,
   }: {
     /** Breadcrumb labels. */
@@ -128,6 +130,8 @@ vi.mock("@/components/app-shell", () => ({
     children: React.ReactNode;
     /** Header controls. */
     headerActions?: React.ReactNode;
+    /** Header metadata. */
+    meta?: React.ReactNode;
     /** Page title. */
     title: string;
   }) => (
@@ -138,6 +142,7 @@ vi.mock("@/components/app-shell", () => ({
       ].join(" > ")}
     >
       {headerActions}
+      {meta}
       {children}
     </div>
   ),
@@ -267,6 +272,7 @@ const owners = [
         name: "Catla",
         ownerClerkId: "user_1002",
         ownerImageUrl: null,
+        ownerIsProfilePublic: true,
         ownerUsername: "royanger",
         ownerUserId: 1002,
         productId: 1,
@@ -279,6 +285,7 @@ const owners = [
       },
     ],
     imageUrl: null,
+    isProfilePublic: true,
     publishTrends: false,
     userId: 1002,
     username: "royanger",
@@ -374,6 +381,28 @@ describe("PublicCollectionsPage", () => {
     expect(html).toContain('href="/collections/1002/1000"');
     expect(html).not.toContain('href="/collections/1002"');
     expect(html).not.toContain("Private collection");
+  });
+
+  it("keeps public collections visible while masking a private owner", () => {
+    const owner = owners[0];
+    if (!owner) throw new Error("Owner fixture is required.");
+    const html = renderToStaticMarkup(
+      <PublicCollectionsPage
+        owners={[
+          {
+            ...owner,
+            imageUrl: null,
+            isProfilePublic: false,
+            username: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("Daily Carry");
+    expect(html).toContain("Private user");
+    expect(html).toContain('data-icon="user-lock"');
+    expect(html).not.toContain("royanger");
   });
 
   it("renders twelve collection cards before viewport sizing initializes", () => {
@@ -1521,6 +1550,27 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain("My Catla");
     expect(html).toContain("Catla");
     expect(html).toContain('href="/products/spinner/catla"');
+  });
+
+  it("keeps collection context while masking a private item owner", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          ownerImageUrl: null,
+          ownerIsProfilePublic: false,
+          ownerUsername: null,
+        }}
+      />,
+    );
+
+    expect(html).toContain("Daily Carry");
+    expect(html).toContain("Private user");
+    expect(html).toContain('data-icon="user-lock"');
+    expect(html).not.toContain("royanger");
   });
 
   it("renders effective collection item details", () => {

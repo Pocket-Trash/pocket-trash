@@ -17,6 +17,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 /** Missing and removed pictures retain the decorative initials fallback. */
 export const Absent: Story = {};
+/** Private attribution uses a decorative lock without loading an image. */
+export const Private: Story = {
+  args: { imageUrl: picture, isPrivate: true, username: null },
+};
 /** A profile uses a 37.5px avatar with a 75px square image request. */
 export const ProfilePicture: Story = {
   args: { imageUrl: picture, size: "lg" },

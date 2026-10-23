@@ -30,6 +30,8 @@ export const userSettings = pgTable("user_settings", {
   currencyCode: currencyCodeEnum("currency_code").notNull().default("USD"),
   /** Explicit supported locale for localized application text. */
   locale: text("locale"),
+  /** Whether public surfaces may identify the account and expose its profile. */
+  isProfilePublic: boolean("is_profile_public").notNull().default(false),
   measurementSystem: measurementSystemEnum("measurement_system")
     .notNull()
     .default("metric"),
