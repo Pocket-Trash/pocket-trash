@@ -9,6 +9,50 @@ production application path is synchronized into Railway's production bot
 service. Do not require a separate webhook-ID secret: derive its identity from
 `AXIOM_INTAKE_WEBHOOK_URL`.
 
+## Local development
+
+Prerequisites: the repository's Node/pnpm versions, `infisical login`, matching
+development Discord/Linear credentials in **dev** `/apps/discord-bot`, and
+Docker/OrbStack running. Run `pnpm dev:all` for all apps, or
+`pnpm --filter @app/discord-bot dev` for the bot alone. The scraper-only
+`pnpm dev:scraper` command remains supported.
+
+When `REDIS_URL` is absent, bot and scraper development commands reuse the
+existing local Redis manager. It creates or starts `pocket-trash-scraper-redis`,
+checks its port mapping, and waits for PING before starting the app. New containers
+bind only `127.0.0.1:4008` and use Redis AOF persistence in their Docker data
+volume. Existing containers are not recreated or reconfigured. Ctrl+C stops the
+application, not Redis; `docker stop pocket-trash-scraper-redis` safely stops it
+later. Do not remove the container/volume to resolve a port conflict if you need
+its data.
+
+An explicit `REDIS_URL` from the shell takes precedence over the dev Infisical
+value; a dev Infisical value takes precedence over the localhost default. An
+explicit URL is treated as externally managed: the launcher only checks PING,
+and never starts/stops Docker for it. Use only isolated **non-production** Redis;
+never copy production credentials. Malformed URLs, Railway expressions and
+private `.railway.internal` hosts fail with redacted errors. URL validation in
+the production bot is unchanged.
+
+No Infisical changes are necessary for the default local setup. Keep `REDIS_URL`
+absent from dev `/apps/discord-bot` to use it; production remains Railway-owned.
+If you choose a hosted development endpoint later, it needs a reachable public
+TCP URL and separate development credentials, not a private Railway reference.
+Do not store this override in tracked files or command history with credentials.
+
+Both apps share the local container intentionally, using separate scraper queue
+and Discord notification/cursor/ticket namespaces. Two worktrees using that
+container also share their development state; do not run two bots for the same
+guild simultaneously. For concurrent independent worktrees, provide distinct
+externally managed Redis URLs (and development Discord applications). Setting
+`SCRAPER_REDIS_PORT` selects the managed container's expected host port, but
+cannot remap an existing container; mismatches fail rather than delete data.
+
+The bot listens on port `4009` by default. `GET http://localhost:4009/health`
+returns `200` only after Discord, Linear and Redis readiness checks pass.
+Ticket enablement remains whatever dev Infisical specifies; this startup fix
+does not change `DISCORD_TICKETS_ENABLED` or authorize paid inference.
+
 ## Application setup
 
 For each application, enable **Message Content Intent** under **Bot > Privileged

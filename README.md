@@ -105,6 +105,12 @@ Set `INFISICAL_RUNNER_VERBOSE=1` when running `pnpm dev:all` if provider details
 are needed. Webhook setup and relay requirements are documented in
 [Development Webhook Forwarding](docs/clerk-webhooks.md).
 
+Start Docker/OrbStack before `pnpm dev:all`. Bot and scraper development commands
+start or reuse `pocket-trash-scraper-redis` on localhost port `4008`, wait for an
+authenticated Redis PING, and leave the container/data running after Ctrl+C.
+No hosted Redis service or Infisical Redis secret is required. See
+[local Redis setup](docs/discord-bot.md#local-development) for overrides and isolation.
+
 ## Build and validation
 
 | Command | What it does |

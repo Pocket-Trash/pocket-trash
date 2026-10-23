@@ -141,6 +141,8 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       ...quietRunArgs("/apps/discord-bot"),
+      "node",
+      "/repo/scripts/dev-redis.mjs",
       "tsx",
       "watch",
       "src/index.ts",

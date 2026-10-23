@@ -5,7 +5,11 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "passThroughEnv": ["INFISICAL_RUNNER_VERBOSE"],
+      "passThroughEnv": [
+        "INFISICAL_RUNNER_VERBOSE",
+        "REDIS_URL",
+        "SCRAPER_REDIS_PORT"
+      ],
       "persistent": true
     },
     "build": {

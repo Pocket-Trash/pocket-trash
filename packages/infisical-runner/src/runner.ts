@@ -227,6 +227,12 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
     );
   }
 
+  if (
+    request.command === "dev" &&
+    ["discord-bot", "scraper"].includes(request.app)
+  ) {
+    innerCommand.push("node", join(request.repoRoot, "scripts/dev-redis.mjs"));
+  }
   innerCommand.push(...request.commandArgs);
 
   // Infisical accepts a single secret path per `run`, so nest runs to
@@ -390,9 +396,19 @@ export async function runInfisicalCommand(
   );
 
   const args = buildInfisicalRunArgs(request);
+  const environment = { ...process.env };
+  delete environment.POCKET_TRASH_DEV_REDIS_URL;
+  if (
+    request.command === "dev" &&
+    ["discord-bot", "scraper"].includes(request.app) &&
+    process.env.REDIS_URL !== undefined
+  ) {
+    // Preserve the caller's explicit target across Infisical injection, without argv exposure.
+    environment.POCKET_TRASH_DEV_REDIS_URL = process.env.REDIS_URL;
+  }
   const child = spawn("infisical", args, {
     cwd: process.cwd(),
-    env: process.env,
+    env: environment,
     stdio: "inherit",
   });
 

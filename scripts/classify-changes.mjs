@@ -288,6 +288,11 @@ const changeClassificationRules = [
     domains: ["discord_bot", "scraper", "preview", "validation"],
   },
   {
+    category: "local-redis-tooling",
+    paths: ["scripts/dev-redis.mjs", "scripts/dev-redis.test.mjs"],
+    domains: ["discord_bot", "scraper", "validation"],
+  },
+  {
     category: "local-scraper-tooling",
     paths: [
       "scripts/dev-scraper.mjs",
