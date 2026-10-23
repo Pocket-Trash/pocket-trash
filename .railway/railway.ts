@@ -6,16 +6,23 @@ import {
   project,
   service,
 } from "railway/iac";
+import { resolveRailwayContext } from "./context.ts";
 
 export default defineRailway((ctx) => {
-  if (ctx.projectName !== "Pocket Trash") {
+  // Env-var targeting omits names; resolve them with the scoped workspace token.
+  const resolved =
+    ctx.projectId && ctx.environmentId && ctx.projectName !== "Pocket Trash"
+      ? resolveRailwayContext(ctx.projectId, ctx.environmentId)
+      : undefined;
+  if ((resolved?.projectName ?? ctx.projectName) !== "Pocket Trash") {
     throw new Error(
       "Link the Pocket Trash project before planning its infrastructure.",
     );
   }
   /** Whether the linked environment uses the production scraper service. */
-  const production = ctx.environment === "production";
-  if (!production && ctx.environment !== "preview") {
+  const environment = resolved?.environmentName ?? ctx.environment;
+  const production = environment === "production";
+  if (!production && environment !== "preview") {
     throw new Error(
       "Link production or the preview template; native PR environments inherit its settings.",
     );

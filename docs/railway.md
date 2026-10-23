@@ -114,8 +114,12 @@ PR environments inherit the preview template; the Deploy workflow still stages
 each preview's database, image prefix, cron flag, and logging metadata. Keep
 real scraping disabled on shared-database previews.
 
-Automation that exports `RAILWAY_PROJECT_ID` must unset it after linking so the
-CLI passes the saved project's name into the IaC context.
+Automation keeps `RAILWAY_PROJECT_ID` and resolves `RAILWAY_ENVIRONMENT_ID`
+through a project-scoped API query. Do not use `railway link` with CI workspace
+tokens: it requests account-level workspace listings and reports Unauthorized
+even when the token can read and deploy this project. The IaC context resolver
+verifies the project and environment names through the same scoped API before
+building the resource graph. Preview queue setup also avoids account listings.
 
 Railway does not read IaC during a source deployment. Apply reviewed configuration
 changes explicitly before deploying code that depends on them. Production source

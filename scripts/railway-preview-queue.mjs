@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
+import { resolveRailwayContext } from "../.railway/context.ts";
 
 /** Environment-local queue managed by the preview workflow. */
 const queueName = "pocket-trash-queue";
@@ -106,7 +107,7 @@ export async function prepareRailwayPreviewQueue({
     "--service",
     queueName,
   ];
-  const context = JSON.parse(run(["link", ...scope, "--json"]));
+  const context = resolveRailwayContext(projectId, environment, queueName, run);
   if (
     context.projectId !== projectId ||
     context.environmentName !== environment ||
@@ -115,7 +116,7 @@ export async function prepareRailwayPreviewQueue({
     !context.environmentId
   ) {
     throw new Error(
-      "Railway linked a different preview scope; refusing changes.",
+      "Railway resolved a different preview scope; refusing changes.",
     );
   }
   const metadata = JSON.parse(
@@ -142,10 +143,21 @@ export async function prepareRailwayPreviewQueue({
     (volume) => volume.serviceId === context.serviceId,
   );
   const skippedService = skipped?.services?.includes(context.serviceId);
-  const config = JSON.parse(
-    run(["environment", "config", "--environment", environment, "--json"]),
-  );
-  const queue = config.services?.[context.serviceId];
+  /**
+   * Reads only this project's resolved environment configuration.
+   * @returns {object | undefined} Environment configuration without account listings.
+   */
+  const readConfig = () =>
+    JSON.parse(
+      run([
+        "api",
+        "query QueueConfig($projectId:String!,$environmentId:String!){environment(id:$environmentId,projectId:$projectId){config}}",
+        "--variables",
+        JSON.stringify({ projectId, environmentId: context.environmentId }),
+        "--compact",
+      ]),
+    ).data?.environment?.config;
+  const queue = readConfig()?.services?.[context.serviceId];
   const mountPath =
     queue?.deploy?.requiredMountPath ?? skippedMount?.mountPath ?? "/data";
   if (
@@ -212,9 +224,7 @@ export async function prepareRailwayPreviewQueue({
     "Preview queue volume did not become ready.",
   );
   if (skippedService) {
-    const activated = JSON.parse(
-      run(["environment", "config", "--environment", environment, "--json"]),
-    );
+    const activated = readConfig();
     if (
       !/^redis:/.test(
         activated.services?.[context.serviceId]?.source?.image ?? "",

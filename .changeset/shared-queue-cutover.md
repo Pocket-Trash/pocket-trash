@@ -3,4 +3,4 @@
 "@app/discord-bot": patch
 ---
 
-Provision persistent preview queues and route scraper deployments to the shared queue without removing existing service settings.
+Route scraper deployments to persistent shared Redis and support workspace-scoped Railway credentials in CI.

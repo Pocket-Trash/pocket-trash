@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolveRailwayContext } from "../.railway/context.ts";
 import { prepareRailwayPreviewQueue } from "./railway-preview-queue.mjs";
 
 /**
@@ -39,29 +40,46 @@ function fixture({
      */
     run(args) {
       calls.push(args);
-      if (args[0] === "link")
+      if (args[0] === "api" && args[1].includes("ProjectContext"))
         return JSON.stringify({
-          projectId: "test-project",
-          environmentName: "pocket-trash-pr-123",
-          environmentId: "preview-id",
-          serviceName: "pocket-trash-queue",
-          serviceId: "queue-id",
+          data: {
+            project: {
+              id: "test-project",
+              name: "Pocket Trash",
+              environments: {
+                edges: [
+                  { node: { id: "preview-id", name: "pocket-trash-pr-123" } },
+                ],
+              },
+              services: {
+                edges: [
+                  { node: { id: "queue-id", name: "pocket-trash-queue" } },
+                ],
+              },
+            },
+          },
         });
-      if (args[0] === "environment")
+      if (args[0] === "api" && args[1].includes("QueueConfig"))
         return JSON.stringify({
-          services: volumeExists
-            ? {
-                "queue-id": {
-                  source: { image: "redis:8.2" },
-                  deploy: {
-                    requiredMountPath: "/bitnami",
-                    multiRegionConfig: {
-                      "us-east4-eqdc4a": { numReplicas: 1 },
-                    },
-                  },
-                },
-              }
-            : {},
+          data: {
+            environment: {
+              config: {
+                services: volumeExists
+                  ? {
+                      "queue-id": {
+                        source: { image: "redis:8.2" },
+                        deploy: {
+                          requiredMountPath: "/bitnami",
+                          multiRegionConfig: {
+                            "us-east4-eqdc4a": { numReplicas: 1 },
+                          },
+                        },
+                      },
+                    }
+                  : {},
+              },
+            },
+          },
         });
       if (args[0] === "volume")
         return JSON.stringify({
@@ -162,6 +180,7 @@ test("reuses an attached volume without creating, detaching or replacing data", 
       (args) => !args.includes("delete") && !args.includes("detach"),
     ),
   );
+  assert.ok(options.calls.every((args) => args[0] !== "link"));
 });
 
 test("rejects production and the preview template before running commands", async () => {
@@ -235,7 +254,7 @@ test("rejects a persistent environment even if its name looks like a PR", async 
   const run = options.run;
   options.run = (args) => {
     const result = JSON.parse(run(args));
-    if (args[0] === "api" && args[1].includes("query"))
+    if (args[0] === "api" && args[1].includes("skippedResourceIds"))
       result.data.environment.isEphemeral = false;
     return JSON.stringify(result);
   };
@@ -251,10 +270,10 @@ test("fails closed when no skipped inherited storage exists", async () => {
   const run = options.run;
   options.run = (args) => {
     const result = JSON.parse(run(args));
-    if (args[0] === "api" && args[1].includes("query"))
+    if (args[0] === "api" && args[1].includes("skippedResourceIds"))
       result.data.environment.meta.skippedResourceIds = {};
-    if (args[0] === "environment")
-      result.services = {
+    if (args[0] === "api" && args[1].includes("QueueConfig"))
+      result.data.environment.config.services = {
         "queue-id": {
           source: { image: "redis:8.2" },
           deploy: { requiredMountPath: "/bitnami" },
@@ -306,4 +325,64 @@ test("fails immediately when the new deployment fails", async () => {
     return JSON.stringify(result);
   };
   await assert.rejects(prepareRailwayPreviewQueue(options), /did not succeed/);
+});
+
+test("resolves project-scoped IDs without account or workspace listings", () => {
+  const options = fixture();
+  const context = resolveRailwayContext(
+    "test-project",
+    "preview-id",
+    "pocket-trash-queue",
+    options.run,
+  );
+  assert.equal(context.environmentName, "pocket-trash-pr-123");
+  assert.equal(context.serviceId, "queue-id");
+  assert.equal(options.calls.length, 1);
+  assert.match(options.calls[0][1], /project\(id:\$id\)/);
+  assert.doesNotMatch(options.calls[0][1], /\bme\b|workspaces/);
+});
+
+test("rejects a wrong project instead of weakening the IaC name guard", () => {
+  const options = fixture();
+  assert.throws(
+    () =>
+      resolveRailwayContext(
+        "wrong-project",
+        "preview-id",
+        undefined,
+        options.run,
+      ),
+    /Pocket Trash project/,
+  );
+});
+
+test("rejects missing and duplicate environment names", () => {
+  const options = fixture();
+  assert.throws(
+    () =>
+      resolveRailwayContext("test-project", "missing", undefined, options.run),
+    /missing or ambiguous/,
+  );
+  /**
+   * Simulates duplicate environment names in the scoped API response.
+   * @param {string[]} args - CLI arguments.
+   * @returns {string} Modified JSON response.
+   */
+  const run = (args) => {
+    const result = JSON.parse(options.run(args));
+    result.data.project.environments.edges.push({
+      node: { id: "other-id", name: "pocket-trash-pr-123" },
+    });
+    return JSON.stringify(result);
+  };
+  assert.throws(
+    () =>
+      resolveRailwayContext(
+        "test-project",
+        "pocket-trash-pr-123",
+        undefined,
+        run,
+      ),
+    /missing or ambiguous/,
+  );
 });

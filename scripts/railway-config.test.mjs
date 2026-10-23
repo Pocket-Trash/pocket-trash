@@ -264,8 +264,9 @@ test("checks both templates without applying changes or exposing secrets to fork
   assert.match(run, /config plan --detailed-exit-code/);
   assert.match(run, /GITHUB_EVENT_NAME.*pull_request/);
   assert.doesNotMatch(run, /config apply|show-values|include-variables/);
-  assert.match(run, /railway link --project/);
-  assert.match(run, /--environment/);
+  assert.doesNotMatch(run, /railway link/);
+  assert.match(run, /railway api/);
+  assert.match(run, /export RAILWAY_ENVIRONMENT_ID/);
   /**
    * Execute the workflow step with a simulated Railway plan result.
    *
@@ -283,8 +284,8 @@ test("checks both templates without applying changes or exposing secrets to fork
         `
       pnpm() {
         case "$3" in
-          link) test "$5" = expected-project && test "$7" = "$RAILWAY_ENVIRONMENT" ;;
-          config) test -z "\${RAILWAY_PROJECT_ID+x}" && return "$PLAN_EXIT_CODE" ;;
+          api) printf '%s' '{"data":{"project":{"environments":{"edges":[{"node":{"id":"env-preview","name":"preview"}},{"node":{"id":"env-production","name":"production"}}]}}}}' ;;
+          config) test "$RAILWAY_PROJECT_ID" = expected-project && test "$RAILWAY_ENVIRONMENT_ID" = "env-$RAILWAY_ENVIRONMENT" && return "$PLAN_EXIT_CODE" ;;
           *) return 1 ;;
         esac
       }
