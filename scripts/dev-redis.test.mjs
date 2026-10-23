@@ -108,48 +108,52 @@ test("an unreachable explicit URL fails readiness without starting the child or 
   );
 });
 
-test("missing URL reuses local Redis and passes its selected port to the child", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "eng540-docker-"));
-  const server = createServer((socket) =>
-    socket.on("data", (chunk) => {
-      socket.write(
-        "+PONG\r\n".repeat((chunk.toString().match(/\*\d+\r\n/g) ?? []).length),
-      );
-    }),
-  );
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = String(server.address().port);
-  writeFileSync(
-    join(directory, "docker"),
-    `#!/bin/sh\ncase "$1" in\nps) echo 'pocket-trash-scraper-redis Up 1 minute';;\nport) echo '127.0.0.1:${port}';;\n*) exit 99;;\nesac\n`,
-    { mode: 0o700 },
-  );
-  try {
-    const env = { ...process.env, SCRAPER_REDIS_PORT: port, PATH: directory };
-    delete env.REDIS_URL;
-    delete env.POCKET_TRASH_DEV_REDIS_URL;
-    const child = spawn(
-      process.execPath,
-      [
-        "scripts/dev-redis.mjs",
-        process.execPath,
-        "-e",
-        `process.stdout.write(process.env.REDIS_URL === 'redis://localhost:${port}' ? 'LOCAL_OK' : 'WRONG')`,
-      ],
-      { env },
+for (const coldStart of [false, true]) {
+  test(`missing URL ${coldStart ? "waits for a cold image download" : "reuses local Redis"} and passes its port to the child`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), "eng540-docker-"));
+    const server = createServer((socket) =>
+      socket.on("data", (chunk) => {
+        socket.write(
+          "+PONG\r\n".repeat(
+            (chunk.toString().match(/\*\d+\r\n/g) ?? []).length,
+          ),
+        );
+      }),
     );
-    let output = "";
-    child.stdout.on("data", (data) => {
-      output += data;
-    });
-    const code = await new Promise((resolve) => child.on("close", resolve));
-    assert.equal(code, 0);
-    assert.equal(output, "LOCAL_OK");
-  } finally {
-    server.close();
-    rmSync(directory, { recursive: true });
-  }
-});
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String(server.address().port);
+    writeFileSync(
+      join(directory, "docker"),
+      `#!/bin/sh\ncase "$1" in\nps) ${coldStart ? `[ -f '${directory}/created' ] && ` : ""}echo 'pocket-trash-scraper-redis Up 1 minute'; exit 0;;\nrun) /bin/sleep 11; /usr/bin/touch '${directory}/created';;\nport) echo '127.0.0.1:${port}';;\n*) exit 99;;\nesac\n`,
+      { mode: 0o700 },
+    );
+    try {
+      const env = { ...process.env, SCRAPER_REDIS_PORT: port, PATH: directory };
+      delete env.REDIS_URL;
+      delete env.POCKET_TRASH_DEV_REDIS_URL;
+      const child = spawn(
+        process.execPath,
+        [
+          "scripts/dev-redis.mjs",
+          process.execPath,
+          "-e",
+          `process.stdout.write(process.env.REDIS_URL === 'redis://localhost:${port}' ? 'LOCAL_OK' : 'WRONG')`,
+        ],
+        { env },
+      );
+      let output = "";
+      child.stdout.on("data", (data) => {
+        output += data;
+      });
+      const code = await new Promise((resolve) => child.on("close", resolve));
+      assert.equal(code, 0);
+      assert.equal(output, "LOCAL_OK");
+    } finally {
+      server.close();
+      rmSync(directory, { recursive: true });
+    }
+  });
+}
 
 test("missing Docker fails before starting the child", () => {
   const result = launch(undefined, { PATH: "/no-docker" });

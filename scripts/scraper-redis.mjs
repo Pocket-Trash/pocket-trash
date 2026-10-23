@@ -47,20 +47,24 @@ export async function ensureScraperRedisContainer({
 
   if (!existing.trim()) {
     try {
-      await capture("docker", [
-        "run",
-        "--name",
-        scraperRedisContainerName,
-        "-p",
-        `127.0.0.1:${redisPort}:6379`,
-        "-d",
-        "redis:8.2.1",
-        "redis-server",
-        "--appendonly",
-        "yes",
-        "--appendfsync",
-        "everysec",
-      ]);
+      await capture(
+        "docker",
+        [
+          "run",
+          "--name",
+          scraperRedisContainerName,
+          "-p",
+          `127.0.0.1:${redisPort}:6379`,
+          "-d",
+          "redis:8.2.1",
+          "redis-server",
+          "--appendonly",
+          "yes",
+          "--appendfsync",
+          "everysec",
+        ],
+        300_000,
+      );
     } catch {
       // A concurrent app may have created the same container after our lookup.
       const created = await capture("docker", [
@@ -149,14 +153,15 @@ export function printScriptError(error) {
  *
  * @param command - Executable name or path.
  * @param args - Command arguments.
+ * @param timeout - Maximum command duration in milliseconds; image downloads need longer.
  * @returns A promise for captured standard output.
  * @rejects When the process cannot start or exits unsuccessfully.
  */
-function capture(command, args) {
+function capture(command, args, timeout = 10_000) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: 10_000,
+      timeout,
     });
     let stdout = "";
     let stderr = "";
