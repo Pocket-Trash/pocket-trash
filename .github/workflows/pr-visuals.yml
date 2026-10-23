@@ -1,0 +1,31 @@
+name: PR Visuals
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  id-token: write
+
+jobs:
+  visuals:
+    # Keep paid runs off until live verification and activation are approved.
+    if: vars.PR_VISUALS_ENABLED == 'true' && github.repository == 'Pocket-Trash/pocket-trash'
+    uses: Pocket-Trash/pr-review-tool/.github/workflows/review.yml@b8417b5089afe9cf8773735c6a2f7ba4c301329f
+    with:
+      task: visuals
+      config-path: .github/pr-visuals.json
+      app-id: "5371542"
+      app-slug: pocket-trash-pr-review
+      infisical-project-id: 1d68bea3-0525-453f-b380-3cdc82cad1f8
+      infisical-environment: preview
+      infisical-path: /tools/github/pr-review-tool
+    secrets:
+      INFISICAL_GITHUB_IDENTITY_ID: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+      INFISICAL_DOMAIN: ${{ secrets.INFISICAL_DOMAIN }}
+      INFISICAL_OIDC_AUDIENCE: ${{ secrets.INFISICAL_OIDC_AUDIENCE }}
