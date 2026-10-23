@@ -2,7 +2,7 @@ import type {
   PublicCollectionItemTrends,
   PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
-  UserCollectionItem,
+  PublicUserCollectionItem,
 } from "@package/services";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 
@@ -108,7 +108,7 @@ interface UserTrendIdentifier<Item> {
  * @returns Exact totals and filtered composition buckets.
  */
 export function summarizeUserTrends(
-  items: UserCollectionItem[],
+  items: PublicUserCollectionItem[],
   collectionCount: number,
   search: CatalogTrendsSearch,
 ): UserTrends {

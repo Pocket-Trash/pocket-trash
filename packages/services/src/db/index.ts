@@ -159,6 +159,7 @@ export type {
   PublicMaterialSpecificSummary,
   PublicMaterialSummary,
   PublicProductTypeTrend,
+  PublicUserCollectionItem,
   SliderMagnetConfiguration,
   SliderMagnetLayout,
   SliderMagnetPreset,

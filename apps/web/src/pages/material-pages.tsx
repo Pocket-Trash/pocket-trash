@@ -5,9 +5,8 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogProduct,
-  PublicMaterial,
   PublicMaterialSummary,
-  UserCollectionItem,
+  PublicUserCollectionItem,
 } from "@package/services";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
@@ -30,6 +29,7 @@ import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
 import { rankedDirectoryIds } from "@/lib/directory-search";
+import type { PublicMaterialDetail } from "@/lib/materials";
 import {
   clampMaterialPage,
   getMaterialInitial,
@@ -405,7 +405,7 @@ function MaterialProductCard({ product }: MaterialProductCardProps) {
 /** Properties for a material's public collection-item card. */
 type MaterialCollectionItemCardProps = {
   /** Public collection item to render. */
-  item: UserCollectionItem;
+  item: PublicUserCollectionItem;
 };
 
 /**
@@ -437,14 +437,17 @@ function MaterialCollectionItemCard({ item }: MaterialCollectionItemCardProps) {
         ) : null}
         <p className="text-sm text-muted-foreground">
           {item.collectionName}
-          {item.ownerUsername ? (
+          {item.ownerUsername || !item.ownerIsProfilePublic ? (
             <span className="inline-flex items-center gap-1">
               <span aria-hidden="true"> · </span>
               <PublicProfileAvatar
                 imageUrl={item.ownerImageUrl}
+                isPrivate={!item.ownerIsProfilePublic}
                 username={item.ownerUsername}
               />
-              {item.ownerUsername}
+              {item.ownerIsProfilePublic
+                ? item.ownerUsername
+                : t("web.profiles.privateUser")}
             </span>
           ) : null}
         </p>
@@ -480,7 +483,7 @@ export function MaterialDetailPage({
   /** Requested one-based collection-item page. */
   collectionItemsPage: number;
   /** Material and its public relations. */
-  material: PublicMaterial;
+  material: PublicMaterialDetail;
   /**
    * Updates the collection-item page without replacing product pagination.
    *

@@ -19,6 +19,8 @@ describe("public search integration", () => {
     });
     await client.exec(`
       INSERT INTO users (clerk_id, username) VALUES ('search-person', 'SearchPerson');
+      INSERT INTO user_settings (user_id, is_profile_public)
+        SELECT id, true FROM users WHERE clerk_id = 'search-person';
       INSERT INTO makers (name, slug) VALUES ('Café Search Maker', 'cafe-search-maker');
       INSERT INTO product_types (name, slug) VALUES ('Search Writing Tool', 'search-writing-tool');
       INSERT INTO product (

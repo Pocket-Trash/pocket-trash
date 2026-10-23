@@ -142,6 +142,7 @@ function item(
     ownerClerkId: "user_storybook",
     ownerUserId: 1000,
     ownerImageUrl: null,
+    ownerIsProfilePublic: true,
     ownerUsername: "collector",
     productId: catalogProduct.id,
     productImages: [],

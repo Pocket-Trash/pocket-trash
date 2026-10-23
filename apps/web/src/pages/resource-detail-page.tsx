@@ -6,6 +6,7 @@ import {
   faFileZipper,
   faPencil,
   faTrash,
+  faUserLock,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -191,8 +192,15 @@ export function ResourceDetailPage({
             <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
               <div>
                 <dt>{t("web.resources.detail.sharedBy")}</dt>
-                <dd className="m-0 text-foreground">
-                  {detail.uploaderUsername}
+                <dd className="m-0 inline-flex items-center gap-1 text-foreground">
+                  {detail.uploaderIsProfilePublic ? (
+                    detail.uploaderUsername
+                  ) : (
+                    <>
+                      <FontAwesomeIcon aria-hidden="true" icon={faUserLock} />
+                      {t("web.profiles.privateUser")}
+                    </>
+                  )}
                 </dd>
               </div>
               <DetailRow

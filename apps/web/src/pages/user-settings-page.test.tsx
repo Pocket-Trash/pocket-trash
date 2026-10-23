@@ -42,11 +42,15 @@ vi.mock("@/hooks/use-pen-settings", () => ({
    * @returns The display-preference fixtures.
    */
   usePenSettings: () => ({
+    accountSettingsLoadFailed: false,
+    accountSettingsLoaded: true,
     currency: "USD",
+    isProfilePublic: false,
     measurementSystem: "metric",
     publishTrends: false,
     saving: false,
     setCurrency: vi.fn(),
+    setIsProfilePublic: vi.fn(),
     setMeasurementSystem: vi.fn(),
     setPublishTrends: vi.fn(),
   }),
@@ -66,6 +70,11 @@ describe("UserSettingsPage", () => {
     const html = renderToStaticMarkup(<UserSettingsPage />);
 
     expect(html).toContain('aria-label="Measurement system options"');
+    expect(html.indexOf("Profile visibility")).toBeLessThan(
+      html.indexOf("Measurement system"),
+    );
+    expect(html.match(/\bmy-12\b/g)).toHaveLength(3);
+    expect(html).toContain('role="switch"');
     expect(html).toContain("Metric");
     expect(html).toContain("Imperial");
     expect(html).toContain('aria-label="Display currency"');

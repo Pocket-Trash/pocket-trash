@@ -65,6 +65,8 @@ describe("public search migration", () => {
       INSERT INTO product_detail_spinner_button (id)
         SELECT id FROM product WHERE name = 'Search Button';
       INSERT INTO users (clerk_id, username) VALUES ('search-owner', 'search-owner');
+      INSERT INTO user_settings (user_id, is_profile_public)
+        SELECT id, true FROM users WHERE clerk_id = 'search-owner';
       INSERT INTO user_collection (owner_id, name, normalized_name, is_private)
         SELECT id, 'Search Collection', 'search collection', false
         FROM users WHERE clerk_id = 'search-owner';
@@ -114,6 +116,41 @@ describe("public search migration", () => {
           kind: "product",
           title: "Bolt Pen",
         },
+      ],
+    });
+
+    await database.exec(`
+      UPDATE user_settings SET is_profile_public = false
+      WHERE user_id = (SELECT id FROM users WHERE clerk_id = 'search-owner');
+    `);
+    await expect(
+      database.query(
+        "select kind, context, search_text_b from search_documents where title in ('Search Collection', 'My Bolt', 'search-owner') order by kind",
+      ),
+    ).resolves.toMatchObject({
+      rows: [
+        { context: null, kind: "collection", search_text_b: "" },
+        {
+          context: "Search Collection · Café Maker · Pen",
+          kind: "collection_item",
+          search_text_b: "Café Maker Pen Pen Search Collection",
+        },
+      ],
+    });
+    await database.exec(`
+      UPDATE user_settings SET theme = 'dark'
+      WHERE user_id = (SELECT id FROM users WHERE clerk_id = 'search-owner');
+      UPDATE user_settings SET is_profile_public = true
+      WHERE user_id = (SELECT id FROM users WHERE clerk_id = 'search-owner');
+    `);
+    await expect(
+      database.query(
+        "select kind, context from search_documents where title in ('Search Collection', 'search-owner') order by kind",
+      ),
+    ).resolves.toMatchObject({
+      rows: [
+        { context: "search-owner", kind: "collection" },
+        { context: null, kind: "person" },
       ],
     });
     await expect(

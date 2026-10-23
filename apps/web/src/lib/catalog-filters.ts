@@ -5,7 +5,7 @@ import type {
   CatalogProduct,
   CatalogProductType,
   PublicProductTypeTrend,
-  UserCollectionItem,
+  PublicUserCollectionItem,
 } from "@package/services";
 
 /** Stable recorded-activity ranges shared by Trends URL and request validation. */
@@ -555,8 +555,8 @@ export function productFilterItem(
  * @returns The adapted filterable collection item.
  */
 export function collectionFilterItem(
-  item: UserCollectionItem,
-  items: UserCollectionItem[] = [item],
+  item: PublicUserCollectionItem,
+  items: PublicUserCollectionItem[] = [item],
 ): FilterableCatalogItem {
   const itemsById = new Map(
     items.map((candidate) => [candidate.collectionItemId, candidate]),

@@ -412,9 +412,21 @@ async function createPublicPrivacyFixture(
   if (!owner || !privateCollection) {
     throw new Error("The public privacy fixture dependencies are missing.");
   }
+  const [ownerSettings] = await database
+    .select({ isProfilePublic: schema.userSettings.isProfilePublic })
+    .from(schema.userSettings)
+    .where(eq(schema.userSettings.userId, owner.id))
+    .limit(1);
+  if (!ownerSettings) {
+    throw new Error("The public privacy fixture owner settings are missing.");
+  }
 
   const runId = `e2e-${crypto.randomUUID()}`;
   const seeded = await database.transaction(async (transaction) => {
+    await transaction
+      .update(schema.userSettings)
+      .set({ isProfilePublic: true })
+      .where(eq(schema.userSettings.userId, owner.id));
     const collections = await transaction
       .insert(schema.userCollection)
       .values([
@@ -543,10 +555,12 @@ async function createPublicPrivacyFixture(
   return {
     /** Removes the public collections; the shared mutation fixture owns the private one. */
     async cleanup() {
-      await cleanupPublicPrivacyFixture(database, owner.id, [
-        seeded.publicCollection.id,
-        seeded.emptyCollection.id,
-      ]);
+      await cleanupPublicPrivacyFixture(
+        database,
+        owner.id,
+        ownerSettings.isProfilePublic,
+        [seeded.publicCollection.id, seeded.emptyCollection.id],
+      );
     },
     ...seeded,
     ownerId: owner.id,
@@ -560,22 +574,30 @@ async function createPublicPrivacyFixture(
  *
  * @param database - Isolated preview database.
  * @param ownerId - Expected collection owner identifier.
+ * @param originalProfileVisibility - Profile visibility restored after the test.
  * @param collectionIds - Exact public collection identifiers.
  * @returns Completion after removal.
  */
 async function cleanupPublicPrivacyFixture(
   database: Database,
   ownerId: number,
+  originalProfileVisibility: boolean,
   collectionIds: number[],
 ) {
-  await database
-    .delete(schema.userCollection)
-    .where(
-      and(
-        eq(schema.userCollection.ownerId, ownerId),
-        inArray(schema.userCollection.id, collectionIds),
-      ),
-    );
+  await database.transaction(async (transaction) => {
+    await transaction
+      .update(schema.userSettings)
+      .set({ isProfilePublic: originalProfileVisibility })
+      .where(eq(schema.userSettings.userId, ownerId));
+    await transaction
+      .delete(schema.userCollection)
+      .where(
+        and(
+          eq(schema.userCollection.ownerId, ownerId),
+          inArray(schema.userCollection.id, collectionIds),
+        ),
+      );
+  });
 }
 
 /**

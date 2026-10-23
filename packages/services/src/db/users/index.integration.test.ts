@@ -39,12 +39,22 @@ describe("user ban management", () => {
       await expect(
         services.users.getByUsername(input.username),
       ).resolves.toEqual(owner);
+      await expect(
+        services.users.getPublicByUsername(input.username),
+      ).resolves.toBeNull();
+      if (!owner) throw new Error("Missing picture owner.");
+      await db.insert(schema.userSettings).values({
+        isProfilePublic: true,
+        userId: owner.id,
+      });
+      await expect(
+        services.users.getPublicByUsername(input.username),
+      ).resolves.toEqual(owner);
       await expect(services.users.getByUsername("unknown")).resolves.toBeNull();
       await db.insert(schema.user).values({ clerkId: "user_without_username" });
       await expect(
         services.users.getByUsername("user_without_username"),
       ).resolves.toBeNull();
-      if (!owner) throw new Error("Missing picture owner.");
       await db.insert(schema.userCollection).values({
         name: "Public",
         normalizedName: "public",
@@ -65,6 +75,13 @@ describe("user ban management", () => {
       await expect(services.users.syncFromClerk(changed)).resolves.toBe(
         "updated",
       );
+      await expect(
+        services.users.getPublicByUsername(input.username),
+      ).resolves.toMatchObject({
+        clerkId: input.clerkId,
+        imageUrl: changed.imageUrl,
+        username: input.username,
+      });
       await expect(services.users.syncFromClerk(input)).resolves.toBe(
         "unchanged",
       );

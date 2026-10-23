@@ -8,6 +8,6 @@ export const getPublicUserProfile = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
-    const user = await s.db.users.getByUsername(data.username);
+    const user = await s.db.users.getPublicByUsername(data.username);
     return user?.username ? { username: user.username } : null;
   });

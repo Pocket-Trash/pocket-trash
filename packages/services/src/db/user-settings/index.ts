@@ -27,6 +27,8 @@ export type UpsertUserSettingsInput = {
    * Currency used to display monetary values.
    */
   currencyCode: CurrencyCode;
+  /** Whether public surfaces may identify the account and expose its profile. */
+  isProfilePublic: boolean;
   /** App-wide system used for secondary measurement displays. */
   measurementSystem: MeasurementSystem;
   /** Whether privacy-filtered personal Trends are publicly available. */
@@ -113,6 +115,7 @@ export type UserSettingsService = {
  */
 export const defaultUserSettings: UpsertUserSettingsInput = {
   currencyCode: "USD",
+  isProfilePublic: false,
   locale: null,
   measurementSystem: "metric",
   publishTrends: false,
@@ -175,6 +178,7 @@ export function createUserSettingsService(
           const [row] = await db
             .select({
               currencyCode: schema.userSettings.currencyCode,
+              isProfilePublic: schema.userSettings.isProfilePublic,
               locale: schema.userSettings.locale,
               measurementSystem: schema.userSettings.measurementSystem,
               publishTrends: schema.userSettings.publishTrends,

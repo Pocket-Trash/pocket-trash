@@ -2091,6 +2091,8 @@ export type UserCollectionItem = {
   ownerUsername: string | null;
   /** Selected Clerk picture URL; null when the owner has no public picture. */
   ownerImageUrl: string | null;
+  /** Whether public surfaces may identify the item's owner. */
+  ownerIsProfilePublic: boolean;
   /**
    * Owner database user identifier.
    */
@@ -2129,12 +2131,17 @@ export type UserCollectionItem = {
   productImages: CatalogImage[];
 };
 
+/** Public collection item with its internal Clerk identifier removed. */
+export type PublicUserCollectionItem = Omit<UserCollectionItem, "ownerClerkId">;
+
 /**
  * Public owner identity and aggregate collection counts.
  */
 export type PublicCollectionOwner = {
   /** Selected Clerk picture URL; null when the owner has no public picture. */
   imageUrl: string | null;
+  /** Whether public surfaces may identify the owner. */
+  isProfilePublic: boolean;
   /**
    * Visible collections owned by the user.
    */
@@ -2156,7 +2163,7 @@ export type PublicCollectionOwner = {
   /**
    * Username.
    */
-  username: string;
+  username: string | null;
 };
 
 /**
@@ -7335,8 +7342,8 @@ export function createCollectionsService(
       if (!ownerIds.length) return [];
       const owners = await db
         .select({
-          clerkId: schema.user.clerkId,
           imageUrl: schema.user.imageUrl,
+          isProfilePublic: schema.userSettings.isProfilePublic,
           userId: schema.user.id,
           username: schema.user.username,
           publishTrends: schema.userSettings.publishTrends,
@@ -7358,13 +7365,24 @@ export function createCollectionsService(
             ),
             itemCount: ownerItems.length,
             items: ownerItems,
-            imageUrl: owner.imageUrl,
-            publishTrends: owner.publishTrends ?? false,
+            imageUrl: owner.isProfilePublic ? owner.imageUrl : null,
+            isProfilePublic: owner.isProfilePublic ?? false,
+            publishTrends:
+              (owner.isProfilePublic ?? false) &&
+              (owner.publishTrends ?? false),
             userId: owner.userId,
-            username: owner.username ?? owner.clerkId,
+            username: owner.isProfilePublic ? owner.username : null,
           };
         })
-        .sort((left, right) => left.username.localeCompare(right.username));
+        .sort((left, right) =>
+          left.username && right.username
+            ? left.username.localeCompare(right.username)
+            : left.username
+              ? -1
+              : right.username
+                ? 1
+                : left.userId - right.userId,
+        );
     },
     /**
      * Sets collection visibility.
@@ -10777,6 +10795,7 @@ async function queryOwnedItems(
       name: schema.product.name,
       ownerClerkId: schema.user.clerkId,
       ownerImageUrl: schema.user.imageUrl,
+      ownerIsProfilePublic: schema.userSettings.isProfilePublic,
       ownerUsername: schema.user.username,
       ownerUserId: schema.user.id,
       productId: schema.product.id,
@@ -10805,6 +10824,10 @@ async function queryOwnedItems(
     })
     .from(schema.collectionItem)
     .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
+    .leftJoin(
+      schema.userSettings,
+      eq(schema.userSettings.userId, schema.user.id),
+    )
     .innerJoin(
       schema.userCollection,
       eq(schema.collectionItem.collectionId, schema.userCollection.id),
@@ -11033,8 +11056,15 @@ async function queryOwnedItems(
       materials: materialsByItem.get(row.collectionItemId) ?? [],
       name: row.name,
       ownerClerkId: row.ownerClerkId,
-      ownerImageUrl: row.ownerImageUrl,
-      ownerUsername: row.ownerUsername,
+      ownerImageUrl:
+        options.publicOnly && !row.ownerIsProfilePublic
+          ? null
+          : row.ownerImageUrl,
+      ownerIsProfilePublic: row.ownerIsProfilePublic ?? false,
+      ownerUsername:
+        options.publicOnly && !row.ownerIsProfilePublic
+          ? null
+          : row.ownerUsername,
       ownerUserId: row.ownerUserId,
       ownershipPeriods: [],
       productId: row.productId,
