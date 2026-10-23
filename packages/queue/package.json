@@ -23,7 +23,7 @@
   "dependencies": {
     "bullmq": "^5.80.4",
     "ioredis": "^5.11.1",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@package/tsconfig": "workspace:*"

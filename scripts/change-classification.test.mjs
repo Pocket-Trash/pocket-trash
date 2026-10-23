@@ -76,6 +76,15 @@ function expected(
   };
 }
 
+test("shared local Redis tooling validates both consumers", () => {
+  for (const path of ["scripts/dev-redis.mjs", "scripts/dev-redis.test.mjs"]) {
+    assert.deepEqual(
+      classifyChanges([path]),
+      expected(["discord_bot", "scraper", "validation"]),
+    );
+  }
+});
+
 test("PR visuals use only the reviewed Phase 1 caller and existing OIDC bootstrap", () => {
   const workflow = parse(
     readFileSync(

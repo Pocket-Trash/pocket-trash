@@ -198,6 +198,93 @@ test("allows the reviewed braces advisory", async (t) => {
   assert.equal(result.code, 0, result.output);
 });
 
+test("allows only the reviewed Vercel development Zod finding", async (t) => {
+  const result = await runScopedZodAudit(t, scopedZodAudit);
+  assert.equal(result.code, 0, result.output);
+});
+
+test("blocks changes to the reviewed Zod version, development status or paths", async (t) => {
+  for (const change of [
+    { version: "4.4.3" },
+    { version: "3.25.76" },
+    { dev: false },
+    { paths: ["apps/api>zod"] },
+    { paths: [".>vercel>@vercel/new-consumer>zod"] },
+    { paths: [] },
+  ]) {
+    const audit = structuredClone(scopedZodAudit);
+    Object.assign(audit.advisories[123].findings[0], change);
+    const result = await runScopedZodAudit(t, audit);
+    assert.notEqual(result.code, 0, result.output);
+    assert.match(result.output, /outside the reviewed Vercel Zod scope/);
+  }
+});
+
+test("scoped Zod approval never suppresses another high advisory or an invalid audit response", async (t) => {
+  const other = structuredClone(scopedZodAudit);
+  other.advisories[456] = {
+    ...other.advisories[123],
+    github_advisory_id: "GHSA-grv7-fg5c-xmjg",
+    title: "Other high advisory",
+  };
+  for (const audit of [
+    other,
+    { error: "registry unavailable" },
+    { advisories: {} },
+    "not json",
+  ]) {
+    const result = await runScopedZodAudit(t, audit);
+    assert.notEqual(result.code, 0, result.output);
+  }
+});
+
+test("a higher severity requires a new review of the Zod exception", async (t) => {
+  const audit = structuredClone(scopedZodAudit);
+  audit.advisories[123].severity = "critical";
+  const result = await runScopedZodAudit(t, audit);
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /outside the reviewed Vercel Zod scope/);
+});
+
+/**
+ * Exercises the public audit command with a deterministic package-manager response.
+ * @param t - Test context owning the temporary executable.
+ * @param audit - Audit JSON or malformed output.
+ * @returns The captured audit command result.
+ */
+async function runScopedZodAudit(t, audit) {
+  const directory = await mkdtemp(path.join(tmpdir(), "scoped-zod-audit-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const output = typeof audit === "string" ? audit : JSON.stringify(audit);
+  await writeFile(
+    path.join(directory, "pnpm"),
+    `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(output)}); process.exitCode=1;\n`,
+    { mode: 0o700 },
+  );
+  return run(process.execPath, ["scripts/security-audit.mjs"], process.cwd(), {
+    PATH: directory + path.delimiter + process.env.PATH,
+  });
+}
+
+/** Reviewed Zod 3 package-manager finding; no application dependency is exempted. */
+const scopedZodAudit = {
+  advisories: {
+    123: {
+      github_advisory_id: "GHSA-mrhx-c7xc-m3w5",
+      module_name: "zod",
+      severity: "high",
+      title: "Reviewed Vercel Zod finding",
+      findings: [
+        {
+          version: "3.22.4",
+          dev: true,
+          paths: [".>vercel>@vercel/backends>zod"],
+        },
+      ],
+    },
+  },
+};
+
 test("rejects an incomplete audit exception", async (t) => {
   const result = await runAuditWithExceptions(t, [
     { advisory: "GHSA-vfj7-8cjw-p6xm" },
