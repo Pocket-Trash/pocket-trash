@@ -36,6 +36,18 @@ const defaultExceptionsFile = new URL(
 /** Repository pnpm workspace configuration. */
 const workspaceFile = new URL("../pnpm-workspace.yaml", import.meta.url);
 
+/** Advisory approved only for the exact Vercel development-tooling finding. */
+const vercelZodAdvisory = "GHSA-mrhx-c7xc-m3w5";
+/** Reviewed dependency paths; new consumers require another security review. */
+const vercelZodPaths = new Set([
+  ".>vercel>@vercel/backends>zod",
+  ".>vercel>@vercel/express>@vercel/cervel>@vercel/backends>zod",
+  ".>vercel>@vercel/express>zod",
+  ".>vercel>@vercel/hono>zod",
+  ".>vercel>@vercel/python>@vercel/python-analysis>zod",
+  ".>vercel>@vercel/python-analysis>zod",
+]);
+
 const { values } = parseArgs({
   options: {
     "exceptions-file": { type: "string" },
@@ -49,18 +61,97 @@ try {
   const workspace = parseYaml(await readFile(workspaceFile, "utf8"));
   validateConfiguration(exceptions, workspace.auditConfig?.ignoreGhsas ?? []);
 
-  const result = spawnSync("pnpm", ["audit", "--audit-level", "high"], {
-    stdio: "inherit",
-  });
-
-  if (result.error) {
-    throw result.error;
+  if (exceptions.some(({ advisory }) => advisory === vercelZodAdvisory)) {
+    process.exitCode = auditWithVercelZodScope(
+      workspace.auditConfig?.ignoreGhsas ?? [],
+    );
+  } else {
+    const result = spawnSync("pnpm", ["audit", "--audit-level", "high"], {
+      stdio: "inherit",
+    });
+    if (result.error) throw result.error;
+    process.exitCode = result.status ?? 1;
   }
-
-  process.exitCode = result.status ?? 1;
 } catch (error) {
   console.error(`[security:audit] ${error.message}`);
   process.exitCode = 1;
+}
+
+/**
+ * Excludes only the reviewed finding while retaining application and registry failures.
+ * The Zod advisory is never added to pnpm's global advisory ignore list.
+ * @param ignoredAdvisories - Other globally reviewed advisory exceptions.
+ * @returns Zero when no unapproved high or critical findings remain, otherwise one.
+ * @throws When the report is unavailable, malformed, or exceeds the reviewed scope.
+ */
+function auditWithVercelZodScope(ignoredAdvisories) {
+  const result = spawnSync(
+    "pnpm",
+    ["audit", "--audit-level", "high", "--json"],
+    {
+      encoding: "utf8",
+      maxBuffer: 4 * 1024 * 1024,
+      timeout: 60_000,
+    },
+  );
+  if (result.error)
+    throw new Error("Package-manager audit failed; no findings were exempted.");
+  let report;
+  try {
+    report = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("Invalid package-manager audit response.");
+  }
+  if (
+    report.error ||
+    !report.advisories ||
+    typeof report.advisories !== "object" ||
+    Array.isArray(report.advisories) ||
+    ![0, 1].includes(result.status)
+  )
+    throw new Error("Invalid package-manager audit response.");
+  const advisories = Object.values(report.advisories);
+  if (result.status !== 0 && advisories.length === 0)
+    throw new Error("Package-manager audit failed without findings.");
+  let blocked = false;
+  for (const advisory of advisories) {
+    if (advisory.github_advisory_id === vercelZodAdvisory) {
+      if (
+        advisory.module_name !== "zod" ||
+        advisory.severity !== "high" ||
+        !Array.isArray(advisory.findings) ||
+        !advisory.findings.length ||
+        advisory.findings.some(
+          (finding) =>
+            finding.version !== "3.22.4" ||
+            finding.dev !== true ||
+            !Array.isArray(finding.paths) ||
+            !finding.paths.length ||
+            finding.paths.some((value) => !vercelZodPaths.has(value)),
+        )
+      ) {
+        throw new Error(
+          "Finding outside the reviewed Vercel Zod scope; audit blocked.",
+        );
+      }
+      console.log(
+        `Reviewed Vercel-only Zod 3.22.4 exception: ${vercelZodAdvisory}`,
+      );
+      continue;
+    }
+    if (ignoredAdvisories.includes(advisory.github_advisory_id)) continue;
+    if (
+      !["info", "low", "moderate", "high", "critical"].includes(
+        advisory.severity,
+      )
+    )
+      throw new Error("Invalid advisory severity.");
+    console.log(
+      `${advisory.severity}: ${advisory.title} (${advisory.github_advisory_id})`,
+    );
+    if (["high", "critical"].includes(advisory.severity)) blocked = true;
+  }
+  return blocked ? 1 : 0;
 }
 
 /**
@@ -165,7 +256,10 @@ function parseUtcTimestamp(value, field, index) {
  * @throws When the configured and reviewed advisory sets differ.
  */
 function validateConfiguration(exceptions, configuredGhsas) {
-  const reviewed = exceptions.map(({ advisory }) => advisory).sort();
+  const reviewed = exceptions
+    .map(({ advisory }) => advisory)
+    .filter((advisory) => advisory !== vercelZodAdvisory)
+    .sort();
   const configured = [...configuredGhsas].sort();
 
   if (
