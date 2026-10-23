@@ -11,7 +11,9 @@ import { cardImageUrl } from "@/lib/card-image";
  * @param props.coverAlt - Alternative text for the cover image.
  * @param props.itemCountLabel - Localized item-count text.
  * @param props.ownerImageUrl - Selected public Clerk picture URL.
+ * @param props.ownerIsProfilePublic - Whether public attribution may identify the owner.
  * @param props.ownerName - Optional collection owner name.
+ * @param props.privateUserLabel - Localized anonymous owner label.
  * @param props.privateLabel - Localized label for private collections.
  * @returns The collection card UI.
  */
@@ -21,7 +23,9 @@ export function CollectionCard({
   itemCountLabel,
   ownerName,
   ownerImageUrl = null,
+  ownerIsProfilePublic = true,
   privateLabel,
+  privateUserLabel,
 }: {
   /**
    * Collection summary to present.
@@ -38,13 +42,17 @@ export function CollectionCard({
   /**
    * Optional collection owner name.
    */
-  ownerName?: string;
+  ownerName?: string | null;
   /** Selected public Clerk picture URL, or null when absent. */
   ownerImageUrl?: string | null;
+  /** Whether public attribution may identify the owner. @default true */
+  ownerIsProfilePublic?: boolean;
   /**
    * Localized label for private collections.
    */
   privateLabel: string;
+  /** Localized label used when public attribution is private. */
+  privateUserLabel?: string;
 }) {
   return (
     <article className="flex h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-transform group-hover:-translate-y-0.5 group-hover:border-primary">
@@ -65,13 +73,14 @@ export function CollectionCard({
             <Badge variant="secondary">{privateLabel}</Badge>
           ) : null}
         </div>
-        {ownerName ? (
+        {ownerName || !ownerIsProfilePublic ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <PublicProfileAvatar
               imageUrl={ownerImageUrl}
-              username={ownerName}
+              isPrivate={!ownerIsProfilePublic}
+              username={ownerName ?? null}
             />
-            {ownerName}
+            {ownerIsProfilePublic ? ownerName : privateUserLabel}
           </p>
         ) : null}
         {collection.summary ? (

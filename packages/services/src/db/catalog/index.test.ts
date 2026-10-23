@@ -358,6 +358,7 @@ describe("collection catalog writes", () => {
       ownerClerkId: "user-secret",
       ownerUserId: 1000,
       ownerImageUrl: "https://img.clerk.com/selected",
+      ownerIsProfilePublic: true,
       ownerUsername: "ranger",
       privatedByClerkId: null,
       productBearing: "R188",
@@ -429,6 +430,8 @@ describe("collection catalog writes", () => {
           {
             clerkId: "user-secret",
             imageUrl: null,
+            isProfilePublic: true,
+            publishTrends: false,
             userId: 1015,
             username: null,
           },
@@ -445,7 +448,7 @@ describe("collection catalog writes", () => {
         itemCount: 0,
         items: [],
         userId: 1015,
-        username: "user-secret",
+        username: null,
       }),
     ]);
   });

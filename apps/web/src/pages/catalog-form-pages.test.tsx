@@ -1279,6 +1279,7 @@ function collectionFixture(
     name: product.name,
     ownerClerkId: "user_test",
     ownerImageUrl: null,
+    ownerIsProfilePublic: true,
     ownerUsername: "tester",
     ownerUserId: 1,
     productId: product.id,

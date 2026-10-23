@@ -124,6 +124,7 @@ export type {
   PublicSpinnerTrend,
   PublicSpinnerTrends,
   PublicSpinnerTrendValue,
+  PublicUserCollectionItem,
   SearchCounts,
   SearchGroup,
   SearchHighlight,

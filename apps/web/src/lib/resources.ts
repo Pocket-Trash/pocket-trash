@@ -23,6 +23,36 @@ type ResourceDownloadInput = ResourceIdInput & {
    */
   fileId: number;
 };
+
+/** Resource uploader identity supplied by the services boundary. */
+type ResourceUploaderIdentity = {
+  /** Internal Clerk identifier. */
+  uploaderClerkId: string;
+  /** Whether public attribution is enabled. */
+  uploaderIsProfilePublic: boolean;
+  /** Public username when one exists. */
+  uploaderUsername: string | null;
+};
+
+/**
+ * Removes private account identity from a resource at the public boundary.
+ *
+ * @param resource - Resource containing internal uploader identity.
+ * @returns A copy without the Clerk identifier and with private attribution masked.
+ * @template T - Resource shape preserved by the operation.
+ */
+export function redactPublicResourceUploader<
+  T extends ResourceUploaderIdentity,
+>(resource: T): Omit<T, "uploaderClerkId"> {
+  const publicResource = { ...resource };
+  Reflect.deleteProperty(publicResource, "uploaderClerkId");
+  return {
+    ...publicResource,
+    uploaderUsername: resource.uploaderIsProfilePublic
+      ? resource.uploaderUsername
+      : null,
+  };
+}
 /**
  * Validated resource-version download input.
  */
@@ -76,15 +106,14 @@ export const getResourceDetail = createServerFn({ method: "GET" })
     const viewer = await getResourceViewer();
     const detail = await s.resources.getDetail(data.resourceId, viewer);
     if (!detail) return null;
-    const { uploaderClerkId, ...browserDetail } = detail;
-    return {
-      ...browserDetail,
+    return redactPublicResourceUploader({
+      ...detail,
       canAdminister: hasPermission(viewer, "resources.manage"),
       canEdit:
-        uploaderClerkId === viewer?.clerkId ||
+        detail.uploaderClerkId === viewer?.clerkId ||
         hasPermission(viewer, "resources.manage"),
-      isOwner: uploaderClerkId === viewer?.clerkId,
-    };
+      isOwner: detail.uploaderClerkId === viewer?.clerkId,
+    });
   });
 
 /**
@@ -186,11 +215,11 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
     );
     return {
       ...directory,
-      resources: directory.resources.map(
-        ({ uploaderClerkId, ...resource }) => ({
+      resources: directory.resources.map((resource) =>
+        redactPublicResourceUploader({
           ...resource,
           canEdit:
-            uploaderClerkId === viewer?.clerkId ||
+            resource.uploaderClerkId === viewer?.clerkId ||
             hasPermission(viewer, "resources.manage"),
         }),
       ),

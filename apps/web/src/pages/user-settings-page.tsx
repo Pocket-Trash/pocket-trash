@@ -3,6 +3,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
+import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { UserPageShell } from "@/components/user-page-shell";
 import { usePenSettings } from "@/hooks/use-pen-settings";
@@ -29,12 +31,6 @@ import { useLocale } from "@/providers/locale-provider";
  */
 type SettingsTranslationFormatter = (key: TranslationKey) => string;
 
-/** Translation keys supplied by the companion public Trends localization change. */
-type PublicTrendsSettingsKey =
-  | TranslationKey
-  | "web.settings.publicTrendsDescription"
-  | "web.settings.publicTrendsLabel";
-
 /**
  * Renders the user's measurement and currency display preferences.
  *
@@ -48,14 +44,17 @@ export function UserSettingsPage() {
    * @param key - Translation key.
    * @returns The localized message.
    */
-  const t = (key: PublicTrendsSettingsKey) =>
-    formatTranslation(key as TranslationKey, {}, locale);
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const {
+    accountSettingsLoadFailed,
+    accountSettingsLoaded,
     currency,
+    isProfilePublic,
     measurementSystem,
     publishTrends,
     saving,
     setCurrency,
+    setIsProfilePublic,
     setMeasurementSystem,
     setPublishTrends,
   } = usePenSettings();
@@ -63,7 +62,25 @@ export function UserSettingsPage() {
   return (
     <UserPageShell section="settings" title={t("web.settings.settings")}>
       <div className="grid w-full max-w-xl gap-6">
-        <div className="grid gap-6 rounded-lg border border-border bg-card p-4 sm:p-6">
+        <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+          <fieldset className="grid gap-2">
+            <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {t("web.settings.profileVisibilityLabel")}
+            </legend>
+            <p className="text-sm text-muted-foreground">
+              {t("web.settings.profileVisibilityDescription")}
+            </p>
+            <PublicResourceSwitch
+              checked={isProfilePublic}
+              disabled={
+                saving || !accountSettingsLoaded || accountSettingsLoadFailed
+              }
+              onCheckedChange={setIsProfilePublic}
+            />
+          </fieldset>
+
+          <Separator className="my-12" />
+
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t("web.settings.measurementSystemLabel")}
@@ -85,12 +102,17 @@ export function UserSettingsPage() {
             </ToggleGroup>
           </fieldset>
 
+          <Separator className="my-12" />
+
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t("web.settings.publicTrendsLabel")}
             </legend>
             <p className="text-sm text-muted-foreground">
               {t("web.settings.publicTrendsDescription")}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t("web.settings.publicTrendsProfileRequirement")}
             </p>
             <ToggleGroup
               aria-label={t("web.settings.publicTrendsLabel")}
@@ -100,14 +122,22 @@ export function UserSettingsPage() {
               type="single"
               value={publishTrends ? "public" : "private"}
             >
-              <ToggleGroupItem disabled={saving} value="private">
+              <ToggleGroupItem
+                disabled={saving || !isProfilePublic}
+                value="private"
+              >
                 {t("web.resources.visibility.private")}
               </ToggleGroupItem>
-              <ToggleGroupItem disabled={saving} value="public">
+              <ToggleGroupItem
+                disabled={saving || !isProfilePublic}
+                value="public"
+              >
                 {t("web.resources.visibility.public")}
               </ToggleGroupItem>
             </ToggleGroup>
           </fieldset>
+
+          <Separator className="my-12" />
 
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">

@@ -191,6 +191,7 @@ function item(overrides: Partial<UserCollectionItem>): UserCollectionItem {
     name: "Product",
     ownerClerkId: "user_owner",
     ownerImageUrl: null,
+    ownerIsProfilePublic: true,
     ownerUserId: 1,
     ownerUsername: "owner",
     productId: 100,

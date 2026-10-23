@@ -219,6 +219,7 @@ const item: UserCollectionItem = {
   name: product.name,
   ownerClerkId: "user_storybook",
   ownerImageUrl: null,
+  ownerIsProfilePublic: true,
   ownerUsername: "royanger",
   ownerUserId: collection.ownerUserId,
   productId: product.id,
@@ -245,6 +246,7 @@ const installedButton: UserCollectionItem = {
 
 /** Public collection owner shared by the stories. */
 const owner: PublicCollectionOwner = {
+  isProfilePublic: true,
   publishTrends: false,
   imageUrl: null,
   collections: [collection],
@@ -318,7 +320,7 @@ export const Collection: Story = {
       items={[item]}
       onFiltersChange={fn()}
       ownerImageUrl="https://cdn.pocket-trash.app/assets/storybook/product-images/one.webp"
-      ownerUsername={owner.username}
+      ownerUsername={owner.username ?? undefined}
     />
   ),
   /**

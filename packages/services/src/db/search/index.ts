@@ -44,6 +44,8 @@ export type SearchResult = {
   imageUrl?: string;
   /** Stable result kind. */
   kind: SearchKind;
+  /** Whether collection attribution may identify its owner. */
+  ownerIsProfilePublic?: boolean;
   /** Parent identifier for nested results. */
   parentId?: number;
   /** Public result title. */
@@ -104,6 +106,8 @@ type SearchRow = {
   imageUrl: string | null;
   /** Stable result kind. */
   kind: SearchKind;
+  /** Whether collection attribution may identify its owner. */
+  ownerIsProfilePublic: boolean | null;
   /** Parent identifier for nested results. */
   parentId: number | string | null;
   /** Public result title. */
@@ -225,7 +229,9 @@ export function createSearchService(db: Database): SearchService {
           : sql`to_tsquery('simple', normalize_search_text(${prefix}) || ':*')`
         : sql`websearch_to_tsquery('simple', normalize_search_text(${base}))`;
       const groupFilter =
-        group === "all" ? sql`true` : sql`search_group = ${group}`;
+        group === "all"
+          ? sql`true`
+          : sql`search_documents.search_group = ${group}`;
       const offset = (page - 1) * pageSize;
       const pagination =
         input.surface === "directory"
@@ -235,27 +241,45 @@ export function createSearchService(db: Database): SearchService {
       const [resultRows, countRows] = await Promise.all([
         db.execute(sql<SearchRow>`
           with query as (select ${queryExpression} as value)
-          select kind, source_id as id, parent_id as "parentId", title, href,
-            image_url as "imageUrl", context,
+          select search_documents.kind, search_documents.source_id as id,
+            search_documents.parent_id as "parentId", search_documents.title,
+            search_documents.href, search_documents.image_url as "imageUrl",
+            search_documents.context,
+            case when search_documents.kind in ('collection', 'collection_item')
+              then coalesce(owner_settings.is_profile_public, false)
+              else null
+            end as "ownerIsProfilePublic",
             ts_headline(
-              'simple', concat_ws(' ', title, context, description), query.value,
+              'simple', concat_ws(' ', search_documents.title, search_documents.context, search_documents.description), query.value,
               ${`StartSel=${START_MATCH}, StopSel=${END_MATCH}, MaxWords=24, MinWords=8, ShortWord=2`}
             ) as headline
           from search_documents cross join query
-          where search_vector @@ query.value and ${groupFilter}
+          left join user_collection search_collection
+            on search_documents.kind = 'collection'
+              and search_collection.id = search_documents.source_id
+          left join collection_item search_item
+            on search_documents.kind = 'collection_item'
+              and search_item.id = search_documents.source_id
+          left join user_settings owner_settings
+            on owner_settings.user_id = coalesce(
+              search_collection.owner_id,
+              search_item.owner_id
+            )
+          where search_documents.search_vector @@ query.value and ${groupFilter}
           order by
-            (normalize_search_text(title) = normalize_search_text(${query})) desc,
-            (normalize_search_text(title) like normalize_search_text(${query}) || '%') desc,
-            ts_rank_cd(search_vector, query.value) desc,
-            normalize_search_text(title), kind, source_id
+            (normalize_search_text(search_documents.title) = normalize_search_text(${query})) desc,
+            (normalize_search_text(search_documents.title) like normalize_search_text(${query}) || '%') desc,
+            ts_rank_cd(search_documents.search_vector, query.value) desc,
+            normalize_search_text(search_documents.title),
+            search_documents.kind, search_documents.source_id
           ${pagination}
         `),
         db.execute(sql<CountRow>`
           with query as (select ${queryExpression} as value)
           select search_group as "group", count(*)::integer as count
           from search_documents cross join query
-          where search_vector @@ query.value
-          group by search_group
+          where search_documents.search_vector @@ query.value
+          group by search_documents.search_group
         `),
       ]);
 
@@ -274,6 +298,9 @@ export function createSearchService(db: Database): SearchService {
           id: Number(row.id),
           ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
           kind: row.kind,
+          ...(row.ownerIsProfilePublic === null
+            ? {}
+            : { ownerIsProfilePublic: row.ownerIsProfilePublic }),
           ...(row.parentId === null ? {} : { parentId: Number(row.parentId) }),
           title: row.title,
         })),

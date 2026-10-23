@@ -9,7 +9,41 @@ import {
   productApprovalSchema,
   productDeletionSchema,
   productFormSchema,
+  redactPublicCatalogProduct,
+  redactPublicCollectionOwner,
 } from "./catalog-api";
+
+describe("public catalog products", () => {
+  it("removes the contributor Clerk identifier", () => {
+    const product = redactPublicCatalogProduct({
+      id: 1000,
+      ownerClerkId: "user_secret",
+    });
+
+    expect(product).toEqual({ id: 1000 });
+    expect(JSON.stringify(product)).not.toContain("user_secret");
+  });
+});
+
+describe("public collection attribution", () => {
+  it("removes internal identity and masks private attribution", () => {
+    const item = redactPublicCollectionOwner({
+      ownerClerkId: "user_secret",
+      ownerImageUrl: "https://example.com/private.png",
+      ownerIsProfilePublic: false,
+      ownerUsername: "private-user",
+      productId: 1000,
+    });
+
+    expect(item).toEqual({
+      ownerImageUrl: null,
+      ownerIsProfilePublic: false,
+      ownerUsername: null,
+      productId: 1000,
+    });
+    expect(JSON.stringify(item)).not.toContain("user_secret");
+  });
+});
 
 describe("collection product types", () => {
   it.each([

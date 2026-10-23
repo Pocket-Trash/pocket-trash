@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { loggerMessages } from "@package/logger";
 import { formatTranslation } from "@pocket-trash/localizations";
+import { useRouter } from "@tanstack/react-router";
 import * as React from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
@@ -23,6 +24,10 @@ type PenSettings = Pick<
   typeof defaultUserSettings,
   "currencyCode" | "measurementSystem" | "publishTrends"
 >;
+
+/** Account-backed settings combined with locally cached display preferences. */
+type AccountPenSettings = PenSettings &
+  Pick<typeof defaultUserSettings, "isProfilePublic">;
 
 /**
  * Reads valid pen display settings from local storage.
@@ -76,7 +81,11 @@ function writeStoredPenSettings(settings: PenSettings): void {
   try {
     window.localStorage.setItem(
       userSettingsStorageKey,
-      JSON.stringify(settings),
+      JSON.stringify({
+        currencyCode: settings.currencyCode,
+        measurementSystem: settings.measurementSystem,
+        publishTrends: settings.publishTrends,
+      }),
     );
   } catch {
     // Local persistence is best-effort; the save path still reports server errors.
@@ -90,10 +99,16 @@ function writeStoredPenSettings(settings: PenSettings): void {
  * @throws When called outside `LocaleProvider`.
  */
 export function usePenSettings() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const router = useRouter();
   const { locale, measurementSystem, setMeasurementSystem } = useLocale();
   const settingsSaveFailureMessage = formatTranslation(
     "web.error.settingsSaveFailed",
+    {},
+    locale,
+  );
+  const settingsLoadFailureMessage = formatTranslation(
+    "error.generic",
     {},
     locale,
   );
@@ -105,7 +120,13 @@ export function usePenSettings() {
   const [publishTrends, setPublishTrendsState] = React.useState(
     initialSettings.publishTrends,
   );
+  const [isProfilePublic, setIsProfilePublicState] = React.useState(false);
+  const [accountSettingsLoaded, setAccountSettingsLoaded] =
+    React.useState(false);
+  const [accountSettingsLoadFailed, setAccountSettingsLoadFailed] =
+    React.useState(false);
   const mutationVersionRef = React.useRef(0);
+  const profileMutationVersionRef = React.useRef(0);
 
   const applyPenSettings = React.useCallback(
     (settings: PenSettings) => {
@@ -123,39 +144,64 @@ export function usePenSettings() {
   }, [applyPenSettings, initialSettings, isLoaded, isSignedIn]);
 
   React.useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    mutationVersionRef.current += 1;
+    profileMutationVersionRef.current += 1;
+    setSaving(false);
+    setIsProfilePublicState(false);
+    setAccountSettingsLoaded(false);
+    setAccountSettingsLoadFailed(false);
+    if (!isLoaded || !isSignedIn || !userId) return;
 
     let cancelled = false;
     const requestVersion = mutationVersionRef.current;
+    const profileMutationVersion = profileMutationVersionRef.current;
 
     getCurrentUserSettingsState()
       .then((settingsState) => {
-        if (
-          cancelled ||
-          !settingsState?.hasSavedSettings ||
-          requestVersion !== mutationVersionRef.current
-        ) {
+        if (cancelled) return;
+        if (!settingsState) {
+          setAccountSettingsLoadFailed(true);
+          toast.error(settingsLoadFailureMessage);
           return;
         }
 
-        applyPenSettings(settingsState.settings);
+        if (requestVersion === mutationVersionRef.current) {
+          applyPenSettings(settingsState.settings);
+        }
+        if (profileMutationVersion === profileMutationVersionRef.current) {
+          setIsProfilePublicState(settingsState.settings.isProfilePublic);
+        }
+        setAccountSettingsLoaded(true);
       })
       .catch((error: unknown) => {
+        if (cancelled) return;
         logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
+        setAccountSettingsLoadFailed(true);
+        toast.error(settingsLoadFailureMessage);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [applyPenSettings, isLoaded, isSignedIn]);
+  }, [
+    applyPenSettings,
+    isLoaded,
+    isSignedIn,
+    settingsLoadFailureMessage,
+    userId,
+  ]);
 
   const saveSettings = React.useCallback(
-    (patch: UserSettingsPatch, previousSettings: PenSettings) => {
+    (patch: UserSettingsPatch, previousSettings: AccountPenSettings) => {
       const mutationVersion = mutationVersionRef.current + 1;
       mutationVersionRef.current = mutationVersion;
+      if ("isProfilePublic" in patch) {
+        profileMutationVersionRef.current += 1;
+      }
       const optimisticSettings = { ...previousSettings, ...patch };
 
       applyPenSettings(optimisticSettings);
+      setIsProfilePublicState(optimisticSettings.isProfilePublic);
 
       if (!isLoaded || !isSignedIn) {
         return;
@@ -165,11 +211,20 @@ export function usePenSettings() {
 
       patchCurrentUserSettings({ data: patch })
         .then((settings) => {
-          if (!settings || mutationVersion !== mutationVersionRef.current) {
+          if (mutationVersion !== mutationVersionRef.current) {
+            return;
+          }
+
+          if (!settings) {
+            applyPenSettings(previousSettings);
+            setIsProfilePublicState(previousSettings.isProfilePublic);
+            toast.error(settingsSaveFailureMessage);
             return;
           }
 
           applyPenSettings(settings);
+          setIsProfilePublicState(settings.isProfilePublic);
+          void router.invalidate();
         })
         .catch((error: unknown) => {
           logger.warn(loggerMessages.web.userSettingsSaveFailed, { error });
@@ -177,6 +232,7 @@ export function usePenSettings() {
           if (mutationVersion !== mutationVersionRef.current) return;
 
           applyPenSettings(previousSettings);
+          setIsProfilePublicState(previousSettings.isProfilePublic);
           toast.error(settingsSaveFailureMessage);
         })
         .finally(() => {
@@ -185,44 +241,84 @@ export function usePenSettings() {
           }
         });
     },
-    [applyPenSettings, isLoaded, isSignedIn, settingsSaveFailureMessage],
+    [
+      applyPenSettings,
+      isLoaded,
+      isSignedIn,
+      router,
+      settingsSaveFailureMessage,
+    ],
   );
 
   const updateMeasurementSystem = React.useCallback(
     (nextSystem: MeasurementSystem) => {
       saveSettings(
         { measurementSystem: nextSystem },
-        { currencyCode: currency, measurementSystem, publishTrends },
+        {
+          currencyCode: currency,
+          isProfilePublic,
+          measurementSystem,
+          publishTrends,
+        },
       );
     },
-    [currency, measurementSystem, publishTrends, saveSettings],
+    [currency, isProfilePublic, measurementSystem, publishTrends, saveSettings],
   );
 
   const setCurrency = React.useCallback(
     (nextCurrency: CurrencyCode) => {
       saveSettings(
         { currencyCode: nextCurrency },
-        { currencyCode: currency, measurementSystem, publishTrends },
+        {
+          currencyCode: currency,
+          isProfilePublic,
+          measurementSystem,
+          publishTrends,
+        },
       );
     },
-    [currency, measurementSystem, publishTrends, saveSettings],
+    [currency, isProfilePublic, measurementSystem, publishTrends, saveSettings],
   );
 
   const setPublishTrends = React.useCallback(
     (nextValue: boolean) => {
       saveSettings(
         { publishTrends: nextValue },
-        { currencyCode: currency, measurementSystem, publishTrends },
+        {
+          currencyCode: currency,
+          isProfilePublic,
+          measurementSystem,
+          publishTrends,
+        },
       );
     },
-    [currency, measurementSystem, publishTrends, saveSettings],
+    [currency, isProfilePublic, measurementSystem, publishTrends, saveSettings],
+  );
+
+  const setIsProfilePublic = React.useCallback(
+    (nextValue: boolean) => {
+      saveSettings(
+        { isProfilePublic: nextValue },
+        {
+          currencyCode: currency,
+          isProfilePublic,
+          measurementSystem,
+          publishTrends,
+        },
+      );
+    },
+    [currency, isProfilePublic, measurementSystem, publishTrends, saveSettings],
   );
 
   return {
+    accountSettingsLoadFailed,
+    accountSettingsLoaded,
     currency,
+    isProfilePublic,
     measurementSystem,
     publishTrends,
     setCurrency,
+    setIsProfilePublic,
     setMeasurementSystem: updateMeasurementSystem,
     setPublishTrends,
     saving,

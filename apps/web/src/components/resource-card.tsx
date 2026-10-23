@@ -5,6 +5,7 @@ import {
   faFileLines,
   faFileZipper,
   faPencil,
+  faUserLock,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -233,6 +234,7 @@ function ResourceCardContent({
    */
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
 }) {
+  const masksUploader = !showVisibility && !resource.uploaderIsProfilePublic;
   return (
     <>
       <div className="relative">
@@ -285,8 +287,16 @@ function ResourceCardContent({
         </div>
 
         <div className="mt-auto grid gap-1 text-sm text-muted-foreground">
-          <span>
-            {t("web.resources.detail.sharedBy")} {resource.uploaderUsername}
+          <span className="inline-flex items-center gap-1">
+            {t("web.resources.detail.sharedBy")}{" "}
+            {masksUploader ? (
+              <>
+                <FontAwesomeIcon aria-hidden="true" icon={faUserLock} />
+                {t("web.profiles.privateUser")}
+              </>
+            ) : (
+              resource.uploaderUsername
+            )}
           </span>
           {resource.isPrivate && resource.privateReason ? (
             <span>
