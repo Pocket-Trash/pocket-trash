@@ -69,6 +69,13 @@ test("pins patched shell-quote and Sharp releases across transitive paths", () =
   assert.doesNotMatch(workspaceLockfile, /sharp@0\.35\.4/);
 });
 
+test("pins patched Undici releases without changing consumer major versions", () => {
+  for (const version of ["6.29.1", "7.30.1", "8.12.2"])
+    assert.ok(workspaceLockfile.includes(`undici@${version}:`));
+  for (const version of ["6.29.0", "7.29.1", "7.30.0", "8.11.2"])
+    assert.ok(!workspaceLockfile.includes(`undici@${version}:`));
+});
+
 test("provides the locked deployment executables", async () => {
   const commands = [
     ["skills", "1.7.0"],
