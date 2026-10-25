@@ -65,11 +65,12 @@ finally { redis.disconnect(); }`,
  * @param {() => boolean} check - Read-only readiness check.
  * @param {(milliseconds: number) => Promise<unknown>} pause - Polling delay.
  * @param {string} message - Safe timeout diagnostic.
+ * @param {number} [attempts] - Maximum readiness checks, including CLI latency.
  * @returns {Promise<void>} Readiness completion.
  * @rejects {Error} When the check fails or readiness times out.
  */
-async function waitUntil(check, pause, message) {
-  for (let attempt = 0; attempt < 60; attempt++) {
+async function waitUntil(check, pause, message, attempts = 60) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (check()) return;
     await pause(1_000);
   }
@@ -266,6 +267,7 @@ export async function prepareRailwayPreviewQueue({
     },
     pause,
     "Preview Redis deployment did not reach SUCCESS.",
+    300, // Volume mounting can keep a healthy deployment pending for several minutes.
   );
   const variables = JSON.parse(run(["variable", "list", ...scope, "--json"]));
   const redisUrl = variables.REDIS_PUBLIC_URL;
