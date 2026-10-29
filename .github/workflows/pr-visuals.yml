@@ -16,7 +16,7 @@ jobs:
   visuals:
     # Keep paid runs off until live verification and activation are approved.
     if: vars.PR_VISUALS_ENABLED == 'true' && github.repository == 'Pocket-Trash/pocket-trash'
-    uses: Pocket-Trash/pr-review-tool/.github/workflows/review.yml@b8417b5089afe9cf8773735c6a2f7ba4c301329f
+    uses: Pocket-Trash/pr-review-tool/.github/workflows/review.yml@current-release
     with:
       task: visuals
       config-path: .github/pr-visuals.json
