@@ -195,14 +195,36 @@ test("blocks artifacts for a high-severity development advisory", async (t) => {
   );
 });
 
-test("allows the reviewed braces advisory", async (t) => {
-  const registry = await startAuditRegistry(t, bracesAudit);
-  const result = await run("pnpm", ["run", "security:audit"], process.cwd(), {
-    PNPM_CONFIG_FETCH_RETRIES: "0",
-    PNPM_CONFIG_REGISTRY: registry,
-  });
+test("removes the withdrawn braces exception and retains only scoped Vercel Zod approval", async () => {
+  const exceptions = JSON.parse(
+    await readFile("security-audit-exceptions.json", "utf8"),
+  );
+  assert.deepEqual(
+    exceptions.map(({ advisory }) => advisory),
+    ["GHSA-mrhx-c7xc-m3w5"],
+  );
+  assert.doesNotMatch(workspacePolicy, /GHSA-vfj7-8cjw-p6xm|ignoreGhsas:/);
+});
 
-  assert.equal(result.code, 0, result.output);
+test("locks mature security fixes without changing supported package majors", () => {
+  for (const version of [
+    "seroval@1.6.11",
+    "hono@4.13.11",
+    "@hono/node-server@2.1.3",
+    "@vitest/mocker@4.1.12",
+    "smol-toml@1.9.0",
+    "fast-uri@3.1.9",
+  ])
+    assert.ok(workspaceLockfile.includes(version), version);
+  for (const version of [
+    "seroval@1.6.7:",
+    "hono@4.13.9:",
+    "@hono/node-server@2.1.1:",
+    "@vitest/mocker@4.1.11:",
+    "smol-toml@1.7.1:",
+    "fast-uri@3.1.8:",
+  ])
+    assert.ok(!workspaceLockfile.includes(version), version);
 });
 
 test("allows only the reviewed Vercel development Zod finding", async (t) => {
@@ -328,7 +350,7 @@ test("rejects an audit exception lasting more than seven days", async (t) => {
 });
 
 test("rejects audit configuration without matching exception metadata", async (t) => {
-  const result = await runAuditWithExceptions(t, []);
+  const result = await runAuditWithExceptions(t, [validAuditException]);
 
   assert.notEqual(result.code, 0, result.output);
   assert.match(result.output, /does not match/);
@@ -613,11 +635,11 @@ function run(command, args, cwd, env = {}) {
 
 /** Valid temporary audit exception metadata. */
 const validAuditException = {
-  advisory: "GHSA-vfj7-8cjw-p6xm",
+  advisory: "GHSA-grv7-fg5c-xmjg",
   owner: "Security Owner",
   followUpIssue: "ENG-337",
-  approvedAt: "2026-10-05T17:34:28Z",
-  expiresAt: "2026-10-12T17:00:00Z",
+  approvedAt: new Date(Date.now() - 60_000).toISOString(),
+  expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
   reason: "No patched release exists.",
 };
 
@@ -631,24 +653,6 @@ const vulnerableAudit = {
       severity: "high",
       vulnerable_versions: "<=3.0.3",
       cwe: ["CWE-400"],
-      cvss: {
-        score: 7.5,
-        vectorString: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
-      },
-    },
-  ],
-};
-
-/** Reviewed braces advisory fixture. */
-const bracesAudit = {
-  braces: [
-    {
-      id: 999998,
-      url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
-      title: "Braces fixture advisory",
-      severity: "high",
-      vulnerable_versions: "<=3.0.3",
-      cwe: ["CWE-674"],
       cvss: {
         score: 7.5,
         vectorString: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",

@@ -19,7 +19,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.3",
     "@package/database": "workspace:*",
     "@package/logger": "workspace:*",
     "@package/markdown": "workspace:*",
@@ -28,7 +28,7 @@
     "@t3-oss/env-core": "^0.13.11",
     "cron-parser": "4.9.0",
     "drizzle-orm": "1.0.0-rc.4",
-    "hono": "^4.13.9",
+    "hono": "^4.13.11",
     "ioredis": "^5.11.1",
     "undici": "^8.12.2",
     "zod": "^4.6.6"
