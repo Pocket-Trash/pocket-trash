@@ -496,6 +496,9 @@ jobs:
       - name: Install Redis and PDF test tools
         run: sudo apt-get update && sudo apt-get install --yes redis-server poppler-utils
       - name: Run tests
+        env:
+          TURBO_CONCURRENCY: "2"
+          VITEST_MAX_WORKERS: "1"
         run: pnpm test:ci
 
   storybook-test:
