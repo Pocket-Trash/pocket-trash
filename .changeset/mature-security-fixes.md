@@ -6,3 +6,4 @@
 ---
 
 Update vulnerable dependencies and remove the withdrawn braces exception.
+Keep avatar Storybook image checks independent of CDN availability.
