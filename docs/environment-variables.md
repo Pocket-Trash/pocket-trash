@@ -44,11 +44,19 @@ production dataset map fields without placing it in an application runtime or
 `tools/github/secrets`. Runtime `AXIOM_TOKEN` values remain limited to ingest,
 plus query access where the logger live test requires it.
 
-Railway owns the shared `REDIS_URL` reference for the scraper and Discord bot.
+For hosted deployments, Railway owns the shared `REDIS_URL` reference for the scraper and Discord bot.
 Point both services at `${{pocket-trash-queue.REDIS_URL}}`; do not copy the URL,
 password, or public endpoint into Infisical. Sharing this credential also shares
 capacity and outage scope, while stable app-specific queue names and payload
 schemas prevent logical overlap.
+
+Local bot/scraper `dev` commands instead default to Docker Redis on localhost
+port `4008`, after loading dev secrets. No new Infisical key or import is needed.
+An explicit shell `REDIS_URL` overrides the dev Infisical value; either overrides
+the local default and must target reachable, isolated non-production Redis.
+Turbo forwards `REDIS_URL` and `SCRAPER_REDIS_PORT` for development only. The
+runner carries a shell override privately across secret injection, never in
+command arguments. See [Discord local development](discord-bot.md#local-development).
 
 The direct logger transport uses one app-bound `LOGGER_NOTIFICATION_TOKEN` in
 each of `/apps/api`, `/apps/web`, and `/apps/scraper`. Store the matching values

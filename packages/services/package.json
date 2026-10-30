@@ -52,7 +52,7 @@
     "@package/storage": "workspace:*",
     "@pocket-trash/localizations": "^0.41.0",
     "drizzle-orm": "1.0.0-rc.4",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

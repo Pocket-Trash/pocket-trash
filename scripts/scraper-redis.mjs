@@ -46,19 +46,44 @@ export async function ensureScraperRedisContainer({
   ]);
 
   if (!existing.trim()) {
-    await runCommand("docker", [
-      "run",
-      "--name",
-      scraperRedisContainerName,
-      "-p",
-      `${redisPort}:6379`,
-      "-d",
-      "redis:8.2.1",
-    ]);
-    return;
+    try {
+      await capture(
+        "docker",
+        [
+          "run",
+          "--name",
+          scraperRedisContainerName,
+          "-p",
+          `127.0.0.1:${redisPort}:6379`,
+          "-d",
+          "redis:8.2.1",
+          "redis-server",
+          "--appendonly",
+          "yes",
+          "--appendfsync",
+          "everysec",
+        ],
+        300_000,
+      );
+    } catch {
+      // A concurrent app may have created the same container after our lookup.
+      const created = await capture("docker", [
+        "ps",
+        "-a",
+        "--filter",
+        `name=^/${scraperRedisContainerName}$`,
+        "--format",
+        "{{.Names}}",
+      ]);
+      if (!created.trim())
+        throw new Error(
+          "Cannot start local Redis. Start Docker/OrbStack and check SCRAPER_REDIS_PORT.",
+        );
+      await runCommand("docker", ["start", scraperRedisContainerName]);
+    }
   }
 
-  if (!existing.includes("Up ")) {
+  if (existing.trim() && !existing.includes("Up ")) {
     await runCommand("docker", ["start", scraperRedisContainerName]);
   }
 
@@ -81,8 +106,28 @@ export function runCommand(command, args, env = process.env) {
       stdio: "inherit",
     });
 
-    child.on("error", reject);
+    /** Forwards terminal shutdown without stopping the persistent Redis container. */
+    const interrupt = () => {
+      child.kill("SIGINT");
+    };
+    /** Forwards orchestrator shutdown to the wrapped development process. */
+    const terminate = () => {
+      child.kill("SIGTERM");
+    };
+    process.on("SIGINT", interrupt);
+    process.on("SIGTERM", terminate);
+    /** Removes signal listeners when the wrapped process settles. */
+    const cleanup = () => {
+      process.off("SIGINT", interrupt);
+      process.off("SIGTERM", terminate);
+    };
+
+    child.on("error", (error) => {
+      cleanup();
+      reject(error);
+    });
     child.on("close", (code) => {
+      cleanup();
       if (code === 0) {
         resolve();
         return;
@@ -108,13 +153,15 @@ export function printScriptError(error) {
  *
  * @param command - Executable name or path.
  * @param args - Command arguments.
+ * @param timeout - Maximum command duration in milliseconds; image downloads need longer.
  * @returns A promise for captured standard output.
  * @rejects When the process cannot start or exits unsuccessfully.
  */
-function capture(command, args) {
+function capture(command, args, timeout = 10_000) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
+      timeout,
     });
     let stdout = "";
     let stderr = "";
@@ -161,9 +208,7 @@ async function assertScraperRedisPort(expectedPort) {
       `Existing Docker container "${scraperRedisContainerName}" is mapped to host port ${hostPorts.join(", ") || "unknown"}, but the scraper expects ${expectedPort}.`,
       "Docker cannot change port mappings on an existing container.",
       "",
-      "To recreate the local scraper Redis container on the expected port, run:",
-      `  docker rm -f ${scraperRedisContainerName}`,
-      "  pnpm dev:scraper",
+      "Do not remove the container unless you intend to discard its local state.",
       "",
       "To keep using the existing container, run scraper commands with matching env:",
       `  SCRAPER_REDIS_PORT=${hostPorts[0] ?? "6379"} REDIS_URL=redis://localhost:${hostPorts[0] ?? "6379"} pnpm scraper:scrape -- autmog`,

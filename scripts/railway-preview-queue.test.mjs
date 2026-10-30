@@ -315,6 +315,23 @@ test("does not accept an old healthy deployment as evidence of redeploy success"
   );
 });
 
+test("waits through slow volume mounting before accepting the new deployment", async () => {
+  const options = fixture();
+  const run = options.run;
+  let deploymentPolls = 0;
+  options.run = (args) => {
+    const result = JSON.parse(run(args));
+    if (args[0] === "deployment" && result[0].id === "new-deployment") {
+      deploymentPolls++;
+      result[0].status = deploymentPolls > 120 ? "SUCCESS" : "DEPLOYING";
+    }
+    return JSON.stringify(result);
+  };
+  await prepareRailwayPreviewQueue(options);
+  assert.equal(deploymentPolls, 121);
+  assert.ok(options.calls.some((args) => args[0] === "variable"));
+});
+
 test("fails immediately when the new deployment fails", async () => {
   const options = fixture();
   const run = options.run;

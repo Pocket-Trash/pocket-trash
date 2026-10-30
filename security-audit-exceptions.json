@@ -6,5 +6,13 @@
     "approvedAt": "2026-10-23T02:34:35Z",
     "expiresAt": "2026-10-30T02:34:35Z",
     "reason": "No patched braces release exists; affected paths are development tooling."
+  },
+  {
+    "advisory": "GHSA-mrhx-c7xc-m3w5",
+    "owner": "Roy Anger",
+    "followUpIssue": "ENG-574",
+    "approvedAt": "2026-10-23T22:27:57Z",
+    "expiresAt": "2026-10-30T22:27:57Z",
+    "reason": "Temporary exception for Zod 3.22.4 on six reviewed Vercel CLI development-tooling paths only. The audit validates version, development-only status and exact paths before excluding this finding; all application Zod 4 resolutions remain patched. Crafted build inputs can exhaust tooling memory."
   }
 ]
