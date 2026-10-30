@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
-import pictureUrl from "../../e2e/fixtures/collection-covers/red.png?url&no-inline";
 import { PublicProfileAvatar } from "./public-profile-avatar";
 
-/** Local fixture keeps image-loading assertions independent of CDN availability. */
-const picture = new URL(pictureUrl, import.meta.url).href;
+/** Storybook image fixture; production URLs always come from Clerk. */
+const picture =
+  "https://cdn.pocket-trash.app/assets/storybook/product-images/one.webp";
 /** Public avatar stories exercise the shared primitive and Clerk URL parameters. */
 const meta = {
   component: PublicProfileAvatar,
