@@ -3,7 +3,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import {
@@ -328,16 +328,19 @@ export function useFeedbackAction(
     },
   );
   if (state.actorId !== actorId) dispatch({ type: "actorChanged", actorId });
+  /** Requests a confirmed feedback write through a stable consumer command.
+   * @param action - Existing feedback operation. */
+  const run = useCallback(
+    (action: FeedbackAction) => {
+      dispatch({ type: "requested", action });
+    },
+    [dispatch],
+  );
   return {
     pending: Boolean(state.request),
     action: state.action,
     error: state.error,
-
-    /** Requests a confirmed feedback write.
-     * @param action - Existing feedback operation. */
-    run(action: FeedbackAction) {
-      dispatch({ type: "requested", action });
-    },
+    run,
   };
 }
 

@@ -16,7 +16,7 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { type ComponentProps, useCallback, useRef } from "react";
+import { type ComponentProps, useCallback, useMemo, useRef } from "react";
 import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
@@ -394,6 +394,7 @@ function AdminFeedbackContent({
   const sync = useFeedbackAction(() => {
     load(offset);
   });
+  const requestSync = sync.run;
   const syncingId =
     sync.pending && sync.action?.kind === "sync"
       ? sync.action.data.feedbackId
@@ -408,30 +409,35 @@ function AdminFeedbackContent({
    * @param nextStatus - Archive status.
    * @param nextSearch - Current search draft.
    * @param refreshTargets - Whether to refresh eligible merge targets. */
-  function load(
-    nextOffset: number,
-    nextSort = sort,
-    nextStatus = status,
-    nextSearch = search,
-    refreshTargets = false,
-  ) {
-    dispatch({
-      type: "requested",
-      offset: nextOffset,
-      sort: nextSort,
-      status: nextStatus,
-      search: nextSearch,
-      targets: refreshTargets,
-    });
-  }
-
+  const load = useCallback(
+    (
+      nextOffset: number,
+      nextSort = sort,
+      nextStatus = status,
+      nextSearch = search,
+      refreshTargets = false,
+    ) => {
+      dispatch({
+        type: "requested",
+        offset: nextOffset,
+        sort: nextSort,
+        status: nextStatus,
+        search: nextSearch,
+        targets: refreshTargets,
+      });
+    },
+    [dispatch, sort, status, search],
+  );
   /** Opens a selected feedback item and remembers its return-focus control.
    * @param item - Selected feedback.
    * @param opener - Opening control. */
-  function open(item: Item, opener: HTMLElement) {
-    openerRef.current = opener;
-    dispatch({ type: "opened", item });
-  }
+  const open = useCallback(
+    (item: Item, opener: HTMLElement) => {
+      openerRef.current = opener;
+      dispatch({ type: "opened", item });
+    },
+    [dispatch],
+  );
   /** Dismisses the controlled dialog and restores focus. */
   function close() {
     dispatch({ type: "dismissed" });
@@ -443,28 +449,29 @@ function AdminFeedbackContent({
    *
    * @param field - Field whose sorting changes.
    */
-  function changeSort(field: SortField) {
-    const current = sort.find(
-      ({ field: sortedField }) => sortedField === field,
-    );
-    const next: Sort[] = current
-      ? current.direction === "asc"
-        ? sort.map((entry) =>
-            entry.field === field
-              ? { ...entry, direction: "desc" as const }
-              : entry,
-          )
-        : sort.filter(({ field: sortedField }) => sortedField !== field)
-      : [
-          ...(scope === "pending" ? [] : sort.slice(-1)),
-          { direction: "asc" as const, field },
-        ];
-    void load(0, next);
-  }
+  const changeSort = useCallback(
+    (field: SortField) => {
+      const current = sort.find(
+        ({ field: sortedField }) => sortedField === field,
+      );
+      const next: Sort[] = current
+        ? current.direction === "asc"
+          ? sort.map((entry) =>
+              entry.field === field
+                ? { ...entry, direction: "desc" as const }
+                : entry,
+            )
+          : sort.filter(({ field: sortedField }) => sortedField !== field)
+        : [
+            ...(scope === "pending" ? [] : sort.slice(-1)),
+            { direction: "asc" as const, field },
+          ];
+      void load(0, next);
+    },
+    [sort, scope, load],
+  );
 
-  /** Builds table columns from the current committed filters and action eligibility.
-   * @returns Current feedback table columns. */
-  function columnsForView() {
+  const columns = useMemo(() => {
     const title = columnHelper.accessor("title", {
       /**
        * Renders the feedback title cell.
@@ -614,7 +621,10 @@ function AdminFeedbackContent({
           <Button
             disabled={syncingId === row.original.id}
             onClick={() =>
-              sync.run({ kind: "sync", data: { feedbackId: row.original.id } })
+              requestSync({
+                kind: "sync",
+                data: { feedbackId: row.original.id },
+              })
             }
             size="sm"
             type="button"
@@ -693,9 +703,9 @@ function AdminFeedbackContent({
       }),
       syncColumn,
     ]);
-  }
+  }, [locale, scope, sort, syncingId, t, changeSort, open, requestSync]);
   const table = useTable({
-    columns: columnsForView(),
+    columns,
     data: page.items,
     features,
   });
