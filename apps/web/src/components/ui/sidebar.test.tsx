@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { Activity, act, StrictMode } from "react";
+import { Activity, act, createRef, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider, useSidebar } from "./sidebar";
@@ -75,6 +75,30 @@ describe("sidebar visibility and shortcuts", () => {
     expect(container.querySelector("output")?.textContent).toBe(
       "false:true:false",
     );
+  });
+
+  it("preserves forwarded wrapper refs alongside the shortcut subscription", async () => {
+    const ref = createRef<HTMLDivElement>();
+    await act(async () =>
+      root.render(
+        <SidebarProvider ref={ref}>
+          <Probe />
+        </SidebarProvider>,
+      ),
+    );
+    expect(ref.current).toBe(
+      container.querySelector('[data-slot="sidebar-wrapper"]'),
+    );
+    await act(async () =>
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "b", ctrlKey: true }),
+      ),
+    );
+    expect(container.querySelector("output")?.textContent).toBe(
+      "false:false:false",
+    );
+    await act(async () => root.render(null));
+    expect(ref.current).toBeNull();
   });
 
   it("reports controlled changes and excludes editable shortcut targets", async () => {

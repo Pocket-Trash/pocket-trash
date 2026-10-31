@@ -122,6 +122,7 @@ function SidebarProvider({
   className,
   style,
   children,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<"div"> & {
   /**
@@ -196,6 +197,10 @@ function SidebarProvider({
   const subscribeShortcut = React.useCallback(
     (node: HTMLDivElement | null) => {
       if (!node) return;
+      const cleanupForwardedRef =
+        typeof forwardedRef === "function" ? forwardedRef(node) : undefined;
+      if (forwardedRef && typeof forwardedRef !== "function")
+        forwardedRef.current = node;
       /**
        * Toggles the sidebar for its configured keyboard shortcut.
        *
@@ -221,9 +226,14 @@ function SidebarProvider({
       };
 
       window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        if (typeof cleanupForwardedRef === "function") cleanupForwardedRef();
+        else if (typeof forwardedRef === "function") forwardedRef(null);
+        else if (forwardedRef) forwardedRef.current = null;
+      };
     },
-    [toggleSidebar],
+    [forwardedRef, toggleSidebar],
   );
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
