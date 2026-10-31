@@ -20,11 +20,9 @@
   "dependencies": {
     "@clerk/backend": "^3.11.0",
     "@hono/zod-openapi": "^1.6.3",
-    "@package/database": "workspace:*",
     "@package/logger": "workspace:*",
     "@package/services": "workspace:*",
     "@scalar/hono-api-reference": "^0.12.2",
-    "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.13.11",
     "zod": "4.6.6"
   },
