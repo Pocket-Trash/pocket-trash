@@ -20,13 +20,23 @@ vi.mock("@clerk/tanstack-react-start", () => ({
    *
    * @returns Authenticated session state.
    */
-  useAuth: () => ({ isLoaded: true, isSignedIn: true }),
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: "locale-user" }),
 }));
 
-vi.mock("@/lib/locale-api", () => ({
-  fetchLocaleSettingsState: api.fetch,
-  updateLocaleSetting: api.update,
+vi.mock("@/lib/user-settings", () => ({
+  defaultUserSettings: {
+    currencyCode: "USD",
+    isProfilePublic: false,
+    locale: null,
+    measurementSystem: "metric",
+    publishTrends: false,
+    theme: "system",
+  },
+  getCurrentUserSettingsState: api.fetch,
+  patchCurrentUserSettings: api.update,
+  userSettingsStorageKey: "pocket-trash.settings",
 }));
+vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn() } }));
 
 vi.mock("sonner", () => ({ toast: notifications }));
 
@@ -48,7 +58,17 @@ describe("AuthenticatedLocaleSync", () => {
 
   it("keeps the anonymous locale and reports a failed promotion", async () => {
     window.localStorage.setItem(localeStorageKey, "es-MX");
-    api.fetch.mockResolvedValue({ settings: { locale: null } });
+    api.fetch.mockResolvedValue({
+      hasSavedSettings: false,
+      settings: {
+        currencyCode: "USD",
+        isProfilePublic: false,
+        locale: null,
+        measurementSystem: "metric",
+        publishTrends: false,
+        theme: "system",
+      },
+    });
     api.update.mockRejectedValue(new Error("offline"));
 
     await act(async () => {
@@ -59,7 +79,12 @@ describe("AuthenticatedLocaleSync", () => {
       );
     });
 
-    await vi.waitFor(() => expect(api.update).toHaveBeenCalledWith("es-MX"));
+    await vi.waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith({
+        data: { locale: "es-MX" },
+        signal: expect.any(AbortSignal),
+      }),
+    );
     expect(window.localStorage.getItem(localeStorageKey)).toBe("es-MX");
     expect(notifications.error).toHaveBeenCalledOnce();
   });

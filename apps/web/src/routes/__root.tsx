@@ -202,10 +202,7 @@ function RootContent() {
           ),
         }}
       />
-      <AppProviders
-        initialSettingsState={loaderData.settingsState}
-        initialUiPreferences={loaderData.uiPreferences}
-      >
+      <AppProviders initialUiPreferences={loaderData.uiPreferences}>
         <div className="flex min-h-svh flex-col bg-background text-foreground">
           <div className="flex flex-1 flex-col">
             <Outlet />
