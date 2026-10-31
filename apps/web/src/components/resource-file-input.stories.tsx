@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useForm, useStore } from "@tanstack/react-form";
+import { useMemo } from "react";
 import { expect, fn } from "storybook/test";
 import { FileDropInput, ResourceFileInput } from "./resource-file-input";
 
@@ -113,12 +114,22 @@ function FileInputExample({
    */
   initialFiles?: boolean;
 }) {
-  const [files, setFiles] = useState<File[]>(() =>
-    initialFiles
-      ? [new File(["solid"], "spinner.stl", { type: "model/stl" })]
-      : [],
+  const initialSelection = useMemo(
+    () =>
+      initialFiles
+        ? [new File(["solid"], "spinner.stl", { type: "model/stl" })]
+        : [],
+    [initialFiles],
   );
-  return <ResourceFileInput {...args} files={files} onFilesChange={setFiles} />;
+  const form = useForm({ defaultValues: { files: initialSelection } });
+  const files = useStore(form.store, (state) => state.values.files);
+  return (
+    <ResourceFileInput
+      {...args}
+      files={files}
+      onFilesChange={(files) => form.setFieldValue("files", files)}
+    />
+  );
 }
 
 /** Verifies hidden image-picker sizing and keyboard access in constrained layouts. */

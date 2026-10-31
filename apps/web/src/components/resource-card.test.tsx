@@ -100,3 +100,9 @@ describe("resource card", () => {
     expect(html).not.toContain('data-icon="user-lock"');
   });
 });
+
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /** Supplies an anonymous resource observer.
+   * @returns Account context. */
+  useAuth: () => ({ userId: null }),
+}));

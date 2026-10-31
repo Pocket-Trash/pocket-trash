@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, mocked, within } from "storybook/test";
 import { markResourcePrivate, setResourceVisibility } from "@/lib/resources";
-import { StoryProviders } from "../../.storybook/story-fixtures";
+import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
   PublicResourceSwitch,
   ResourceVisibilityToggle,
@@ -23,6 +23,7 @@ const meta = {
    * Resets successful visibility mutations before each story.
    */
   beforeEach: () => {
+    mockStoryAuth();
     mocked(markResourcePrivate).mockResolvedValue(undefined);
     mocked(setResourceVisibility).mockResolvedValue(undefined);
   },
