@@ -121,16 +121,25 @@ export const LightboxNavigation: Story = {
    * @param context.userEvent - Storybook interaction driver.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(
-      canvas.getByRole("button", {
-        name: `Images: ${firstProductImage.fileName}`,
-      }),
-    );
+    const launcher = canvas.getByRole("button", {
+      name: `Images: ${firstProductImage.fileName}`,
+    });
+    await userEvent.click(launcher);
     const dialog = within(canvasElement.ownerDocument.body).getByRole(
       "dialog",
       { name: "Images" },
     );
     await expect(dialog).toBeVisible();
+    await userEvent.keyboard("{ArrowLeft}");
+    await expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      productImages.at(-1)?.url,
+    );
+    await userEvent.keyboard("{ArrowRight}");
+    await expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      firstProductImage.url,
+    );
     await userEvent.click(
       within(dialog).getByRole("button", { name: "Next image" }),
     );
@@ -142,6 +151,7 @@ export const LightboxNavigation: Story = {
       within(dialog).getByRole("button", { name: "Close image" }),
     );
     await expect(dialog).not.toBeVisible();
+    await expect(launcher).toHaveFocus();
   },
 };
 

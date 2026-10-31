@@ -9,7 +9,7 @@ import type {
   PublicUserCollectionItem,
 } from "@package/services";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   DirectorySearch,
@@ -25,7 +25,9 @@ import {
 import { ProductCard } from "@/components/product-card";
 import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Button } from "@/components/ui/button";
+import { useViewportWidth } from "@/hooks/use-browser-layout";
 import { useDirectorySearch } from "@/hooks/use-directory-search";
+import { usePageCorrection } from "@/hooks/use-page-correction";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
 import { rankedDirectoryIds } from "@/lib/directory-search";
@@ -291,24 +293,14 @@ export function MaterialResultPage<T>({
   requestedPage,
 }: MaterialResultPageProps<T>) {
   const t = useCatalogCopy();
-  const [pageSize, setPageSize] = useState<number | null>(null);
-  useEffect(() => {
-    /**
-     * Synchronizes the page size with the active viewport tier.
-     *
-     * @returns Nothing.
-     */
-    const updatePageSize = () => setPageSize(getMaterialPageSize(innerWidth));
-    updatePageSize();
-    addEventListener("resize", updatePageSize);
-    return () => removeEventListener("resize", updatePageSize);
-  }, []);
-  const renderedPageSize = pageSize ?? 12;
+  const width = useViewportWidth();
+  const renderedPageSize = width === null ? 12 : getMaterialPageSize(width);
   const page = clampMaterialPage(requestedPage, items.length, renderedPageSize);
   const pageCount = Math.max(1, Math.ceil(items.length / renderedPageSize));
-  useEffect(() => {
-    if (pageSize !== null && page !== requestedPage) onPageChange(page);
-  }, [onPageChange, page, pageSize, requestedPage]);
+  usePageCorrection(
+    { requested: requestedPage, page, measured: width !== null },
+    onPageChange,
+  );
 
   return (
     <>

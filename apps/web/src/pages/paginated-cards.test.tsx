@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { Activity, act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PaginatedCards } from "@/components/paginated-cards";
@@ -67,5 +67,136 @@ describe("PaginatedCards", () => {
     expect(container.textContent).toContain("17");
     expect(onPageChange).not.toHaveBeenCalled();
     container.remove();
+  });
+
+  it("replaces an out-of-range URL once and does not replay it through Activity", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 400,
+    });
+    const onPageChange = vi.fn();
+    const container = document.createElement("div");
+    root = createRoot(container);
+    const items = Array.from({ length: 17 }, (_, index) => index + 1);
+    /**
+     * Renders the same pagination through Activity visibility changes.
+     * @param mode - Activity visibility.
+     * @returns StrictMode pagination fixture.
+     */
+    const tree = (mode: "visible" | "hidden") => (
+      <StrictMode>
+        <Activity mode={mode}>
+          <PaginatedCards
+            ariaLabel="Products"
+            items={items}
+            page={99}
+            widePageSize={16}
+            onPageChange={onPageChange}
+          >
+            {(page) => <div>{page.join(",")}</div>}
+          </PaginatedCards>
+        </Activity>
+      </StrictMode>
+    );
+    await act(async () => root?.render(tree("visible")));
+    expect(onPageChange).toHaveBeenCalledExactlyOnceWith(2, { replace: true });
+    await act(async () => root?.render(tree("hidden")));
+    await act(async () => root?.render(tree("visible")));
+    expect(onPageChange).toHaveBeenCalledTimes(1);
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1440,
+    });
+    await act(async () => window.dispatchEvent(new Event("resize")));
+    expect(onPageChange).toHaveBeenLastCalledWith(1, { replace: true });
+    expect(onPageChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("pushes user navigation and replaces corrections after controlled input changes", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 400,
+    });
+    const onPageChange = vi.fn();
+    const container = document.createElement("div");
+    root = createRoot(container);
+    const items = Array.from({ length: 17 }, (_, index) => index + 1);
+    await act(async () =>
+      root?.render(
+        <PaginatedCards
+          ariaLabel="Products"
+          items={items}
+          page={0}
+          widePageSize={16}
+          onPageChange={onPageChange}
+        >
+          {(page) => <div>{page.join(",")}</div>}
+        </PaginatedCards>,
+      ),
+    );
+    const next = [
+      ...container.querySelectorAll<HTMLButtonElement>("button"),
+    ].find(
+      (button) =>
+        button.getAttribute("aria-label") === "web.search.pagination.nextPage",
+    );
+    expect(next).toBeDefined();
+    await act(async () => next?.click());
+    expect(onPageChange).toHaveBeenLastCalledWith(1, { replace: false });
+    await act(async () =>
+      root?.render(
+        <PaginatedCards
+          ariaLabel="Products"
+          items={items.slice(0, 1)}
+          page={2}
+          widePageSize={16}
+          onPageChange={onPageChange}
+        >
+          {(page) => <div>{page.join(",")}</div>}
+        </PaginatedCards>,
+      ),
+    );
+    expect(onPageChange).toHaveBeenLastCalledWith(0, { replace: true });
+  });
+
+  it("retains local navigation until its item set changes", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 400,
+    });
+    const container = document.createElement("div");
+    root = createRoot(container);
+    const items = Array.from({ length: 17 }, (_, index) => index + 1);
+    await act(async () =>
+      root?.render(
+        <PaginatedCards ariaLabel="Products" items={items} widePageSize={16}>
+          {(page) => <div data-items>{page.join(",")}</div>}
+        </PaginatedCards>,
+      ),
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="web.search.pagination.nextPage"]',
+        )
+        ?.click(),
+    );
+    expect(container.querySelector("[data-items]")?.textContent).toBe(
+      "9,10,11,12,13,14,15,16",
+    );
+    await act(async () =>
+      root?.render(
+        <PaginatedCards
+          ariaLabel="Products"
+          items={[...items]}
+          widePageSize={16}
+        >
+          {(page) => <div data-items>{page.join(",")}</div>}
+        </PaginatedCards>,
+      ),
+    );
+    expect(container.querySelector("[data-items]")?.textContent).toBe(
+      "1,2,3,4,5,6,7,8",
+    );
   });
 });
