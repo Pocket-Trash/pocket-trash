@@ -1,7 +1,7 @@
 import { faSliders } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogColor } from "@package/services";
-import * as React from "react";
+import React from "react";
 import {
   type EffectEntity,
   type EffectReducer,

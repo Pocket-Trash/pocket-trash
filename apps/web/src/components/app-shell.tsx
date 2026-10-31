@@ -2,7 +2,7 @@ import { faChevronRight, faHouse } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { DEFAULT_LOCALE, formatTranslation } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import type * as React from "react";
+import type React from "react";
 import { GlobalSearch } from "@/components/global-search";
 import { LanguageSelect } from "@/components/language-select";
 import { ThemeToggle } from "@/components/theme-toggle";

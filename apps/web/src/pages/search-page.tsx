@@ -14,7 +14,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import * as React from "react";
+import React from "react";
 import { AppShell } from "@/components/app-shell";
 import { Pagination } from "@/components/pagination";
 import {

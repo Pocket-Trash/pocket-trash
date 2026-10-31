@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test eslint/index.test.mjs",
-    "test:ci": "node --test eslint/index.test.mjs"
+    "test": "node --test eslint/index.test.mjs eslint/web-state.test.mjs",
+    "test:ci": "node --test eslint/index.test.mjs eslint/web-state.test.mjs"
   },
   "exports": {
     "./biome": "./biome.json",

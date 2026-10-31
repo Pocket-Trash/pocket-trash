@@ -24,7 +24,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";
-import * as React from "react";
+import React from "react";
 import { useEffectReducer } from "use-effect-reducer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -838,14 +838,15 @@ export const MarkdownEditor = React.forwardRef<
  * @returns An empty fallback element.
  */
 function VisualLoadFailure(props: MarkdownVisualEditorProps) {
+  const { onError } = props;
   const reported = React.useRef(false);
   const report = React.useCallback(
     (node: HTMLSpanElement | null) => {
       if (!node || reported.current) return;
       reported.current = true;
-      props.onError();
+      onError();
     },
-    [props.onError],
+    [onError],
   );
   return <span hidden ref={report} />;
 }

@@ -9,7 +9,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
-import type * as React from "react";
+import type React from "react";
 import { DocumentHead } from "@/components/document-head";
 import { PageFooter } from "@/components/page-footer";
 import { markHydrated } from "@/lib/hydration-marker";

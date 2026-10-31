@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "react";
 
 /** Visual viewport measurements needed to calculate keyboard overlap. */
 type ViewportMetrics = {

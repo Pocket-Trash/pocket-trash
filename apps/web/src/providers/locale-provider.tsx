@@ -1,5 +1,5 @@
 import type { SupportedLocale } from "@pocket-trash/localizations";
-import * as React from "react";
+import React from "react";
 import type { MeasurementSystem } from "@/lib/pen-formatters";
 import type { UserSettingsState } from "@/lib/user-settings";
 import {
