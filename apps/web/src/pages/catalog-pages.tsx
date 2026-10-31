@@ -23,8 +23,10 @@ import {
   type Measurement,
 } from "@package/services/measurements";
 import type { TranslationKey } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useId, useState } from "react";
+import { useId, useRef } from "react";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -670,6 +672,7 @@ export function ProductDetailPage({
                 {t("web.action.edit")}
               </Link>
               <VisibilityButton
+                key={product.id}
                 canAdminister={product.canAdminister}
                 initialPrivate={product.isPrivate}
                 isAdminPrivate={product.isAdminPrivate}
@@ -701,6 +704,7 @@ export function ProductDetailPage({
       <main className="mx-auto grid max-w-5xl gap-6 p-6">
         {product.canAdminister ? (
           <CatalogApprovalControls
+            key={product.id}
             initialStatus={product.approvalStatus}
             onDecide={async ({ action, reason }) => {
               const result = await decideCatalogProductApproval({
@@ -1534,6 +1538,7 @@ export function CollectionPage({
             {t("web.action.edit")}
           </Link>
           <VisibilityButton
+            key={collection.id}
             canAdminister={Boolean(collection.canAdminister)}
             initialPrivate={collection.isPrivate}
             isAdminPrivate={collection.isAdminPrivate}
@@ -1842,6 +1847,49 @@ export function ProductGrid({
   );
 }
 
+/** Approval decision state and active save. */
+type ApprovalState = {
+  /** Current durable decision. */
+  status: CatalogApprovalStatus;
+  /** Last approval status supplied by the caller. */
+  supplied: CatalogApprovalStatus;
+  /** Whether the latest save failed. */
+  error: boolean;
+  /** Pending decision effect. */
+  request: EffectEntity<ApprovalState, ApprovalEvent> | undefined;
+};
+/** Approval commands, external status updates, and terminal responses. */
+type ApprovalEvent =
+  | {
+      /** Requests an approval decision. */
+      type: "requested";
+      /** Selected administrative action. */
+      action: CatalogApprovalAction;
+      /** Nonblank moderation reason. */
+      reason: string;
+    }
+  | {
+      /** Applies new caller-owned status and replaces stale work. */
+      type: "statusReceived";
+      /** Latest durable status. */
+      status: CatalogApprovalStatus;
+    }
+  | {
+      /** Completes one administrative decision. */
+      type: "finished";
+      /** Durable status on success. */
+      status?: CatalogApprovalStatus;
+    };
+/** Captured approval request. */
+type ApprovalEffect = {
+  /** Decision implementation. */
+  type: "decide";
+  /** Administrative transition. */
+  action: CatalogApprovalAction;
+  /** Validated moderation reason. */
+  reason: string;
+};
+
 /**
  * Renders shared administrative product and collection-item approval controls.
  *
@@ -1873,30 +1921,92 @@ export function CatalogApprovalControls({
 }) {
   const t = useCatalogCopy();
   const reasonId = useId();
-  const [error, setError] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [reason, setReason] = useState("");
-  const [status, setStatus] = useState(initialStatus);
-
+  const form = useForm({ defaultValues: { reason: "" } });
+  const reason = useStore(form.store, (state) => state.values.reason);
+  const task = useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: ApprovalEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CatalogApprovalStatus>;
+  } | null>(null);
+  const [approval, dispatch] = useEffectReducer<
+    ApprovalState,
+    ApprovalEvent,
+    ApprovalEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested") {
+        if (state.request) return state;
+        return {
+          ...state,
+          error: false,
+          request: exec({
+            type: "decide",
+            action: event.action,
+            reason: event.reason,
+          }),
+        };
+      }
+      exec.stop(state.request);
+      if (event.type === "statusReceived")
+        return {
+          status: event.status,
+          supplied: event.status,
+          error: false,
+          request: undefined,
+        };
+      return {
+        ...state,
+        status: event.status ?? state.status,
+        error: event.status === undefined,
+        request: undefined,
+      };
+    },
+    {
+      status: initialStatus,
+      supplied: initialStatus,
+      error: false,
+      request: undefined,
+    },
+    {
+      /**
+       * Persists one approval action without replaying it on lifecycle resumption.
+       * @param _state - State that queued the action.
+       * @param effect - Captured decision and reason.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      decide: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: onDecide({ action: effect.action, reason: effect.reason }),
+          };
+        void task.current.promise.then(
+          (status) => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished", status });
+            form.reset();
+          },
+          () => {
+            if (!signal.aborted) dispatch({ type: "finished" });
+          },
+        );
+      },
+    },
+  );
+  if (approval.supplied !== initialStatus)
+    dispatch({ type: "statusReceived", status: initialStatus });
+  const { status, error } = approval;
+  const pending = Boolean(approval.request);
   /**
-   * Submits one approval action using the current reason.
-   *
+   * Validates the required reason and queues an administrative transition.
    * @param action - Requested approval transition.
-   * @returns Completion after the UI state settles.
    */
-  const decide = async (action: CatalogApprovalAction) => {
-    const normalizedReason = reason.trim();
+  const decide = (action: CatalogApprovalAction) => {
+    const normalizedReason = form.state.values.reason.trim();
     if (!normalizedReason || pending) return;
-    setError(false);
-    setPending(true);
-    try {
-      setStatus(await onDecide({ action, reason: normalizedReason }));
-      setReason("");
-    } catch {
-      setError(true);
-    } finally {
-      setPending(false);
-    }
+    dispatch({ type: "requested", action, reason: normalizedReason });
   };
 
   return (
@@ -1917,7 +2027,7 @@ export function CatalogApprovalControls({
         disabled={pending}
         id={reasonId}
         maxLength={1000}
-        onChange={(event) => setReason(event.target.value)}
+        onChange={(event) => form.setFieldValue("reason", event.target.value)}
         placeholder={t("web.catalog.approval.reasonPlaceholder")}
         required
         value={reason}
@@ -2068,6 +2178,7 @@ export function CollectionItemDetailPage({
               {t("web.action.edit")}
             </Link>
             <VisibilityButton
+              key={item.collectionItemId}
               canAdminister={item.canAdminister}
               disabled={item.collectionIsPrivate}
               initialPrivate={item.isPrivate}
@@ -2102,6 +2213,7 @@ export function CollectionItemDetailPage({
       <main className="mx-auto grid w-full max-w-5xl gap-6 p-6">
         {item.canAdminister ? (
           <CatalogApprovalControls
+            key={item.collectionItemId}
             initialStatus={item.approvalStatus}
             target="collectionItem"
             onDecide={async ({ action, reason }) => {
@@ -2332,6 +2444,53 @@ export function CollectionItemDetailPage({
   );
 }
 
+/** Shared catalog privacy state and active mutation. */
+type CatalogVisibilityState = {
+  /** Current durable privacy. */
+  isPrivate: boolean;
+  /** Last privacy supplied by the caller. */
+  supplied: boolean;
+  /** Localized mutation failure. */
+  error: string | null;
+  /** Pending visibility effect. */
+  request:
+    | EffectEntity<CatalogVisibilityState, CatalogVisibilityEvent>
+    | undefined;
+};
+/** Visibility commands, caller updates, and terminal feedback. */
+type CatalogVisibilityEvent =
+  | {
+      /** Requests a durable privacy change. */
+      type: "requested";
+      /** Requested privacy. */
+      isPrivate: boolean;
+      /** Optional staff moderation reason. */
+      reason?: string;
+    }
+  | {
+      /** Reconciles privacy supplied by route data. */
+      type: "privacyReceived";
+      /** Latest durable privacy. */
+      isPrivate: boolean;
+    }
+  | {
+      /** Settles one visibility mutation. */
+      type: "finished";
+      /** Requested privacy, applied only on success. */
+      isPrivate: boolean;
+      /** Localized failure feedback. */
+      error: string | null;
+    };
+/** Committed shared catalog visibility request. */
+type CatalogVisibilityEffect = {
+  /** Visibility implementation. */
+  type: "persist";
+  /** Requested durable privacy. */
+  isPrivate: boolean;
+  /** Optional moderation reason. */
+  reason?: string;
+};
+
 /**
  * Renders owner or administrator visibility controls.
  *
@@ -2383,10 +2542,100 @@ function VisibilityButton({
   /** Catalog translation formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
-  const [isPrivate, setIsPrivate] = useState(initialPrivate);
-  const [error, setError] = useState<string | null>(null);
+  const task = useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CatalogVisibilityEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<unknown>;
+  } | null>(null);
+  const [visibility, dispatch] = useEffectReducer<
+    CatalogVisibilityState,
+    CatalogVisibilityEvent,
+    CatalogVisibilityEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested") {
+        if (state.request) return state;
+        return {
+          ...state,
+          error: null,
+          request: exec({
+            type: "persist",
+            isPrivate: event.isPrivate,
+            reason: event.reason,
+          }),
+        };
+      }
+      exec.stop(state.request);
+      if (event.type === "privacyReceived")
+        return {
+          isPrivate: event.isPrivate,
+          supplied: event.isPrivate,
+          error: null,
+          request: undefined,
+        };
+      return {
+        ...state,
+        isPrivate: event.error ? state.isPrivate : event.isPrivate,
+        error: event.error,
+        request: undefined,
+      };
+    },
+    {
+      isPrivate: initialPrivate,
+      supplied: initialPrivate,
+      error: null,
+      request: undefined,
+    },
+    {
+      /**
+       * Persists privacy once and ignores feedback from a replaced observer.
+       * @param _state - State that requested persistence.
+       * @param effect - Requested privacy and moderation reason.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      persist: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: onChange(effect.isPrivate, effect.reason),
+          };
+        void task.current.promise.then(
+          (result) => {
+            if (signal.aborted) return;
+            const error = isMutationFailure(result)
+              ? [
+                  t(result.formError),
+                  result.formErrorDetail
+                    ? t(result.formErrorDetail, result.formErrorValues)
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : null;
+            dispatch({ type: "finished", isPrivate: effect.isPrivate, error });
+          },
+          () => {
+            if (!signal.aborted)
+              dispatch({
+                type: "finished",
+                isPrivate: effect.isPrivate,
+                error: t("error.generic"),
+              });
+          },
+        );
+      },
+    },
+  );
+  if (visibility.supplied !== initialPrivate)
+    dispatch({ type: "privacyReceived", isPrivate: initialPrivate });
+  const { isPrivate, error } = visibility;
   const actorIsModerating = canAdminister && !isOwner;
-  const locked = disabled || (isAdminPrivate && !actorIsModerating);
+  const locked =
+    disabled ||
+    Boolean(visibility.request) ||
+    (isAdminPrivate && !actorIsModerating);
 
   if (privacyInherited) {
     return (
@@ -2442,25 +2691,9 @@ function VisibilityButton({
         <PublicResourceSwitch
           checked={!isPrivate}
           disabled={locked}
-          onCheckedChange={(isPublic) => {
-            setError(null);
-            void onChange(!isPublic).then((result) => {
-              if (isMutationFailure(result)) {
-                setError(
-                  [
-                    t(result.formError),
-                    result.formErrorDetail
-                      ? t(result.formErrorDetail, result.formErrorValues)
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" "),
-                );
-                return;
-              }
-              setIsPrivate(!isPublic);
-            });
-          }}
+          onCheckedChange={(isPublic) =>
+            dispatch({ type: "requested", isPrivate: !isPublic })
+          }
         />
         {error ? (
           <span
@@ -2480,28 +2713,12 @@ function VisibilityButton({
         aria-pressed={!isPrivate}
         className={buttonVariants({ variant: "outline" })}
         disabled={locked}
-        onClick={async () => {
-          const nextPrivate = !isPrivate;
+        onClick={() => {
           const reason = actorIsModerating
             ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
             : undefined;
           if (actorIsModerating && !reason) return;
-          setError(null);
-          const result = await onChange(nextPrivate, reason);
-          if (isMutationFailure(result)) {
-            setError(
-              [
-                t(result.formError),
-                result.formErrorDetail
-                  ? t(result.formErrorDetail, result.formErrorValues)
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" "),
-            );
-            return;
-          }
-          setIsPrivate(nextPrivate);
+          dispatch({ type: "requested", isPrivate: !isPrivate, reason });
         }}
         title={
           disabled
