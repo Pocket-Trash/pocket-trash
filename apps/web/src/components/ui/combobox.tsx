@@ -5,7 +5,7 @@ import {
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import * as React from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 
 /** Explicit catalog-popup disclosure and completed selection intent. */

@@ -31,7 +31,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.{jsx,tsx}"],
+    files: ["**/*.{jsx,tsx}", "apps/web/**/*.{js,mjs,cjs,ts,mts,cts}"],
     plugins: {
       "react-hooks": reactHooks,
     },

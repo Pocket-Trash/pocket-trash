@@ -9,7 +9,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
-import type * as React from "react";
+import type React from "react";
 import { DocumentHead } from "@/components/document-head";
 import { PageFooter } from "@/components/page-footer";
 import { markHydrated } from "@/lib/hydration-marker";
@@ -202,10 +202,7 @@ function RootContent() {
           ),
         }}
       />
-      <AppProviders
-        initialSettingsState={loaderData.settingsState}
-        initialUiPreferences={loaderData.uiPreferences}
-      >
+      <AppProviders initialUiPreferences={loaderData.uiPreferences}>
         <div className="flex min-h-svh flex-col bg-background text-foreground">
           <div className="flex flex-1 flex-col">
             <Outlet />

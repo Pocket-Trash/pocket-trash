@@ -52,7 +52,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserPageShell } from "@/components/user-page-shell";
-import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { cardImageUrl } from "@/lib/card-image";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
@@ -79,7 +78,10 @@ import {
   catalogTypeDisplayLabel,
   matchCatalogSearch,
 } from "@/lib/catalog-search";
-import { rankedDirectoryIds } from "@/lib/directory-search";
+import {
+  type DirectorySearchState,
+  rankedDirectoryIds,
+} from "@/lib/directory-search";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -343,6 +345,7 @@ export function ResourcesPage() {
  * @returns The product index page.
  */
 export function ProductsPage({
+  directorySearch = { items: [], status: "idle" },
   aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
@@ -351,6 +354,8 @@ export function ProductsPage({
   searchQuery = filters.query,
   view = "products",
 }: {
+  /** Ranked public matches and feedback supplied by the route loader. */
+  directorySearch?: DirectorySearchState;
   /** Registered terminology aliases available to search and display. */
   aliases?: CatalogTerminologyAlias[];
   /** Active catalog filters. */
@@ -368,7 +373,6 @@ export function ProductsPage({
 }) {
   const t = useCatalogCopy();
   const { locale } = useLocale();
-  const directorySearch = useDirectorySearch(searchQuery, "products");
   const addProduct = onFiltersChange ? (
     <Link className={buttonVariants({ size: "sm" })} to="/products/add">
       {t("web.action.addProduct")}
@@ -1063,11 +1067,14 @@ export function ProductDetailPage({
  * @returns The public collection directory.
  */
 export function PublicCollectionsPage({
+  directorySearch = { items: [], status: "idle" },
   filters = emptyCatalogFilters(),
   onFiltersChange,
   owners,
   searchQuery = filters.query,
 }: {
+  /** Ranked public matches and feedback supplied by the route loader. */
+  directorySearch?: DirectorySearchState;
   /** Registered terminology aliases available to search. */
   aliases?: CatalogTerminologyAlias[];
   /** Active catalog filters. */
@@ -1080,7 +1087,6 @@ export function PublicCollectionsPage({
   searchQuery?: string;
 }) {
   const t = useCatalogCopy();
-  const directorySearch = useDirectorySearch(searchQuery, "collections");
   const publicItems = owners.flatMap(({ items }) =>
     items.filter(
       ({ approvalStatus, collectionIsPrivate, isPrivate }) =>
@@ -1420,6 +1426,7 @@ export function UserCollectionsPage({
  * @returns The collection page.
  */
 export function CollectionPage({
+  directorySearch = { items: [], status: "idle" },
   aliases = [],
   collection,
   filters = emptyCatalogFilters(),
@@ -1431,6 +1438,8 @@ export function CollectionPage({
   publicSearchQuery = filters.query,
   userArea = false,
 }: {
+  /** Ranked public matches and feedback supplied by the route loader. */
+  directorySearch?: DirectorySearchState;
   /** Registered terminology aliases available to search and display. */
   aliases?: CatalogTerminologyAlias[];
   /** Collection to display. */
@@ -1453,10 +1462,6 @@ export function CollectionPage({
   userArea?: boolean;
 }) {
   const t = useCatalogCopy();
-  const directorySearch = useDirectorySearch(
-    userArea ? "" : publicSearchQuery,
-    "collections",
-  );
   const rankedPublicItemIds = directorySearch.items.flatMap((result) =>
     result.kind === "collection_item" && result.parentId === collection.id
       ? [result.id]

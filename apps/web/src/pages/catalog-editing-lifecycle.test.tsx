@@ -129,14 +129,15 @@ function ReadyMarkdownEditor(props: {
      */
     isLoading: () => false,
   }));
+  const { onLoadingChange } = props;
   const bind = useCallback(
     (node: HTMLSpanElement | null) => {
       if (node && !reported.current) {
         reported.current = true;
-        props.onLoadingChange?.(false);
+        onLoadingChange?.(false);
       }
     },
-    [props.onLoadingChange],
+    [onLoadingChange],
   );
   return <span ref={bind} />;
 }

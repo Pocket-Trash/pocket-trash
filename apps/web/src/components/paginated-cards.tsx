@@ -1,5 +1,7 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useReducer } from "react";
 import { Pagination } from "@/components/pagination";
+import { useViewportWidth } from "@/hooks/use-browser-layout";
+import { usePageCorrection } from "@/hooks/use-page-correction";
 
 /**
  * Properties shared by paginated catalog card lists.
@@ -69,38 +71,49 @@ export function PaginatedCards<T>({
   page: controlledPage,
   widePageSize,
 }: PaginatedCardsProps<T>) {
-  const [pageSize, setPageSize] = useState(12);
-  const [viewportMeasured, setViewportMeasured] = useState(false);
-  const [renderedItems, setRenderedItems] = useState(items);
-  const [requestedPage, setRequestedPage] = useState(0);
-  useEffect(() => {
-    /** Synchronizes the page size with the current catalog grid width. */
-    const updatePageSize = () => {
-      setPageSize(getCatalogPageSize(window.innerWidth, widePageSize));
-      setViewportMeasured(true);
-    };
-    updatePageSize();
-    window.addEventListener("resize", updatePageSize);
-    return () => window.removeEventListener("resize", updatePageSize);
-  }, [widePageSize]);
-  if (renderedItems !== items) {
-    setRenderedItems(items);
-    if (controlledPage === undefined) setRequestedPage(0);
-  }
+  const width = useViewportWidth();
+  const pageSize =
+    width === null ? 12 : getCatalogPageSize(width, widePageSize);
+  const [state, dispatch] = useReducer(
+    (
+      state: {
+        /** Ordered input records, used to reset local pagination. */
+        items: T[];
+        /** User-requested zero-based page. */
+        requestedPage: number;
+      },
+      event:
+        | {
+            /** Input records changed. */
+            type: "itemsChanged";
+            /** Replacement records. */
+            items: T[];
+          }
+        | {
+            /** User selected a page. */
+            type: "pageRequested";
+            /** Requested zero-based page. */
+            page: number;
+          },
+    ) =>
+      event.type === "itemsChanged"
+        ? { items: event.items, requestedPage: 0 }
+        : { ...state, requestedPage: event.page },
+    { items, requestedPage: 0 },
+  );
+  if (state.items !== items) dispatch({ type: "itemsChanged", items });
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const page = Math.max(
     0,
-    Math.min(controlledPage ?? requestedPage, pageCount - 1),
+    Math.min(
+      controlledPage ?? (state.items === items ? state.requestedPage : 0),
+      pageCount - 1,
+    ),
   );
-  useEffect(() => {
-    if (
-      viewportMeasured &&
-      controlledPage !== undefined &&
-      controlledPage !== page
-    ) {
-      onPageChange?.(page, { replace: true });
-    }
-  }, [controlledPage, onPageChange, page, viewportMeasured]);
+  usePageCorrection(
+    { requested: controlledPage ?? page, page, measured: width !== null },
+    (corrected) => onPageChange?.(corrected, { replace: true }),
+  );
   /**
    * Applies a user-requested page to controlled or local state.
    *
@@ -110,7 +123,7 @@ export function PaginatedCards<T>({
     if (onPageChange) {
       onPageChange(nextPage, { replace: false });
     } else {
-      setRequestedPage(nextPage);
+      dispatch({ type: "pageRequested", page: nextPage });
     }
   };
 
