@@ -209,6 +209,106 @@ export const listFeedbackNotifications = createServerFn({
   return await s.db.feedback.listNotifications();
 });
 
+/** Loads listActive data with the account authorizing this exact request.
+ * @returns Account-bound canonical feedback data.
+ * @rejects When authorization or feedback lookup fails. */
+export const loadActiveFeedbackSnapshot = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const actor = await requireResourceUploader();
+  const { s } = await import("@/lib/services");
+  return {
+    actorId: actor.clerkId,
+    initialItems: await s.db.feedback.listActive(actor.clerkId, ""),
+  };
+});
+
+/** Loads listCompleted data with the account authorizing this exact request.
+ * @returns Account-bound canonical feedback data.
+ * @rejects When authorization or feedback lookup fails. */
+export const loadCompletedFeedbackSnapshot = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const actor = await requireResourceUploader();
+  const { s } = await import("@/lib/services");
+  return {
+    actorId: actor.clerkId,
+    initialItems: await s.db.feedback.listCompleted(actor.clerkId, ""),
+  };
+});
+
+/** Loads listMine data with the account authorizing this exact request.
+ * @returns Account-bound canonical feedback data.
+ * @rejects When authorization or feedback lookup fails. */
+export const loadMyFeedbackSnapshot = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return {
+      actorId: actor.clerkId,
+      initialPage: await s.db.feedback.listMine(actor.clerkId, {
+        offset: 0,
+        search: "",
+      }),
+    };
+  },
+);
+
+/** Loads listNotifications data with the account authorizing this exact request.
+ * @returns Account-bound canonical feedback data.
+ * @rejects When authorization or feedback lookup fails. */
+export const loadFeedbackNotificationsSnapshot = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const actor = await requireFeedbackAdmin();
+  const { s } = await import("@/lib/services");
+  return {
+    actorId: actor.clerkId,
+    initialNotifications: await s.db.feedback.listNotifications(),
+  };
+});
+
+/** Loads administrator feedback and its associated choices under one authorized account.
+ * @returns Account-bound canonical feedback and filter choices.
+ * @rejects When validation, authorization, or feedback lookup fails. */
+export const loadAdminFeedbackSnapshot = createServerFn({ method: "GET" })
+  .validator((scope: unknown) => {
+    if (
+      scope !== "pending" &&
+      scope !== "planned" &&
+      scope !== "allActive" &&
+      scope !== "archive"
+    )
+      throw invalidFeedbackRequest();
+    return scope;
+  })
+  .handler(async ({ data: scope }) => {
+    const actor = await requireFeedbackAdmin();
+    const { s } = await import("@/lib/services");
+    const { adminFeedbackArchiveStatuses } = await import("@package/services");
+    const [initialPage, mergeTargets] = await Promise.all([
+      scope === "pending"
+        ? s.db.feedback.listPending({ offset: 0 })
+        : scope === "planned"
+          ? s.db.feedback.listAdminActive({
+              offset: 0,
+              statuses: ["requested", "planned", "in_progress"],
+            })
+          : scope === "allActive"
+            ? s.db.feedback.listAdminActive({ offset: 0 })
+            : s.db.feedback.listArchive({ offset: 0, statuses: [] }),
+      scope === "pending"
+        ? s.db.feedback.listMergeTargets()
+        : Promise.resolve([]),
+    ]);
+    return {
+      actorId: actor.clerkId,
+      initialPage,
+      mergeTargets,
+      archiveStatuses: scope === "archive" ? adminFeedbackArchiveStatuses : [],
+    };
+  });
+
 /** Marks one feedback notification read for the current administrator.
  *
  * @rejects When validation, authorization, or persistence fails.

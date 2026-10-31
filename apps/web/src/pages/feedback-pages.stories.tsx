@@ -1,10 +1,13 @@
+import { formatTranslation } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, within } from "storybook/test";
+import { expect, mocked, within } from "storybook/test";
+import { findDuplicateFeedback } from "@/lib/feedback";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
   CompletedFeedbackPage,
   FeedbackBoardPage,
   MyFeedbackPage,
+  SubmitFeedbackPage,
 } from "./feedback-pages";
 
 /** Requested feedback fixture used by page stories. */
@@ -180,5 +183,45 @@ export const Completed: Story = {
     await expect(canvas.getByText("Saved searches")).toBeVisible();
     await expect(canvas.queryByText("Upvote")).not.toBeInTheDocument();
     await expect(canvas.queryByText("Remove vote")).not.toBeInTheDocument();
+  },
+};
+
+/** Duplicate-aware submission keeps the draft available for explicit confirmation. */
+export const SubmissionDuplicates: Story = {
+  /** Configures a deterministic duplicate suggestion. */
+  beforeEach: () => {
+    mocked(findDuplicateFeedback).mockResolvedValue([requested]);
+  },
+  /** Renders the existing feedback submission flow.
+   * @returns Duplicate-aware submission form. */
+  render: () => <SubmitFeedbackPage />,
+  /** Checks draft retention and accessible duplicate suggestions.
+   * @param context - Story interaction context. */
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByLabelText("Title"), "Saved searches");
+    await userEvent.type(
+      canvas.getByLabelText("Description"),
+      "Keep useful searches.",
+    );
+    await userEvent.selectOptions(
+      canvas.getByLabelText(
+        formatTranslation("web.feedback.new.categoryLabel"),
+      ),
+      "feature",
+    );
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: formatTranslation("web.feedback.new.submit"),
+      }),
+    );
+    await expect(
+      await canvas.findByRole("heading", { name: "Saved searches" }),
+    ).toBeVisible();
+    await expect(canvas.getByLabelText("Title")).toHaveValue("Saved searches");
+    await expect(
+      canvas.getByRole("button", {
+        name: formatTranslation("web.feedback.duplicates.submitAnyway"),
+      }),
+    ).toBeEnabled();
   },
 };

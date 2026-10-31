@@ -1,10 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import {
-  canManageFeedback,
-  listArchivedFeedback,
-  listFeedbackArchiveStatuses,
-} from "@/lib/feedback";
+import { canManageFeedback, loadAdminFeedbackSnapshot } from "@/lib/feedback";
 import { AdminFeedbackArchivePage } from "@/pages/admin-feedback-pages";
 
 /**
@@ -22,16 +18,15 @@ export const Route = createFileRoute("/admin/feedback/archive")({
   /**
    * Loads archived feedback and its available archive states.
    *
+   * @param input - Router loader cancellation context.
    * @returns The first archived-feedback page and available archive states.
    * @rejects When archived feedback or archive states cannot be loaded.
    */
-  loader: async () => {
-    const [initialPage, archiveStatuses] = await Promise.all([
-      listArchivedFeedback({ data: { offset: 0, statuses: [] } }),
-      listFeedbackArchiveStatuses(),
-    ]);
-    return { archiveStatuses, initialPage };
-  },
+  loader: async ({ abortController }) =>
+    await loadAdminFeedbackSnapshot({
+      data: "archive",
+      signal: abortController.signal,
+    }),
   component: AdminFeedbackArchiveRoute,
   /**
    * Builds document metadata for the admin feedback archive route.

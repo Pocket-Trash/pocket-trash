@@ -1,6 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { canManageFeedback, listAdminAllActiveFeedback } from "@/lib/feedback";
+import { canManageFeedback, loadAdminFeedbackSnapshot } from "@/lib/feedback";
 import { AdminAllActiveFeedbackPage } from "@/pages/admin-feedback-pages";
 
 /**
@@ -31,10 +31,15 @@ export const Route = createFileRoute("/admin/feedback/")({
   /**
    * Loads the first page of active feedback for administrators.
    *
+   * @param input - Router loader cancellation context.
    * @returns The first page of active feedback.
    * @rejects When active feedback cannot be loaded.
    */
-  loader: async () => await listAdminAllActiveFeedback({ data: { offset: 0 } }),
+  loader: async ({ abortController }) =>
+    await loadAdminFeedbackSnapshot({
+      data: "allActive",
+      signal: abortController.signal,
+    }),
 });
 
 /**
@@ -43,5 +48,5 @@ export const Route = createFileRoute("/admin/feedback/")({
  * @returns The rendered route UI.
  */
 function AdminAllActiveFeedbackRoute() {
-  return <AdminAllActiveFeedbackPage initialPage={Route.useLoaderData()} />;
+  return <AdminAllActiveFeedbackPage {...Route.useLoaderData()} />;
 }
