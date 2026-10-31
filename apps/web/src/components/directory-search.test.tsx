@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { Activity, act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,7 +34,7 @@ describe("DirectorySearch", () => {
     vi.useRealTimers();
   });
 
-  it("debounces URL updates and guides one-character queries", () => {
+  it("debounces URL updates and guides one-character queries", async () => {
     const onQueryChange = vi.fn();
     act(() =>
       root.render(
@@ -55,9 +55,13 @@ describe("DirectorySearch", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(container.textContent).toContain("web.search.minimumLength");
-    act(() => vi.advanceTimersByTime(299));
+    await act(async () => {
+      vi.advanceTimersByTime(299);
+    });
     expect(onQueryChange).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(1));
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
     expect(onQueryChange).toHaveBeenCalledWith("m");
 
     act(() =>
@@ -70,5 +74,109 @@ describe("DirectorySearch", () => {
       ),
     );
     expect(input.value).toBe("restored");
+  });
+
+  it("retains newer edits through URL acknowledgement and cancels them for external history", async () => {
+    const commit = vi.fn();
+    /**
+     * Renders the public input through query and Activity changes.
+     * @param query - Current route query.
+     * @param mode - Activity visibility.
+     * @returns Lifecycle-wrapped directory input.
+     */
+    const tree = (query: string, mode: "visible" | "hidden" = "visible") => (
+      <StrictMode>
+        <Activity mode={mode}>
+          <DirectorySearch
+            query={query}
+            onQueryChange={commit}
+            placeholderKey="web.search.directory.makersPlaceholder"
+          />
+        </Activity>
+      </StrictMode>
+    );
+    act(() => root.render(tree("")));
+    const input = container.querySelector("input");
+    if (!input) throw new Error("Missing directory input.");
+    input.focus();
+    /**
+     * Edits the existing input through its public DOM event.
+     * @param value - Next draft text.
+     */
+    const edit = (value: string) => {
+      act(() => {
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set?.call(input, value);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    edit("bolt");
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(commit).toHaveBeenLastCalledWith("bolt");
+    edit("bolt pen");
+    act(() => root.render(tree("bolt")));
+    expect(input.value).toBe("bolt pen");
+    expect(container.querySelector("input")).toBe(input);
+    expect(document.activeElement).toBe(input);
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(commit).toHaveBeenLastCalledWith("bolt pen");
+    act(() => root.render(tree("bolt pen", "hidden")));
+    act(() => root.render(tree("bolt pen")));
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(commit).toHaveBeenCalledTimes(2);
+    edit("stale");
+    act(() => root.render(tree("restored")));
+    expect(input.value).toBe("restored");
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(commit).toHaveBeenCalledTimes(2);
+  });
+
+  it("delivers through the current committed callback without restarting its debounce", async () => {
+    const previous = vi.fn();
+    const current = vi.fn();
+    act(() =>
+      root.render(
+        <DirectorySearch
+          query=""
+          onQueryChange={previous}
+          placeholderKey="web.search.directory.makersPlaceholder"
+        />,
+      ),
+    );
+    const input = container.querySelector("input");
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(input, "maker");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+    act(() =>
+      root.render(
+        <DirectorySearch
+          query=""
+          onQueryChange={current}
+          placeholderKey="web.search.directory.makersPlaceholder"
+        />,
+      ),
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(previous).not.toHaveBeenCalled();
+    expect(current).toHaveBeenCalledExactlyOnceWith("maker");
   });
 });

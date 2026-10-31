@@ -1,7 +1,6 @@
 import type { SearchResponse } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, fn, mocked, waitFor } from "storybook/test";
-import { searchPublic } from "@/lib/search";
+import { expect, fn, waitFor } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { SearchPage } from "./search-page";
 
@@ -44,14 +43,11 @@ const response: SearchResponse = {
 /** Configures public search page stories. */
 const meta = {
   args: {
+    data: { status: "ready", response },
     onNavigate: fn(),
     search: { q: "bolt" },
   },
-  /** Configures the public search response. */
-  beforeEach: () => {
-    mockStoryAuth();
-    mocked(searchPublic).mockResolvedValue(response);
-  },
+  beforeEach: mockStoryAuth,
   component: SearchPage,
   decorators: [
     (Story) => (

@@ -55,7 +55,11 @@ vi.mock("@/components/app-shell", () => ({
   ),
 }));
 
-import { SearchPage, type SearchPageSearch } from "./search-page";
+import {
+  SearchPage,
+  type SearchPageData,
+  type SearchPageSearch,
+} from "./search-page";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -121,10 +125,18 @@ describe("SearchPage", () => {
    * Renders a normalized search state.
    *
    * @param search - URL-backed search state.
+   * @param data - Result and feedback supplied by the route loader.
    */
-  function render(search: SearchPageSearch) {
+  function render(
+    search: SearchPageSearch,
+    data: SearchPageData = (search.q?.length ?? 0) >= 2
+      ? { status: "ready", response }
+      : { status: "idle" },
+  ) {
     act(() =>
-      root.render(<SearchPage onNavigate={onNavigate} search={search} />),
+      root.render(
+        <SearchPage data={data} onNavigate={onNavigate} search={search} />,
+      ),
     );
   }
 
@@ -150,13 +162,10 @@ describe("SearchPage", () => {
   });
 
   it("renders counts and rows, pushes tabs, and replaces typed queries", async () => {
-    searchPublic.mockResolvedValue(response);
     render({ q: "bolt" });
     await act(async () => Promise.resolve());
 
-    expect(searchPublic).toHaveBeenCalledWith({
-      data: { group: "all", page: 1, query: "bolt", surface: "page" },
-    });
+    expect(searchPublic).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Results: 2");
     expect(
       Array.from(
@@ -219,48 +228,47 @@ describe("SearchPage", () => {
     });
     act(() => vi.advanceTimersByTime(299));
     expect(onNavigate).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(1));
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
     expect(onNavigate).toHaveBeenLastCalledWith(
       { q: "maker" },
       { replace: true },
     );
   });
 
-  it("shows loading and error states without removing the query", async () => {
-    let reject: ((error: Error) => void) | undefined;
-    searchPublic.mockImplementation(
-      () =>
-        new Promise<SearchResponse>((_resolve, rejectPromise) => {
-          reject = rejectPromise;
-        }),
+  it("shows route loading and error feedback without remounting its query input", () => {
+    render({ q: "bolt" }, { status: "loading" });
+    const input = container.querySelector(
+      'input[aria-label="Search Pocket Trash"]',
     );
-    render({ q: "bolt" });
     expect(container.querySelector('[role="status"]')).not.toBeNull();
-
-    await act(async () => reject?.(new Error("offline")));
+    render({ q: "bolt" }, { status: "error" });
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
       "couldn’t complete",
     );
     expect(
-      (
-        container.querySelector(
-          'input[aria-label="Search Pocket Trash"]',
-        ) as HTMLInputElement
-      ).value,
-    ).toBe("bolt");
+      container.querySelector('input[aria-label="Search Pocket Trash"]'),
+    ).toBe(input);
+    expect((input as HTMLInputElement).value).toBe("bolt");
+    expect(searchPublic).not.toHaveBeenCalled();
   });
 
   it("shows empty results", async () => {
-    searchPublic.mockResolvedValue({ ...response, items: [], total: 0 });
-    render({ q: "missing" });
+    render(
+      { q: "missing" },
+      { status: "ready", response: { ...response, items: [], total: 0 } },
+    );
     await act(async () => Promise.resolve());
 
     expect(container.textContent).toContain("No results match this search.");
   });
 
   it("pushes page changes while preserving the query and filter", async () => {
-    searchPublic.mockResolvedValue({ ...response, total: 11 });
-    render({ q: "bolt", type: "products" });
+    render(
+      { q: "bolt", type: "products" },
+      { status: "ready", response: { ...response, total: 11 } },
+    );
     await act(async () => Promise.resolve());
 
     act(() =>
@@ -276,14 +284,40 @@ describe("SearchPage", () => {
     );
   });
 
-  it("replaces an out-of-range page with the last page", async () => {
-    searchPublic.mockResolvedValue({ ...response, page: 100, total: 11 });
-    render({ page: 100, q: "bolt", type: "products" });
-    await act(async () => Promise.resolve());
-
-    expect(onNavigate).toHaveBeenCalledWith(
-      { page: 2, q: "bolt", type: "products" },
+  it("keeps the latest tab when a query debounce began on an earlier tab", async () => {
+    vi.useFakeTimers();
+    render({ q: "bolt", type: "products" });
+    const input = container.querySelector("input");
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(input, "maker");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+    render({ q: "bolt", type: "makers" });
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+      { q: "maker", type: "makers" },
       { replace: true },
+    );
+    expect(container.querySelector("input")).toBe(input);
+  });
+
+  it("uses the route's accepted page without issuing a client request", () => {
+    render(
+      { page: 2, q: "bolt", type: "products" },
+      { status: "ready", response: { ...response, page: 2, total: 11 } },
+    );
+    expect(searchPublic).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(
+      "2",
     );
   });
 });

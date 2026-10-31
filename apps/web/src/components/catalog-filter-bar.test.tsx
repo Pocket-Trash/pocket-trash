@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { Activity, act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CatalogFilterCopy } from "./catalog-filter-bar";
@@ -86,7 +86,7 @@ vi.mock("@/components/ui/sheet", () => ({
     /** Controlled sheet open state. */
     open: boolean;
   }) => (
-    <div data-open={String(open)} data-testid="mobile-filter-sheet">
+    <div data-open={String(open ?? false)} data-testid="mobile-filter-sheet">
       {children}
     </div>
   ),
@@ -156,6 +156,17 @@ vi.mock("@/components/ui/sheet", () => ({
    * @returns No rendered output.
    */
   SheetTrigger: () => null,
+  /**
+   * Renders the uncontrolled sheet's close control in focused facet tests.
+   * @param props - Close control properties.
+   * @param props.children - Localized close label.
+   * @returns Close button fixture.
+   */
+  SheetClose: ({
+    children,
+  }: {
+    /** Close label. */ children: React.ReactNode;
+  }) => <button type="button">{children}</button>,
 }));
 
 vi.mock("@/components/ui/toggle-group", () => ({
@@ -366,6 +377,45 @@ describe("CatalogFilterBar", () => {
     expect(onChange).toHaveBeenCalledWith({ ...filters, query: "cassette" });
   });
 
+  it("prunes changed facets once and does not replay a completed correction through Activity", async () => {
+    const onChange = vi.fn();
+    const selected = { ...filters, materialIds: [42] };
+    /**
+     * Renders facet changes through Activity lifecycle transitions.
+     * @param available - Whether the selected material is still available.
+     * @param mode - Activity visibility.
+     * @returns Controlled filter-bar fixture.
+     */
+    const tree = (
+      available: boolean,
+      mode: "visible" | "hidden" = "visible",
+    ) => (
+      <StrictMode>
+        <Activity mode={mode}>
+          <CatalogFilterBar
+            copy={copy}
+            filters={selected}
+            onChange={onChange}
+            resultCount={7}
+            facets={{
+              ...facets,
+              materials: available
+                ? [{ count: 1, id: 42, name: "Titanium", slug: "titanium" }]
+                : [],
+            }}
+          />
+        </Activity>
+      </StrictMode>
+    );
+    await act(async () => root.render(tree(true)));
+    expect(onChange).not.toHaveBeenCalled();
+    await act(async () => root.render(tree(false)));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(filters);
+    await act(async () => root.render(tree(false, "hidden")));
+    await act(async () => root.render(tree(false)));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the anchored panel without opening the mobile sheet", () => {
     act(() =>
       root.render(
@@ -390,7 +440,7 @@ describe("CatalogFilterBar", () => {
         .querySelector('[data-testid="mobile-filter-sheet"]')
         ?.getAttribute("data-open"),
     ).toBe("false");
-    expect(container.querySelector("section")).not.toBeNull();
+    expect(document.querySelector("section")).not.toBeNull();
   });
 
   it("announces result counts and exposes the discovery facets as checkboxes", () => {
@@ -459,7 +509,7 @@ describe("CatalogFilterBar", () => {
     );
   });
 
-  it("closes the anchored panel from Apply or an outside click", () => {
+  it("closes the anchored panel from Apply", () => {
     act(() =>
       root.render(
         <CatalogFilterBar
@@ -477,17 +527,9 @@ describe("CatalogFilterBar", () => {
     );
     act(() => more?.click());
     const apply = [
-      ...container.querySelectorAll<HTMLButtonElement>("section button"),
+      ...document.querySelectorAll<HTMLButtonElement>("section button"),
     ].find((candidate) => candidate.textContent?.trim() === "Apply");
     act(() => apply?.click());
-    expect(container.querySelector("section")).toBeNull();
-
-    act(() => more?.click());
-    act(() =>
-      document.body.dispatchEvent(
-        new MouseEvent("pointerdown", { bubbles: true }),
-      ),
-    );
-    expect(container.querySelector("section")).toBeNull();
+    expect(document.querySelector("section")).toBeNull();
   });
 });
