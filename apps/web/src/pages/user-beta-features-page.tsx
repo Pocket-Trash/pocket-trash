@@ -1,15 +1,13 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserPageShell } from "@/components/user-page-shell";
-import {
-  listUserBetaFeatureFlags,
-  setUserBetaFeatureFlag,
-} from "@/lib/feature-flags";
+import { useFeatureFlagMutation } from "@/hooks/use-feature-flag-mutation";
+import type { listUserBetaFeatureFlags } from "@/lib/feature-flags";
 import { useLocale } from "@/providers/locale-provider";
 
 /** User-visible beta feature and its current opt-in state. */
@@ -18,9 +16,38 @@ type BetaFlag = Awaited<ReturnType<typeof listUserBetaFeatureFlags>>[number];
 /**
  * Renders controls for the current user's beta-feature opt-ins.
  *
+ * @param props - Current route-loaded beta flags.
  * @returns The beta-features settings page.
  */
-export function UserBetaFeaturesPage() {
+export function UserBetaFeaturesPage({
+  initialFlags = [],
+  actorId,
+}: {
+  /** Account that authorized the route loader snapshot. */
+  actorId?: string;
+  /** Current user-specific flags supplied by the route loader. */
+  initialFlags?: BetaFlag[];
+}) {
+  const { userId } = useAuth();
+  return (
+    <BetaFeaturesContent
+      key={userId}
+      flags={actorId === undefined || actorId === userId ? initialFlags : []}
+    />
+  );
+}
+
+/**
+ * Observes one account's opt-ins while Router owns canonical flags.
+ * @param props - Current route-owned flags.
+ * @returns Account-scoped beta-feature controls.
+ */
+function BetaFeaturesContent({
+  flags,
+}: {
+  /** Current canonical opt-in data. */
+  flags: BetaFlag[];
+}) {
   const { locale } = useLocale();
   /**
    * Formats localized beta-feature copy.
@@ -29,20 +56,8 @@ export function UserBetaFeaturesPage() {
    * @returns The localized message.
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
-  const [flags, setFlags] = useState<BetaFlag[]>([]);
-  const [status, setStatus] = useState<string | null>(null);
-  const failedToLoadText = t("web.status.failedToLoad");
-
-  /** Reloads the current user's beta-feature flags. */
-  async function loadFlags() {
-    setFlags(await listUserBetaFeatureFlags());
-  }
-
-  useEffect(() => {
-    loadFlags().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : failedToLoadText);
-    });
-  }, [failedToLoadText]);
+  const mutation = useFeatureFlagMutation();
+  const status = mutation.error;
 
   return (
     <UserPageShell
@@ -78,15 +93,14 @@ export function UserBetaFeaturesPage() {
                 ) : null}
               </div>
               <Button
-                onClick={async () => {
-                  await setUserBetaFeatureFlag({
-                    data: {
-                      enabled: !flag.enabled,
-                      slug: flag.slug,
-                    },
-                  });
-                  await loadFlags();
-                }}
+                disabled={mutation.pending}
+                onClick={() =>
+                  mutation.mutate({
+                    kind: "beta",
+                    enabled: !flag.enabled,
+                    slug: flag.slug,
+                  })
+                }
                 type="button"
                 variant={flag.enabled ? "default" : "outline"}
               >
