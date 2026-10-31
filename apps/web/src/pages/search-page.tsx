@@ -27,12 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { searchPublic } from "@/lib/search";
-import {
-  SEARCH_QUERY_DELAY_MS,
-  SEARCH_QUERY_MAX_LENGTH,
-  SEARCH_QUERY_MIN_LENGTH,
-} from "@/lib/search-constants";
+import { useSearchDraft } from "@/hooks/use-search-draft";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/search-constants";
 import { useLocale } from "@/providers/locale-provider";
 
 /** URL-backed state accepted by the public search page. */
@@ -51,8 +47,18 @@ export type SearchNavigationOptions = {
   replace: boolean;
 };
 
+/** Route-owned public search result and feedback state. */
+export type SearchPageData = {
+  /** Route request status. */
+  status: "idle" | "loading" | "ready" | "error";
+  /** Accepted route results, present only after a successful query. */
+  response?: SearchResponse;
+};
+
 /** Properties for the public search page. */
 type SearchPageProps = {
+  /** Result and feedback owned by the route loader. */
+  data: SearchPageData;
   /**
    * Applies a normalized search state to the URL.
    *
@@ -102,16 +108,23 @@ const emptyCounts: SearchCounts = {
  * @param props - Search page properties.
  * @returns The searchable, filterable result directory.
  */
-export function SearchPage({ onNavigate, search }: SearchPageProps) {
+export function SearchPage({ data, onNavigate, search }: SearchPageProps) {
   const { locale } = useLocale();
-  const request = React.useRef(0);
-  const [inputValue, setInputValue] = React.useState(search.q ?? "");
-  const [response, setResponse] = React.useState<SearchResponse>();
-  const [state, setState] = React.useState<
-    "idle" | "loading" | "ready" | "error"
-  >("idle");
   const group = search.type ?? "all";
   const page = search.page ?? 1;
+  const { response, status: state } = data;
+  const [inputValue, edit, submitDraft] = useSearchDraft(
+    search.q ?? "",
+    (q) => {
+      onNavigate(
+        {
+          ...(q ? { q } : {}),
+          ...(q && group !== "all" ? { type: group } : {}),
+        },
+        { replace: true },
+      );
+    },
+  );
 
   /** Formats search copy for the active locale. */
   const t = React.useCallback(
@@ -120,65 +133,6 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
     [locale],
   );
 
-  React.useEffect(() => setInputValue(search.q ?? ""), [search.q]);
-
-  React.useEffect(() => {
-    const q = inputValue.trim();
-    if (q === (search.q ?? "")) return;
-    const timer = window.setTimeout(
-      () =>
-        onNavigate(
-          {
-            ...(q ? { q } : {}),
-            ...(q && group !== "all" ? { type: group } : {}),
-          },
-          { replace: true },
-        ),
-      SEARCH_QUERY_DELAY_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [group, inputValue, onNavigate, search.q]);
-
-  React.useEffect(() => {
-    const query = search.q?.trim() ?? "";
-    const currentRequest = ++request.current;
-    if (query.length < SEARCH_QUERY_MIN_LENGTH) {
-      setResponse(undefined);
-      setState("idle");
-      return;
-    }
-
-    setResponse(undefined);
-    setState("loading");
-    void searchPublic({
-      data: { group, page, query, surface: "page" },
-    })
-      .then((nextResponse) => {
-        if (currentRequest !== request.current) return;
-        const pageCount = Math.max(
-          1,
-          Math.ceil(nextResponse.total / nextResponse.pageSize),
-        );
-        if (page > pageCount) {
-          onNavigate(
-            {
-              q: query,
-              ...(group === "all" ? {} : { type: group }),
-              ...(pageCount === 1 ? {} : { page: pageCount }),
-            },
-            { replace: true },
-          );
-          return;
-        }
-        setResponse(nextResponse);
-        setState("ready");
-      })
-      .catch(() => {
-        if (currentRequest !== request.current) return;
-        setState("error");
-      });
-  }, [group, onNavigate, page, search.q]);
-
   /**
    * Submits the input as a new query and resets pagination.
    *
@@ -186,14 +140,7 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
    */
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const q = inputValue.trim();
-    onNavigate(
-      {
-        ...(q ? { q } : {}),
-        ...(q && group !== "all" ? { type: group } : {}),
-      },
-      { replace: true },
-    );
+    submitDraft();
   };
 
   const counts = response?.counts ?? emptyCounts;
@@ -211,7 +158,7 @@ export function SearchPage({ onNavigate, search }: SearchPageProps) {
           <Input
             aria-label={t("web.search.label")}
             maxLength={SEARCH_QUERY_MAX_LENGTH}
-            onChange={(event) => setInputValue(event.target.value)}
+            onChange={(event) => edit(event.target.value)}
             placeholder={t("web.search.placeholder")}
             value={inputValue}
           />

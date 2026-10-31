@@ -1,12 +1,9 @@
 import type { TranslationKey } from "@pocket-trash/localizations";
-import * as React from "react";
 import { Input } from "@/components/ui/input";
-import type { DirectorySearchState } from "@/hooks/use-directory-search";
+import { useSearchDraft } from "@/hooks/use-search-draft";
 import { useCatalogCopy } from "@/lib/catalog-copy";
-import {
-  SEARCH_QUERY_DELAY_MS,
-  SEARCH_QUERY_MAX_LENGTH,
-} from "@/lib/search-constants";
+import type { DirectorySearchState } from "@/lib/directory-search";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/search-constants";
 
 /** Properties for one URL-backed public-directory search input. */
 type DirectorySearchProps = {
@@ -34,26 +31,15 @@ export function DirectorySearch({
   query,
 }: DirectorySearchProps) {
   const t = useCatalogCopy();
-  const [value, setValue] = React.useState(query);
+  const [value, edit] = useSearchDraft(query, onQueryChange);
   const normalizedValue = value.trim();
-  const normalizedQuery = query.trim();
-
-  React.useEffect(() => setValue(query), [query]);
-  React.useEffect(() => {
-    if (normalizedValue === normalizedQuery) return;
-    const timeout = window.setTimeout(
-      () => onQueryChange(normalizedValue),
-      SEARCH_QUERY_DELAY_MS,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [normalizedQuery, normalizedValue, onQueryChange]);
 
   return (
     <div className="grid gap-2">
       <Input
         aria-label={t("web.search.label")}
         maxLength={SEARCH_QUERY_MAX_LENGTH}
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => edit(event.target.value)}
         placeholder={t(placeholderKey)}
         type="search"
         value={value}
