@@ -1,4 +1,4 @@
-import { useClerk } from "@clerk/tanstack-react-start";
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faCircleCheck,
   faSpinnerScale,
@@ -9,14 +9,11 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Link, Navigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  type ErasureStatusView,
-  getSelfErasureStatus,
-} from "@/lib/account-erasure";
+import { useErasurePolling } from "@/hooks/use-erasure-polling";
+import type { ErasureStatusView } from "@/lib/account-erasure";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
@@ -27,30 +24,32 @@ import { useLocale } from "@/providers/locale-provider";
  */
 export function AccountErasureStatusPage({
   initialStatus,
+  actorId,
 }: {
+  /** Account that authorized the loader snapshot. */
+  actorId?: string | null;
   /** Status loaded for the active erasure request. */
   initialStatus: ErasureStatusView;
 }) {
-  const [status, setStatus] = useState(initialStatus);
-  const clerk = useClerk();
+  const { userId, isLoaded, isSignedIn } = useAuth();
+  if (isLoaded && !isSignedIn) return <Navigate to="/account-erased" replace />;
+  if (actorId !== undefined && actorId !== userId) return null;
+  return <SelfErasureStatus key={userId} initialStatus={initialStatus} />;
+}
 
-  useEffect(() => {
-    if (status.status !== "processing") return;
-    const interval = window.setInterval(() => {
-      void getSelfErasureStatus()
-        .then((next) => {
-          if (next === "signed_out") {
-            void clerk.signOut({ redirectUrl: "/account-erased" });
-            return;
-          }
-          if (next) setStatus(next);
-        })
-        .catch(() => undefined);
-    }, 3000);
-    return () => window.clearInterval(interval);
-  }, [clerk, status.status]);
-
-  return <AccountErasureState status={status} />;
+/**
+ * Owns one current account's receipt polling lifetime.
+ * @param props - Current account receipt.
+ * @returns Current self-erasure progress.
+ */
+function SelfErasureStatus({
+  initialStatus,
+}: {
+  /** Current authorized receipt. */
+  initialStatus: ErasureStatusView;
+}) {
+  const { status } = useErasurePolling(initialStatus, "self");
+  return <AccountErasureState status={status ?? initialStatus} />;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { getSelfErasureStatus } from "@/lib/account-erasure";
+import { getSelfErasureStatusSnapshot } from "@/lib/account-erasure";
 import { AccountErasureStatusPage } from "@/pages/account-erasure-pages";
 
 /**
@@ -10,14 +10,18 @@ export const Route = createFileRoute("/account-erasure")({
   /**
    * Loads the current erasure status and redirects signed-out or unavailable requests.
    *
-   * @returns The current erasure status.
+   * @param context - Current Router loader cancellation lifetime.
+   * @returns The current erasure status and account identity.
    * @rejects When erasure status cannot be loaded or navigation redirects to the applicable account page.
    */
-  loader: async () => {
-    const status = await getSelfErasureStatus();
+  loader: async ({ abortController }) => {
+    const snapshot = await getSelfErasureStatusSnapshot({
+      signal: abortController.signal,
+    });
+    const { status } = snapshot;
     if (status === "signed_out") throw redirect({ to: "/account-erased" });
     if (!status) throw redirect({ to: "/user/account" });
-    return status;
+    return { actorId: snapshot.actorId, status };
   },
   component: AccountErasureRoute,
   /**
@@ -36,5 +40,6 @@ export const Route = createFileRoute("/account-erasure")({
  * @returns The rendered route UI.
  */
 function AccountErasureRoute() {
-  return <AccountErasureStatusPage initialStatus={Route.useLoaderData()} />;
+  const { actorId, status } = Route.useLoaderData();
+  return <AccountErasureStatusPage actorId={actorId} initialStatus={status} />;
 }
