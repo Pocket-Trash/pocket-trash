@@ -102,6 +102,7 @@
     },
     "test:ci": {
       "dependsOn": ["^build"],
+      "env": ["VITEST_MAX_WORKERS"],
       "outputs": []
     },
     "test-storybook": {

@@ -85,7 +85,7 @@ test("shared local Redis tooling validates both consumers", () => {
   }
 });
 
-test("PR visuals use only the reviewed Phase 1 caller and existing OIDC bootstrap", () => {
+test("PR visuals follow the promoted release channel with unchanged OIDC and authorization", () => {
   const workflow = parse(
     readFileSync(
       new URL("../.github/workflows/pr-visuals.yml", import.meta.url),
@@ -105,7 +105,7 @@ test("PR visuals use only the reviewed Phase 1 caller and existing OIDC bootstra
   assert.deepEqual(Object.keys(workflow.jobs), ["visuals"]);
   assert.deepEqual(workflow.jobs.visuals, {
     if: "vars.PR_VISUALS_ENABLED == 'true' && github.repository == 'Pocket-Trash/pocket-trash'",
-    uses: "Pocket-Trash/pr-review-tool/.github/workflows/review.yml@b8417b5089afe9cf8773735c6a2f7ba4c301329f",
+    uses: "Pocket-Trash/pr-review-tool/.github/workflows/review.yml@current-release",
     with: {
       task: "visuals",
       "config-path": ".github/pr-visuals.json",
