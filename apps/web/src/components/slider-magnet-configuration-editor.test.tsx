@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import type { SliderMagnetConfiguration } from "@package/services";
-import * as React from "react";
+import { useForm, useStore } from "@tanstack/react-form";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -48,13 +48,17 @@ describe("slider magnet configuration editor", () => {
      * @returns Controlled editor fixture.
      */
     function EditorFixture() {
-      const [value, setValue] =
-        React.useState<SliderMagnetConfiguration | null>(null);
+      const form = useForm({
+        defaultValues: {
+          configuration: null as SliderMagnetConfiguration | null,
+        },
+      });
+      const value = useStore(form.store, (state) => state.values.configuration);
 
       return (
         <SliderMagnetConfigurationEditor
           layout="2x2"
-          onChange={setValue}
+          onChange={(value) => form.setFieldValue("configuration", value)}
           presets={[
             {
               configuration: uniformMagnetConfiguration("2x2", "N52"),
@@ -113,16 +117,21 @@ describe("slider magnet configuration editor", () => {
      * @returns Controlled editor fixture.
      */
     function EditorFixture() {
-      const [value, setValue] = React.useState<SliderMagnetConfiguration>({
-        sideA: ["N52", "N52", "N52", "N52"],
-        sideB: ["N52", "N52", "N52", "N52"],
+      const form = useForm({
+        defaultValues: {
+          configuration: {
+            sideA: ["N52", "N52", "N52", "N52"],
+            sideB: ["N52", "N52", "N52", "N52"],
+          } as SliderMagnetConfiguration | null,
+        },
       });
+      const value = useStore(form.store, (state) => state.values.configuration);
 
       return (
         <SliderMagnetConfigurationEditor
           layout="2x2"
           onChange={(next) => {
-            if (next) setValue(next);
+            if (next) form.setFieldValue("configuration", next);
           }}
           t={(key) => key}
           value={value}

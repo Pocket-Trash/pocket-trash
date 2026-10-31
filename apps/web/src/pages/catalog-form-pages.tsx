@@ -30,10 +30,15 @@ import {
   sliderMagnetLayouts,
 } from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import * as React from "react";
 import { createPortal } from "react-dom";
+import {
+  type EffectEntity,
+  type EffectReducer,
+  useEffectReducer,
+} from "use-effect-reducer";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
@@ -141,14 +146,19 @@ export function ProductFormPage({
   options: CatalogOptions;
 }) {
   const t = useCatalogCopy();
-  const [selectedType, setSelectedType] = React.useState<ComboboxOption | null>(
-    () =>
-      initialProduct
+  const typeForm = useForm({
+    defaultValues: {
+      productType: initialProduct
         ? {
             id: initialProduct.productTypeId,
             name: initialProduct.productTypeName,
           }
-        : null,
+        : (null as ComboboxOption | null),
+    },
+  });
+  const selectedType = useStore(
+    typeForm.store,
+    (state) => state.values.productType,
   );
   const productType =
     initialProduct?.productTypeSlug ??
@@ -167,7 +177,9 @@ export function ProductFormPage({
             <CatalogCombobox
               ariaLabel={t("web.catalog.field.productType")}
               items={initialOptions.productTypes}
-              onValueChange={setSelectedType}
+              onValueChange={(value) =>
+                typeForm.setFieldValue("productType", value)
+              }
               placeholder={t("web.catalog.selectProductType")}
               value={selectedType}
             />
@@ -210,6 +222,30 @@ const pensAdminActions = [
 /** One structured Pens administration action. */
 type PensAdminAction = (typeof pensAdminActions)[number];
 
+/** Pending Pens administrative save effect. */
+type PensAdminSaveState =
+  | EffectEntity<PensAdminSaveState, PensAdminSaveEvent>
+  | undefined;
+/** Administrative mutation and terminal events. */
+type PensAdminSaveEvent =
+  | {
+      /** Submits a structured administrative mutation. */
+      type: "requested";
+      /** Existing validated server input boundary. */
+      data: unknown;
+    }
+  | {
+      /** Clears the completed save effect. */
+      type: "finished";
+    };
+/** Committed Pens administration request. */
+type PensAdminSaveEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Existing server input payload. */
+  data: unknown;
+};
+
 /**
  * Renders structured Pens administration for an existing product.
  *
@@ -236,16 +272,106 @@ export function PensAdminEditor({
    */
   const copy = (key: string) => t(`web.pens.admin.${key}` as TranslationKey);
   const admin = options.pensAdminOptions;
-  const [action, setAction] = React.useState<PensAdminAction>(
-    product.productTypeSlug === "refill"
-      ? "refill-offering"
-      : "compatibility-group",
+  const form = useForm({
+    defaultValues: {
+      action: (product.productTypeSlug === "refill"
+        ? "refill-offering"
+        : "compatibility-group") as PensAdminAction,
+      primaryId: "",
+      secondaryId: "",
+      text: "",
+      text2: "",
+    },
+    validators: {
+      /**
+       * Requires the fields used by the selected structured action.
+       * @param context - Current administrative fields.
+       * @returns Existing required-field feedback for incomplete input.
+       */
+      onSubmit: ({ value }): string | undefined => {
+        const textAction =
+          value.action === "refill-tip-style" ||
+          value.action === "refill-ink-color";
+        if (
+          textAction
+            ? !value.text.trim() || !value.text2.trim()
+            : !value.primaryId
+        )
+          return "web.catalog.error.required";
+        if (
+          value.action === "refill-offering" &&
+          (!value.secondaryId || !value.text.trim())
+        )
+          return "web.catalog.error.required";
+        if (
+          value.action === "offering-identifier" &&
+          (!value.text.trim() || !value.text2)
+        )
+          return "web.catalog.error.required";
+        return undefined;
+      },
+    },
+    /**
+     * Submits the selected structured Pens administration action.
+     * @returns Nothing; the committed save owns response handling.
+     */
+    onSubmit: () => submit(),
+  });
+  const { action, primaryId, secondaryId, text, text2 } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [primaryId, setPrimaryId] = React.useState("");
-  const [secondaryId, setSecondaryId] = React.useState("");
-  const [text, setText] = React.useState("");
-  const [text2, setText2] = React.useState("");
-  const [message, setMessage] = React.useState<string | null>(null);
+  const message = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const pending = React.useRef<ReturnType<typeof authorCatalogPensData> | null>(
+    null,
+  );
+  const [saving, dispatch] = useEffectReducer<
+    PensAdminSaveState,
+    PensAdminSaveEvent,
+    PensAdminSaveEffect
+  >(
+    (
+      state: EffectEntity<PensAdminSaveState, PensAdminSaveEvent> | undefined,
+      event: PensAdminSaveEvent,
+      exec,
+    ) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "save", data: event.data });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined as PensAdminSaveState,
+    {
+      /**
+       * Runs a single administrative mutation and observes it across resumption.
+       * @param _state - Current pending effect.
+       * @param effect - Submitted structured payload.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect: PensAdminSaveEffect, dispatch, { signal }) => {
+        pending.current ??= authorCatalogPensData({ data: effect.data });
+        void pending.current.then(
+          (result) => {
+            if (signal.aborted) return;
+            pending.current = null;
+            dispatch({ type: "finished" });
+            if (!result.ok) {
+              form.setErrorMap({ onSubmit: result.formError });
+              return;
+            }
+            window.location.reload();
+          },
+          () => {
+            if (signal.aborted) return;
+            pending.current = null;
+            dispatch({ type: "finished" });
+            form.setErrorMap({ onSubmit: "error.generic" });
+          },
+        );
+      },
+    },
+  );
   if (!admin) return null;
 
   const compatibilityMemberships = admin.compatibilityMemberships
@@ -326,9 +452,9 @@ export function PensAdminEditor({
   /**
    * Validates and submits the selected structured mutation.
    *
-   * @returns A promise that resolves after the response is handled.
+   * @returns Nothing; response handling belongs to the committed save.
    */
-  const submit = async () => {
+  const submit = () => {
     const id = Number(primaryId);
     const id2 = Number(secondaryId);
     const data: unknown =
@@ -367,12 +493,7 @@ export function PensAdminEditor({
                     name: text,
                     slug: text2,
                   };
-    const result = await authorCatalogPensData({ data });
-    if (!result.ok) {
-      setMessage(result.formError);
-      return;
-    }
-    window.location.reload();
+    dispatch({ type: "requested", data });
   };
 
   return (
@@ -384,33 +505,52 @@ export function PensAdminEditor({
         t("web.pens.admin.actionLabel" as TranslationKey),
         action,
         (value) => {
-          setAction(value as PensAdminAction);
-          setPrimaryId("");
-          setSecondaryId("");
-          setMessage(null);
+          form.setFieldValue("action", value as PensAdminAction);
+          form.setFieldValue("primaryId", "");
+          form.setFieldValue("secondaryId", "");
+          form.setErrorMap({ onSubmit: undefined });
         },
         pensAdminActions.map((id) => ({ id, name: copy(`action.${id}`) })),
       )}
       {action === "refill-offering" ? (
         <>
-          {select(copy("tipStyle"), primaryId, setPrimaryId, admin.tipStyles)}
+          {select(
+            copy("tipStyle"),
+            primaryId,
+            (value) => form.setFieldValue("primaryId", value),
+            admin.tipStyles,
+          )}
           {select(
             copy("inkColor"),
             secondaryId,
-            setSecondaryId,
+            (value) => form.setFieldValue("secondaryId", value),
             admin.inkColors,
           )}
-          {input(copy("tipSize"), text, setText)}
+          {input(copy("tipSize"), text, (value) =>
+            form.setFieldValue("text", value),
+          )}
         </>
       ) : null}
       {action === "offering-identifier" ? (
         <>
-          {select(copy("offering"), primaryId, setPrimaryId, admin.offerings)}
-          {input(copy("identifier"), text, setText)}
-          {select(copy("identifierKindLabel"), text2, setText2, [
-            { id: "maker-code", name: copy("identifierKind.makerCode") },
-            { id: "sku", name: copy("identifierKind.sku") },
-          ])}
+          {select(
+            copy("offering"),
+            primaryId,
+            (value) => form.setFieldValue("primaryId", value),
+            admin.offerings,
+          )}
+          {input(copy("identifier"), text, (value) =>
+            form.setFieldValue("text", value),
+          )}
+          {select(
+            copy("identifierKindLabel"),
+            text2,
+            (value) => form.setFieldValue("text2", value),
+            [
+              { id: "maker-code", name: copy("identifierKind.makerCode") },
+              { id: "sku", name: copy("identifierKind.sku") },
+            ],
+          )}
         </>
       ) : null}
       {action === "compatibility-membership" ? (
@@ -418,7 +558,7 @@ export function PensAdminEditor({
           {select(
             copy("compatibilityGroup"),
             primaryId,
-            setPrimaryId,
+            (value) => form.setFieldValue("primaryId", value),
             admin.compatibilityGroups,
           )}
         </>
@@ -427,27 +567,34 @@ export function PensAdminEditor({
         ? select(
             copy("compatibilityMembership"),
             primaryId,
-            setPrimaryId,
+            (value) => form.setFieldValue("primaryId", value),
             compatibilityMemberships,
           )
         : null}
       {action === "refill-tip-style" || action === "refill-ink-color" ? (
         <>
-          {input(copy("name"), text, setText)}
-          {input(copy("slug"), text2, setText2)}
+          {input(copy("name"), text, (value) =>
+            form.setFieldValue("text", value),
+          )}
+          {input(copy("slug"), text2, (value) =>
+            form.setFieldValue("text2", value),
+          )}
         </>
       ) : null}
       {action === "compatibility-group"
         ? select(
             copy("registeredGroup"),
             primaryId,
-            setPrimaryId,
+            (value) => form.setFieldValue("primaryId", value),
             admin.compatibilityGroupConcepts,
           )
         : null}
-      {message ? <Notice>{t(message as TranslationKey)}</Notice> : null}
+      {typeof message === "string" ? (
+        <Notice>{t(message as TranslationKey)}</Notice>
+      ) : null}
       <Button
-        onClick={() => void submit()}
+        disabled={Boolean(saving)}
+        onClick={() => void form.handleSubmit()}
         type="button"
         variant={action.endsWith("-remove") ? "destructive" : "default"}
       >
@@ -541,6 +688,161 @@ type ProductEditorValue = Omit<
   width: EditableDimensionMeasurement;
 };
 
+/** Product save feedback owned by TanStack Form. */
+type ProductValidation = {
+  /** Localized form feedback. */
+  form: string;
+  /** Field errors returned by the existing schema or server. */
+  fields?: Record<string, string[] | undefined>;
+};
+/** Product editor disclosures, shared options, and committed save lifetime. */
+type ProductEditorState = {
+  /** Current shared lookup choices. */
+  options: CatalogOptions;
+  /** Identifier retained after saving before an upload retry. */
+  savedProductId: number | null;
+  /** Whether assignment weight fields are exposed. */
+  showMaterialWeights: boolean;
+  /** Whether changing layout discarded an incompatible snapshot. */
+  magnetConfigurationNotice: boolean;
+  /** Part type currently being created. */
+  activePartType: PenPartProductType | null;
+  /** Disclosed part compatibility roles. */
+  openPartRoles: Set<PenPartProductType>;
+  /** Whether Markdown initialization is pending. */
+  descriptionLoading: boolean;
+  /** Current save effect, absent after terminal feedback. */
+  save: EffectEntity<ProductEditorState, ProductEditorEvent> | undefined;
+};
+/** Product editing intents and save completion. */
+type ProductEditorEvent =
+  | {
+      /** Accepts the stable shared-control options callback. */
+      type: "lookupOptionsChanged";
+      /** Complete choices or a pure updater from an existing caller. */
+      update: React.SetStateAction<CatalogOptions>;
+    }
+  | {
+      /** Changes assignment weight disclosure. */
+      type: "materialWeightsToggled";
+    }
+  | {
+      /** Records a discarded incompatible magnet snapshot. */
+      type: "magnetSnapshotDiscarded";
+    }
+  | {
+      /** Opens or closes embedded part creation. */
+      type: "partCreationChanged";
+      /** Part type being created, absent when closed. */
+      partType: PenPartProductType | null;
+    }
+  | {
+      /** Toggles one compatibility role disclosure. */
+      type: "partRoleToggled";
+      /** Compatibility role to disclose. */
+      role: PenPartProductType;
+    }
+  | {
+      /** Receives committed editor readiness. */
+      type: "descriptionLoadingChanged";
+      /** Whether initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Submits validated fields and the current file selection. */
+      type: "saveRequested";
+      /** Validated product fields. */
+      value: ProductEditorValue;
+      /** Optional moderation reason. */
+      reason?: string;
+      /** Files belonging to this save attempt. */
+      files: File[];
+    }
+  | {
+      /** Completes a save attempt, including a retryable upload failure. */
+      type: "saveFinished";
+      /** Identifier returned before any image upload. */
+      productId?: number;
+    };
+/** One validated product save and its ordered uploads. */
+type ProductEditorEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Captured validated fields, including the last saved identifier. */
+  value: ProductEditorValue;
+  /** Optional moderation reason. */
+  reason?: string;
+  /** Files selected at submission. */
+  files: File[];
+};
+/** Product save result retained while its UI is suspended. */
+type ProductSaveResult = {
+  /** Saved product, including when a subsequent upload failed. */
+  product?: CatalogProduct;
+  /** Files requiring retry. */
+  files: File[];
+  /** Existing localized failure response. */
+  error?: ProductValidation;
+};
+/**
+ * Owns product UI and save transitions without performing mutations in render.
+ * @param state - Current editor controls and save lifetime.
+ * @param event - Editing intent or terminal save event.
+ * @param exec - Committed effect queue.
+ * @returns Updated controls and pending save.
+ */
+const productEditorReducer: EffectReducer<
+  ProductEditorState,
+  ProductEditorEvent,
+  ProductEditorEffect
+> = (state, event, exec) => {
+  switch (event.type) {
+    case "lookupOptionsChanged":
+      return {
+        ...state,
+        options:
+          typeof event.update === "function"
+            ? event.update(state.options)
+            : event.update,
+      };
+    case "materialWeightsToggled":
+      return { ...state, showMaterialWeights: !state.showMaterialWeights };
+    case "magnetSnapshotDiscarded":
+      return { ...state, magnetConfigurationNotice: true };
+    case "partCreationChanged":
+      return { ...state, activePartType: event.partType };
+    case "partRoleToggled": {
+      const roles = new Set(state.openPartRoles);
+      if (roles.has(event.role)) roles.delete(event.role);
+      else roles.add(event.role);
+      return { ...state, openPartRoles: roles };
+    }
+    case "descriptionLoadingChanged":
+      return { ...state, descriptionLoading: event.loading };
+    case "saveRequested":
+      if (state.save) return state;
+      return {
+        ...state,
+        save: exec({
+          type: "save",
+          value: {
+            ...event.value,
+            productId: state.savedProductId ?? event.value.productId,
+          },
+          reason: event.reason,
+          files: event.files,
+        }),
+      };
+    case "saveFinished":
+      exec.stop(state.save);
+      return {
+        ...state,
+        savedProductId: event.productId ?? state.savedProductId,
+        save: undefined,
+      };
+  }
+};
+
 /** Properties for the product material-combination editor. */
 type MaterialAssignmentsEditorProps = {
   /**
@@ -561,6 +863,33 @@ type MaterialAssignmentsEditorProps = {
   value: ProductEditorValue["materialAssignments"];
 };
 
+/** Material sheet context; edited fields belong to its form. */
+type MaterialAssignmentSession = {
+  /** Whether the sheet is visible. */
+  open: boolean;
+  /** Initial assignment and its identity in this form session. */
+  initial: {
+    /** Existing assignment position, or new assignment. */
+    index: number | null;
+    /** Editable component and weight fields. */
+    assignment: ProductEditorValue["materialAssignments"][number];
+  };
+};
+/** Material sheet disclosure events. */
+type MaterialAssignmentEvent =
+  | {
+      /** Begins editing an existing or new assignment. */
+      type: "opened";
+      /** Existing assignment position. */
+      index: number | null;
+      /** Initial editable assignment. */
+      assignment: MaterialAssignmentSession["initial"]["assignment"];
+    }
+  | {
+      /** Dismisses or saves this editing session. */
+      type: "closed";
+    };
+
 /**
  * Edits each material combination in a focused modal.
  *
@@ -575,15 +904,87 @@ export function MaterialAssignmentsEditor({
   t,
   value,
 }: MaterialAssignmentsEditorProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
-  const [draft, setDraft] = React.useState<
-    ProductEditorValue["materialAssignments"][number]
-  >({
-    materials: [{ materialId: 0, materialSpecificId: null }],
-    weight: { unit: "g", value: "" },
+  const [editing, dispatch] = React.useReducer(
+    (
+      state: MaterialAssignmentSession,
+      event: MaterialAssignmentEvent,
+    ): MaterialAssignmentSession => {
+      switch (event.type) {
+        case "opened":
+          return {
+            open: true,
+            initial: { index: event.index, assignment: event.assignment },
+          };
+        case "closed":
+          return { ...state, open: false };
+      }
+    },
+    {
+      open: false,
+      initial: {
+        index: null,
+        assignment: {
+          materials: [{ materialId: 0, materialSpecificId: null }],
+          weight: { unit: "g", value: "" },
+        },
+      },
+    },
+  );
+  /**
+   * Validates component completeness and uniqueness within this draft and product.
+   * @param input - Draft fields and the existing assignment identity.
+   * @returns Existing immediate validation categories, when invalid.
+   */
+  const validateDraft = ({
+    value: current,
+  }: {
+    /** Draft form values. */ value: MaterialAssignmentSession["initial"];
+  }) => {
+    const signatures = current.assignment.materials
+      .filter(({ materialId }) => materialId !== 0)
+      .map(
+        ({ materialId, materialSpecificId }) =>
+          `${materialId}:${materialSpecificId ?? "general"}`,
+      );
+    const incomplete =
+      current.assignment.materials.length === 0 ||
+      current.assignment.materials.some(({ materialId }) => materialId === 0);
+    const duplicate =
+      new Set(signatures).size !== signatures.length ||
+      value.some(
+        (assignment, index) =>
+          index !== current.index &&
+          materialCombinationSignature(assignment) ===
+            materialCombinationSignature(current.assignment),
+      );
+    return incomplete || duplicate ? { incomplete, duplicate } : undefined;
+  };
+  const draftForm = useForm({
+    defaultValues: editing.initial,
+    validators: {
+      onMount: validateDraft,
+      onChange: validateDraft,
+      onSubmit: validateDraft,
+    },
+    /**
+     * Applies one valid combination through the existing controlled callback.
+     * @param input - Validated assignment and its edit identity.
+     */
+    onSubmit: ({ value: current }) => {
+      onChange(
+        current.index === null
+          ? [...value, current.assignment]
+          : value.map((assignment, index) =>
+              index === current.index ? current.assignment : assignment,
+            ),
+      );
+      dispatch({ type: "closed" });
+    },
   });
-
+  const draft = useStore(draftForm.store, (state) => state.values.assignment);
+  const feedback = useStore(draftForm.store, (state) => state.errors[0]);
+  const canSave = useStore(draftForm.store, (state) => state.canSubmit);
+  const isOpen = editing.open;
   /**
    * Opens a new or existing material combination.
    *
@@ -602,9 +1003,10 @@ export function MaterialAssignmentsEditor({
           }
         : value[index];
     if (!assignment) return;
-    setEditingIndex(index);
-    setDraft(structuredClone(assignment));
-    setIsOpen(true);
+    const initial = structuredClone(assignment);
+    draftForm.reset({ index, assignment: initial });
+    void draftForm.validate("mount");
+    dispatch({ type: "opened", index, assignment: initial });
   };
   /**
    * Resolves one stored combination to its current display label.
@@ -627,25 +1029,6 @@ export function MaterialAssignmentsEditor({
         };
       }),
     );
-  const componentSignatures = draft.materials
-    .filter(({ materialId }) => materialId !== 0)
-    .map(
-      ({ materialId, materialSpecificId }) =>
-        `${materialId}:${materialSpecificId ?? "general"}`,
-    );
-  const hasDuplicateComponent =
-    new Set(componentSignatures).size !== componentSignatures.length;
-  const hasDuplicateAssignment = value.some(
-    (assignment, index) =>
-      index !== editingIndex &&
-      materialCombinationSignature(assignment) ===
-        materialCombinationSignature(draft),
-  );
-  const hasIncompleteComponent =
-    draft.materials.length === 0 ||
-    draft.materials.some(({ materialId }) => materialId === 0);
-  const hasInvalidDraft =
-    hasIncompleteComponent || hasDuplicateComponent || hasDuplicateAssignment;
 
   return (
     <>
@@ -693,16 +1076,18 @@ export function MaterialAssignmentsEditor({
               a.name.localeCompare(b.name),
             ),
           }));
-          setDraft((current) => ({
-            ...current,
-            materials: [
-              ...current.materials.filter(({ materialId }) => materialId !== 0),
-              { materialId: material.id, materialSpecificId: null },
-            ],
-          }));
+          draftForm.setFieldValue("assignment.materials", (current) => [
+            ...current.filter(({ materialId }) => materialId !== 0),
+            { materialId: material.id, materialSpecificId: null },
+          ]);
         }}
       />
-      <Sheet onOpenChange={setIsOpen} open={isOpen}>
+      <Sheet
+        onOpenChange={(open) => {
+          if (!open) dispatch({ type: "closed" });
+        }}
+        open={isOpen}
+      >
         <SheetContent className="sm:w-[40rem] sm:max-w-[90vw]">
           <SheetHeader>
             <SheetTitle>
@@ -721,9 +1106,8 @@ export function MaterialAssignmentsEditor({
                   })}
                   items={options.materials}
                   onValueChange={(material) =>
-                    setDraft((current) => ({
-                      ...current,
-                      materials: current.materials.map((row, i) =>
+                    draftForm.setFieldValue("assignment.materials", (current) =>
+                      current.map((row, i) =>
                         i === index
                           ? {
                               materialId: Number(material?.id ?? 0),
@@ -731,7 +1115,7 @@ export function MaterialAssignmentsEditor({
                             }
                           : row,
                       ),
-                    }))
+                    )
                   }
                   placeholder={t("web.catalog.selectMaterial")}
                   value={
@@ -746,9 +1130,8 @@ export function MaterialAssignmentsEditor({
                     ({ materialId }) => materialId === selection.materialId,
                   )}
                   onValueChange={(specific) =>
-                    setDraft((current) => ({
-                      ...current,
-                      materials: current.materials.map((row, i) =>
+                    draftForm.setFieldValue("assignment.materials", (current) =>
+                      current.map((row, i) =>
                         i === index
                           ? {
                               ...row,
@@ -758,7 +1141,7 @@ export function MaterialAssignmentsEditor({
                             }
                           : row,
                       ),
-                    }))
+                    )
                   }
                   placeholder={t("web.materials.specific.general")}
                   removeLabel={t("web.action.close")}
@@ -772,12 +1155,9 @@ export function MaterialAssignmentsEditor({
                 <Button
                   aria-label={t("web.action.close")}
                   onClick={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      materials: current.materials.filter(
-                        (_, i) => i !== index,
-                      ),
-                    }))
+                    draftForm.setFieldValue("assignment.materials", (current) =>
+                      current.filter((_, i) => i !== index),
+                    )
                   }
                   type="button"
                   variant="outline"
@@ -788,49 +1168,37 @@ export function MaterialAssignmentsEditor({
             ))}
             <Button
               onClick={() =>
-                setDraft((current) => ({
+                draftForm.setFieldValue("assignment.materials", (current) => [
                   ...current,
-                  materials: [
-                    ...current.materials,
-                    { materialId: 0, materialSpecificId: null },
-                  ],
-                }))
+                  { materialId: 0, materialSpecificId: null },
+                ])
               }
               type="button"
               variant="outline"
             >
               {t("web.catalog.materialCombination.addSingle")}
             </Button>
-            {hasIncompleteComponent ? (
+            {feedback?.incomplete ? (
               <p className="text-sm text-destructive" role="alert">
                 {t("web.catalog.materialCombination.empty")}
               </p>
             ) : null}
-            {hasDuplicateComponent || hasDuplicateAssignment ? (
+            {feedback?.duplicate ? (
               <p className="text-sm text-destructive" role="alert">
                 {t("web.catalog.materialCombination.duplicate")}
               </p>
             ) : null}
             <div className="flex justify-end gap-2">
               <Button
-                onClick={() => setIsOpen(false)}
+                onClick={() => dispatch({ type: "closed" })}
                 type="button"
                 variant="outline"
               >
                 {t("action.cancel")}
               </Button>
               <Button
-                disabled={hasInvalidDraft}
-                onClick={() => {
-                  onChange(
-                    editingIndex === null
-                      ? [...value, draft]
-                      : value.map((assignment, index) =>
-                          index === editingIndex ? draft : assignment,
-                        ),
-                  );
-                  setIsOpen(false);
-                }}
+                disabled={!canSave}
+                onClick={() => void draftForm.handleSubmit()}
                 type="button"
               >
                 {t("action.save")}
@@ -885,28 +1253,158 @@ export function ProductEditor({
   const imageGuidance = getImageUploadGuidance(locale);
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [options, setOptions] = React.useState(initialOptions);
-  const [images, setImages] = React.useState<File[]>([]);
-  const [existingImages, setExistingImages] = React.useState(
-    initialProduct?.images ?? [],
+  const imageForm = useForm({
+    defaultValues: {
+      pending: [] as File[],
+      existing: initialProduct?.images ?? [],
+    },
+  });
+  const images = useStore(imageForm.store, (state) => state.values.pending);
+  const existingImages = useStore(
+    imageForm.store,
+    (state) => state.values.existing,
   );
-  const [savedProductId, setSavedProductId] = React.useState<number | null>(
-    initialProduct?.id ?? null,
+  const pendingSave = React.useRef<Promise<ProductSaveResult> | null>(null);
+  const [ui, dispatch] = useEffectReducer(
+    productEditorReducer,
+    () => ({
+      options: initialOptions,
+      savedProductId: initialProduct?.id ?? null,
+      showMaterialWeights:
+        initialProduct?.materials.some(({ weight }) => weight !== null) ??
+        false,
+      magnetConfigurationNotice: false,
+      activePartType: null,
+      openPartRoles: new Set(
+        initialProduct?.compatibleParts.map(
+          ({ productTypeSlug }) => productTypeSlug as PenPartProductType,
+        ) ?? [],
+      ),
+      descriptionLoading: true,
+      save: undefined,
+    }),
+    {
+      /**
+       * Runs one submitted mutation and reattaches to it after Activity resumption.
+       * @param _state - State that queued this attempt.
+       * @param effect - Captured validated submission.
+       * @param dispatch - Terminal save dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        // Retain the mutation promise across Activity; resumption only reattaches feedback.
+        pendingSave.current ??= (async (): Promise<ProductSaveResult> => {
+          let product: CatalogProduct | undefined;
+          try {
+            const result = await saveCatalogProduct({
+              data: { ...effect.value, reason: effect.reason },
+            });
+            if (!result.ok)
+              return {
+                files: effect.files,
+                error: { form: result.formError, fields: result.fieldErrors },
+              };
+            product = result.product;
+            if (quickCreate || effect.files.length === 0)
+              return { product, files: [] };
+            const uploads = await uploadImages({
+              locale,
+              files: effect.files,
+              getToken,
+              /**
+               * Offers to restore an owner-deleted duplicate before continuing uploads.
+               * @param imageId - Duplicate image identifier.
+               * @returns Whether the owner accepted and restored the image.
+               */
+              onOwnerDeletedDuplicate: async (imageId) => {
+                if (
+                  !window.confirm(
+                    t("web.resources.trash.restoreConfirmationDescription", {
+                      name: result.product.name,
+                    }),
+                  )
+                )
+                  return false;
+                await restoreCatalogImage({
+                  data: {
+                    imageId,
+                    reason: effect.reason,
+                    targetType: "product",
+                  },
+                });
+                return true;
+              },
+              targetId: product.id,
+              targetType: "product",
+              reason: effect.reason,
+            });
+            return {
+              product,
+              files: uploads.failed,
+              error: uploads.failed.length
+                ? { form: "web.resources.upload.sessionFailure" }
+                : undefined,
+            };
+          } catch (error) {
+            return {
+              product,
+              files: effect.files,
+              error: {
+                form: (error as ImageUploadError).key ?? "error.generic",
+              },
+            };
+          }
+        })();
+        void pendingSave.current.then((result) => {
+          if (signal.aborted) return;
+          pendingSave.current = null;
+          dispatch({ type: "saveFinished", productId: result.product?.id });
+          imageForm.setFieldValue("pending", (current) =>
+            current.filter(
+              (file) =>
+                !effect.files.includes(file) || result.files.includes(file),
+            ),
+          );
+          if (result.error) {
+            form.setErrorMap({ onSubmit: result.error });
+            return;
+          }
+          if (!result.product) return;
+          if (onCreated) {
+            onCreated(result.product);
+            return;
+          }
+          if (!quickCreate)
+            void navigate({
+              params: {
+                productSlug: result.product.slug,
+                productTypeSlug: result.product.productTypeSlug,
+              },
+              to: "/products/$productTypeSlug/$productSlug",
+            });
+        });
+      },
+    },
   );
-  const [serverErrors, setServerErrors] = React.useState<
-    Record<string, string[] | undefined>
-  >({});
-  const [formError, setFormError] = React.useState<string | null>(null);
+  const {
+    options,
+    showMaterialWeights,
+    magnetConfigurationNotice,
+    activePartType,
+    openPartRoles,
+    descriptionLoading,
+  } = ui;
   const supportsMaterialWeights =
     productTypeSlug === "spinner" ||
     productTypeSlug === "spinner-button" ||
     productTypeSlug === "slider";
-  const [showMaterialWeights, setShowMaterialWeights] = React.useState(
-    () =>
-      initialProduct?.materials.some(({ weight }) => weight !== null) ?? false,
-  );
-  const [magnetConfigurationNotice, setMagnetConfigurationNotice] =
-    React.useState(false);
+  /**
+   * Accepts the existing shared-control lookup update contract.
+   * @param update - Replacement choices or a pure options updater.
+   * @returns Nothing.
+   */
+  const receiveOptions = (update: React.SetStateAction<CatalogOptions>) =>
+    dispatch({ type: "lookupOptionsChanged", update });
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const plateDialog = React.useRef<HTMLDialogElement>(null);
   const plateTrigger = React.useRef<HTMLButtonElement>(null);
@@ -917,20 +1415,20 @@ export function ProductEditor({
   const partDialog = React.useRef<HTMLDialogElement>(null);
   const partTrigger = React.useRef<HTMLButtonElement>(null);
   const partDialogTitleId = React.useId();
-  const [activePartType, setActivePartType] =
-    React.useState<PenPartProductType | null>(null);
-  const [openPartRoles, setOpenPartRoles] = React.useState(
-    () =>
-      new Set(
-        initialProduct?.compatibleParts.map(
-          ({ productTypeSlug }) => productTypeSlug as PenPartProductType,
-        ) ?? [],
-      ),
-  );
-  React.useEffect(() => {
-    if (activePartType) partDialog.current?.showModal();
-  }, [activePartType]);
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
+  /**
+   * Owns the part-creation modal from its committed DOM lifetime.
+   * @param node - Current modal node.
+   * @returns Cleanup closing only this mounted dialog.
+   */
+  const bindPartDialog = React.useCallback((node: HTMLDialogElement | null) => {
+    partDialog.current = node;
+    if (!node) return;
+    node.showModal();
+    return () => {
+      node.close();
+      if (partDialog.current === node) partDialog.current = null;
+    };
+  }, []);
   const defaultValues: ProductEditorValue = {
     aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
@@ -1002,19 +1500,33 @@ export function ProductEditor({
   };
   const form = useForm({
     defaultValues,
+    validators: {
+      /**
+       * Keeps schema and file validation in the form before any mutation starts.
+       * @param context - Current form values.
+       * @returns Existing field and form errors, if validation fails.
+       */
+      onSubmit: ({ value }): ProductValidation | undefined => {
+        const result = productFormSchema.safeParse(value);
+        if (!result.success)
+          return {
+            fields: z.flattenError(result.error).fieldErrors,
+            form: "web.catalog.error.form",
+          };
+        const imageError = validateImages(
+          imageForm.state.values.pending,
+          locale,
+        );
+        if (imageError) return { form: imageError.key };
+        return undefined;
+      },
+    },
     /**
-     * Saves the current product editor values.
-     *
-     * @param root0 - Form submission state.
-     * @param root0.value - Current product field values.
-     * @returns A promise that resolves after the save flow completes.
+     * Queues one validated save with its moderation reason and selected files.
+     * @param context - Validated form submission.
      */
-    onSubmit: async ({ value }) => {
-      if (descriptionRef.current?.isLoading()) return;
-      const currentValue = {
-        ...value,
-        description: descriptionRef.current?.getValue() ?? value.description,
-      };
+    onSubmit: ({ value }) => {
+      if (descriptionRef.current?.isLoading() || ui.save) return;
       const moderating = Boolean(
         initialProduct?.canAdminister && !initialProduct.isOwner,
       );
@@ -1022,87 +1534,16 @@ export function ProductEditor({
         ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
         : undefined;
       if (moderating && !reason) return;
-      const clientResult = productFormSchema.safeParse(currentValue);
-      if (!clientResult.success) {
-        setServerErrors(z.flattenError(clientResult.error).fieldErrors);
-        setFormError("web.catalog.error.form");
-        return;
-      }
-      const imageError = validateImages(images, locale);
-      if (imageError) {
-        setFormError(imageError.key);
-        return;
-      }
-      const result = await saveCatalogProduct({
-        data: {
-          ...currentValue,
-          productId: savedProductId ?? value.productId,
-          reason,
-        },
-      });
-      if (!result.ok) {
-        setServerErrors(result.fieldErrors);
-        setFormError(result.formError);
-        return;
-      }
-      setSavedProductId(result.product.id);
-      if (quickCreate) {
-        onCreated?.(result.product);
-        return;
-      }
-      if (images.length) {
-        try {
-          const uploads = await uploadImages({
-            locale,
-            files: images,
-            getToken,
-            /**
-             * Offers to restore an owner-deleted duplicate image.
-             *
-             * @param imageId - Duplicate image identifier.
-             * @returns Whether the duplicate was restored.
-             */
-            onOwnerDeletedDuplicate: async (imageId) => {
-              if (
-                !window.confirm(
-                  t("web.resources.trash.restoreConfirmationDescription", {
-                    name: result.product.name,
-                  }),
-                )
-              )
-                return false;
-              await restoreCatalogImage({
-                data: { imageId, reason, targetType: "product" },
-              });
-              return true;
-            },
-            targetId: result.product.id,
-            targetType: "product",
-            reason,
-          });
-          setImages(uploads.failed);
-          if (uploads.failed.length) {
-            setFormError("web.resources.upload.sessionFailure");
-            return;
-          }
-        } catch (error) {
-          setFormError((error as ImageUploadError).key ?? "error.generic");
-          return;
-        }
-      }
-      if (onCreated) {
-        onCreated(result.product);
-        return;
-      }
-      await navigate({
-        params: {
-          productSlug: result.product.slug,
-          productTypeSlug: result.product.productTypeSlug,
-        },
-        to: "/products/$productTypeSlug/$productSlug",
+      dispatch({
+        type: "saveRequested",
+        value,
+        reason,
+        files: imageForm.state.values.pending,
       });
     },
   });
+  const serverErrors = useStore(form.store, (state) => state.fieldMeta);
+  const formError = useStore(form.store, (state) => state.errorMap.onSubmit);
 
   /**
    * Replaces the layout and clears an incompatible snapshot.
@@ -1115,7 +1556,7 @@ export function ProductEditor({
       form.state.values.magnetConfiguration !== null
     ) {
       form.setFieldValue("magnetConfiguration", null);
-      setMagnetConfigurationNotice(true);
+      dispatch({ type: "magnetSnapshotDiscarded" });
     }
     form.setFieldValue("magnetLayout", layout);
   };
@@ -1126,6 +1567,12 @@ export function ProductEditor({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        if (descriptionRef.current?.isLoading() || ui.save) return;
+        form.setFieldValue(
+          "description",
+          descriptionRef.current?.getValue() ?? form.state.values.description,
+        );
+        form.setErrorMap({ onSubmit: { form: "", fields: {} } });
         void form.handleSubmit();
       }}
     >
@@ -1141,7 +1588,7 @@ export function ProductEditor({
                 required
                 value={field.state.value}
               />
-              <FieldError error={serverErrors.name?.[0]} t={t} />
+              <FieldError error={serverErrors.name?.errors[0]} t={t} />
             </Field>
           )}
         </form.Field>
@@ -1176,7 +1623,7 @@ export function ProductEditor({
                 <LookupDialog
                   kind="maker"
                   onCreated={(maker) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       makers: [...current.makers, maker].sort((a, b) =>
                         a.name.localeCompare(b.name),
@@ -1186,7 +1633,7 @@ export function ProductEditor({
                   }}
                   t={t}
                 />
-                <FieldError error={serverErrors.makerId?.[0]} t={t} />
+                <FieldError error={serverErrors.makerId?.errors[0]} t={t} />
               </Field>
             );
           }}
@@ -1215,7 +1662,7 @@ export function ProductEditor({
                     kind="terminologyAlias"
                     makerId={makerId}
                     onCreated={(terminologyAlias) =>
-                      setOptions((current) => ({
+                      receiveOptions((current) => ({
                         ...current,
                         terminologyAliases: [
                           ...(current.terminologyAliases ?? []),
@@ -1326,7 +1773,10 @@ export function ProductEditor({
                 >
                   {t("web.catalog.help.productLinks")}
                 </p>
-                <FieldError error={serverErrors.productLinks?.[0]} t={t} />
+                <FieldError
+                  error={serverErrors.productLinks?.errors[0]}
+                  t={t}
+                />
               </Field>
             )}
           </form.Field>
@@ -1347,7 +1797,7 @@ export function ProductEditor({
                   }
                   value={field.state.value.join(", ")}
                 />
-                <FieldError error={serverErrors.aliases?.[0]} t={t} />
+                <FieldError error={serverErrors.aliases?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1369,7 +1819,7 @@ export function ProductEditor({
                     ) ?? null
                   }
                 />
-                <FieldError error={serverErrors.mechanismId?.[0]} t={t} />
+                <FieldError error={serverErrors.mechanismId?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1385,7 +1835,7 @@ export function ProductEditor({
                   required
                   value={field.state.value ?? ""}
                 />
-                <FieldError error={serverErrors.refillModel?.[0]} t={t} />
+                <FieldError error={serverErrors.refillModel?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1396,7 +1846,7 @@ export function ProductEditor({
               <Field label={t("web.catalog.field.materials")}>
                 <MaterialAssignmentsEditor
                   onChange={field.handleChange}
-                  onOptionsChange={setOptions}
+                  onOptionsChange={receiveOptions}
                   options={options}
                   singleAssignment={productTypeSlug === "slider-insert"}
                   t={t}
@@ -1407,7 +1857,9 @@ export function ProductEditor({
                     <Button
                       aria-pressed={showMaterialWeights}
                       className="w-fit"
-                      onClick={() => setShowMaterialWeights((shown) => !shown)}
+                      onClick={() =>
+                        dispatch({ type: "materialWeightsToggled" })
+                      }
                       type="button"
                       variant="outline"
                     >
@@ -1482,7 +1934,7 @@ export function ProductEditor({
                   </div>
                 ) : null}
                 <FieldError
-                  error={serverErrors.materialAssignments?.[0]}
+                  error={serverErrors.materialAssignments?.errors[0]}
                   t={t}
                 />
               </Field>
@@ -1496,14 +1948,14 @@ export function ProductEditor({
               {(field) => (
                 <FinishOptionsEditor
                   onChange={field.handleChange}
-                  onOptionsChange={setOptions}
+                  onOptionsChange={receiveOptions}
                   options={options}
                   t={t}
                   value={field.state.value}
                 />
               )}
             </form.Field>
-            <FieldError error={serverErrors.finishOptions?.[0]} t={t} />
+            <FieldError error={serverErrors.finishOptions?.errors[0]} t={t} />
           </>
         ) : null}
 
@@ -1585,7 +2037,7 @@ export function ProductEditor({
                       value={selected}
                     />
                     <FieldError
-                      error={serverErrors.refillCompatibility?.[0]}
+                      error={serverErrors.refillCompatibility?.errors[0]}
                       t={t}
                     />
                   </Field>
@@ -1614,11 +2066,9 @@ export function ProductEditor({
                           <input
                             checked={checked}
                             onChange={(event) => {
-                              setOpenPartRoles((current) => {
-                                const next = new Set(current);
-                                if (event.target.checked) next.add(role.type);
-                                else next.delete(role.type);
-                                return next;
+                              dispatch({
+                                type: "partRoleToggled",
+                                role: role.type,
                               });
                               if (!event.target.checked)
                                 field.handleChange(
@@ -1661,7 +2111,10 @@ export function ProductEditor({
                               aria-haspopup="dialog"
                               onClick={(event) => {
                                 partTrigger.current = event.currentTarget;
-                                setActivePartType(role.type);
+                                dispatch({
+                                  type: "partCreationChanged",
+                                  partType: role.type,
+                                });
                               }}
                               type="button"
                               variant="outline"
@@ -1674,7 +2127,7 @@ export function ProductEditor({
                     );
                   })}
                   <FieldError
-                    error={serverErrors.compatiblePartProductIds?.[0]}
+                    error={serverErrors.compatiblePartProductIds?.errors[0]}
                     t={t}
                   />
                 </fieldset>
@@ -1733,7 +2186,7 @@ export function ProductEditor({
                     })}
                     value={field.state.value as never}
                   />
-                  <FieldError error={serverErrors[name]?.[0]} t={t} />
+                  <FieldError error={serverErrors[name]?.errors[0]} t={t} />
                 </Field>
               )}
             </form.Field>
@@ -1779,7 +2232,7 @@ export function ProductEditor({
                     {t("web.slider.relationship.addPlates")}
                   </Button>
                   <FieldError
-                    error={serverErrors.includedPlateProductId?.[0]}
+                    error={serverErrors.includedPlateProductId?.errors[0]}
                     t={t}
                   />
                 </Field>
@@ -1804,7 +2257,7 @@ export function ProductEditor({
                   />
                   {t("web.slider.capability.usesInserts")}
                 </label>
-                <FieldError error={serverErrors.usesInserts?.[0]} t={t} />
+                <FieldError error={serverErrors.usesInserts?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1860,7 +2313,7 @@ export function ProductEditor({
                               form.state.values.magnetConfiguration !== null
                             ) {
                               form.setFieldValue("magnetConfiguration", null);
-                              setMagnetConfigurationNotice(true);
+                              dispatch({ type: "magnetSnapshotDiscarded" });
                             }
                           }}
                           placeholder={t(
@@ -1882,7 +2335,9 @@ export function ProductEditor({
                           {t("web.slider.relationship.addInsert")}
                         </Button>
                         <FieldError
-                          error={serverErrors.includedInsertProductId?.[0]}
+                          error={
+                            serverErrors.includedInsertProductId?.errors[0]
+                          }
                           t={t}
                         />
                       </Field>
@@ -1941,7 +2396,7 @@ export function ProductEditor({
                           </p>
                         ) : null}
                         <FieldError
-                          error={serverErrors.magnetLayout?.[0]}
+                          error={serverErrors.magnetLayout?.errors[0]}
                           t={t}
                         />
                       </Field>
@@ -1999,7 +2454,7 @@ export function ProductEditor({
                   onChange={(event) => field.handleChange(event.target.value)}
                   value={field.state.value}
                 />
-                <FieldError error={serverErrors.bearing?.[0]} t={t} />
+                <FieldError error={serverErrors.bearing?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -2041,7 +2496,7 @@ export function ProductEditor({
                         value={selected}
                       />
                       <FieldError
-                        error={serverErrors.compatibleButtonId?.[0]}
+                        error={serverErrors.compatibleButtonId?.errors[0]}
                         t={t}
                       />
                     </Field>
@@ -2059,15 +2514,17 @@ export function ProductEditor({
             <CatalogMarkdownEditor
               defaultValue={field.state.value}
               error={
-                serverErrors.description?.[0]
-                  ? t(serverErrors.description[0])
+                serverErrors.description?.errors[0]
+                  ? t(serverErrors.description.errors[0])
                   : undefined
               }
               help={t("web.catalog.help.markdownDescription")}
               id="product-description"
               label={t("web.catalog.field.description")}
               onChange={field.handleChange}
-              onLoadingChange={setDescriptionLoading}
+              onLoadingChange={(loading) =>
+                dispatch({ type: "descriptionLoadingChanged", loading })
+              }
               ref={descriptionRef}
             />
           )}
@@ -2075,6 +2532,7 @@ export function ProductEditor({
         {!quickCreate ? (
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
+            disabled={Boolean(ui.save)}
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -2091,10 +2549,13 @@ export function ProductEditor({
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImages((current) => [...current, ...additions])
+              imageForm.setFieldValue("pending", (current) => [
+                ...current,
+                ...additions,
+              ])
             }
             onRemove={(index) =>
-              setImages((current) =>
+              imageForm.setFieldValue("pending", (current) =>
                 current.filter((_, candidate) => candidate !== index),
               )
             }
@@ -2112,7 +2573,7 @@ export function ProductEditor({
                 : undefined
             }
             images={existingImages}
-            onChange={setExistingImages}
+            onChange={(value) => imageForm.setFieldValue("existing", value)}
             t={t}
             targetType="product"
           />
@@ -2125,7 +2586,9 @@ export function ProductEditor({
       </div>
       {formError ? (
         <div className="lg:col-span-2">
-          <Notice>{t(formError)}</Notice>
+          <Notice>
+            {t(typeof formError === "string" ? formError : formError.form)}
+          </Notice>
         </div>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
@@ -2159,6 +2622,7 @@ export function ProductEditor({
             <Button
               disabled={
                 Boolean(isSubmitting) ||
+                Boolean(ui.save) ||
                 descriptionLoading ||
                 String(description).length > 5000
               }
@@ -2186,7 +2650,7 @@ export function ProductEditor({
                     plateTrigger.current?.focus();
                   }}
                   onCreated={(plate) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       relationshipProducts: [
                         ...current.relationshipProducts,
@@ -2213,11 +2677,12 @@ export function ProductEditor({
             <dialog
               aria-labelledby={partDialogTitleId}
               className="m-auto w-[min(64rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
-              onClose={() => {
-                setActivePartType(null);
+              onCancel={(event) => {
+                event.preventDefault();
+                dispatch({ type: "partCreationChanged", partType: null });
                 partTrigger.current?.focus();
               }}
-              ref={partDialog}
+              ref={bindPartDialog}
             >
               <div className="grid gap-4 p-6">
                 <h2 className="text-lg font-semibold" id={partDialogTitleId}>
@@ -2226,11 +2691,11 @@ export function ProductEditor({
                 <ProductEditor
                   onCancel={() => {
                     partDialog.current?.close();
-                    setActivePartType(null);
+                    dispatch({ type: "partCreationChanged", partType: null });
                     partTrigger.current?.focus();
                   }}
                   onCreated={(part) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       relationshipProducts: [
                         ...current.relationshipProducts,
@@ -2242,7 +2707,7 @@ export function ProductEditor({
                       part.id,
                     ]);
                     partDialog.current?.close();
-                    setActivePartType(null);
+                    dispatch({ type: "partCreationChanged", partType: null });
                     partTrigger.current?.focus();
                   }}
                   options={options}
@@ -2270,7 +2735,7 @@ export function ProductEditor({
                     insertTrigger.current?.focus();
                   }}
                   onCreated={(insert) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       relationshipProducts: [
                         ...current.relationshipProducts,
@@ -2637,6 +3102,74 @@ type LookupDialogProps = (
   t: ReturnType<typeof useCatalogCopy>;
 };
 
+/** Inline lookup fields owned by the dialog form. */
+type LookupFields = {
+  /** Canonical lookup name or maker terminology label. */
+  name: string;
+  /** Color hex input. */
+  hex: string;
+  /** Optional maker root URL. */
+  rootUrl: string;
+  /** Preferred maker terminology choice. */
+  isPreferred: boolean;
+};
+/** Created lookup discriminated by its stable caller contract. */
+type CreatedLookup =
+  | {
+      /** Maker result. */
+      kind: "maker";
+      /** Created maker. */
+      value: CatalogMaker;
+    }
+  | {
+      /** Color result. */
+      kind: "color";
+      /** Created color. */
+      value: CatalogColor;
+    }
+  | {
+      /** Maker terminology result. */
+      kind: "terminologyAlias";
+      /** Created terminology alias. */
+      value: CatalogTerminologyAlias;
+    }
+  | {
+      /** Shared lookup result. */
+      kind: "finish" | "material" | "pattern";
+      /** Created canonical lookup. */
+      value: CatalogLookup;
+    };
+/** Inline lookup result retained across lifecycle resumption. */
+type LookupSaveResult = {
+  /** Created value on success. */
+  created?: CreatedLookup;
+  /** Existing field and form failures. */
+  error?: ProductValidation;
+};
+/** Pending inline lookup creation. */
+type LookupSaveState =
+  | EffectEntity<LookupSaveState, LookupSaveEvent>
+  | undefined;
+/** Creation, dismissal, and terminal lookup events. */
+type LookupSaveEvent =
+  | {
+      /** Submits captured inline fields. */
+      type: "requested";
+      /** Fields validated by the dialog form. */
+      fields: LookupFields;
+    }
+  | {
+      /** Disposes a dismissed or completed lookup. */
+      type: "closed" | "finished";
+    };
+/** Committed inline lookup creation. */
+type LookupSaveEffect = {
+  /** Creation implementation. */
+  type: "create";
+  /** Captured inline form values. */
+  fields: LookupFields;
+};
+
 /**
  * Renders a modal for creating one catalog lookup value.
  *
@@ -2648,14 +3181,103 @@ function LookupDialog(props: LookupDialogProps) {
   const ref = React.useRef<HTMLDialogElement>(null);
   const dialogId = React.useId();
   const titleId = React.useId();
-  const [name, setName] = React.useState("");
-  const [hex, setHex] = React.useState("#808080");
-  const [rootUrl, setRootUrl] = React.useState("");
-  const [isPreferred, setIsPreferred] = React.useState(false);
-  const [fieldErrors, setFieldErrors] = React.useState<
-    Record<string, string[] | undefined>
-  >({});
-  const [error, setError] = React.useState<string | null>(null);
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      hex: "#808080",
+      rootUrl: "",
+      isPreferred: false,
+    },
+    validators: {
+      /**
+       * Requires a lookup name before creation.
+       * @param context - Current lookup fields.
+       * @returns Existing localized validation feedback.
+       */
+      onSubmit: ({ value }): ProductValidation | undefined =>
+        value.name.trim()
+          ? undefined
+          : {
+              form: "web.catalog.error.form",
+              fields: { name: ["web.catalog.error.required"] },
+            },
+    },
+    /**
+     * Queues the validated lookup without restarting completed mutations.
+     * @param context - Current form submission.
+     * @returns Nothing.
+     */
+    onSubmit: ({ value }) => dispatch({ type: "requested", fields: value }),
+  });
+  const { name, hex, rootUrl, isPreferred } = useStore(
+    form.store,
+    (state) => state.values,
+  );
+  const fieldErrors = useStore(form.store, (state) => state.fieldMeta);
+  const error = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const pending = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: LookupSaveEffect;
+    /** Mutation completion retained across suspended observers. */
+    promise: Promise<LookupSaveResult>;
+  } | null>(null);
+  const [saving, dispatch] = useEffectReducer<
+    LookupSaveState,
+    LookupSaveEvent,
+    LookupSaveEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "create", fields: event.fields });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined,
+    {
+      /**
+       * Creates one lookup and publishes only to its active dialog observer.
+       * @param _state - Current creation lifetime.
+       * @param effect - Captured fields.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      create: (_state, effect, dispatch, { signal }) => {
+        if (pending.current?.effect !== effect)
+          pending.current = { effect, promise: create(effect.fields) };
+        void pending.current.promise.then((result) => {
+          if (signal.aborted) return;
+          pending.current = null;
+          dispatch({ type: "finished" });
+          if (result.error) {
+            form.setErrorMap({ onSubmit: result.error });
+            return;
+          }
+          const created = result.created;
+          if (!created) return;
+          if (created.kind === "maker" && props.kind === "maker")
+            props.onCreated(created.value);
+          else if (created.kind === "color" && props.kind === "color")
+            props.onCreated(created.value);
+          else if (
+            created.kind === "terminologyAlias" &&
+            props.kind === "terminologyAlias"
+          )
+            props.onCreated(created.value);
+          else if (
+            (created.kind === "finish" ||
+              created.kind === "material" ||
+              created.kind === "pattern") &&
+            (props.kind === "finish" ||
+              props.kind === "material" ||
+              props.kind === "pattern")
+          )
+            props.onCreated(created.value);
+          form.reset();
+          ref.current?.close();
+        });
+      },
+    },
+  );
   const action = {
     color: "web.action.addColor",
     finish: "web.action.addFinish",
@@ -2666,75 +3288,67 @@ function LookupDialog(props: LookupDialogProps) {
   }[kind] as TranslationKey;
 
   /**
-   * Creates the configured lookup and closes the dialog on success.
-   *
-   * @returns A promise that resolves after creation is attempted.
+   * Creates the configured lookup using captured fields.
+   * @param input - Validated inline lookup fields.
+   * @returns Created lookup or existing localized failures.
    */
-  const create = async () => {
-    if (props.kind === "maker") {
-      const result = await createCatalogMaker({ data: { name, rootUrl } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+  const create = async ({
+    name,
+    hex,
+    rootUrl,
+    isPreferred,
+  }: LookupFields): Promise<LookupSaveResult> => {
+    try {
+      if (props.kind === "maker") {
+        const result = await createCatalogMaker({ data: { name, rootUrl } });
+        return result.ok
+          ? { created: { kind: "maker", value: result.maker } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.maker);
-    } else if (props.kind === "terminologyAlias") {
-      const result = await createCatalogTerminologyAlias({
-        data: {
-          canonicalKey: props.canonicalKey,
-          canonicalNamespace: "product-type",
-          isPreferred,
-          label: name,
-          makerId: props.makerId,
-        },
-      });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "terminologyAlias") {
+        const result = await createCatalogTerminologyAlias({
+          data: {
+            canonicalKey: props.canonicalKey,
+            canonicalNamespace: "product-type",
+            isPreferred,
+            label: name,
+            makerId: props.makerId,
+          },
+        });
+        return result.ok
+          ? {
+              created: {
+                kind: "terminologyAlias",
+                value: result.terminologyAlias,
+              },
+            }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.terminologyAlias);
-    } else if (props.kind === "material") {
-      const result = await createCatalogMaterial({ data: { name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "material") {
+        const result = await createCatalogMaterial({ data: { name } });
+        return result.ok
+          ? { created: { kind: "material", value: result.material } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.material);
-    } else if (props.kind === "finish") {
-      const result = await createCatalogFinish({ data: { name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "finish") {
+        const result = await createCatalogFinish({ data: { name } });
+        return result.ok
+          ? { created: { kind: "finish", value: result.finish } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.finish);
-    } else if (props.kind === "pattern") {
-      const result = await createCatalogPattern({ data: { name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "pattern") {
+        const result = await createCatalogPattern({ data: { name } });
+        return result.ok
+          ? { created: { kind: "pattern", value: result.pattern } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.pattern);
-    } else {
       const result = await createCatalogColor({ data: { hex, name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
-      }
-      props.onCreated(result.color);
+      return result.ok
+        ? { created: { kind: "color", value: result.color } }
+        : { error: { form: result.formError, fields: result.fieldErrors } };
+    } catch {
+      return { error: { form: "error.generic" } };
     }
-    setName("");
-    setHex("#808080");
-    setRootUrl("");
-    setIsPreferred(false);
-    setFieldErrors({});
-    setError(null);
-    ref.current?.close();
   };
 
   return (
@@ -2743,8 +3357,7 @@ function LookupDialog(props: LookupDialogProps) {
         aria-controls={dialogId}
         aria-haspopup="dialog"
         onClick={() => {
-          setFieldErrors({});
-          setError(null);
+          form.setErrorMap({ onSubmit: undefined });
           ref.current?.showModal();
         }}
         type="button"
@@ -2757,30 +3370,43 @@ function LookupDialog(props: LookupDialogProps) {
         className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
         id={dialogId}
         ref={ref}
+        onClose={() => dispatch({ type: "closed" })}
       >
         <div className="grid gap-4 p-6">
           <h2 className="text-lg font-semibold" id={titleId}>
             {t(action)}
           </h2>
-          <Field label={t("web.catalog.field.name")}>
-            <Input
-              aria-label={t("web.catalog.field.name")}
-              onChange={(event) => setName(event.target.value)}
-              required
-              value={name}
-            />
-            <FieldError error={fieldErrors.name?.[0]} t={t} />
-          </Field>
+          <form.Field name="name">
+            {() => (
+              <Field label={t("web.catalog.field.name")}>
+                <Input
+                  aria-label={t("web.catalog.field.name")}
+                  onChange={(event) =>
+                    form.setFieldValue("name", event.target.value)
+                  }
+                  required
+                  value={name}
+                />
+                <FieldError error={fieldErrors.name?.errors[0]} t={t} />
+              </Field>
+            )}
+          </form.Field>
           {kind === "maker" ? (
-            <Field label={t("web.catalog.field.rootUrl")}>
-              <Input
-                aria-label={t("web.catalog.field.rootUrl")}
-                onChange={(event) => setRootUrl(event.target.value)}
-                type="url"
-                value={rootUrl}
-              />
-              <FieldError error={fieldErrors.rootUrl?.[0]} t={t} />
-            </Field>
+            <form.Field name="rootUrl">
+              {() => (
+                <Field label={t("web.catalog.field.rootUrl")}>
+                  <Input
+                    aria-label={t("web.catalog.field.rootUrl")}
+                    onChange={(event) =>
+                      form.setFieldValue("rootUrl", event.target.value)
+                    }
+                    type="url"
+                    value={rootUrl}
+                  />
+                  <FieldError error={fieldErrors.rootUrl?.errors[0]} t={t} />
+                </Field>
+              )}
+            </form.Field>
           ) : kind === "terminologyAlias" ? null : (
             <Field label={t("web.catalog.field.slug")}>
               <Input
@@ -2794,7 +3420,9 @@ function LookupDialog(props: LookupDialogProps) {
             <label className="flex items-center gap-2 text-sm">
               <input
                 checked={isPreferred}
-                onChange={(event) => setIsPreferred(event.target.checked)}
+                onChange={(event) =>
+                  form.setFieldValue("isPreferred", event.target.checked)
+                }
                 type="checkbox"
               />
               {t("web.slider.alias.preferred")}
@@ -2804,14 +3432,18 @@ function LookupDialog(props: LookupDialogProps) {
             <Field label={t("web.catalog.field.colors")}>
               <Input
                 aria-label={t("web.catalog.field.colors")}
-                onChange={(event) => setHex(event.target.value.toUpperCase())}
+                onChange={(event) =>
+                  form.setFieldValue("hex", event.target.value.toUpperCase())
+                }
                 required
                 type="color"
                 value={hex}
               />
             </Field>
           ) : null}
-          {error ? <Notice>{t(error)}</Notice> : null}
+          {error ? (
+            <Notice>{t(typeof error === "string" ? error : error.form)}</Notice>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button
               onClick={() => ref.current?.close()}
@@ -2820,7 +3452,14 @@ function LookupDialog(props: LookupDialogProps) {
             >
               {t("action.cancel")}
             </Button>
-            <Button onClick={() => void create()} type="button">
+            <Button
+              disabled={Boolean(saving)}
+              onClick={() => {
+                form.setErrorMap({ onSubmit: { form: "", fields: {} } });
+                void form.handleSubmit();
+              }}
+              type="button"
+            >
               {t(action)}
             </Button>
           </div>
