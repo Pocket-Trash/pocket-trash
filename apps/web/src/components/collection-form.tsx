@@ -4,6 +4,7 @@ import {
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogImage, UserCollectionSummary } from "@package/services";
+import { useForm, useStore } from "@tanstack/react-form";
 import {
   createColumnHelper,
   createPaginatedRowModel,
@@ -11,7 +12,8 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useReducer, useRef } from "react";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import {
   MarkdownEditor,
   type MarkdownEditorHandle,
@@ -206,15 +208,69 @@ export function CollectionForm({
   const summaryId = useId();
   const descriptionId = useId();
   const descriptionRef = useRef<MarkdownEditorHandle>(null);
-  const [value, setValue] = useState<CollectionFormValue>(
-    initialValue ?? {
-      description: "",
-      isPrivate: true,
-      name: "",
-      summary: "",
-    },
+  const [descriptionLoading, dispatch] = useReducer(
+    (
+      _state: boolean,
+      event: {
+        /** Committed editor readiness. */
+        type: "editorLoadingChanged";
+        /** Whether initialization is pending. */
+        loading: boolean;
+      },
+    ) => event.loading,
+    true,
   );
-  const [files, setFiles] = useState<File[]>([]);
+  /**
+   * Validates metadata using the existing limits without adding user-facing copy.
+   * @param input - Current collection metadata and selected images.
+   * @returns Whether existing collection limits are violated.
+   */
+  const validate = ({
+    value: current,
+  }: {
+    /** Current metadata and files. */ value: CollectionFormValue & {
+      /** Selected initial collection images. */ files: File[];
+    };
+  }) =>
+    current.name.trim().length < 2 ||
+    current.name.length > 80 ||
+    current.description.length > 5000 ||
+    current.summary.length > 200
+      ? true
+      : undefined;
+  const form = useForm({
+    defaultValues: {
+      ...(initialValue ?? {
+        description: "",
+        isPrivate: true,
+        name: "",
+        summary: "",
+      }),
+      files: [] as File[],
+    },
+    validators: { onMount: validate, onChange: validate, onSubmit: validate },
+    /**
+     * Delivers valid metadata through the existing caller-owned save workflow.
+     * @param input - Validated metadata and selected images.
+     * @returns Completion of the caller's save workflow.
+     */
+    onSubmit: ({ value: current }) =>
+      onSubmit(
+        {
+          description: current.description,
+          isPrivate: current.isPrivate,
+          name: current.name,
+          summary: current.summary,
+        },
+        current.files,
+      ),
+  });
+  const value = useStore(form.store, (state) => state.values);
+  const files = value.files;
+  const canSubmit = useStore(
+    form.store,
+    (state) => state.canSubmit && !state.isSubmitting,
+  );
   return (
     <form
       className={cn(
@@ -224,10 +280,12 @@ export function CollectionForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        const description =
-          descriptionRef.current?.getValue() ?? value.description;
-        if (description.length > 5000 || value.summary.length > 200) return;
-        void onSubmit({ ...value, description }, files);
+        if (disabled || descriptionRef.current?.isLoading()) return;
+        form.setFieldValue(
+          "description",
+          descriptionRef.current?.getValue() ?? value.description,
+        );
+        void form.handleSubmit();
       }}
     >
       <div className="grid min-w-0 content-start gap-5">
@@ -238,9 +296,7 @@ export function CollectionForm({
             id={nameId}
             maxLength={80}
             minLength={2}
-            onChange={(event) =>
-              setValue({ ...value, name: event.target.value })
-            }
+            onChange={(event) => form.setFieldValue("name", event.target.value)}
             placeholder={copy.namePlaceholder}
             required
             value={value.name}
@@ -255,7 +311,7 @@ export function CollectionForm({
             maxLength={200}
             name="summary"
             onChange={(event) =>
-              setValue({ ...value, summary: event.target.value })
+              form.setFieldValue("summary", event.target.value)
             }
             placeholder={copy.summaryPlaceholder}
             value={value.summary}
@@ -267,8 +323,11 @@ export function CollectionForm({
           disabled={disabled}
           id={descriptionId}
           label={copy.description}
+          onLoadingChange={(loading) =>
+            dispatch({ type: "editorLoadingChanged", loading })
+          }
           onChange={(description) =>
-            setValue((current) => ({ ...current, description }))
+            form.setFieldValue("description", description)
           }
           placeholder={copy.descriptionPlaceholder}
           ref={descriptionRef}
@@ -279,7 +338,7 @@ export function CollectionForm({
             checked={!value.isPrivate}
             disabled={disabled}
             onCheckedChange={(isPublic) =>
-              setValue({ ...value, isPrivate: !isPublic })
+              form.setFieldValue("isPrivate", !isPublic)
             }
           />
         </div>
@@ -303,10 +362,13 @@ export function CollectionForm({
               label={copy.cover}
               multiple
               onFilesChange={(additions) =>
-                setFiles((current) => [...current, ...additions])
+                form.setFieldValue("files", (current) => [
+                  ...current,
+                  ...additions,
+                ])
               }
               onRemove={(index) =>
-                setFiles((current) =>
+                form.setFieldValue("files", (current) =>
                   current.filter((_, candidate) => candidate !== index),
                 )
               }
@@ -341,12 +403,7 @@ export function CollectionForm({
           </Button>
         ) : null}
         <Button
-          disabled={
-            disabled ||
-            value.name.trim().length < 2 ||
-            value.description.length > 5000 ||
-            value.summary.length > 200
-          }
+          disabled={disabled || descriptionLoading || !canSubmit}
           type="submit"
         >
           {copy.submit}
@@ -609,6 +666,30 @@ export function CollectionCoverManager({
   );
 }
 
+/** Pending collection image upload. */
+type CollectionUploadState =
+  | EffectEntity<CollectionUploadState, CollectionUploadEvent>
+  | undefined;
+/** File submission and terminal upload feedback. */
+type CollectionUploadEvent =
+  | {
+      /** Starts one selected batch. */
+      type: "requested";
+      /** Selected batch snapshot. */
+      files: File[];
+    }
+  | {
+      /** Completes the upload observer. */
+      type: "finished";
+    };
+/** Committed selected-image batch. */
+type CollectionUploadEffect = {
+  /** Upload callback implementation. */
+  type: "upload";
+  /** Files selected at submission. */
+  files: File[];
+};
+
 /**
  * Renders a batch image uploader that clears successful submissions.
  *
@@ -683,14 +764,59 @@ export function CollectionImageUploader({
 }) {
   const { locale } = useLocale();
   const imageGuidance = getImageUploadGuidance(locale);
-  const [files, setFiles] = useState<File[]>([]);
+  const form = useForm({ defaultValues: { files: [] as File[] } });
+  const files = useStore(form.store, (state) => state.values.files);
+  const task = useRef<{
+    /** Descriptor whose callback must not replay. */
+    effect: CollectionUploadEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<boolean>;
+  } | null>(null);
+  const [pending, dispatch] = useEffectReducer<
+    CollectionUploadState,
+    CollectionUploadEvent,
+    CollectionUploadEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "upload", files: event.files });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined,
+    {
+      /**
+       * Observes one upload callback across lifecycle resumption without replaying it.
+       * @param _state - Current upload lifetime.
+       * @param effect - Files captured by this upload.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      upload: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: onUpload(effect.files) };
+        void task.current.promise.then(
+          (clear) => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            if (clear)
+              form.setFieldValue("files", (current) =>
+                current.filter((file) => !effect.files.includes(file)),
+              );
+          },
+          () => {
+            if (!signal.aborted) dispatch({ type: "finished" });
+          },
+        );
+      },
+    },
+  );
   /**
-   * Uploads the selected files and clears successful submissions.
-   *
-   * @returns A promise that resolves after the upload attempt.
+   * Queues the selected files for the existing authorized upload callback.
    */
-  const upload = async () => {
-    if (files.length && (await onUpload(files))) setFiles([]);
+  const upload = () => {
+    if (!disabled && files.length && !pending)
+      dispatch({ type: "requested", files });
   };
   const content = (
     <>
@@ -702,17 +828,17 @@ export function CollectionImageUploader({
         aspectRatioWarning={imageGuidance.warning}
         browseLabel={copy.browse}
         description={copy.imageHelp}
-        disabled={disabled}
+        disabled={disabled || Boolean(pending)}
         fileTypes={copy.imageTypes}
         files={files}
         id="collection-gallery-images"
         label={copy.label}
         multiple
         onFilesChange={(additions) =>
-          setFiles((current) => [...current, ...additions])
+          form.setFieldValue("files", (current) => [...current, ...additions])
         }
         onRemove={(index) =>
-          setFiles((current) =>
+          form.setFieldValue("files", (current) =>
             current.filter((_, candidate) => candidate !== index),
           )
         }
@@ -720,7 +846,7 @@ export function CollectionImageUploader({
       />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button
-        disabled={disabled || !files.length}
+        disabled={disabled || Boolean(pending) || !files.length}
         onClick={embedded ? () => void upload() : undefined}
         type={embedded ? "button" : "submit"}
       >

@@ -60,5 +60,11 @@ export const Route = createFileRoute("/user/collections_/$collectionId_/edit")({
  */
 function CollectionEditRoute() {
   const { collection, deletion } = Route.useLoaderData();
-  return <CollectionFormPage collection={collection} deletion={deletion} />;
+  return (
+    <CollectionFormPage
+      key={collection.id}
+      collection={collection}
+      deletion={deletion}
+    />
+  );
 }

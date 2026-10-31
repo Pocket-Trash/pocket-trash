@@ -3479,6 +3479,95 @@ function LookupDialog(props: LookupDialogProps) {
   );
 }
 
+/** One collection metadata, cover, or gallery operation. */
+type CollectionPageOperation =
+  | {
+      /** Saves metadata before initial images. */
+      kind: "save";
+      /** Submitted metadata. */
+      value: CollectionFormValue;
+      /** Initial collection images. */
+      files: File[];
+      /** Existing or just-created collection identifier. */
+      collectionId: number | null;
+      /** Optional moderation reason. */
+      reason?: string;
+      /** Resolves the existing form callback after terminal feedback. */
+      complete(): void;
+    }
+  | {
+      /** Changes or deletes an existing cover. */
+      kind: "cover";
+      /** Existing authorized cover callback. */
+      action: CollectionCoverAction;
+      /** Optional moderation reason. */
+      reason?: string;
+      /** Resolves the existing cover callback. */
+      complete(): void;
+    }
+  | {
+      /** Uploads an existing collection gallery batch. */
+      kind: "gallery";
+      /** Collection receiving the batch. */
+      collectionId: number;
+      /** Selected image batch. */
+      files: File[];
+      /**
+       * Resolves the existing uploader callback.
+       * @param clear - Whether all selected files uploaded.
+       */
+      complete(clear: boolean): void;
+    };
+/** Durable outcome retained while collection UI is suspended. */
+type CollectionPageResult = {
+  /** Saved collection, including after upload failure. */
+  collection?: UserCollectionSummary;
+  /** Localized metadata/cover failure. */
+  error?: string;
+  /** Localized gallery failure. */
+  uploadError?: string;
+  /** Whether the successful gallery batch may be cleared. */
+  uploaded?: boolean;
+  /** Destination after a successful metadata save. */
+  navigateId?: number;
+  /** Whether cover/gallery data should be reloaded after success. */
+  reload?: boolean;
+};
+/** Collection page data and its one active workflow. */
+type CollectionPageState = {
+  /** Latest durable collection. */
+  current: UserCollectionSummary | undefined;
+  /** Localized metadata or cover failure. */
+  error: string | null;
+  /** Localized gallery failure. */
+  uploadError: string | null;
+  /** Active metadata, gallery, or cover effect. */
+  operation: EffectEntity<CollectionPageState, CollectionPageEvent> | undefined;
+};
+/** Collection-page operation requests and terminal feedback. */
+type CollectionPageEvent =
+  | {
+      /** Requests one authorized workflow. */
+      type: "requested";
+      /** Captured operation and existing callback completion. */
+      operation: CollectionPageOperation;
+    }
+  | {
+      /** Delivers the operation result and stops its effect. */
+      type: "finished";
+      /** Operation whose feedback should be updated. */
+      kind: CollectionPageOperation["kind"];
+      /** Durable result. */
+      result: CollectionPageResult;
+    };
+/** Committed collection-page operation. */
+type CollectionPageEffect = {
+  /** Workflow implementation. */
+  type: "run";
+  /** Immutable operation and completion callback. */
+  operation: CollectionPageOperation;
+};
+
 /**
  * Renders the collection create or edit form.
  *
@@ -3505,10 +3594,148 @@ export function CollectionFormPage({
   const t = useCatalogCopy();
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [current, setCurrent] = React.useState(collection);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionPageEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CollectionPageResult>;
+  } | null>(null);
+  const active = React.useRef(false);
+  const [page, dispatch] = useEffectReducer<
+    CollectionPageState,
+    CollectionPageEvent,
+    CollectionPageEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested") {
+        if (state.operation) return state;
+        return {
+          ...state,
+          error: event.operation.kind === "gallery" ? state.error : null,
+          uploadError:
+            event.operation.kind === "gallery" ? null : state.uploadError,
+          operation: exec({ type: "run", operation: event.operation }),
+        };
+      }
+      exec.stop(state.operation);
+      return {
+        ...state,
+        current: event.result.collection ?? state.current,
+        error:
+          event.kind === "gallery" ? state.error : (event.result.error ?? null),
+        uploadError:
+          event.kind === "gallery"
+            ? (event.result.uploadError ?? null)
+            : state.uploadError,
+        operation: undefined,
+      };
+    },
+    {
+      current: collection,
+      error: null,
+      uploadError: null,
+      operation: undefined,
+    },
+    {
+      /**
+       * Runs one collection mutation and observes it across lifecycle resumption.
+       * @param _state - Current page data.
+       * @param effect - Captured authorized operation.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      run: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: perform(effect.operation) };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          active.current = false;
+          dispatch({ type: "finished", kind: effect.operation.kind, result });
+          if (effect.operation.kind === "gallery")
+            effect.operation.complete(result.uploaded ?? false);
+          else effect.operation.complete();
+          if (result.reload) window.location.reload();
+          else if (result.navigateId !== undefined)
+            void navigate({
+              params: { collectionId: result.navigateId },
+              to: "/user/collections/$collectionId",
+            });
+        });
+      },
+    },
+  );
+  const { current, error, uploadError } = page;
+  const saving = Boolean(page.operation);
+  /**
+   * Performs metadata, cover, or gallery I/O without publishing disposed UI feedback.
+   * @param operation - Captured authorized operation.
+   * @returns Durable result retained for the active observer.
+   */
+  async function perform(
+    operation: CollectionPageOperation,
+  ): Promise<CollectionPageResult> {
+    if (operation.kind === "gallery") {
+      try {
+        const upload = await uploadImages({
+          locale,
+          files: operation.files,
+          getToken,
+          targetId: operation.collectionId,
+          targetType: "collection",
+        });
+        return upload.failed.length
+          ? { uploadError: t("web.collections.error.upload"), uploaded: false }
+          : { uploaded: true, reload: true };
+      } catch (error) {
+        const failure = error as ImageUploadError;
+        return {
+          uploadError: t(failure.key ?? "error.generic", failure.params),
+          uploaded: false,
+        };
+      }
+    }
+    if (operation.kind === "cover") {
+      try {
+        await operation.action(operation.reason);
+        return { reload: true };
+      } catch {
+        return { error: t("error.generic") };
+      }
+    }
+    let saved: UserCollectionSummary | undefined;
+    try {
+      const result = await saveCollection({
+        data: {
+          collectionId: operation.collectionId,
+          ...operation.value,
+          reason: operation.reason,
+        },
+      });
+      if (!result.ok) return { error: t(result.formError) };
+      saved = result.collection;
+      if (operation.files.length) {
+        const upload = await uploadImages({
+          locale,
+          files: operation.files,
+          getToken,
+          reason: operation.reason,
+          targetId: saved.id,
+          targetType: "collection",
+        });
+        if (upload.failed.length)
+          return {
+            collection: saved,
+            error: t("web.collections.error.upload"),
+          };
+      }
+      return { collection: saved, navigateId: saved.id };
+    } catch {
+      return {
+        collection: saved,
+        error: t(saved ? "web.collections.error.upload" : "error.generic"),
+      };
+    }
+  }
   const copy = {
     browse: t("web.resources.upload.browseFiles"),
     cancel: t("action.cancel"),
@@ -3531,88 +3758,52 @@ export function CollectionFormPage({
   };
 
   /**
-   * Saves the collection and uploads its initial images.
-   *
-   * @param value - Collection form values.
-   * @param images - Initial collection images.
-   * @returns A promise that resolves after the save flow completes.
+   * Queues metadata and initial images with any required staff reason.
+   * @param value - Collection metadata.
+   * @param images - Initial image batch.
+   * @returns Completion after active terminal feedback.
    */
-  async function submit(value: CollectionFormValue, images: File[]) {
-    setSaving(true);
-    setError(null);
+  function submit(value: CollectionFormValue, images: File[]): Promise<void> {
+    if (active.current) return Promise.resolve();
     const moderating = Boolean(current?.canAdminister && !current.isOwner);
     const reason = moderating
       ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
       : undefined;
-    if (moderating && !reason) {
-      setSaving(false);
-      return;
-    }
-    const result = await saveCollection({
-      data: {
-        collectionId: current?.id ?? null,
-        description: value.description,
-        isPrivate: value.isPrivate,
-        name: value.name,
-        reason,
-        summary: value.summary,
-      },
-    });
-    if (!result.ok) {
-      setError(t(result.formError));
-      setSaving(false);
-      return;
-    }
-    setCurrent(result.collection);
-    if (images.length) {
-      try {
-        const upload = await uploadImages({
-          locale,
+    if (moderating && !reason) return Promise.resolve();
+    active.current = true;
+    return new Promise((complete) =>
+      dispatch({
+        type: "requested",
+        operation: {
+          kind: "save",
+          value,
           files: images,
-          getToken,
+          collectionId: current?.id ?? null,
           reason,
-          targetId: result.collection.id,
-          targetType: "collection",
-        });
-        if (upload.failed.length) {
-          setError(t("web.collections.error.upload"));
-          setSaving(false);
-          return;
-        }
-      } catch {
-        setError(t("web.collections.error.upload"));
-        setSaving(false);
-        return;
-      }
-    }
-    await navigate({
-      params: { collectionId: result.collection.id },
-      to: "/user/collections/$collectionId",
-    });
+          complete,
+        },
+      }),
+    );
   }
-
   /**
-   * Runs a collection cover action with any required moderation reason.
-   *
-   * @param action - Cover action to perform.
-   * @returns A promise that resolves after the action completes.
+   * Queues an existing cover action after its staff-reason check.
+   * @param action - Authorized cover operation.
+   * @returns Completion after active terminal feedback.
    */
-  async function updateCover(action: CollectionCoverAction) {
-    if (!current) return;
+  function updateCover(action: CollectionCoverAction): Promise<void> {
+    if (!current || active.current) return Promise.resolve();
     const moderating = Boolean(current.canAdminister && !current.isOwner);
     const reason = moderating
       ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
       : undefined;
-    if (moderating && !reason) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await action(reason);
-      window.location.reload();
-    } catch {
-      setError(t("error.generic"));
-      setSaving(false);
-    }
+    if (moderating && !reason) return Promise.resolve();
+    active.current = true;
+    return new Promise((complete) =>
+      dispatch({
+        type: "requested",
+        operation: { kind: "cover", action, reason, complete },
+      }),
+    );
   }
 
   return (
@@ -3663,32 +3854,20 @@ export function CollectionFormPage({
                   disabled={saving}
                   embedded
                   error={uploadError}
-                  onUpload={async (files) => {
-                    setSaving(true);
-                    setUploadError(null);
-                    try {
-                      const upload = await uploadImages({
-                        locale,
-                        files,
-                        getToken,
-                        targetId: current.id,
-                        targetType: "collection",
-                      });
-                      if (upload.failed.length) {
-                        setUploadError(t("web.collections.error.upload"));
-                        setSaving(false);
-                        return false;
-                      }
-                      window.location.reload();
-                      return true;
-                    } catch (uploadFailure) {
-                      const failure = uploadFailure as ImageUploadError;
-                      setUploadError(
-                        t(failure.key ?? "error.generic", failure.params),
-                      );
-                      setSaving(false);
-                      return false;
-                    }
+                  onUpload={(files) => {
+                    if (active.current) return Promise.resolve(false);
+                    active.current = true;
+                    return new Promise((complete) =>
+                      dispatch({
+                        type: "requested",
+                        operation: {
+                          kind: "gallery",
+                          collectionId: current.id,
+                          files,
+                          complete,
+                        },
+                      }),
+                    );
                   }}
                 />
                 {current.coverImages.length ? (
@@ -3814,6 +3993,41 @@ export function CollectionFormPage({
   );
 }
 
+/** Collection lifecycle confirmation fields. */
+type CollectionDeletionFields = {
+  /** Archive, delete, or move operation. */
+  choice: "archive" | "delete" | "move";
+  /** Explicit destructive-action confirmation. */
+  confirmed: boolean;
+  /** Same-owner destination for a move. */
+  destinationId: number | null;
+  /** Cross-owner moderation reason. */
+  reason: string;
+};
+/** Pending confirmed collection lifecycle operation. */
+type CollectionDeletionState =
+  | EffectEntity<CollectionDeletionState, CollectionDeletionEvent>
+  | undefined;
+/** Confirmation submission and terminal feedback. */
+type CollectionDeletionEvent =
+  | {
+      /** Commits validated confirmation fields. */
+      type: "requested";
+      /** Captured confirmation fields. */
+      fields: CollectionDeletionFields;
+    }
+  | {
+      /** Stops the completed operation. */
+      type: "finished";
+    };
+/** Committed collection lifecycle request. */
+type CollectionDeletionEffect = {
+  /** Lifecycle operation implementation. */
+  type: "commit";
+  /** Validated confirmation fields. */
+  fields: CollectionDeletionFields;
+};
+
 /**
  * Renders the archive and deletion choices for an existing collection.
  *
@@ -3853,17 +4067,101 @@ export function CollectionDeletionSection({
 }) {
   const t = useCatalogCopy();
   const dialog = React.useRef<HTMLDialogElement>(null);
-  const [choice, setChoice] = React.useState<"archive" | "delete" | "move">(
-    "archive",
+  const moderating = Boolean(collection.canAdminister && !collection.isOwner);
+  /**
+   * Enforces the current action's confirmation, destination, and staff reason.
+   * @param input - Current confirmation fields.
+   * @returns Whether a required confirmation field is missing.
+   */
+  const validate = ({
+    value,
+  }: {
+    /** Current confirmation fields. */ value: CollectionDeletionFields;
+  }) =>
+    (value.choice !== "archive" && !value.confirmed) ||
+    (value.choice === "move" && value.destinationId === null) ||
+    (moderating && !value.reason.trim())
+      ? true
+      : undefined;
+  const form = useForm({
+    defaultValues: {
+      choice: "archive",
+      confirmed: false,
+      destinationId: null,
+      reason: "",
+    } as CollectionDeletionFields,
+    validators: { onMount: validate, onChange: validate, onSubmit: validate },
+    /**
+     * Queues the validated lifecycle operation.
+     * @param input - Current confirmation fields.
+     */
+    onSubmit: ({ value }) => {
+      dispatch({ type: "requested", fields: value });
+    },
+  });
+  const { choice, confirmed, destinationId, reason } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [confirmed, setConfirmed] = React.useState(false);
-  const [destinationId, setDestinationId] = React.useState<number | null>(null);
-  const [submitting, setSubmitting] = React.useState(false);
-  const [failed, setFailed] = React.useState(false);
-  const [reason, setReason] = React.useState("");
+  const failed = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const canSubmit = useStore(
+    form.store,
+    (state) => !validate({ value: state.values }) && !state.isSubmitting,
+  );
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionDeletionEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<void>;
+  } | null>(null);
+  const [pending, dispatch] = useEffectReducer<
+    CollectionDeletionState,
+    CollectionDeletionEvent,
+    CollectionDeletionEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "commit", fields: event.fields });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined,
+    {
+      /**
+       * Runs a confirmed lifecycle operation once across Activity resumption.
+       * @param _state - Pending request.
+       * @param effect - Captured confirmation fields.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      commit: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: onSubmit(
+              effect.fields.choice,
+              effect.fields.destinationId,
+              moderating ? effect.fields.reason.trim() : undefined,
+            ),
+          };
+        void task.current.promise.then(
+          () => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            dialog.current?.close();
+          },
+          () => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            form.setErrorMap({ onSubmit: true });
+          },
+        );
+      },
+    },
+  );
+  const submitting = Boolean(pending);
   const reasonId = React.useId();
   const titleId = React.useId();
-  const moderating = Boolean(collection.canAdminister && !collection.isOwner);
   const destination = destinations.find(({ id }) => id === destinationId);
   const destructive = choice !== "archive";
 
@@ -3880,13 +4178,7 @@ export function CollectionDeletionSection({
       <dialog
         aria-labelledby={titleId}
         className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-        onClose={() => {
-          setChoice("archive");
-          setConfirmed(false);
-          setDestinationId(null);
-          setFailed(false);
-          setReason("");
-        }}
+        onClose={() => form.reset()}
         onCancel={(event) => {
           if (submitting) event.preventDefault();
         }}
@@ -3894,30 +4186,9 @@ export function CollectionDeletionSection({
       >
         <form
           className="grid gap-5 p-6"
-          onSubmit={async (event) => {
+          onSubmit={(event) => {
             event.preventDefault();
-            if (
-              submitting ||
-              (destructive && !confirmed) ||
-              (choice === "move" && destinationId === null) ||
-              (moderating && !reason.trim())
-            ) {
-              return;
-            }
-            setFailed(false);
-            setSubmitting(true);
-            try {
-              await onSubmit(
-                choice,
-                destinationId,
-                moderating ? reason.trim() : undefined,
-              );
-              dialog.current?.close();
-            } catch {
-              setFailed(true);
-            } finally {
-              setSubmitting(false);
-            }
+            if (!submitting) void form.handleSubmit();
           }}
         >
           <fieldset className="grid gap-3">
@@ -3941,8 +4212,8 @@ export function CollectionDeletionSection({
                   disabled={submitting}
                   name="collection-deletion-choice"
                   onChange={() => {
-                    setChoice(value);
-                    setConfirmed(false);
+                    form.setFieldValue("choice", value);
+                    form.setFieldValue("confirmed", false);
                   }}
                   type="radio"
                   value={value}
@@ -3961,7 +4232,9 @@ export function CollectionDeletionSection({
                   addLabel={t("web.action.addCollection")}
                   collections={destinations}
                   label={t("web.collections.deletion.destination")}
-                  onChange={setDestinationId}
+                  onChange={(value) =>
+                    form.setFieldValue("destinationId", value)
+                  }
                   placeholder={t("web.collections.select.placeholder")}
                   selectedId={destinationId}
                 />
@@ -3986,7 +4259,9 @@ export function CollectionDeletionSection({
                 checked={confirmed}
                 className="mt-0.5 size-4"
                 disabled={submitting}
-                onChange={(event) => setConfirmed(event.target.checked)}
+                onChange={(event) =>
+                  form.setFieldValue("confirmed", event.target.checked)
+                }
                 type="checkbox"
               />
               <span>
@@ -4010,7 +4285,9 @@ export function CollectionDeletionSection({
                 maxLength={1000}
                 disabled={submitting}
                 value={reason}
-                onChange={(event) => setReason(event.target.value)}
+                onChange={(event) =>
+                  form.setFieldValue("reason", event.target.value)
+                }
               />
             </div>
           ) : null}
@@ -4029,12 +4306,7 @@ export function CollectionDeletionSection({
               {t("action.cancel")}
             </Button>
             <Button
-              disabled={
-                submitting ||
-                (destructive && !confirmed) ||
-                (choice === "move" && destinationId === null) ||
-                (moderating && !reason.trim())
-              }
+              disabled={submitting || !canSubmit}
               type="submit"
               variant={destructive ? "destructive" : "default"}
             >
@@ -4369,6 +4641,108 @@ function collectionProductDefaults(
   };
 }
 
+/** Collection-item creation response retained through Activity suspension. */
+type CollectionAddResult = {
+  /** Created item identifier, including after upload failure. */
+  itemId: number | null;
+  /** Created or selected collection identifier. */
+  collectionId: number | null;
+  /** Item images still needing upload. */
+  images: File[];
+  /** Collection images still needing upload. */
+  collectionImages: File[];
+  /** Duplicate confirmation counts returned by the existing endpoint. */
+  duplicateCounts?: Record<number, number>;
+  /** Existing localized failure. */
+  error?: string;
+  /** Whether all ordered creation/upload work completed. */
+  complete?: boolean;
+};
+/** Committed collection-item creation and ordered image uploads. */
+type CollectionAddEffect = {
+  /** Creation implementation. */
+  type: "save";
+  /** Existing server input, validated by its unchanged endpoint. */
+  data: unknown;
+  /** Captured product name for duplicate-image confirmation. */
+  productName: string;
+  /** Existing item identifier retained for upload-only retry. */
+  itemId: number | null;
+  /** Existing destination retained for upload-only retry. */
+  collectionId: number | null;
+  /** Captured item images. */
+  images: File[];
+  /** Captured initial collection images. */
+  collectionImages: File[];
+};
+/** Collection creation disclosures, lookup choices, and mutation lifetime. */
+type CollectionAddState = {
+  /** Available lookup choices. */
+  options: CatalogOptions;
+  /** Last saved item identifier. */
+  savedItemId: number | null;
+  /** Last saved destination identifier. */
+  savedCollectionId: number | null;
+  /** Whether the Markdown surface is initializing. */
+  descriptionLoading: boolean;
+  /** Duplicate counts awaiting confirmation. */
+  duplicateCounts: Record<number, number>;
+  /** Whether the product chooser is disclosed. */
+  productSelectorOpen: boolean;
+  /** Current product chooser page. */
+  productPage: number;
+  /** Pending ordered creation workflow. */
+  save: EffectEntity<CollectionAddState, CollectionAddEvent> | undefined;
+};
+/** Product selection, disclosure, and creation events. */
+type CollectionAddEvent =
+  | {
+      /** Dismisses duplicate confirmation after changing a dependent choice. */
+      type: "confirmationDismissed";
+    }
+  | {
+      /** Accepts the existing shared lookup callback. */
+      type: "lookupOptionsChanged";
+      /** Pure replacement or updater. */
+      update: React.SetStateAction<CatalogOptions>;
+    }
+  | {
+      /** Applies a different product and clears stale creation state. */
+      type: "productSelected";
+      /** Whether selection is complete or the chooser remains open. */
+      selected: boolean;
+    }
+  | {
+      /** Changes product chooser disclosure. */
+      type: "selectorChanged";
+      /** Requested disclosure. */
+      open: boolean;
+    }
+  | {
+      /** Selects a product chooser page. */
+      type: "pageSelected";
+      /** Zero-based chooser page. */
+      page: number;
+    }
+  | {
+      /** Receives committed Markdown readiness. */
+      type: "descriptionLoadingChanged";
+      /** Whether initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Queues a validated creation attempt. */
+      type: "saveRequested";
+      /** Captured creation inputs. */
+      request: Omit<CollectionAddEffect, "type" | "itemId" | "collectionId">;
+    }
+  | {
+      /** Settles an ordered creation workflow. */
+      type: "saveFinished";
+      /** Durable result retained across resumption. */
+      result: CollectionAddResult;
+    };
+
 /**
  * Renders the form for adding a product to a collection.
  *
@@ -4411,238 +4785,123 @@ export function CollectionAddPage({
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [images, setImages] = React.useState<File[]>([]);
-  const collectionDialog = React.useRef<HTMLDialogElement>(null);
-  const [newCollection, setNewCollection] =
-    React.useState<CollectionFormValue | null>(() =>
-      collections.length === 0 && defaultCollectionName
-        ? {
-            description: "",
-            isPrivate: true,
-            name: defaultCollectionName,
-            summary: "",
-          }
-        : null,
-    );
-  const [collectionImages, setCollectionImages] = React.useState<File[]>([]);
-  const [selectedCollectionId, setSelectedCollectionId] = React.useState<
-    number | null
-  >(() =>
-    collections.length === 1
-      ? (collections[0]?.id ?? null)
-      : newCollection
-        ? -1
-        : null,
-  );
-  const [savedItemId, setSavedItemId] = React.useState<number | null>(null);
-  const [savedCollectionId, setSavedCollectionId] = React.useState<
-    number | null
-  >(null);
-  const [options, setOptions] = React.useState(initialOptions);
   const initialProduct = products.find(({ id }) => id === initialProductId);
-  const [type, setType] = React.useState<ComboboxOption | null>(() =>
-    initialProduct
+  const initialDefaults = collectionProductDefaults(initialProduct, t);
+  const initialNewCollection = (
+    collections.length === 0 && defaultCollectionName
+      ? {
+          description: "",
+          isPrivate: true,
+          name: defaultCollectionName,
+          summary: "",
+        }
+      : null
+  ) as CollectionFormValue | null;
+  /** Initial collection-item fields. */
+  const defaultValues = {
+    images: [] as File[],
+    newCollection: initialNewCollection,
+    collectionImages: [] as File[],
+    selectedCollectionId: (collections.length === 1
+      ? (collections[0]?.id ?? null)
+      : initialNewCollection
+        ? -1
+        : null) as number | null,
+    type: (initialProduct
       ? (initialOptions.productTypes.find(
           ({ slug }) => slug === initialProduct.productTypeSlug,
         ) ?? null)
-      : null,
-  );
-  const [product, setProduct] = React.useState<CatalogProduct | null>(
-    initialProduct ?? null,
-  );
-  const initialDefaults = collectionProductDefaults(initialProduct, t);
-  const [displayName, setDisplayName] = React.useState(
-    initialDefaults.displayName,
-  );
-  const [description, setDescription] = React.useState("");
-  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
-  const [bearing, setBearing] = React.useState("");
-  const [serialNumber, setSerialNumber] = React.useState<string | null>(null);
-  const [ownership, setOwnership] = React.useState<OwnershipEditorValue>(() =>
-    ownershipEditorValue(),
-  );
-  const [installedPenPartIds, setInstalledPenPartIds] = React.useState<
-    number[]
-  >([]);
-  const [installedRefillProductId, setInstalledRefillProductId] =
-    React.useState<number | null>(null);
-  const [installedRefillOfferingId, setInstalledRefillOfferingId] =
-    React.useState<number | null>(null);
-  const [material, setMaterial] = React.useState<CatalogLookup | null>(
-    initialDefaults.material,
-  );
-  const [finish, setFinish] = React.useState<ComboboxOption | null>(
-    initialDefaults.finish,
-  );
-  const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
-  const [button, setButton] = React.useState<
-    CatalogProduct | ComboboxOption | null
-  >(null);
-  const [buttonMaterial, setButtonMaterial] =
-    React.useState<CatalogLookup | null>(null);
-  const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
-    null,
-  );
-  const [buttonCustomFinish, setButtonCustomFinish] =
-    React.useState(emptyFinishOption);
-  const [duplicateCounts, setDuplicateCounts] = React.useState<
-    Record<number, number>
-  >({});
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [productSelectorOpen, setProductSelectorOpen] = React.useState(
-    !initialProduct,
-  );
-  const [productQuery, setProductQuery] = React.useState("");
-  const [productPage, setProductPage] = React.useState(0);
-  const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
-  const matchingProducts = products.filter(
-    (candidate) =>
-      candidate.productTypeSlug === slug &&
-      `${candidate.name} ${candidate.makerName}`
-        .toLocaleLowerCase(locale)
-        .includes(productQuery.trim().toLocaleLowerCase(locale)),
-  );
-  const productPageCount = Math.max(1, Math.ceil(matchingProducts.length / 12));
-  const currentProductPage = Math.min(productPage, productPageCount - 1);
-  const visibleProducts = matchingProducts.slice(
-    currentProductPage * 12,
-    (currentProductPage + 1) * 12,
-  );
-  const selectedButton =
-    typeof button?.id === "number"
-      ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
-      : null;
-  const customFinishIsValid =
-    finishOptionSchema.safeParse(customFinish).success;
-  const buttonCustomFinishIsValid =
-    finishOptionSchema.safeParse(buttonCustomFinish).success;
-  const selectedCollection = collections.find(
-    ({ id }) => id === selectedCollectionId,
-  );
-  const collectionIsPrivate =
-    selectedCollection?.isPrivate ?? newCollection?.isPrivate ?? true;
-  const collectionChoices = newCollection
-    ? [
-        ...collections,
-        {
-          coverImage: null,
-          coverImages: [],
-          createdAt: new Date(0),
-          description: newCollection.description || null,
-          id: -1,
-          isAdminPrivate: false,
-          isPrivate: newCollection.isPrivate,
-          itemCount: 0,
-          name: newCollection.name,
-          ownerUserId: 0,
-          summary: newCollection.summary || null,
-          updatedAt: new Date(0),
-        },
-      ]
-    : collections;
-  const serialNumberIsValid =
-    serialNumber === null || serialNumber.trim().length > 0;
-
-  /**
-   * Selects one product, applies its unambiguous defaults, and clears stale ownership state.
-   *
-   * @param candidate - Product selected from the catalog.
-   */
-  const selectProduct = (candidate: CatalogProduct) => {
-    const defaults = collectionProductDefaults(candidate, t);
-    setProduct(candidate);
-    setDisplayName(defaults.displayName);
-    setDescription("");
-    setBearing("");
-    setSerialNumber(null);
-    setInstalledPenPartIds([]);
-    setInstalledRefillProductId(null);
-    setInstalledRefillOfferingId(null);
-    setMaterial(defaults.material);
-    setFinish(defaults.finish);
-    setCustomFinish(emptyFinishOption());
-    setButton(null);
-    setButtonMaterial(null);
-    setButtonFinish(null);
-    setButtonCustomFinish(emptyFinishOption());
-    setDuplicateCounts({});
-    setFormError(null);
-    setProductSelectorOpen(false);
+      : null) as ComboboxOption | null,
+    product: (initialProduct ?? null) as CatalogProduct | null,
+    displayName: initialDefaults.displayName,
+    description: "",
+    bearing: "",
+    serialNumber: null as string | null,
+    ownership: ownershipEditorValue() as OwnershipEditorValue,
+    installedPenPartIds: [] as number[],
+    installedRefillProductId: null as number | null,
+    installedRefillOfferingId: null as number | null,
+    material: initialDefaults.material as CatalogLookup | null,
+    finish: initialDefaults.finish as ComboboxOption | null,
+    customFinish: emptyFinishOption(),
+    button: null as CatalogProduct | ComboboxOption | null,
+    buttonMaterial: null as CatalogLookup | null,
+    buttonFinish: null as ComboboxOption | null,
+    buttonCustomFinish: emptyFinishOption(),
+    productQuery: "",
   };
-
   /**
-   * Saves the current collection-item fields.
-   *
-   * @param confirmed - Whether duplicate items were confirmed.
-   * @returns A promise that resolves after the save flow completes.
+   * Validates collection-item and compatibility fields before enabling a submission.
+   * @param input - Current form fields.
+   * @returns Existing localized validation feedback, when invalid.
    */
-  const submit = async (confirmed: boolean) => {
-    const currentDescription =
-      descriptionRef.current?.getValue() ?? description;
-    setFormError(null);
+  const validateDraft = ({
+    value,
+  }: {
+    /** Current collection-item fields. */ value: typeof defaultValues;
+  }): string | undefined => {
+    const selected =
+      typeof value.button?.id === "number"
+        ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
+        : null;
     if (
-      descriptionRef.current?.isLoading() ||
-      currentDescription.length > 5000 ||
-      !product ||
-      !displayName.trim() ||
-      selectedCollectionId === null ||
-      (!product.productTypeSlug.startsWith("pen") && !material) ||
-      !serialNumberIsValid ||
-      (finish?.id === "custom" && !customFinishIsValid) ||
-      !collectionProductTypeIsSupported(product.productTypeSlug) ||
-      (selectedButton &&
-        (!buttonMaterial ||
-          (buttonFinish?.id === "custom" && !buttonCustomFinishIsValid)))
-    ) {
-      return;
-    }
-    const imageError = validateImages(images, locale);
-    if (imageError) {
-      setFormError(imageError.key);
-      return;
-    }
-    if (savedItemId && savedCollectionId) {
-      try {
-        if (images.length) {
-          const uploads = await uploadImages({
-            locale,
-            files: images,
-            getToken,
-            targetId: savedItemId,
-            targetType: "collection_item",
-          });
-          setImages(uploads.failed);
-          if (uploads.failed.length) {
-            setFormError("web.resources.upload.sessionFailure");
-            return;
-          }
-        }
-        if (collectionImages.length) {
-          const coverUpload = await uploadImages({
-            locale,
-            files: collectionImages,
-            getToken,
-            targetId: savedCollectionId,
-            targetType: "collection",
-          });
-          if (coverUpload.failed.length) {
-            setFormError("web.collections.error.upload");
-            return;
-          }
-          setCollectionImages([]);
-        }
-        await navigate({
-          params: { collectionId: savedCollectionId },
-          to: "/user/collections/$collectionId",
-        });
-      } catch (error) {
-        setFormError((error as ImageUploadError).key ?? "error.generic");
-      }
-      return;
-    }
-    const result = await addCollectionProduct({
-      data: {
+      !value.product ||
+      !value.displayName.trim() ||
+      value.description.length > 5000 ||
+      value.selectedCollectionId === null ||
+      (!value.product.productTypeSlug.startsWith("pen") &&
+        (!value.material || !value.finish)) ||
+      (value.serialNumber !== null && !value.serialNumber.trim()) ||
+      (value.finish?.id === "custom" &&
+        !finishOptionSchema.safeParse(value.customFinish).success) ||
+      !collectionProductTypeIsSupported(value.product.productTypeSlug) ||
+      (selected &&
+        (!value.buttonMaterial ||
+          !value.buttonFinish ||
+          (value.buttonFinish?.id === "custom" &&
+            !finishOptionSchema.safeParse(value.buttonCustomFinish).success)))
+    )
+      return "web.catalog.error.form";
+    return validateImages(value.images, locale)?.key;
+  };
+  const form = useForm({
+    onSubmitMeta: { confirmed: false },
+    defaultValues,
+    validators: {
+      onMount: validateDraft,
+      onChange: validateDraft,
+      onSubmit: validateDraft,
+    },
+    /**
+     * Captures one valid item creation without changing its server payload.
+     * @param input - Validated fields and duplicate-confirmation metadata.
+     */
+    onSubmit: ({ value, meta: { confirmed } }) => {
+      const {
+        bearing,
+        buttonCustomFinish,
+        buttonFinish,
+        buttonMaterial,
+        selectedCollectionId,
+        installedPenPartIds,
+        customFinish,
+        displayName,
+        finish,
+        installedRefillOfferingId,
+        installedRefillProductId,
+        material,
+        newCollection,
+        product,
+        ownership,
+        serialNumber,
+      } = value;
+      if (!product || ui.save) return;
+      const currentDescription = value.description;
+      const selectedButton =
+        typeof value.button?.id === "number"
+          ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
+          : null;
+      const data = {
         bearing,
         buttonCustomFinish:
           selectedButton && buttonFinish?.id === "custom"
@@ -4686,79 +4945,385 @@ export function CollectionAddPage({
           entryReason: ownership.entryReason,
         },
         serialNumber,
+      };
+      dispatch({
+        type: "saveRequested",
+        request: {
+          data,
+          productName: product.name,
+          images: value.images,
+          collectionImages: value.collectionImages,
+        },
+      });
+    },
+  });
+  const {
+    images,
+    product,
+    newCollection,
+    selectedCollectionId,
+    type,
+    displayName,
+    description,
+    bearing,
+    serialNumber,
+    ownership,
+    installedPenPartIds,
+    installedRefillProductId,
+    installedRefillOfferingId,
+    material,
+    finish,
+    customFinish,
+    button,
+    buttonMaterial,
+    buttonFinish,
+    buttonCustomFinish,
+    productQuery,
+  } = useStore(form.store, (state) => state.values);
+
+  const collectionDialog = React.useRef<HTMLDialogElement>(null);
+
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionAddEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CollectionAddResult>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    CollectionAddState,
+    CollectionAddEvent,
+    CollectionAddEffect
+  >(
+    (state, event, exec) => {
+      switch (event.type) {
+        case "lookupOptionsChanged":
+          return {
+            ...state,
+            options:
+              typeof event.update === "function"
+                ? event.update(state.options)
+                : event.update,
+          };
+        case "productSelected":
+          exec.stop(state.save);
+          return {
+            ...state,
+            savedItemId: null,
+            savedCollectionId: null,
+            duplicateCounts: {},
+            productSelectorOpen: !event.selected,
+            save: undefined,
+          };
+        case "confirmationDismissed":
+          return { ...state, duplicateCounts: {} };
+        case "selectorChanged":
+          return { ...state, productSelectorOpen: event.open };
+        case "pageSelected":
+          return { ...state, productPage: event.page };
+        case "descriptionLoadingChanged":
+          return state.descriptionLoading === event.loading
+            ? state
+            : { ...state, descriptionLoading: event.loading };
+        case "saveRequested":
+          if (state.save) return state;
+          return {
+            ...state,
+            duplicateCounts: {},
+            save: exec({
+              type: "save",
+              ...event.request,
+              itemId: state.savedItemId,
+              collectionId: state.savedCollectionId,
+            }),
+          };
+        case "saveFinished":
+          exec.stop(state.save);
+          return {
+            ...state,
+            savedItemId: event.result.itemId,
+            savedCollectionId: event.result.collectionId,
+            duplicateCounts: event.result.duplicateCounts ?? {},
+            save: undefined,
+          };
+      }
+    },
+    {
+      options: initialOptions,
+      savedItemId: null,
+      savedCollectionId: null,
+      descriptionLoading: true,
+      duplicateCounts: {},
+      productSelectorOpen: !initialProduct,
+      productPage: 0,
+      save: undefined,
+    },
+    {
+      /**
+       * Observes one creation/upload pipeline without replaying completed mutations.
+       * @param _state - Current creation UI.
+       * @param effect - Captured creation and image inputs.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: performCreation(effect) };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished", result });
+          form.setFieldValue("images", (current) =>
+            current.filter(
+              (file) =>
+                !effect.images.includes(file) || result.images.includes(file),
+            ),
+          );
+          form.setFieldValue("collectionImages", (current) =>
+            current.filter(
+              (file) =>
+                !effect.collectionImages.includes(file) ||
+                result.collectionImages.includes(file),
+            ),
+          );
+          if (result.error) form.setErrorMap({ onSubmit: result.error });
+          if (result.complete && result.collectionId)
+            void navigate({
+              params: { collectionId: result.collectionId },
+              to: "/user/collections/$collectionId",
+            });
+        });
       },
-    });
-    if (!result.ok && result.requiresConfirmation) {
-      setDuplicateCounts(result.duplicateCounts);
-      return;
-    }
-    if (!result.ok) {
-      setFormError(result.formError);
-      return;
-    }
-    setSavedItemId(result.collectionItemId);
-    setSavedCollectionId(result.collectionId);
-    if (images.length) {
-      try {
-        const uploads = await uploadImages({
+    },
+  );
+  const {
+    options,
+    descriptionLoading,
+    duplicateCounts,
+    productSelectorOpen,
+    productPage,
+  } = ui;
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  /**
+   * Receives readiness without changing callback identity for legacy Markdown callers.
+   * @param loading - Whether initialization is pending.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => {
+      dispatch({ type: "descriptionLoadingChanged", loading });
+    },
+    [dispatch],
+  );
+  /**
+   * Accepts the stable shared-control lookup contract.
+   * @param update - Pure catalog replacement or updater.
+   */
+  const receiveOptions = (update: React.SetStateAction<CatalogOptions>) => {
+    dispatch({ type: "lookupOptionsChanged", update });
+  };
+  const canSubmit = useStore(
+    form.store,
+    (state) =>
+      validateDraft({ value: state.values }) === undefined &&
+      !state.isSubmitting,
+  );
+  const formError = useStore(form.store, (state) => state.errorMap.onSubmit);
+  /**
+   * Creates an item, uploads item images, then uploads collection images in the existing order.
+   * @param request - Captured submission or upload-only retry.
+   * @returns Durable identifiers, retained files, and existing failure feedback.
+   */
+  async function performCreation(
+    request: CollectionAddEffect,
+  ): Promise<CollectionAddResult> {
+    let itemId = request.itemId;
+    let collectionId = request.collectionId;
+    let images = request.images;
+    let collectionImages = request.collectionImages;
+    let created = false;
+    try {
+      if (!itemId || !collectionId) {
+        const result = await addCollectionProduct({ data: request.data });
+        if (!result.ok && result.requiresConfirmation)
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            duplicateCounts: result.duplicateCounts,
+          };
+        if (!result.ok)
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            error: result.formError,
+          };
+        itemId = result.collectionItemId;
+        collectionId = result.collectionId;
+        created = true;
+      }
+      if (images.length) {
+        const uploaded = await uploadImages({
           locale,
           files: images,
           getToken,
+          targetId: itemId,
+          targetType: "collection_item",
           /**
-           * Offers to restore an owner-deleted duplicate image.
-           *
-           * @param imageId - Duplicate image identifier.
+           * Offers the existing restore choice for duplicate images on initial creation.
+           * @param imageId - Owner-deleted duplicate identifier.
            * @returns Whether the duplicate was restored.
            */
-          onOwnerDeletedDuplicate: async (imageId) => {
-            if (
-              !window.confirm(
-                t("web.resources.trash.restoreConfirmationDescription", {
-                  name: product.name,
-                }),
-              )
-            )
-              return false;
-            await restoreCatalogImage({
-              data: { imageId, targetType: "collection_item" },
-            });
-            return true;
-          },
-          targetId: result.collectionItemId,
-          targetType: "collection_item",
+          onOwnerDeletedDuplicate: created
+            ? async (imageId) => {
+                if (
+                  !window.confirm(
+                    t("web.resources.trash.restoreConfirmationDescription", {
+                      name: request.productName,
+                    }),
+                  )
+                )
+                  return false;
+                await restoreCatalogImage({
+                  data: { imageId, targetType: "collection_item" },
+                });
+                return true;
+              }
+            : undefined,
         });
-        setImages(uploads.failed);
-        if (uploads.failed.length) {
-          setFormError("web.resources.upload.sessionFailure");
-          return;
-        }
-      } catch (error) {
-        setFormError((error as ImageUploadError).key ?? "error.generic");
-        return;
+        images = uploaded.failed;
+        if (images.length)
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            error: "web.resources.upload.sessionFailure",
+          };
       }
-    }
-    if (collectionImages.length) {
-      try {
-        const upload = await uploadImages({
-          locale,
-          files: collectionImages,
-          getToken,
-          targetId: result.collectionId,
-          targetType: "collection",
-        });
-        if (upload.failed.length) {
-          setFormError("web.collections.error.upload");
-          return;
+      if (collectionImages.length) {
+        try {
+          const uploaded = await uploadImages({
+            locale,
+            files: collectionImages,
+            getToken,
+            targetId: collectionId,
+            targetType: "collection",
+          });
+          collectionImages = uploaded.failed;
+          if (collectionImages.length)
+            return {
+              itemId,
+              collectionId,
+              images,
+              collectionImages,
+              error: "web.collections.error.upload",
+            };
+        } catch {
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            error: "web.collections.error.upload",
+          };
         }
-      } catch {
-        setFormError("web.collections.error.upload");
-        return;
       }
+      return { itemId, collectionId, images, collectionImages, complete: true };
+    } catch (error) {
+      return {
+        itemId,
+        collectionId,
+        images,
+        collectionImages,
+        error: (error as ImageUploadError).key ?? "error.generic",
+      };
     }
-    await navigate({
-      params: { collectionId: result.collectionId },
-      to: "/user/collections/$collectionId",
-    });
+  }
+  const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
+  const matchingProducts = products.filter(
+    (candidate) =>
+      candidate.productTypeSlug === slug &&
+      `${candidate.name} ${candidate.makerName}`
+        .toLocaleLowerCase(locale)
+        .includes(productQuery.trim().toLocaleLowerCase(locale)),
+  );
+  const productPageCount = Math.max(1, Math.ceil(matchingProducts.length / 12));
+  const currentProductPage = Math.min(productPage, productPageCount - 1);
+  const visibleProducts = matchingProducts.slice(
+    currentProductPage * 12,
+    (currentProductPage + 1) * 12,
+  );
+  const selectedButton =
+    typeof button?.id === "number"
+      ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
+      : null;
+  const selectedCollection = collections.find(
+    ({ id }) => id === selectedCollectionId,
+  );
+  const collectionIsPrivate =
+    selectedCollection?.isPrivate ?? newCollection?.isPrivate ?? true;
+  const collectionChoices = newCollection
+    ? [
+        ...collections,
+        {
+          coverImage: null,
+          coverImages: [],
+          createdAt: new Date(0),
+          description: newCollection.description || null,
+          id: -1,
+          isAdminPrivate: false,
+          isPrivate: newCollection.isPrivate,
+          itemCount: 0,
+          name: newCollection.name,
+          ownerUserId: 0,
+          summary: newCollection.summary || null,
+          updatedAt: new Date(0),
+        },
+      ]
+    : collections;
+
+  /**
+   * Selects one product, applies its unambiguous defaults, and clears stale ownership state.
+   *
+   * @param candidate - Product selected from the catalog.
+   */
+  const selectProduct = (candidate: CatalogProduct) => {
+    const defaults = collectionProductDefaults(candidate, t);
+    form.setFieldValue("product", candidate);
+    dispatch({ type: "productSelected", selected: true });
+    form.setFieldValue("displayName", defaults.displayName);
+    form.setFieldValue("description", "");
+    form.setFieldValue("bearing", "");
+    form.setFieldValue("serialNumber", null);
+    form.setFieldValue("installedPenPartIds", []);
+    form.setFieldValue("installedRefillProductId", null);
+    form.setFieldValue("installedRefillOfferingId", null);
+    form.setFieldValue("material", defaults.material);
+    form.setFieldValue("finish", defaults.finish);
+    form.setFieldValue("customFinish", emptyFinishOption());
+    form.setFieldValue("button", null);
+    form.setFieldValue("buttonMaterial", null);
+    form.setFieldValue("buttonFinish", null);
+    form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+    form.setErrorMap({ onSubmit: undefined });
+    dispatch({ type: "selectorChanged", open: false });
+  };
+
+  /**
+   * Saves the current collection-item fields.
+   *
+   * @param confirmed - Whether duplicate items were confirmed.
+   * @returns A promise that resolves after the save flow completes.
+   */
+  const submit = (confirmed: boolean) => {
+    if (descriptionRef.current?.isLoading() || ui.save) return;
+    form.setFieldValue(
+      "description",
+      descriptionRef.current?.getValue() ?? form.state.values.description,
+    );
+    form.setErrorMap({ onSubmit: undefined });
+    void form.handleSubmit({ confirmed });
   };
 
   return (
@@ -4773,7 +5338,9 @@ export function CollectionAddPage({
           <Input
             aria-label={displayNameLabel}
             disabled={!product}
-            onChange={(event) => setDisplayName(event.target.value)}
+            onChange={(event) =>
+              form.setFieldValue("displayName", event.target.value)
+            }
             required
             value={displayName}
           />
@@ -4785,8 +5352,8 @@ export function CollectionAddPage({
           id="collection-item-description"
           key={product?.id ?? "no-product"}
           label={t("web.catalog.field.description")}
-          onChange={setDescription}
-          onLoadingChange={setDescriptionLoading}
+          onChange={(value) => form.setFieldValue("description", value)}
+          onLoadingChange={receiveDescriptionLoading}
           ref={descriptionRef}
         />
         {product?.productTypeSlug === "spinner" ? (
@@ -4794,7 +5361,9 @@ export function CollectionAddPage({
             <Input
               aria-label={t("web.catalog.field.bearing")}
               maxLength={200}
-              onChange={(event) => setBearing(event.target.value)}
+              onChange={(event) =>
+                form.setFieldValue("bearing", event.target.value)
+              }
               value={bearing}
             />
           </Field>
@@ -4802,14 +5371,14 @@ export function CollectionAddPage({
         {product &&
         collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
           <SerialNumberFields
-            onChange={setSerialNumber}
+            onChange={(value) => form.setFieldValue("serialNumber", value)}
             t={t}
             value={serialNumber}
           />
         ) : null}
         <OwnershipLifecycleFields
           allowDeparture={false}
-          onChange={setOwnership}
+          onChange={(value) => form.setFieldValue("ownership", value)}
           value={ownership}
         />
         {syncIncomplete ? (
@@ -4821,10 +5390,10 @@ export function CollectionAddPage({
           label={t("web.collections.field.collection")}
           onAdd={() => collectionDialog.current?.showModal()}
           onChange={(collectionId) => {
-            setSelectedCollectionId(collectionId);
+            form.setFieldValue("selectedCollectionId", collectionId);
             if (collectionId !== -1) {
-              setNewCollection(null);
-              setCollectionImages([]);
+              form.setFieldValue("newCollection", null);
+              form.setFieldValue("collectionImages", []);
             }
           }}
           placeholder={t("web.collections.select.placeholder")}
@@ -4859,9 +5428,9 @@ export function CollectionAddPage({
                 summaryPlaceholder: t("web.collections.placeholder.summary"),
               }}
               onSubmit={(value, collectionImages) => {
-                setNewCollection(value);
-                setCollectionImages(collectionImages);
-                setSelectedCollectionId(-1);
+                form.setFieldValue("newCollection", value);
+                form.setFieldValue("collectionImages", collectionImages);
+                form.setFieldValue("selectedCollectionId", -1);
                 collectionDialog.current?.close();
               }}
             />
@@ -4876,7 +5445,12 @@ export function CollectionAddPage({
           </div>
         </dialog>
         <details
-          onToggle={(event) => setProductSelectorOpen(event.currentTarget.open)}
+          onToggle={(event) =>
+            dispatch({
+              type: "selectorChanged",
+              open: event.currentTarget.open,
+            })
+          }
           open={productSelectorOpen}
         >
           <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
@@ -4888,26 +5462,27 @@ export function CollectionAddPage({
                 ariaLabel={t("web.catalog.field.productType")}
                 items={options.productTypes}
                 onValueChange={(value) => {
-                  setType(value);
-                  setProductPage(0);
-                  setProductQuery("");
-                  setProduct(null);
-                  setDisplayName("");
-                  setDescription("");
-                  setBearing("");
-                  setSerialNumber(null);
-                  setInstalledPenPartIds([]);
-                  setInstalledRefillProductId(null);
-                  setInstalledRefillOfferingId(null);
-                  setMaterial(null);
-                  setFinish(null);
-                  setCustomFinish(emptyFinishOption());
-                  setButton(null);
-                  setButtonMaterial(null);
-                  setButtonFinish(null);
-                  setButtonCustomFinish(emptyFinishOption());
-                  setDuplicateCounts({});
-                  setFormError(null);
+                  form.setFieldValue("type", value);
+                  dispatch({ type: "pageSelected", page: 0 });
+                  form.setFieldValue("productQuery", "");
+                  form.setFieldValue("product", null);
+                  dispatch({ type: "productSelected", selected: false });
+                  form.setFieldValue("displayName", "");
+                  form.setFieldValue("description", "");
+                  form.setFieldValue("bearing", "");
+                  form.setFieldValue("serialNumber", null);
+                  form.setFieldValue("installedPenPartIds", []);
+                  form.setFieldValue("installedRefillProductId", null);
+                  form.setFieldValue("installedRefillOfferingId", null);
+                  form.setFieldValue("material", null);
+                  form.setFieldValue("finish", null);
+                  form.setFieldValue("customFinish", emptyFinishOption());
+                  form.setFieldValue("button", null);
+                  form.setFieldValue("buttonMaterial", null);
+                  form.setFieldValue("buttonFinish", null);
+                  form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+                  dispatch({ type: "confirmationDismissed" });
+                  form.setErrorMap({ onSubmit: undefined });
                 }}
                 placeholder={t("web.catalog.selectProductType")}
                 value={type}
@@ -4919,8 +5494,8 @@ export function CollectionAddPage({
             <Input
               aria-label={t("web.action.search")}
               onChange={(event) => {
-                setProductQuery(event.target.value);
-                setProductPage(0);
+                form.setFieldValue("productQuery", event.target.value);
+                dispatch({ type: "pageSelected", page: 0 });
               }}
               placeholder={t("web.archive.searchPlaceholder")}
               type="search"
@@ -4967,7 +5542,12 @@ export function CollectionAddPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Button
                 disabled={currentProductPage === 0}
-                onClick={() => setProductPage(currentProductPage - 1)}
+                onClick={() =>
+                  dispatch({
+                    type: "pageSelected",
+                    page: currentProductPage - 1,
+                  })
+                }
                 type="button"
                 variant="outline"
               >
@@ -4981,7 +5561,12 @@ export function CollectionAddPage({
               </span>
               <Button
                 disabled={currentProductPage + 1 === productPageCount}
-                onClick={() => setProductPage(currentProductPage + 1)}
+                onClick={() =>
+                  dispatch({
+                    type: "pageSelected",
+                    page: currentProductPage + 1,
+                  })
+                }
                 type="button"
                 variant="outline"
               >
@@ -4995,10 +5580,12 @@ export function CollectionAddPage({
             customFinish={customFinish}
             finish={finish}
             material={material}
-            onCustomFinishChange={setCustomFinish}
-            onFinishChange={setFinish}
-            onMaterialChange={setMaterial}
-            onOptionsChange={setOptions}
+            onCustomFinishChange={(value) =>
+              form.setFieldValue("customFinish", value)
+            }
+            onFinishChange={(value) => form.setFieldValue("finish", value)}
+            onMaterialChange={(value) => form.setFieldValue("material", value)}
+            onOptionsChange={receiveOptions}
             options={options}
             product={product}
             t={t}
@@ -5007,9 +5594,15 @@ export function CollectionAddPage({
         {product?.productTypeSlug === "pen" ? (
           <PenCollectionFields
             allProducts={products}
-            onRefillOfferingChange={setInstalledRefillOfferingId}
-            onRefillProductChange={setInstalledRefillProductId}
-            onInstalledPartIdsChange={setInstalledPenPartIds}
+            onRefillOfferingChange={(value) =>
+              form.setFieldValue("installedRefillOfferingId", value)
+            }
+            onRefillProductChange={(value) =>
+              form.setFieldValue("installedRefillProductId", value)
+            }
+            onInstalledPartIdsChange={(value) =>
+              form.setFieldValue("installedPenPartIds", value)
+            }
             ownedItems={ownedItems}
             product={product}
             refillOfferingId={installedRefillOfferingId}
@@ -5057,17 +5650,18 @@ export function CollectionAddPage({
                 ...options.spinnerButtons,
               ]}
               onValueChange={(value) => {
-                setButton(
+                form.setFieldValue(
+                  "button",
                   typeof value?.id === "number"
                     ? (options.spinnerButtons.find(
                         ({ id }) => id === value.id,
                       ) ?? null)
                     : value,
                 );
-                setButtonMaterial(null);
-                setButtonFinish(null);
-                setButtonCustomFinish(emptyFinishOption());
-                setDuplicateCounts({});
+                form.setFieldValue("buttonMaterial", null);
+                form.setFieldValue("buttonFinish", null);
+                form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+                dispatch({ type: "confirmationDismissed" });
               }}
               placeholder={t("web.catalog.defaultButton")}
               removeLabel={t("web.action.close")}
@@ -5081,10 +5675,16 @@ export function CollectionAddPage({
             customFinish={buttonCustomFinish}
             finish={buttonFinish}
             material={buttonMaterial}
-            onCustomFinishChange={setButtonCustomFinish}
-            onFinishChange={setButtonFinish}
-            onMaterialChange={setButtonMaterial}
-            onOptionsChange={setOptions}
+            onCustomFinishChange={(value) =>
+              form.setFieldValue("buttonCustomFinish", value)
+            }
+            onFinishChange={(value) =>
+              form.setFieldValue("buttonFinish", value)
+            }
+            onMaterialChange={(value) =>
+              form.setFieldValue("buttonMaterial", value)
+            }
+            onOptionsChange={receiveOptions}
             options={options}
             product={selectedButton}
             t={t}
@@ -5115,6 +5715,7 @@ export function CollectionAddPage({
         {product ? (
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
+            disabled={Boolean(ui.save)}
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -5131,10 +5732,13 @@ export function CollectionAddPage({
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImages((current) => [...current, ...additions])
+              form.setFieldValue("images", (current) => [
+                ...current,
+                ...additions,
+              ])
             }
             onRemove={(index) =>
-              setImages((current) =>
+              form.setFieldValue("images", (current) =>
                 current.filter((_, candidate) => candidate !== index),
               )
             }
@@ -5144,20 +5748,7 @@ export function CollectionAddPage({
         {formError ? <Notice>{t(formError)}</Notice> : null}
         {product ? (
           <Button
-            disabled={Boolean(
-              (!product.productTypeSlug.startsWith("pen") && !material) ||
-                descriptionLoading ||
-                description.length > 5000 ||
-                !displayName.trim() ||
-                !serialNumberIsValid ||
-                (!product.productTypeSlug.startsWith("pen") && !finish) ||
-                (finish?.id === "custom" && !customFinishIsValid) ||
-                (selectedButton &&
-                  (!buttonMaterial ||
-                    !buttonFinish ||
-                    (buttonFinish.id === "custom" &&
-                      !buttonCustomFinishIsValid))),
-            )}
+            disabled={descriptionLoading || Boolean(ui.save) || !canSubmit}
             onClick={() => void submit(Object.keys(duplicateCounts).length > 0)}
             type="button"
           >
@@ -5612,6 +6203,90 @@ function localizedFinishLabel(
   });
 }
 
+/** Localized collection-item validation or save feedback. */
+type CollectionEditFeedback = {
+  /** Existing primary failure key. */
+  message: string;
+  /** Optional privacy/compatibility explanation from the endpoint. */
+  detail?: {
+    /** Existing secondary localization key. */
+    key: string;
+    /** Existing interpolation values. */
+    values?: Readonly<Record<string, unknown>>;
+  };
+};
+/** Committed collection-item edit and preceding image uploads. */
+type CollectionEditEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Unchanged server payload, absent for an upload-only save. */
+  data: unknown;
+  /** Whether details should be saved after images. */
+  mode: "save" | "upload";
+  /** Captured image batch. */
+  files: File[];
+  /** Edited item identifier. */
+  itemId: number;
+  /** Item name for duplicate-image restore confirmation. */
+  itemName: string;
+  /** Destination after success. */
+  collectionId: number;
+  /** Existing optional moderation reason. */
+  reason?: string;
+};
+/** Edit outcome retained across lifecycle suspension. */
+type CollectionEditResult = {
+  /** Images requiring retry. */
+  files: File[];
+  /** Existing localized failure response. */
+  error?: CollectionEditFeedback;
+};
+/** Collection-item controls and committed edit lifetime. */
+type CollectionEditState = {
+  /** Available lookup choices. */
+  options: CatalogOptions;
+  /** Whether Markdown is still initializing. */
+  descriptionLoading: boolean;
+  /** Whether the magnet override must be saved. */
+  magnetConfigurationDirty: boolean;
+  /** Whether a layout change discarded an incompatible snapshot. */
+  magnetConfigurationNotice: boolean;
+  /** Pending ordered image/upload operation. */
+  save: EffectEntity<CollectionEditState, CollectionEditEvent> | undefined;
+};
+/** Editing control and terminal save events. */
+type CollectionEditEvent =
+  | {
+      /** Accepts the shared lookup callback. */
+      type: "lookupOptionsChanged";
+      /** Pure replacement or updater. */
+      update: React.SetStateAction<CatalogOptions>;
+    }
+  | {
+      /** Receives committed editor readiness. */
+      type: "descriptionLoadingChanged";
+      /** Whether initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Records an explicit magnet override edit. */
+      type: "magnetConfigurationEdited";
+    }
+  | {
+      /** Records a discarded incompatible magnet override. */
+      type: "magnetLayoutChanged";
+    }
+  | {
+      /** Queues validated fields and image files. */
+      type: "saveRequested";
+      /** Immutable edit inputs. */
+      request: Omit<CollectionEditEffect, "type">;
+    }
+  | {
+      /** Stops the completed edit workflow. */
+      type: "saveFinished";
+    };
+
 /**
  * Renders the collection-item edit page.
  *
@@ -5665,88 +6340,9 @@ export function CollectionEditPage({
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [images, setImages] = React.useState<File[]>([]);
-  const [existingImages, setExistingImages] = React.useState(item.images);
-  const [collectionId, setCollectionId] = React.useState(item.collectionId);
-  const [displayName, setDisplayName] = React.useState(item.displayName);
-  const [description, setDescription] = React.useState(
-    item.descriptionOverride ?? "",
-  );
-  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
-  const [bearing, setBearing] = React.useState(item.bearingOverride ?? "");
-  const [serialNumber, setSerialNumber] = React.useState<string | null>(
-    item.serialNumber ?? null,
-  );
   const ownershipPeriods = item.ownershipPeriods ?? [];
-  const [ownership, setOwnership] = React.useState<OwnershipEditorValue>(() =>
-    ownershipEditorValue(ownershipPeriods.at(-1)),
-  );
-  const [installedPenPartIds, setInstalledPenPartIds] = React.useState<
-    number[]
-  >(item.installedPenPartCollectionItemIds ?? []);
-  const [installedRefillProductId, setInstalledRefillProductId] =
-    React.useState(item.installedRefillProductId ?? null);
-  const [installedRefillOfferingId, setInstalledRefillOfferingId] =
-    React.useState(item.installedRefillOfferingId ?? null);
-  const [options, setOptions] = React.useState(initialOptions);
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [formErrorDetail, setFormErrorDetail] = React.useState<{
-    /** Secondary localized error key. */
-    key: string;
-    /** Interpolation values for the secondary error. */
-    values?: Readonly<Record<string, unknown>>;
-  } | null>(null);
-  const [material, setMaterial] = React.useState<CatalogLookup | null>(
-    collectionMaterialChoice(product, item.materials),
-  );
-  const [finish, setFinish] = React.useState<ComboboxOption | null>(() =>
-    item.finishOption
-      ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
-      : null,
-  );
-  const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
-  const [magnetConfiguration, setMagnetConfiguration] =
-    React.useState<SliderMagnetConfiguration | null>(
-      item.magnetConfiguration ??
-        item.effectiveSliderSetup?.configuration ??
-        null,
-    );
-  const [magnetConfigurationDirty, setMagnetConfigurationDirty] =
-    React.useState(false);
-  const [magnetConfigurationNotice, setMagnetConfigurationNotice] =
-    React.useState(false);
   const initialButton = ownedButtons.find(
     ({ collectionItemId }) => collectionItemId === item.installedButtonId,
-  );
-  const [button, setButton] = React.useState<ComboboxOption | null>(() => {
-    return initialButton
-      ? { id: initialButton.collectionItemId, name: initialButton.displayName }
-      : { id: "default", name: t("web.catalog.defaultButton") };
-  });
-  const [buttonMaterial, setButtonMaterial] =
-    React.useState<CatalogLookup | null>(
-      collectionMaterialChoice(
-        buttonProducts.find(({ id }) => id === initialButton?.productId),
-        initialButton?.materials,
-      ),
-    );
-  const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
-    () =>
-      initialButton?.finishOption
-        ? {
-            id: "current",
-            name: localizedFinishLabel(initialButton.finishOption, t),
-          }
-        : null,
-  );
-  const [buttonCustomFinish, setButtonCustomFinish] =
-    React.useState(emptyFinishOption);
-  const selectedButton = ownedButtons.find(
-    ({ collectionItemId }) => collectionItemId === button?.id,
-  );
-  const selectedButtonProduct = buttonProducts.find(
-    ({ id }) => id === selectedButton?.productId,
   );
   const initialPlate = ownedSliderComponents.find(
     ({ collectionItemId }) => collectionItemId === item.installedPlateId,
@@ -5754,16 +6350,510 @@ export function CollectionEditPage({
   const initialInsert = ownedSliderComponents.find(
     ({ collectionItemId }) => collectionItemId === item.installedInsertId,
   );
-  const [plate, setPlate] = React.useState<ComboboxOption | null>(() =>
-    initialPlate
-      ? { id: initialPlate.collectionItemId, name: initialPlate.displayName }
-      : { id: "default", name: t("web.slider.component.noPlate") },
+
+  /** Initial collection-item editing fields. */
+  const defaultValues = {
+    images: [] as File[],
+    existingImages: item.images,
+    collectionId: item.collectionId,
+    displayName: item.displayName,
+    description: item.descriptionOverride ?? "",
+    bearing: item.bearingOverride ?? "",
+    serialNumber: (item.serialNumber ?? null) as string | null,
+    ownership: ownershipEditorValue(
+      ownershipPeriods.at(-1),
+    ) as OwnershipEditorValue,
+    installedPenPartIds: (item.installedPenPartCollectionItemIds ??
+      []) as number[],
+    installedRefillProductId: item.installedRefillProductId ?? null,
+    installedRefillOfferingId: item.installedRefillOfferingId ?? null,
+    material: collectionMaterialChoice(
+      product,
+      item.materials,
+    ) as CatalogLookup | null,
+    finish: (item.finishOption
+      ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
+      : null) as ComboboxOption | null,
+    customFinish: emptyFinishOption(),
+    magnetConfiguration: (item.magnetConfiguration ??
+      item.effectiveSliderSetup?.configuration ??
+      null) as SliderMagnetConfiguration | null,
+    button: (initialButton
+      ? {
+          id: initialButton.collectionItemId,
+          name: initialButton.displayName,
+        }
+      : {
+          id: "default",
+          name: t("web.catalog.defaultButton"),
+        }) as ComboboxOption | null,
+    buttonMaterial: collectionMaterialChoice(
+      buttonProducts.find(({ id }) => id === initialButton?.productId),
+      initialButton?.materials,
+    ) as CatalogLookup | null,
+    buttonFinish: (initialButton?.finishOption
+      ? {
+          id: "current",
+          name: localizedFinishLabel(initialButton.finishOption, t),
+        }
+      : null) as ComboboxOption | null,
+    buttonCustomFinish: emptyFinishOption(),
+    plate: (initialPlate
+      ? {
+          id: initialPlate.collectionItemId,
+          name: initialPlate.displayName,
+        }
+      : {
+          id: "default",
+          name: t("web.slider.component.noPlate"),
+        }) as ComboboxOption | null,
+    insert: (initialInsert
+      ? {
+          id: initialInsert.collectionItemId,
+          name: initialInsert.displayName,
+        }
+      : {
+          id: "default",
+          name: t("web.slider.component.noInsert"),
+        }) as ComboboxOption | null,
+  };
+  /**
+   * Selects the existing save/upload-only mode from a current form snapshot.
+   * @param value - Current editing fields.
+   * @returns Existing submission mode for valid details or selected images.
+   */
+  const draftMode = (value: typeof defaultValues) => {
+    const selectedButton = ownedButtons.find(
+      ({ collectionItemId }) => collectionItemId === value.button?.id,
+    );
+    const selectedButtonProduct = buttonProducts.find(
+      ({ id }) => id === selectedButton?.productId,
+    );
+    const selectedPlate = ownedSliderComponents.find(
+      ({ collectionItemId }) => collectionItemId === value.plate?.id,
+    );
+    const selectedInsert = ownedSliderComponents.find(
+      ({ collectionItemId }) => collectionItemId === value.insert?.id,
+    );
+    const buttonValid =
+      item.productTypeSlug !== "spinner" ||
+      value.button?.id === "default" ||
+      Boolean(selectedButton && selectedButtonProduct && value.buttonMaterial);
+    const sliderValid =
+      item.productTypeSlug !== "slider" ||
+      ((value.plate?.id === "default" || Boolean(selectedPlate)) &&
+        (!product.usesInserts ||
+          value.insert?.id === "default" ||
+          Boolean(selectedInsert)));
+    const finishValid =
+      value.finish?.id !== "custom" ||
+      finishOptionSchema.safeParse(value.customFinish).success;
+    const buttonFinishValid =
+      value.buttonFinish?.id !== "custom" ||
+      finishOptionSchema.safeParse(value.buttonCustomFinish).success;
+    const valid = Boolean(
+      value.displayName.trim() &&
+        value.description.length <= 5000 &&
+        (product.productTypeSlug.startsWith("pen") || value.material) &&
+        (value.serialNumber === null || value.serialNumber.trim()) &&
+        finishValid &&
+        buttonValid &&
+        sliderValid &&
+        (!selectedButton || buttonFinishValid),
+    );
+    return collectionEditSubmissionMode(valid, value.images.length);
+  };
+  const form = useForm({
+    defaultValues,
+    validators: {
+      /**
+       * Retains upload-only saves while validating images and details before mutation.
+       * @param input - Current edit fields.
+       * @returns Existing localized feedback when no save mode is eligible.
+       */
+      onSubmit: ({ value }): CollectionEditFeedback | undefined => {
+        if (draftMode(value) === "disabled")
+          return { message: "web.catalog.error.form" };
+        const error = validateImages(value.images, locale);
+        return error ? { message: error.key } : undefined;
+      },
+    },
+    /**
+     * Captures validated edits using the unchanged payload and moderation reason.
+     * @param input - Current edit fields.
+     */
+    onSubmit: ({ value }) => {
+      if (ui.save) return;
+      const mode = draftMode(value);
+      if (mode === "disabled") return;
+      const moderating = item.canAdminister && !item.isOwner;
+      const reason = moderating
+        ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+        : undefined;
+      if (moderating && !reason) return;
+      const {
+        collectionId,
+        displayName,
+        description,
+        bearing,
+        serialNumber,
+        ownership,
+        installedPenPartIds,
+        installedRefillProductId,
+        installedRefillOfferingId,
+        material,
+        finish,
+        customFinish,
+        magnetConfiguration,
+        button,
+        buttonMaterial,
+        buttonFinish,
+        buttonCustomFinish,
+        plate,
+        insert,
+      } = value;
+      const currentDescription = description;
+      const selectedButton = ownedButtons.find(
+        ({ collectionItemId }) => collectionItemId === button?.id,
+      );
+      const selectedPlate = ownedSliderComponents.find(
+        ({ collectionItemId }) => collectionItemId === plate?.id,
+      );
+      const selectedInsert = ownedSliderComponents.find(
+        ({ collectionItemId }) => collectionItemId === insert?.id,
+      );
+      const buttonFinishSelectionIsValid =
+        buttonFinish?.id !== "custom" ||
+        finishOptionSchema.safeParse(buttonCustomFinish).success;
+      const magnetConfigurationDirty = ui.magnetConfigurationDirty;
+      let data: unknown;
+      if (mode === "save") {
+        let installedButton:
+          | {
+              /** Installed collection item identifier. */
+              collectionItemId: number;
+              /** Custom finish applied to the installed button. */
+              customFinish: FinishOptionFormValue | null;
+              /** Catalog finish option applied to the installed button. */
+              finishOptionId: number | null;
+              /** Material applied to the installed button. */
+              materialAssignmentId?: number;
+            }
+          | null
+          | undefined;
+        if (item.productTypeSlug === "spinner") {
+          if (button?.id === "default") {
+            installedButton = null;
+          } else {
+            if (
+              !selectedButton ||
+              !buttonMaterial ||
+              !buttonFinish ||
+              !buttonFinishSelectionIsValid
+            ) {
+              return;
+            }
+            installedButton = {
+              collectionItemId: selectedButton.collectionItemId,
+              customFinish:
+                buttonFinish.id === "custom" ? buttonCustomFinish : null,
+              finishOptionId:
+                buttonFinish.id === "current" || buttonFinish.id === "custom"
+                  ? null
+                  : Number(buttonFinish.id),
+              materialAssignmentId:
+                buttonMaterial.id === -1 ? undefined : buttonMaterial.id,
+            };
+          }
+        }
+        const installedPlate =
+          item.productTypeSlug === "slider"
+            ? plate?.id === "default"
+              ? null
+              : selectedPlate
+                ? { collectionItemId: selectedPlate.collectionItemId }
+                : undefined
+            : undefined;
+        const installedInsert =
+          item.productTypeSlug === "slider" && product.usesInserts
+            ? insert?.id === "default"
+              ? null
+              : selectedInsert
+                ? { collectionItemId: selectedInsert.collectionItemId }
+                : undefined
+            : undefined;
+        data = {
+          bearing,
+          collectionId,
+          collectionItemId: item.collectionItemId,
+          installedPenPartCollectionItemIds: installedPenPartIds,
+          customFinish: finish?.id === "custom" ? customFinish : null,
+          displayName,
+          description: currentDescription,
+          finishOptionId:
+            finish?.id === "current" || finish?.id === "custom"
+              ? null
+              : finish
+                ? Number(finish.id)
+                : null,
+          ...(item.productTypeSlug === "pen"
+            ? {
+                installedRefillOfferingId,
+                installedRefillProductId,
+              }
+            : {}),
+          ...(item.productTypeSlug === "spinner" ? { installedButton } : {}),
+          ...(item.productTypeSlug === "slider"
+            ? {
+                installedInsert,
+                installedPlate,
+                ...(magnetConfigurationDirty ? { magnetConfiguration } : {}),
+              }
+            : {}),
+          materialAssignmentId: material?.id === -1 ? undefined : material?.id,
+          ownership: {
+            effectiveEndDate: ownership.currentlyOwned
+              ? null
+              : ownership.effectiveEndDate || null,
+            effectiveStartDate: ownership.startDateUnknown
+              ? null
+              : ownership.effectiveStartDate,
+            entryReason: ownership.entryReason,
+            exitReason: ownership.currentlyOwned
+              ? null
+              : ownership.exitReason || null,
+            periodId: ownership.periodId,
+          },
+          reason,
+          serialNumber,
+        };
+      }
+      dispatch({
+        type: "saveRequested",
+        request: {
+          data,
+          mode,
+          files: value.images,
+          itemId: item.collectionItemId,
+          itemName: item.displayName,
+          collectionId: value.collectionId,
+          reason,
+        },
+      });
+    },
+  });
+  const {
+    images,
+    existingImages,
+    collectionId,
+    displayName,
+    description,
+    bearing,
+    serialNumber,
+    ownership,
+    installedPenPartIds,
+    installedRefillProductId,
+    installedRefillOfferingId,
+    material,
+    finish,
+    customFinish,
+    magnetConfiguration,
+    button,
+    buttonMaterial,
+    buttonFinish,
+    buttonCustomFinish,
+    plate,
+    insert,
+  } = useStore(form.store, (state) => state.values);
+
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionEditEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CollectionEditResult>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    CollectionEditState,
+    CollectionEditEvent,
+    CollectionEditEffect
+  >(
+    (state, event, exec) => {
+      switch (event.type) {
+        case "lookupOptionsChanged":
+          return {
+            ...state,
+            options:
+              typeof event.update === "function"
+                ? event.update(state.options)
+                : event.update,
+          };
+        case "descriptionLoadingChanged":
+          return state.descriptionLoading === event.loading
+            ? state
+            : { ...state, descriptionLoading: event.loading };
+        case "magnetConfigurationEdited":
+          return { ...state, magnetConfigurationDirty: true };
+        case "magnetLayoutChanged":
+          return {
+            ...state,
+            magnetConfigurationDirty: true,
+            magnetConfigurationNotice: true,
+          };
+        case "saveRequested":
+          if (state.save) return state;
+          return { ...state, save: exec({ type: "save", ...event.request }) };
+        case "saveFinished":
+          exec.stop(state.save);
+          return { ...state, save: undefined };
+      }
+    },
+    {
+      options: initialOptions,
+      descriptionLoading: true,
+      magnetConfigurationDirty: false,
+      magnetConfigurationNotice: false,
+      save: undefined,
+    },
+    {
+      /**
+       * Observes image-first editing once across lifecycle resumption.
+       * @param _state - Current edit controls.
+       * @param effect - Captured immutable edit request.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: performEdit(effect) };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished" });
+          form.setFieldValue("images", (current) =>
+            current.filter(
+              (file) =>
+                !effect.files.includes(file) || result.files.includes(file),
+            ),
+          );
+          if (result.error) form.setErrorMap({ onSubmit: result.error });
+          else
+            void navigate({
+              params: { collectionId: effect.collectionId },
+              to: "/user/collections/$collectionId",
+            });
+        });
+      },
+    },
   );
-  const [insert, setInsert] = React.useState<ComboboxOption | null>(() =>
-    initialInsert
-      ? { id: initialInsert.collectionItemId, name: initialInsert.displayName }
-      : { id: "default", name: t("web.slider.component.noInsert") },
+  const { options, descriptionLoading, magnetConfigurationNotice } = ui;
+  const feedback = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const submissionMode = useStore(form.store, (state) =>
+    draftMode(state.values),
   );
+  /**
+   * Accepts the existing shared lookup contract.
+   * @param update - Pure options replacement or updater.
+   */
+  const receiveOptions = (update: React.SetStateAction<CatalogOptions>) => {
+    dispatch({ type: "lookupOptionsChanged", update });
+  };
+  /**
+   * Reports committed Markdown readiness through a stable callback.
+   * @param loading - Whether initialization is pending.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => {
+      dispatch({ type: "descriptionLoadingChanged", loading });
+    },
+    [dispatch],
+  );
+  /**
+   * Uploads selected images before applying edits in the existing mutation order.
+   * @param request - Captured edit and upload inputs.
+   * @returns Retained files and existing localized failure feedback.
+   */
+  async function performEdit(
+    request: CollectionEditEffect,
+  ): Promise<CollectionEditResult> {
+    let files = request.files;
+    try {
+      if (files.length) {
+        const uploaded = await uploadImages({
+          locale,
+          files,
+          getToken,
+          reason: request.reason,
+          targetId: request.itemId,
+          targetType: "collection_item",
+          /**
+           * Offers the existing restore choice for an owner-deleted duplicate image.
+           * @param imageId - Duplicate image identifier.
+           * @returns Whether the duplicate was restored.
+           */
+          onOwnerDeletedDuplicate: async (imageId) => {
+            if (
+              !window.confirm(
+                t("web.resources.trash.restoreConfirmationDescription", {
+                  name: request.itemName,
+                }),
+              )
+            )
+              return false;
+            await restoreCatalogImage({
+              data: {
+                imageId,
+                reason: request.reason,
+                targetType: "collection_item",
+              },
+            });
+            return true;
+          },
+        });
+        files = uploaded.failed;
+        if (files.length)
+          return {
+            files,
+            error: { message: "web.resources.upload.sessionFailure" },
+          };
+      }
+      if (request.mode === "upload") return { files };
+      const result = await updateCollectionItem({ data: request.data });
+      if (result.ok) return { files };
+      return {
+        files,
+        error: {
+          message: result.formError,
+          detail:
+            "formErrorDetail" in result &&
+            typeof result.formErrorDetail === "string"
+              ? {
+                  key: result.formErrorDetail,
+                  values:
+                    "formErrorValues" in result &&
+                    typeof result.formErrorValues === "object" &&
+                    result.formErrorValues !== null
+                      ? (result.formErrorValues as Readonly<
+                          Record<string, unknown>
+                        >)
+                      : undefined,
+                }
+              : undefined,
+        },
+      };
+    } catch (error) {
+      return {
+        files,
+        error: { message: (error as ImageUploadError).key ?? "error.generic" },
+      };
+    }
+  }
+  const selectedButton = ownedButtons.find(
+    ({ collectionItemId }) => collectionItemId === button?.id,
+  );
+  const selectedButtonProduct = buttonProducts.find(
+    ({ id }) => id === selectedButton?.productId,
+  );
+
   const selectedPlate = ownedSliderComponents.find(
     ({ collectionItemId }) => collectionItemId === plate?.id,
   );
@@ -5775,38 +6865,6 @@ export function CollectionEditPage({
   );
   const effectiveMagnetLayout =
     selectedInsertProduct?.magnetLayout ?? product.magnetLayout;
-  const sliderComponentSelectionIsValid =
-    item.productTypeSlug !== "slider" ||
-    ((plate?.id === "default" || Boolean(selectedPlate)) &&
-      (!product.usesInserts ||
-        insert?.id === "default" ||
-        Boolean(selectedInsert)));
-  const buttonSelectionIsValid =
-    item.productTypeSlug !== "spinner" ||
-    button?.id === "default" ||
-    Boolean(selectedButton && selectedButtonProduct && buttonMaterial);
-  const finishSelectionIsValid =
-    finish?.id !== "custom" ||
-    finishOptionSchema.safeParse(customFinish).success;
-  const buttonFinishSelectionIsValid =
-    buttonFinish?.id !== "custom" ||
-    finishOptionSchema.safeParse(buttonCustomFinish).success;
-  const serialNumberIsValid =
-    serialNumber === null || serialNumber.trim().length > 0;
-  const detailsAreValid = Boolean(
-    displayName.trim() &&
-      description.length <= 5000 &&
-      (product.productTypeSlug.startsWith("pen") || material) &&
-      serialNumberIsValid &&
-      finishSelectionIsValid &&
-      buttonSelectionIsValid &&
-      sliderComponentSelectionIsValid &&
-      (!selectedButton || buttonFinishSelectionIsValid),
-  );
-  const submissionMode = collectionEditSubmissionMode(
-    detailsAreValid,
-    images.length,
-  );
 
   return (
     <AppShell
@@ -5820,7 +6878,9 @@ export function CollectionEditPage({
           <Field label={displayNameLabel}>
             <Input
               aria-label={displayNameLabel}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) =>
+                form.setFieldValue("displayName", event.target.value)
+              }
               required
               value={displayName}
             />
@@ -5830,8 +6890,8 @@ export function CollectionEditPage({
             help={t("web.catalog.help.collectionDescriptionOverride")}
             id="collection-item-override"
             label={t("web.catalog.field.description")}
-            onChange={setDescription}
-            onLoadingChange={setDescriptionLoading}
+            onChange={(value) => form.setFieldValue("description", value)}
+            onLoadingChange={receiveDescriptionLoading}
             ref={descriptionRef}
           />
           {item.productTypeSlug === "spinner" ? (
@@ -5839,23 +6899,26 @@ export function CollectionEditPage({
               <Input
                 aria-label={t("web.catalog.field.bearing")}
                 maxLength={200}
-                onChange={(event) => setBearing(event.target.value)}
+                onChange={(event) =>
+                  form.setFieldValue("bearing", event.target.value)
+                }
                 value={bearing}
               />
             </Field>
           ) : null}
           {collectionProductTypeSupportsSerial(item.productTypeSlug) ? (
             <SerialNumberFields
-              onChange={setSerialNumber}
+              onChange={(value) => form.setFieldValue("serialNumber", value)}
               t={t}
               value={serialNumber}
             />
           ) : null}
           <OwnershipLifecycleFields
             allowDeparture
-            onChange={setOwnership}
+            onChange={(value) => form.setFieldValue("ownership", value)}
             onPeriodChange={(periodId) =>
-              setOwnership(
+              form.setFieldValue(
+                "ownership",
                 ownershipEditorValue(
                   ownershipPeriods.find(({ id }) => id === periodId),
                 ),
@@ -5869,7 +6932,8 @@ export function CollectionEditPage({
             collections={collections}
             label={t("web.collections.field.collection")}
             onChange={(nextCollectionId) => {
-              if (nextCollectionId) setCollectionId(nextCollectionId);
+              if (nextCollectionId)
+                form.setFieldValue("collectionId", nextCollectionId);
             }}
             placeholder={t("web.collections.select.placeholder")}
             selectedId={collectionId}
@@ -5879,10 +6943,12 @@ export function CollectionEditPage({
             customFinish={customFinish}
             finish={finish}
             material={material}
-            onCustomFinishChange={setCustomFinish}
-            onFinishChange={setFinish}
-            onMaterialChange={setMaterial}
-            onOptionsChange={setOptions}
+            onCustomFinishChange={(value) =>
+              form.setFieldValue("customFinish", value)
+            }
+            onFinishChange={(value) => form.setFieldValue("finish", value)}
+            onMaterialChange={(value) => form.setFieldValue("material", value)}
+            onOptionsChange={receiveOptions}
             options={options}
             product={product}
             t={t}
@@ -5891,9 +6957,15 @@ export function CollectionEditPage({
             <PenCollectionFields
               allProducts={catalogProducts}
               currentCollectionItemId={item.collectionItemId}
-              onRefillOfferingChange={setInstalledRefillOfferingId}
-              onRefillProductChange={setInstalledRefillProductId}
-              onInstalledPartIdsChange={setInstalledPenPartIds}
+              onRefillOfferingChange={(value) =>
+                form.setFieldValue("installedRefillOfferingId", value)
+              }
+              onRefillProductChange={(value) =>
+                form.setFieldValue("installedRefillProductId", value)
+              }
+              onInstalledPartIdsChange={(value) =>
+                form.setFieldValue("installedPenPartIds", value)
+              }
               ownedItems={ownedItems}
               product={product}
               refillOfferingId={installedRefillOfferingId}
@@ -5920,11 +6992,12 @@ export function CollectionEditPage({
                     })),
                 ]}
                 onValueChange={(value) => {
-                  setButton(value);
+                  form.setFieldValue("button", value);
                   const selected = ownedButtons.find(
                     ({ collectionItemId }) => collectionItemId === value?.id,
                   );
-                  setButtonMaterial(
+                  form.setFieldValue(
+                    "buttonMaterial",
                     collectionMaterialChoice(
                       buttonProducts.find(
                         ({ id }) => id === selected?.productId,
@@ -5932,7 +7005,8 @@ export function CollectionEditPage({
                       selected?.materials,
                     ),
                   );
-                  setButtonFinish(
+                  form.setFieldValue(
+                    "buttonFinish",
                     selected?.finishOption
                       ? {
                           id: "current",
@@ -5940,7 +7014,7 @@ export function CollectionEditPage({
                         }
                       : null,
                   );
-                  setButtonCustomFinish(emptyFinishOption());
+                  form.setFieldValue("buttonCustomFinish", emptyFinishOption());
                 }}
                 placeholder={t("web.catalog.defaultButton")}
                 removeLabel={t("web.action.close")}
@@ -5972,7 +7046,7 @@ export function CollectionEditPage({
                         name: displayName,
                       })),
                   ]}
-                  onValueChange={setPlate}
+                  onValueChange={(value) => form.setFieldValue("plate", value)}
                   placeholder={t("web.slider.component.noPlate")}
                   removeLabel={t("web.action.close")}
                   showSelectedPill
@@ -6014,11 +7088,10 @@ export function CollectionEditPage({
                         effectiveMagnetLayout !== nextLayout &&
                         magnetConfiguration !== null
                       ) {
-                        setMagnetConfiguration(null);
-                        setMagnetConfigurationDirty(true);
-                        setMagnetConfigurationNotice(true);
+                        form.setFieldValue("magnetConfiguration", null);
+                        dispatch({ type: "magnetLayoutChanged" });
                       }
-                      setInsert(value);
+                      form.setFieldValue("insert", value);
                     }}
                     placeholder={t("web.slider.component.noInsert")}
                     removeLabel={t("web.action.close")}
@@ -6031,8 +7104,8 @@ export function CollectionEditPage({
                 <SliderMagnetConfigurationEditor
                   layout={effectiveMagnetLayout}
                   onChange={(value) => {
-                    setMagnetConfiguration(value);
-                    setMagnetConfigurationDirty(true);
+                    form.setFieldValue("magnetConfiguration", value);
+                    dispatch({ type: "magnetConfigurationEdited" });
                   }}
                   presets={options.magnetPresets}
                   t={t}
@@ -6086,20 +7159,26 @@ export function CollectionEditPage({
               customFinish={buttonCustomFinish}
               finish={buttonFinish}
               material={buttonMaterial}
-              onCustomFinishChange={setButtonCustomFinish}
-              onFinishChange={setButtonFinish}
-              onMaterialChange={setButtonMaterial}
-              onOptionsChange={setOptions}
+              onCustomFinishChange={(value) =>
+                form.setFieldValue("buttonCustomFinish", value)
+              }
+              onFinishChange={(value) =>
+                form.setFieldValue("buttonFinish", value)
+              }
+              onMaterialChange={(value) =>
+                form.setFieldValue("buttonMaterial", value)
+              }
+              onOptionsChange={receiveOptions}
               options={options}
               product={selectedButtonProduct}
               t={t}
             />
           ) : null}
-          {formError ? (
+          {feedback ? (
             <Notice>
-              {t(formError)}
-              {formErrorDetail
-                ? ` ${t(formErrorDetail.key, formErrorDetail.values)}`
+              {t(feedback.message)}
+              {feedback.detail
+                ? ` ${t(feedback.detail.key, feedback.detail.values)}`
                 : null}
             </Notice>
           ) : null}
@@ -6128,6 +7207,7 @@ export function CollectionEditPage({
         <div className="grid min-w-0 content-start gap-5">
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
+            disabled={Boolean(ui.save)}
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -6144,10 +7224,13 @@ export function CollectionEditPage({
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImages((current) => [...current, ...additions])
+              form.setFieldValue("images", (current) => [
+                ...current,
+                ...additions,
+              ])
             }
             onRemove={(index) =>
-              setImages((current) =>
+              form.setFieldValue("images", (current) =>
                 current.filter((_, candidate) => candidate !== index),
               )
             }
@@ -6163,7 +7246,7 @@ export function CollectionEditPage({
                 : undefined
             }
             images={existingImages}
-            onChange={setExistingImages}
+            onChange={(value) => form.setFieldValue("existingImages", value)}
             t={t}
             targetType="collection_item"
           />
@@ -6182,221 +7265,20 @@ export function CollectionEditPage({
             {t("action.cancel")}
           </Button>
           <Button
-            disabled={descriptionLoading || submissionMode === "disabled"}
-            onClick={async () => {
-              const currentDescription =
-                descriptionRef.current?.getValue() ?? description;
-              if (
-                descriptionRef.current?.isLoading() ||
-                currentDescription.length > 5000 ||
-                submissionMode === "disabled"
-              ) {
-                return;
-              }
-              const moderating = item.canAdminister && !item.isOwner;
-              const reason = moderating
-                ? window
-                    .prompt(t("web.resources.moderation.reasonLabel"))
-                    ?.trim()
-                : undefined;
-              if (moderating && !reason) return;
-              setFormError(null);
-              setFormErrorDetail(null);
-              const imageError = validateImages(images, locale);
-              if (imageError) {
-                setFormError(imageError.key);
-                return;
-              }
-              if (images.length) {
-                try {
-                  const uploads = await uploadImages({
-                    locale,
-                    files: images,
-                    getToken,
-                    reason,
-                    /**
-                     * Offers to restore an owner-deleted duplicate image.
-                     *
-                     * @param imageId - Duplicate image identifier.
-                     * @returns Whether the duplicate was restored.
-                     */
-                    onOwnerDeletedDuplicate: async (imageId) => {
-                      if (
-                        !window.confirm(
-                          t(
-                            "web.resources.trash.restoreConfirmationDescription",
-                            { name: item.displayName },
-                          ),
-                        )
-                      )
-                        return false;
-                      await restoreCatalogImage({
-                        data: {
-                          imageId,
-                          reason,
-                          targetType: "collection_item",
-                        },
-                      });
-                      return true;
-                    },
-                    targetId: item.collectionItemId,
-                    targetType: "collection_item",
-                  });
-                  setImages(uploads.failed);
-                  if (uploads.failed.length) {
-                    setFormError("web.resources.upload.sessionFailure");
-                    return;
-                  }
-                } catch (error) {
-                  setFormError(
-                    (error as ImageUploadError).key ?? "error.generic",
-                  );
-                  return;
-                }
-              }
-              if (submissionMode === "upload") {
-                await navigate({
-                  params: { collectionId },
-                  to: "/user/collections/$collectionId",
-                });
-                return;
-              }
-              if (
-                (!product.productTypeSlug.startsWith("pen") && !material) ||
-                (finish?.id === "custom" && !finishSelectionIsValid)
-              )
-                return;
-              let installedButton:
-                | {
-                    /** Installed collection item identifier. */
-                    collectionItemId: number;
-                    /** Custom finish applied to the installed button. */
-                    customFinish: FinishOptionFormValue | null;
-                    /** Catalog finish option applied to the installed button. */
-                    finishOptionId: number | null;
-                    /** Material applied to the installed button. */
-                    materialAssignmentId?: number;
-                  }
-                | null
-                | undefined;
-              if (item.productTypeSlug === "spinner") {
-                if (button?.id === "default") {
-                  installedButton = null;
-                } else {
-                  if (
-                    !selectedButton ||
-                    !buttonMaterial ||
-                    !buttonFinish ||
-                    !buttonFinishSelectionIsValid
-                  ) {
-                    return;
-                  }
-                  installedButton = {
-                    collectionItemId: selectedButton.collectionItemId,
-                    customFinish:
-                      buttonFinish.id === "custom" ? buttonCustomFinish : null,
-                    finishOptionId:
-                      buttonFinish.id === "current" ||
-                      buttonFinish.id === "custom"
-                        ? null
-                        : Number(buttonFinish.id),
-                    materialAssignmentId:
-                      buttonMaterial.id === -1 ? undefined : buttonMaterial.id,
-                  };
-                }
-              }
-              const installedPlate =
-                item.productTypeSlug === "slider"
-                  ? plate?.id === "default"
-                    ? null
-                    : selectedPlate
-                      ? { collectionItemId: selectedPlate.collectionItemId }
-                      : undefined
-                  : undefined;
-              const installedInsert =
-                item.productTypeSlug === "slider" && product.usesInserts
-                  ? insert?.id === "default"
-                    ? null
-                    : selectedInsert
-                      ? { collectionItemId: selectedInsert.collectionItemId }
-                      : undefined
-                  : undefined;
-              const result = await updateCollectionItem({
-                data: {
-                  bearing,
-                  collectionId,
-                  collectionItemId: item.collectionItemId,
-                  installedPenPartCollectionItemIds: installedPenPartIds,
-                  customFinish: finish?.id === "custom" ? customFinish : null,
-                  displayName,
-                  description: currentDescription,
-                  finishOptionId:
-                    finish?.id === "current" || finish?.id === "custom"
-                      ? null
-                      : finish
-                        ? Number(finish.id)
-                        : null,
-                  ...(item.productTypeSlug === "pen"
-                    ? {
-                        installedRefillOfferingId,
-                        installedRefillProductId,
-                      }
-                    : {}),
-                  ...(item.productTypeSlug === "spinner"
-                    ? { installedButton }
-                    : {}),
-                  ...(item.productTypeSlug === "slider"
-                    ? {
-                        installedInsert,
-                        installedPlate,
-                        ...(magnetConfigurationDirty
-                          ? { magnetConfiguration }
-                          : {}),
-                      }
-                    : {}),
-                  materialAssignmentId:
-                    material?.id === -1 ? undefined : material?.id,
-                  ownership: {
-                    effectiveEndDate: ownership.currentlyOwned
-                      ? null
-                      : ownership.effectiveEndDate || null,
-                    effectiveStartDate: ownership.startDateUnknown
-                      ? null
-                      : ownership.effectiveStartDate,
-                    entryReason: ownership.entryReason,
-                    exitReason: ownership.currentlyOwned
-                      ? null
-                      : ownership.exitReason || null,
-                    periodId: ownership.periodId,
-                  },
-                  reason,
-                  serialNumber,
-                },
-              });
-              if (result.ok) {
-                await navigate({
-                  params: { collectionId },
-                  to: "/user/collections/$collectionId",
-                });
-              } else {
-                setFormError(result.formError);
-                setFormErrorDetail(
-                  "formErrorDetail" in result &&
-                    typeof result.formErrorDetail === "string"
-                    ? {
-                        key: result.formErrorDetail,
-                        values:
-                          "formErrorValues" in result &&
-                          typeof result.formErrorValues === "object" &&
-                          result.formErrorValues !== null
-                            ? (result.formErrorValues as Readonly<
-                                Record<string, unknown>
-                              >)
-                            : undefined,
-                      }
-                    : null,
-                );
-              }
+            disabled={
+              descriptionLoading ||
+              Boolean(ui.save) ||
+              submissionMode === "disabled"
+            }
+            onClick={() => {
+              if (descriptionRef.current?.isLoading() || ui.save) return;
+              form.setFieldValue(
+                "description",
+                descriptionRef.current?.getValue() ??
+                  form.state.values.description,
+              );
+              form.setErrorMap({ onSubmit: undefined });
+              void form.handleSubmit();
             }}
             type="button"
           >

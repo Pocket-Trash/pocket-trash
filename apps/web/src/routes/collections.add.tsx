@@ -65,10 +65,12 @@ export const Route = createFileRoute("/collections/add")({
  * @returns The rendered route UI.
  */
 function CollectionAddRoute() {
+  const { product } = Route.useSearch();
   return (
     <CollectionAddPage
+      key={product ?? "new"}
       {...Route.useLoaderData()}
-      initialProductId={Route.useSearch().product}
+      initialProductId={product}
     />
   );
 }
