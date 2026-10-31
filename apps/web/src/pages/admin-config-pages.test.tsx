@@ -123,3 +123,9 @@ describe("administrator configuration pages", () => {
     expect(html.match(/type="checkbox"/gu)).toHaveLength(30);
   });
 });
+
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /** Supplies the current configuration account.
+   * @returns Administrator account context. */
+  useAuth: () => ({ userId: "user_admin" }),
+}));
