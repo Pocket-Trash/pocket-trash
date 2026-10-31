@@ -144,58 +144,87 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
-  const [openMobile, setOpenMobile] = React.useState(defaultOpenMobile);
-
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen);
-  const open = openProp ?? _open;
+  const [visibility, dispatch] = React.useReducer(
+    (
+      state: {
+        /** Desktop visibility. */
+        desktop: boolean;
+        /** Mobile sheet visibility. */
+        mobile: boolean;
+      },
+      event:
+        | {
+            /** Sidebar transition. */
+            type: "desktopChanged" | "mobileChanged";
+            /** Requested visibility. */
+            open: boolean;
+          }
+        | {
+            /** Toggle the mobile sheet. */
+            type: "mobileToggled";
+          },
+    ) =>
+      event.type === "mobileToggled"
+        ? { ...state, mobile: !state.mobile }
+        : event.type === "desktopChanged"
+          ? { ...state, desktop: event.open }
+          : { ...state, mobile: event.open },
+    { desktop: defaultOpen, mobile: defaultOpenMobile },
+  );
+  const openMobile = visibility.mobile;
+  const setOpenMobile = React.useCallback((open: boolean) => {
+    dispatch({ type: "mobileChanged", open });
+  }, []);
+  const open = openProp ?? visibility.desktop;
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value;
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
-        _setOpen(openState);
+        dispatch({ type: "desktopChanged", open: openState });
       }
     },
     [setOpenProp, open],
   );
 
-  // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen, setOpenMobile]);
+    if (isMobile) dispatch({ type: "mobileToggled" });
+    else setOpen((open) => !open);
+  }, [isMobile, setOpen]);
 
-  // Adds a keyboard shortcut to toggle the sidebar.
-  React.useEffect(() => {
-    /**
-     * Toggles the sidebar for its configured keyboard shortcut.
-     *
-     * @param event - Keyboard event received by the sidebar listener.
-     */
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          target.closest("input, textarea, select, [contenteditable='true']"))
-      ) {
-        return;
-      }
+  const subscribeShortcut = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return;
+      /**
+       * Toggles the sidebar for its configured keyboard shortcut.
+       *
+       * @param event - Keyboard event received by the sidebar listener.
+       */
+      const handleKeyDown = (event: KeyboardEvent) => {
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            target.closest("input, textarea, select, [contenteditable='true']"))
+        ) {
+          return;
+        }
 
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
-        event.preventDefault();
-        toggleSidebar();
-      }
-    };
+        if (
+          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+          (event.metaKey || event.ctrlKey)
+        ) {
+          event.preventDefault();
+          toggleSidebar();
+        }
+      };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSidebar]);
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    },
+    [toggleSidebar],
+  );
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -218,6 +247,7 @@ function SidebarProvider({
     <SidebarContext.Provider value={contextValue}>
       <TooltipProvider delay={0}>
         <div
+          ref={subscribeShortcut}
           data-slot="sidebar-wrapper"
           style={
             {
