@@ -3,7 +3,8 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useState } from "react";
+import { useRef } from "react";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,14 +13,52 @@ import { useLocale } from "@/providers/locale-provider";
 /** Root URL containing Pocket Trash integration logos. */
 const logoRoot = "https://cdn.pocket-trash.app/assets/static/logos";
 
+/** Confirmed integration action owned by the current account. */
+type ConnectionAction = "connect" | "remove" | "update";
+/** Pending action and existing failure feedback. */
+type ConnectionState = {
+  /** Current integration mutation. */
+  request: EffectEntity<ConnectionState, ConnectionEvent> | undefined;
+  /** Whether the most recent action failed. */
+  failed: boolean;
+};
+/** Explicit connection intent and terminal feedback. */
+type ConnectionEvent =
+  | {
+      /** Requests an integration action. */
+      type: "requested";
+      /** Existing integration operation. */
+      action: ConnectionAction;
+    }
+  | {
+      /** Stops the completed action. */
+      type: "finished";
+      /** Whether Clerk completed the action. */
+      success: boolean;
+    };
+/** Captured integration action; reverification remains Clerk-owned. */
+type ConnectionEffect = {
+  /** Action implementation. */
+  type: "connect";
+  /** Existing integration operation. */
+  action: ConnectionAction;
+};
+
 /** Renders administrator integration settings for the current Clerk user.
  *
  * @returns The administrator settings page.
  */
 export function AdminSettingsPage() {
+  const { user } = useUser();
+  return <AdminSettingsContent key={user?.id} />;
+}
+
+/**
+ * Owns one administrator's integration action lifetime.
+ * @returns Integration controls for the current Clerk user.
+ */
+function AdminSettingsContent() {
   const { isLoaded, user } = useUser();
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
   const { locale } = useLocale();
   /** Formats integration copy for the active locale.
    *
@@ -56,22 +95,56 @@ export function AdminSettingsPage() {
     },
   );
 
-  /** Performs a Linear connection action while tracking its UI state.
-   *
-   * @param action - Connection operation to perform.
-   * @returns Completion after Clerk finishes or reports failure.
-   */
-  async function act(action: "connect" | "remove" | "update") {
-    setBusy(true);
-    setFailed(false);
-    try {
-      await updateConnection(action);
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const task = useRef<{
+    /** Descriptor whose Clerk mutation must not replay. */
+    effect: ConnectionEffect;
+    /** Action completion retained across suspension. */
+    promise: Promise<boolean>;
+  } | null>(null);
+  const [state, dispatch] = useEffectReducer<
+    ConnectionState,
+    ConnectionEvent,
+    ConnectionEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state.request
+          ? state
+          : {
+              request: exec({ type: "connect", action: event.action }),
+              failed: false,
+            };
+      exec.stop(state.request);
+      return { request: undefined, failed: !event.success };
+    },
+    { request: undefined, failed: false },
+    {
+      /**
+       * Observes one reverification action through its current account lifetime.
+       * @param _state - Current integration control state.
+       * @param effect - Captured integration action.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      connect: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: Promise.resolve()
+              .then(() => updateConnection(effect.action))
+              .then(
+                () => true,
+                () => false,
+              ),
+          };
+        void task.current.promise.then((success) => {
+          if (!signal.aborted) dispatch({ type: "finished", success });
+        });
+      },
+    },
+  );
+  const busy = Boolean(state.request);
+  const { failed } = state;
 
   return (
     <AdminPageShell
@@ -135,14 +208,18 @@ export function AdminSettingsPage() {
                 <>
                   <Button
                     disabled={busy}
-                    onClick={() => void act("update")}
+                    onClick={() =>
+                      dispatch({ type: "requested", action: "update" })
+                    }
                     type="button"
                   >
                     {t("web.admin.settings.linear.update")}
                   </Button>
                   <Button
                     disabled={busy}
-                    onClick={() => void act("remove")}
+                    onClick={() =>
+                      dispatch({ type: "requested", action: "remove" })
+                    }
                     type="button"
                     variant="outline"
                   >
@@ -152,7 +229,9 @@ export function AdminSettingsPage() {
               ) : (
                 <Button
                   disabled={busy}
-                  onClick={() => void act("connect")}
+                  onClick={() =>
+                    dispatch({ type: "requested", action: "connect" })
+                  }
                   type="button"
                 >
                   {t("web.admin.settings.linear.connect")}
