@@ -1,5 +1,43 @@
-import type { SearchKind, SearchResult } from "@package/services";
-import { SEARCH_QUERY_MAX_LENGTH } from "./search-constants";
+import type { SearchGroup, SearchKind, SearchResult } from "@package/services";
+import { searchPublic } from "./search";
+import {
+  SEARCH_QUERY_MAX_LENGTH,
+  SEARCH_QUERY_MIN_LENGTH,
+} from "./search-constants";
+
+/** Route-owned public-directory results and inline request feedback. */
+export type DirectorySearchState = {
+  /** Ranked public-index matches. */
+  items: SearchResult[];
+  /** Route request feedback. */
+  status: "idle" | "loading" | "ready" | "error";
+};
+
+/**
+ * Loads ranked public-directory matches under the router's cancellation lifetime.
+ * @param query - Normalized URL-backed query.
+ * @param group - Public directory scope; private and people search are excluded.
+ * @param signal - Router-owned cancellation signal.
+ * @returns Ranked matches or existing inline failure feedback.
+ */
+export async function loadDirectorySearch(
+  query: string,
+  group: Exclude<SearchGroup, "all" | "people">,
+  signal: AbortSignal,
+): Promise<DirectorySearchState> {
+  const normalized = query.trim();
+  if (normalized.length < SEARCH_QUERY_MIN_LENGTH)
+    return { items: [], status: "idle" };
+  try {
+    const { items } = await searchPublic({
+      data: { group, query: normalized, surface: "directory" },
+      signal,
+    });
+    return { items, status: "ready" };
+  } catch {
+    return { items: [], status: "error" };
+  }
+}
 
 /** URL state shared by public directory searches. */
 export type DirectorySearch = {

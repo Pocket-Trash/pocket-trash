@@ -6,10 +6,12 @@ import {
   DirectorySearch,
   DirectorySearchStatus,
 } from "@/components/directory-search";
-import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
-import { rankedDirectoryIds } from "@/lib/directory-search";
+import {
+  type DirectorySearchState,
+  rankedDirectoryIds,
+} from "@/lib/directory-search";
 import { cn } from "@/lib/utils";
 
 /** Ordered table-of-contents labels for maker directory sections. */
@@ -62,10 +64,13 @@ export function makerDirectorySections(
  * @returns The public Makers page.
  */
 export function MakersDirectoryPage({
+  directorySearch: search = { items: [], status: "idle" },
   makers,
   onQueryChange = () => undefined,
   query = "",
 }: {
+  /** Ranked matches and feedback supplied by the route loader. */
+  directorySearch?: DirectorySearchState;
   /** Every public maker directory entry. */
   makers: PublicMakerSummary[];
   /**
@@ -78,7 +83,6 @@ export function MakersDirectoryPage({
   query?: string;
 }) {
   const t = useCatalogCopy();
-  const search = useDirectorySearch(query, "makers");
   const rankedIds = rankedDirectoryIds(search.items, new Set(["maker"]));
   const makersById = new Map(makers.map((maker) => [maker.id, maker]));
   const visibleMakers = query.trim()
