@@ -6,6 +6,14 @@ import {
   OwnerResourceTrashPage,
 } from "./resource-trash-page";
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Supplies the current trash-page account boundary.
+   * @returns Test account identity.
+   */
+  useAuth: () => ({ userId: "user_test" }),
+}));
+
 vi.mock("@/components/admin-page-shell", () => ({
   /**
    * Renders a minimal admin shell for tests.
@@ -92,7 +100,6 @@ describe("resource trash", () => {
     expect(adminHtml).toContain("Deleted by admin");
     expect(adminHtml).toContain("Deleted by an admin");
     expect(adminHtml).toContain("Delete permanently");
-    expect(adminHtml).toContain("Permanently delete resource");
-    expect(adminHtml).toContain("This cannot be undone.");
+    expect(adminHtml).not.toContain("<dialog");
   });
 });

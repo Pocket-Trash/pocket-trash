@@ -51,6 +51,11 @@ vi.mock("@clerk/tanstack-react-start", () => ({
 
 vi.mock("@tanstack/react-router", () => ({
   /**
+   * Supplies the existing route invalidation boundary.
+   * @returns Router refresh observer.
+   */
+  useRouter: () => ({ invalidate: vi.fn() }),
+  /**
    * Renders router links as anchors for static markup tests.
    *
    * @param props - Link properties.
@@ -111,8 +116,7 @@ describe("admin resource notifications", () => {
     expect(html).toContain("Category: 3D printing");
     expect(html).toContain("Uploader: roy");
     expect(html).toContain("Mark private");
-    expect(html).toContain("Reason for delisting");
-    expect(html).toContain("Delist");
+    expect(html).not.toContain("<dialog");
     expect(html).toContain('href="/resources/1000"');
     expect(html).toContain('href="/admin/trash/resources"');
   });

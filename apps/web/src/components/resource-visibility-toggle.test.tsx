@@ -30,3 +30,9 @@ describe("resource visibility toggle", () => {
     expect(html).not.toContain("required");
   });
 });
+
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /** Supplies an anonymous resource observer.
+   * @returns Account context. */
+  useAuth: () => ({ userId: null }),
+}));

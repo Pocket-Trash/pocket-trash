@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect } from "storybook/test";
-import { StoryProviders } from "../../.storybook/story-fixtures";
+import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { ResourceCard, type ResourceCardItem } from "./resource-card";
 
 /**
@@ -33,6 +33,8 @@ const resource = {
  */
 const meta = {
   args: { resource },
+  /** Supplies the anonymous account observed by public downloads. */
+  beforeEach: mockStoryAuth,
   component: ResourceCard,
   decorators: [
     (Story) => (
