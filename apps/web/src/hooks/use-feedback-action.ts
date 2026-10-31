@@ -192,6 +192,7 @@ type Effect = {
  * Performs feedback writes once per confirmed intent and retries failed post-write refreshes separately.
  * @param onCommitted - Active owner's refresh, navigation, or persisted-vote command.
  * @param onFailure - Optional form-owned failure feedback command.
+ * @param onCompleted - Optional active-owner acknowledgement after refresh succeeds.
  * @returns Current eligibility, localized error, and semantic write command.
  */
 export function useFeedbackAction(
@@ -200,6 +201,7 @@ export function useFeedbackAction(
     outcome: Outcome,
   ) => void | Promise<unknown>,
   onFailure?: (error: TranslationKey) => void,
+  onCompleted?: (action: FeedbackAction) => void,
 ) {
   const { userId: actorId } = useAuth();
   const { locale } = useLocale();
@@ -318,7 +320,10 @@ export function useFeedbackAction(
           if (signal.aborted) return;
           const error = ok ? undefined : feedbackFailure(effect.action);
           dispatch({ type: "finished", error });
-          if (ok) task.current = null;
+          if (ok) {
+            task.current = null;
+            onCompleted?.(effect.action);
+          }
           if (error) {
             onFailure?.(error);
             toast.error(t(error));
