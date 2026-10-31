@@ -1,6 +1,6 @@
 import Highcharts from "highcharts/es-modules/masters/highcharts.src.js";
 import "highcharts/es-modules/masters/modules/accessibility.src.js";
-import { useEffect, useRef } from "react";
+import { useCallback } from "react";
 
 /** One recorded-activity chart point. */
 type ActivityChartPoint = {
@@ -39,7 +39,6 @@ export function ActivityTrendsChart({
   /** One or more activity series. */
   series: ActivityChartSeries[];
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const bucketStarts = Array.from(
     new Map(
       series.flatMap(({ values }) =>
@@ -58,41 +57,46 @@ export function ActivityTrendsChart({
       ),
   );
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const chartRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return;
 
-    const chart = Highcharts.chart(containerRef.current, {
-      accessibility: {
-        description: chartLabel,
-        screenReaderSection: {
-          beforeChartFormat:
-            "<div>{typeDescription}</div><div>{chartLongdesc}</div>",
+      const chart = Highcharts.chart(node, {
+        accessibility: {
+          description: chartLabel,
+          screenReaderSection: {
+            beforeChartFormat:
+              "<div>{typeDescription}</div><div>{chartLongdesc}</div>",
+          },
         },
-      },
-      chart: { animation: false, height: 360, styledMode: true, type: "line" },
-      series: series.map(({ name, values }) => ({
-        data: values.map(({ bucketStart, count }) => [
-          bucketStart.getTime(),
-          count,
-        ]),
-        name,
-        type: "line",
-      })),
-      title: { text: chartLabel },
-      tooltip: { shared: true, xDateFormat: "%b %e, %Y" },
-      xAxis: { type: "datetime" },
-      yAxis: { allowDecimals: false, min: 0 },
-    });
+        chart: {
+          animation: false,
+          height: 360,
+          styledMode: true,
+          type: "line",
+        },
+        series: series.map(({ name, values }) => ({
+          data: values.map(({ bucketStart, count }) => [
+            bucketStart.getTime(),
+            count,
+          ]),
+          name,
+          type: "line",
+        })),
+        title: { text: chartLabel },
+        tooltip: { shared: true, xDateFormat: "%b %e, %Y" },
+        xAxis: { type: "datetime" },
+        yAxis: { allowDecimals: false, min: 0 },
+      });
 
-    return () => chart.destroy();
-  }, [chartLabel, series]);
+      return () => chart.destroy();
+    },
+    [chartLabel, series],
+  );
 
   return (
     <div className="space-y-3">
-      <div
-        className="rounded-md border border-border bg-card"
-        ref={containerRef}
-      />
+      <div className="rounded-md border border-border bg-card" ref={chartRef} />
 
       <details className="rounded-md border border-border bg-card">
         <summary className="cursor-pointer p-3 font-semibold">

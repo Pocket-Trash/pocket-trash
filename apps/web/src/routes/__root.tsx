@@ -4,13 +4,15 @@ import "@fortawesome/fontawesome-svg-core/styles.css";
 import { formatTranslation } from "@pocket-trash/localizations";
 import {
   createRootRoute,
-  HeadContent,
   Outlet,
   Scripts,
+  useRouterState,
 } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import type * as React from "react";
+import { DocumentHead } from "@/components/document-head";
 import { PageFooter } from "@/components/page-footer";
+import { markHydrated } from "@/lib/hydration-marker";
 import { logger } from "@/lib/logger";
 import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
@@ -27,6 +29,7 @@ import {
   type UserSettingsState,
 } from "@/lib/user-settings";
 import { AppProviders } from "@/providers/app-providers";
+import { LocaleProvider } from "@/providers/locale-provider";
 import "../styles.css";
 
 config.autoAddCss = false;
@@ -140,25 +143,42 @@ function RootDocument({
    */
   children?: React.ReactNode;
 }) {
+  const initialSettingsState = useRouterState({
+    /** Selects optional settings without requiring a successful root loader.
+     * @param state - Current Router matches.
+     * @returns Root settings or the existing anonymous fallback. */
+    select: (state) => {
+      const data = state.matches.find((match) => match.routeId === "__root__")
+        ?.loaderData as
+        | {
+            /** Optional authorized settings snapshot. */
+            settingsState?: UserSettingsState | null;
+          }
+        | undefined;
+      return data?.settingsState ?? null;
+    },
+  });
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: bootstrapScript(
-              { serverTheme: null, shouldUseServerTheme: false },
-              null,
-              null,
-            ),
-          }}
-        />
-      </head>
-      <body>
-        <div className="root">{children}</div>
-        <Scripts />
-      </body>
-    </html>
+    <LocaleProvider initialSettingsState={initialSettingsState}>
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <DocumentHead />
+          <script
+            dangerouslySetInnerHTML={{
+              __html: bootstrapScript(
+                { serverTheme: null, shouldUseServerTheme: false },
+                null,
+                null,
+              ),
+            }}
+          />
+        </head>
+        <body ref={markHydrated}>
+          <div className="root">{children}</div>
+          <Scripts />
+        </body>
+      </html>
+    </LocaleProvider>
   );
 }
 

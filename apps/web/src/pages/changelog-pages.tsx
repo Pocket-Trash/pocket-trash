@@ -11,11 +11,11 @@ import {
   getChangelogCategoryTitle,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import * as React from "react";
 import { AppShell } from "@/components/app-shell";
 import { MarkdownContent } from "@/components/markdown-content";
 import { badgeVariants } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useClipboardCopy } from "@/hooks/use-clipboard-copy";
 import type { ChangelogEntry, ChangelogPage } from "@/lib/changelog-content";
 import { absoluteUrl } from "@/lib/site-url";
 import { cn } from "@/lib/utils";
@@ -61,7 +61,6 @@ export function ChangelogListPage({
   const pageTitle = category
     ? getChangelogCategoryTitle(category, locale)
     : changelogTitle;
-  useDocumentTitle(pageTitle);
 
   return (
     <AppShell title={changelogTitle}>
@@ -179,9 +178,7 @@ export function ChangelogListPage({
  */
 export function ChangelogEntryPage({ entry }: ChangelogEntryPageProps) {
   const { locale } = useLocale();
-  const [copyStatus, setCopyStatus] = React.useState<
-    "copied" | "failed" | null
-  >(null);
+
   /**
    * Formats a changelog translation in the active locale.
    *
@@ -191,17 +188,9 @@ export function ChangelogEntryPage({ entry }: ChangelogEntryPageProps) {
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const changelogTitle = t("web.navigation.changelog");
   const entryHref = `/changelog/${entry.slug}`;
-  useDocumentTitle(entry.title);
-
-  /** Copies the permanent absolute URL and exposes a localized result. */
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(absoluteUrl(entryHref));
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("failed");
-    }
-  };
+  const { status: copyStatus, copy: copyLink } = useClipboardCopy(
+    absoluteUrl(entryHref),
+  );
 
   return (
     <AppShell
@@ -326,17 +315,4 @@ function EntryCategories({ entry }: ChangelogEntryPageProps) {
 function pageHref(category: ChangelogCategorySlug | undefined, page: number) {
   const pathname = category ? `/changelog/${category}` : "/changelog";
   return page <= 1 ? pathname : `${pathname}?page=${page}`;
-}
-
-/**
- * Keeps the client document title aligned with the active locale.
- *
- * @param title - Localized page title without the site name.
- */
-function useDocumentTitle(title: string) {
-  const { locale } = useLocale();
-
-  React.useEffect(() => {
-    document.title = `${title} · ${formatTranslation("web.site.name", {}, locale)}`;
-  }, [locale, title]);
 }
