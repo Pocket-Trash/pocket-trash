@@ -6,9 +6,10 @@ import {
 } from "@/lib/ui-preferences";
 import type { UserSettingsState } from "@/lib/user-settings";
 import { ClerkProvider } from "./clerk-provider";
-import { AuthenticatedLocaleSync, LocaleProvider } from "./locale-provider";
+import { LocaleProvider } from "./locale-provider";
 import { ThemeProvider } from "./theme-provider";
 import { TooltipProvider } from "./tooltip-provider";
+import { UserSettingsProvider } from "./user-settings-provider";
 
 /**
  * Composes the application locale, authentication, theme, tooltip, and toast providers.
@@ -32,10 +33,8 @@ export function AppProviders({
     <InitialUiPreferencesContext.Provider value={initialUiPreferences}>
       <LocaleProvider initialSettingsState={initialSettingsState}>
         <ClerkProvider>
-          <AuthenticatedLocaleSync
-            initialSettingsState={initialSettingsState}
-          />
-          <ThemeProvider initialSettingsState={initialSettingsState}>
+          <UserSettingsProvider />
+          <ThemeProvider>
             <TooltipProvider>
               {children}
               <Toaster

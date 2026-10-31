@@ -29,33 +29,14 @@ vi.mock("@tanstack/react-router", () => ({
    */
   useRouter: () => ({ invalidate: mocks.invalidate }),
 }));
-vi.mock("@pocket-trash/localizations", () => ({
-  /**
-   * Returns untranslated copy for assertions.
-   *
-   * @param key - Requested translation key.
-   * @returns The requested key for assertions.
-   */
-  formatTranslation: (key: string) => key,
-}));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn() } }));
-vi.mock("@/providers/locale-provider", () => ({
-  /**
-   * Returns stable locale state.
-   *
-   * @returns Stable locale state for the hook under test.
-   */
-  useLocale: () => ({
-    locale: "en-US",
-    measurementSystem: "metric",
-    setMeasurementSystem: mocks.setMeasurementSystem,
-  }),
-}));
 vi.mock("@/lib/user-settings", () => ({
   defaultUserSettings: {
     currencyCode: "USD",
     isProfilePublic: false,
+    locale: null,
+    theme: "system",
     measurementSystem: "metric",
     publishTrends: false,
   },
@@ -64,6 +45,10 @@ vi.mock("@/lib/user-settings", () => ({
   userSettingsStorageKey: "pocket-trash:user-settings",
 }));
 
+import {
+  AuthenticatedLocaleSync,
+  LocaleProvider,
+} from "@/providers/locale-provider";
 import { usePenSettings } from "./use-pen-settings";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -88,12 +73,25 @@ type SettingsResponse = {
  *
  * @returns A button containing serialized hook state.
  */
-function Probe() {
+function SettingsProbe() {
   const settings = usePenSettings();
   return (
     <button type="button" onClick={() => settings.setCurrency("CAD")}>
       {`${settings.accountSettingsLoaded}:${settings.accountSettingsLoadFailed}:${settings.currency}:${settings.isProfilePublic}:${settings.saving}`}
     </button>
+  );
+}
+
+/**
+ * Supplies the real request-local owner and account adapter to the hook probe.
+ * @returns The shared settings provider tree.
+ */
+function Probe() {
+  return (
+    <LocaleProvider initialSettingsState={null}>
+      <AuthenticatedLocaleSync initialSettingsState={null} />
+      <SettingsProbe />
+    </LocaleProvider>
   );
 }
 
