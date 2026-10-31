@@ -13,8 +13,10 @@ import {
 } from "@/components/directory-search";
 import { ResourceCard } from "@/components/resource-card";
 import { Button } from "@/components/ui/button";
-import { useDirectorySearch } from "@/hooks/use-directory-search";
-import { rankedDirectoryIds } from "@/lib/directory-search";
+import {
+  type DirectorySearchState,
+  rankedDirectoryIds,
+} from "@/lib/directory-search";
 import type { listResourceDirectory } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -30,11 +32,14 @@ type ResourceDirectory = Awaited<ReturnType<typeof listResourceDirectory>>;
  * @returns The resource directory page.
  */
 export function ResourcesPage({
+  directorySearch: search = { items: [], status: "idle" },
   directory,
   onQueryChange = () => undefined,
   query = "",
   selectedCategorySlugs,
 }: {
+  /** Ranked matches and feedback supplied by the route loader. */
+  directorySearch?: DirectorySearchState;
   /** Resources, categories, and invalid filters. */
   directory: ResourceDirectory;
   /**
@@ -51,7 +56,6 @@ export function ResourcesPage({
   const { isSignedIn } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
-  const search = useDirectorySearch(query, "resources");
   const rankedIds = rankedDirectoryIds(search.items, new Set(["resource"]));
   const resourcesById = new Map(
     directory.resources.map((resource) => [resource.id, resource]),

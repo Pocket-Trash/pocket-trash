@@ -26,11 +26,13 @@ import { ProductCard } from "@/components/product-card";
 import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Button } from "@/components/ui/button";
 import { useViewportWidth } from "@/hooks/use-browser-layout";
-import { useDirectorySearch } from "@/hooks/use-directory-search";
 import { usePageCorrection } from "@/hooks/use-page-correction";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
-import { rankedDirectoryIds } from "@/lib/directory-search";
+import {
+  type DirectorySearchState,
+  rankedDirectoryIds,
+} from "@/lib/directory-search";
 import type { PublicMaterialDetail } from "@/lib/materials";
 import {
   clampMaterialPage,
@@ -76,10 +78,13 @@ function materialCardCopy(
  * @returns The materials directory page.
  */
 export function MaterialsPage({
+  directorySearch: search = { items: [], status: "idle" },
   materials,
   onQueryChange = () => undefined,
   query = "",
 }: {
+  /** Ranked matches and feedback supplied by the route loader. */
+  directorySearch?: DirectorySearchState;
   /** Every material and its public usage counts. */
   materials: PublicMaterialSummary[];
   /**
@@ -92,7 +97,6 @@ export function MaterialsPage({
   query?: string;
 }) {
   const t = useCatalogCopy();
-  const search = useDirectorySearch(query, "materials");
   const rankedIds = rankedDirectoryIds(
     search.items,
     new Set(["material"]),
