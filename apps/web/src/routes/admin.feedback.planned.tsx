@@ -1,6 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { canManageFeedback, listAdminActiveFeedback } from "@/lib/feedback";
+import { canManageFeedback, loadAdminFeedbackSnapshot } from "@/lib/feedback";
 import { AdminActiveFeedbackPage } from "@/pages/admin-feedback-pages";
 
 /**
@@ -18,10 +18,15 @@ export const Route = createFileRoute("/admin/feedback/planned")({
   /**
    * Loads the first page of planned feedback.
    *
+   * @param input - Router loader cancellation context.
    * @returns The first page of planned feedback.
    * @rejects When planned feedback cannot be loaded.
    */
-  loader: async () => await listAdminActiveFeedback({ data: { offset: 0 } }),
+  loader: async ({ abortController }) =>
+    await loadAdminFeedbackSnapshot({
+      data: "planned",
+      signal: abortController.signal,
+    }),
   component: AdminPlannedFeedbackRoute,
   /**
    * Builds document metadata for the admin feedback planned route.
@@ -39,5 +44,5 @@ export const Route = createFileRoute("/admin/feedback/planned")({
  * @returns The rendered route UI.
  */
 function AdminPlannedFeedbackRoute() {
-  return <AdminActiveFeedbackPage initialPage={Route.useLoaderData()} />;
+  return <AdminActiveFeedbackPage {...Route.useLoaderData()} />;
 }

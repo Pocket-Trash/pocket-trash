@@ -149,6 +149,7 @@ export const Requests: Story = {
     );
     await waitFor(() =>
       expect(mocked(listPendingFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: {
           offset: 0,
           search: "",
@@ -222,6 +223,7 @@ export const Active: Story = {
     await userEvent.type(search, "saved");
     await waitFor(() =>
       expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: { offset: 0, search: "saved", sort: [] },
       }),
     );
@@ -229,12 +231,14 @@ export const Active: Story = {
     await expect(search).toHaveValue("");
     await waitFor(() =>
       expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: { offset: 0, search: "", sort: [] },
       }),
     );
     await userEvent.type(search, "saved");
     await waitFor(() =>
       expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: { offset: 0, search: "saved", sort: [] },
       }),
     );
@@ -243,6 +247,7 @@ export const Active: Story = {
     );
     await waitFor(() =>
       expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: {
           offset: 0,
           search: "saved",
@@ -253,6 +258,7 @@ export const Active: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Next page" }));
     await waitFor(() =>
       expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: {
           offset: 30,
           search: "saved",
@@ -393,6 +399,7 @@ export const AllActive: Story = {
     await userEvent.type(search, "saved");
     await waitFor(() =>
       expect(mocked(listAdminAllActiveFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: { offset: 0, search: "saved", sort: [] },
       }),
     );
@@ -452,6 +459,7 @@ export const Archive: Story = {
     );
     await waitFor(() =>
       expect(mocked(listArchivedFeedback)).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
         data: {
           offset: 0,
           search: "",

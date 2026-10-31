@@ -1,6 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute } from "@tanstack/react-router";
-import { listCompletedFeedback } from "@/lib/feedback";
+import { loadCompletedFeedbackSnapshot } from "@/lib/feedback";
 import { CompletedFeedbackPage } from "@/pages/feedback-pages";
 
 /** Shows completed feedback to authenticated users. */
@@ -8,11 +8,12 @@ export const Route = createFileRoute("/feedback/completed")({
   /**
    * Loads the first page of completed feedback.
    *
+   * @param input - Router loader cancellation context.
    * @returns The first page of completed feedback.
    * @rejects When completed feedback cannot be loaded.
    */
-  loader: async () =>
-    await listCompletedFeedback({ data: { offset: 0, search: "" } }),
+  loader: async ({ abortController }) =>
+    await loadCompletedFeedbackSnapshot({ signal: abortController.signal }),
   component: CompletedFeedbackRoute,
   /**
    * Builds completed feedback document metadata.
@@ -30,5 +31,5 @@ export const Route = createFileRoute("/feedback/completed")({
  * @returns The completed feedback route page.
  */
 function CompletedFeedbackRoute() {
-  return <CompletedFeedbackPage initialItems={Route.useLoaderData()} />;
+  return <CompletedFeedbackPage {...Route.useLoaderData()} />;
 }
