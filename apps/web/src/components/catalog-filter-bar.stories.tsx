@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useReducer } from "react";
-import { expect, within } from "storybook/test";
+import { expect, waitFor, within } from "storybook/test";
 import {
   type CatalogFacets,
   type CatalogFilters,
@@ -226,15 +226,17 @@ export const FilterInteraction: Story = {
     await expect(popup).toBeVisible();
     within(popup).getByRole("button", { name: "Apply" }).focus();
     await userEvent.keyboard("{Escape}");
-    await expect(popup).not.toBeVisible();
+    await waitFor(() => expect(popup).not.toBeVisible());
     const trigger = canvas.getByRole("button", { name: "More filters" });
-    await expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus());
     await userEvent.click(trigger);
     await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Clear" }));
-    await expect(
-      page.queryByRole("dialog", { name: "Filters" }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        page.queryByRole("dialog", { name: "Filters" }),
+      ).not.toBeInTheDocument(),
+    );
   },
 };
 
