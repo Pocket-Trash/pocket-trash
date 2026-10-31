@@ -1,5 +1,8 @@
-import { useId, useRef, useState } from "react";
+import { useAuth } from "@clerk/tanstack-react-start";
+import { useForm, useStore } from "@tanstack/react-form";
+import { useCallback, useId, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useConfirmedDeletion } from "@/hooks/use-confirmed-deletion";
 import { useCatalogCopy } from "@/lib/catalog-copy";
 
 /**
@@ -8,9 +11,28 @@ import { useCatalogCopy } from "@/lib/catalog-copy";
  * @param props - Target label, target type, staff reason requirement, and deletion callback.
  * @returns Accessible permanent deletion controls shared by products and collection items.
  */
-export function PermanentDeletionControls({
+export function PermanentDeletionControls(props: PermanentDeletionProperties) {
+  const { userId } = useAuth();
+  return (
+    <PermanentDeletionForm
+      key={`${userId}:${props.reasonRequired}:${props.targetType ?? "product"}`}
+      {...props}
+    />
+  );
+}
+
+/** Backward-compatible confirmed deletion properties with optional post-commit completion. */
+type PermanentDeletionProperties = Parameters<typeof PermanentDeletionForm>[0];
+
+/**
+ * Owns one account/target confirmation form without binding cleanup to user dismissal.
+ * @param props - Existing deletion contract and optional post-commit completion.
+ * @returns Explicit permanent deletion controls.
+ */
+function PermanentDeletionForm({
   name,
   onDelete,
+  onDeleted,
   reasonRequired,
   targetType = "product",
 }: {
@@ -28,6 +50,12 @@ export function PermanentDeletionControls({
    * @rejects When deletion is blocked or fails.
    */
   onDelete(reason?: string): Promise<void>;
+  /**
+   * Completes existing post-delete navigation only after the current observer sees acknowledgement.
+   * @returns Completion after the existing post-delete action.
+   * @rejects When completion fails.
+   */
+  onDeleted?: () => Promise<unknown> | void;
 }) {
   const t = useCatalogCopy();
   const item = targetType === "collection_item";
@@ -40,128 +68,176 @@ export function PermanentDeletionControls({
   const titleId = useId();
   const descriptionId = useId();
   const reasonId = useId();
-  const [confirmed, setConfirmed] = useState(false);
-  const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  const form = useForm({
+    defaultValues: { confirmed: false, reason: "" },
+    validators: {
+      /**
+       * Requires the existing explicit confirmation and optional trimmed staff reason.
+       * @param input - Current confirmation fields.
+       * @returns Existing failure key when confirmation is incomplete.
+       */
+      onSubmit: ({ value }): string | undefined =>
+        !value.confirmed || (reasonRequired && !value.reason.trim())
+          ? item
+            ? "error.generic"
+            : "web.catalog.deletion.failed"
+          : undefined,
+    },
+    /**
+     * Captures one validated deletion intent without changing its caller contract.
+     * @param input - Current confirmation and optional reason.
+     * @returns Nothing.
+     */
+    onSubmit: ({ value }) =>
+      deletion.confirm(reasonRequired ? value.reason.trim() : undefined),
+  });
+  const { confirmed, reason } = useStore(form.store, (state) => state.values);
+  const failure = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const eligible = useStore(
+    form.store,
+    (state) =>
+      !state.isSubmitting &&
+      state.values.confirmed &&
+      (!reasonRequired || Boolean(state.values.reason.trim())),
+  );
+  const deletion = useConfirmedDeletion(onDelete, onDeleted, (error) => {
+    form.setErrorMap({
+      onSubmit:
+        error instanceof Error &&
+        !item &&
+        error.message === "web.catalog.deletion.blocked"
+          ? error.message
+          : item
+            ? "error.generic"
+            : "web.catalog.deletion.failed",
+    });
+  });
+  const submitting = deletion.submitting;
+  /** Dismisses only explicit user intent, preserving the form through Activity cleanup. */
+  const dismiss = () => {
+    if (submitting) return;
+    form.reset();
+    deletion.dismiss();
+  };
+  /**
+   * Owns the committed dialog DOM lifetime.
+   * @param node - Current confirmation dialog.
+   * @returns Cleanup closing only this mounted dialog.
+   */
+  const bindDialog = useCallback((node: HTMLDialogElement | null) => {
+    dialog.current = node;
+    if (!node) return;
+    node.showModal();
+    return () => {
+      node.close();
+      if (dialog.current === node) dialog.current = null;
+    };
+  }, []);
   return (
     <>
       <Button
         type="button"
         variant="destructive"
-        onClick={() => dialog.current?.showModal()}
+        onClick={() => {
+          if (deletion.open) return;
+          form.reset();
+          deletion.openConfirmation();
+        }}
       >
         {action}
       </Button>
-      <dialog
-        ref={dialog}
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-        onCancel={(event) => {
-          if (submitting) event.preventDefault();
-        }}
-        onClose={() => {
-          setConfirmed(false);
-          setReason("");
-          setFailure(null);
-        }}
-      >
-        <form
-          className="grid gap-5 p-6"
-          onSubmit={async (event) => {
+      {deletion.open ? (
+        <dialog
+          ref={bindDialog}
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+          onCancel={(event) => {
             event.preventDefault();
-            if (submitting || !confirmed || (reasonRequired && !reason.trim()))
-              return;
-            setSubmitting(true);
-            setFailure(null);
-            try {
-              await onDelete(reasonRequired ? reason.trim() : undefined);
-              dialog.current?.close();
-            } catch (error) {
-              setFailure(
-                error instanceof Error &&
-                  !item &&
-                  error.message === "web.catalog.deletion.blocked"
-                  ? error.message
-                  : item
-                    ? "error.generic"
-                    : "web.catalog.deletion.failed",
-              );
-            } finally {
-              setSubmitting(false);
-            }
+            dismiss();
           }}
         >
-          <h2 className="text-xl font-semibold" id={titleId}>
-            {item ? action : t("web.catalog.deletion.title")}
-          </h2>
-          <p className="text-sm text-muted-foreground" id={descriptionId}>
-            {t(
-              item
-                ? "web.collections.deletion.itemDescription"
-                : "web.catalog.deletion.description",
-              { name },
-            )}
-          </p>
-          {reasonRequired ? (
-            <div className="grid gap-2">
-              <label htmlFor={reasonId}>
-                {t("web.resources.moderation.reasonLabel")}
-              </label>
-              <textarea
-                id={reasonId}
-                className="min-h-20 rounded-md border border-input bg-background p-3 text-foreground"
-                required
-                maxLength={1000}
-                disabled={submitting}
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
-            </div>
-          ) : null}
-          <label className="flex items-start gap-3 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4"
-              checked={confirmed}
-              disabled={submitting}
-              onChange={(event) => setConfirmed(event.target.checked)}
-            />
-            <span>
+          <form
+            className="grid gap-5 p-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (submitting) return;
+              form.setErrorMap({ onSubmit: undefined });
+              void form.handleSubmit();
+            }}
+          >
+            <h2 className="text-xl font-semibold" id={titleId}>
+              {item ? action : t("web.catalog.deletion.title")}
+            </h2>
+            <p className="text-sm text-muted-foreground" id={descriptionId}>
               {t(
                 item
-                  ? "web.collections.deletion.itemConfirmation"
-                  : "web.catalog.deletion.confirmation",
+                  ? "web.collections.deletion.itemDescription"
+                  : "web.catalog.deletion.description",
+                { name },
               )}
-            </span>
-          </label>
-          {failure ? (
-            <p className="text-sm text-destructive" role="alert">
-              {t(failure)}
             </p>
-          ) : null}
-          <div className="flex flex-wrap justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={submitting}
-              onClick={() => dialog.current?.close()}
-            >
-              {t("action.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              variant="destructive"
-              disabled={
-                submitting || !confirmed || (reasonRequired && !reason.trim())
-              }
-            >
-              {action}
-            </Button>
-          </div>
-        </form>
-      </dialog>
+            {reasonRequired ? (
+              <div className="grid gap-2">
+                <label htmlFor={reasonId}>
+                  {t("web.resources.moderation.reasonLabel")}
+                </label>
+                <textarea
+                  id={reasonId}
+                  className="min-h-20 rounded-md border border-input bg-background p-3 text-foreground"
+                  required
+                  maxLength={1000}
+                  disabled={submitting}
+                  value={reason}
+                  onChange={(event) =>
+                    form.setFieldValue("reason", event.target.value)
+                  }
+                />
+              </div>
+            ) : null}
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4"
+                checked={confirmed}
+                disabled={submitting}
+                onChange={(event) =>
+                  form.setFieldValue("confirmed", event.target.checked)
+                }
+              />
+              <span>
+                {t(
+                  item
+                    ? "web.collections.deletion.itemConfirmation"
+                    : "web.catalog.deletion.confirmation",
+                )}
+              </span>
+            </label>
+            {failure ? (
+              <p className="text-sm text-destructive" role="alert">
+                {t(failure)}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={submitting}
+                onClick={dismiss}
+              >
+                {t("action.cancel")}
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={submitting || !eligible}
+              >
+                {action}
+              </Button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
     </>
   );
 }

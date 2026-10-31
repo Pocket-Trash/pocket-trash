@@ -1235,7 +1235,7 @@ describe("ProductDetailPage", () => {
         />,
       );
       expect(html).toContain("Permanently delete product");
-      expect(html.includes("<textarea")).toBe(!isOwner);
+      expect(html).not.toContain("<dialog");
     }
   });
 
@@ -1592,3 +1592,9 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain("text-[13.5px] leading-[1.6]");
   });
 });
+
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /** Supplies the catalog deletion observer's current account.
+   * @returns Current account context. */
+  useAuth: () => ({ userId: "user_test" }),
+}));
