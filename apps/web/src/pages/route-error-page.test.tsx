@@ -121,17 +121,13 @@ describe("RouteErrorPage", () => {
     expect(resolveRouteErrorLocale(null, null)).toBe("en-US");
   });
 
-  it("logs one serialized boundary error without the query string", () => {
+  it("renders recovery without reporting from a component lifetime", () => {
     const error = new TypeError("render failed");
     mocks.pathname = "/products";
 
     act(() => root.render(<RouteErrorPage error={error} reset={vi.fn()} />));
 
-    expect(mocks.loggerError).toHaveBeenCalledOnce();
-    expect(mocks.loggerError).toHaveBeenCalledWith("web.route.error", {
-      attributes: { route: "/products" },
-      error,
-    });
+    expect(mocks.loggerError).not.toHaveBeenCalled();
   });
 
   it("hides technical details in production", () => {

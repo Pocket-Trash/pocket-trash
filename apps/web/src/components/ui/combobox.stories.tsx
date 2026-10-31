@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useReducer } from "react";
 import { expect, fn, waitFor, within } from "storybook/test";
 import {
   CatalogCombobox,
@@ -137,11 +137,22 @@ export const MultipleSelection: Story = {
  * @returns The rendered single combobox UI.
  */
 function SingleCombobox(props: React.ComponentProps<typeof CatalogCombobox>) {
-  const [value, setValue] = useState<ComboboxOption | null>(null);
+  const [value, dispatch] = useReducer(
+    (
+      _value: ComboboxOption | null,
+      event: {
+        /** Confirmed selection or removal. */
+        type: "selectionChanged";
+        /** Current controlled option. */
+        value: ComboboxOption | null;
+      },
+    ) => event.value,
+    null,
+  );
   return (
     <CatalogCombobox
       {...props}
-      onValueChange={setValue}
+      onValueChange={(value) => dispatch({ type: "selectionChanged", value })}
       showSelectedPill
       value={value}
     />
@@ -154,15 +165,66 @@ function SingleCombobox(props: React.ComponentProps<typeof CatalogCombobox>) {
  * @returns The rendered multi combobox UI.
  */
 function MultiCombobox() {
-  const [value, setValue] = useState<ComboboxOption[]>([bronze]);
+  const [value, dispatch] = useReducer(
+    (
+      _value: ComboboxOption[],
+      event: {
+        /** Confirmed selection or removal. */
+        type: "selectionChanged";
+        /** Current controlled options. */
+        value: ComboboxOption[];
+      },
+    ) => event.value,
+    [bronze],
+  );
   return (
     <CatalogMultiCombobox
       ariaLabel="Materials"
       items={options}
-      onValueChange={setValue}
+      onValueChange={(value) => dispatch({ type: "selectionChanged", value })}
       placeholder="Select materials"
       removeLabel="Remove"
       value={value}
     />
   );
 }
+
+/** Keyboard selection and Escape preserve input focus through popup transitions. */
+export const KeyboardSelection: Story = {
+  /** Renders the existing controlled single-select fixture.
+   * @param args - Current combobox properties.
+   * @returns Controlled combobox fixture. */
+  render: (args) => <SingleCombobox {...args} />,
+  /** Exercises filtering, selection, Escape, and focus without a pointer.
+   * @param context - Story interaction context. */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const input = canvas.getByRole("combobox", { name: "Material" });
+    await userEvent.click(input);
+    await userEvent.type(input, "Tit");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(input).toHaveValue("Titanium");
+    await expect(input).toHaveFocus();
+    const page = within(canvasElement.ownerDocument.body);
+    await waitFor(() => expect(page.queryByRole("listbox")).toBeNull());
+    await userEvent.keyboard("{ArrowDown}");
+    await expect(await page.findByRole("listbox")).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(page.queryByRole("listbox")).toBeNull());
+    await expect(input).toHaveFocus();
+  },
+};
+
+/** Disabled single-select controls retain their selected value and pill. */
+export const Disabled: Story = {
+  args: { disabled: true, showSelectedPill: true, value: bronze },
+  /** Checks existing disabled input and removal eligibility.
+   * @param context - Story interaction context. */
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("combobox", { name: "Material" }),
+    ).toBeDisabled();
+    await expect(
+      canvas.getByRole("button", { name: "Remove: Bronze" }),
+    ).toBeDisabled();
+  },
+};

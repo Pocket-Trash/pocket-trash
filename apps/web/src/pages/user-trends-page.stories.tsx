@@ -4,7 +4,7 @@ import type {
   UserCollectionItem,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useReducer } from "react";
 import { expect, fn, within } from "storybook/test";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import type { CommunityTrendsSource } from "@/lib/user-trends";
@@ -75,7 +75,18 @@ const collectionHistoryTrends: UserCollectionHistoryTrends = {
  * @returns Populated personal Trends fixture.
  */
 function UserTrendsFixture() {
-  const [search, setSearch] = useState<CatalogTrendsSearch>({});
+  const [search, dispatch] = useReducer(
+    (
+      _search: CatalogTrendsSearch,
+      event: {
+        /** Filter navigation intent. */
+        type: "filtersChanged";
+        /** Next URL-filter snapshot. */
+        search: CatalogTrendsSearch;
+      },
+    ) => event.search,
+    {},
+  );
   return (
     <UserTrendsPage
       activityTrends={activityTrends}
@@ -83,7 +94,7 @@ function UserTrendsFixture() {
       collectionHistoryTrends={collectionHistoryTrends}
       communityTrends={communityTrends}
       items={items}
-      onSearchChange={setSearch}
+      onSearchChange={(search) => dispatch({ type: "filtersChanged", search })}
       search={search}
     />
   );

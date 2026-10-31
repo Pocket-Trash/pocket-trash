@@ -12,7 +12,7 @@ import type {
   PublicSpinnerTrends,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useReducer } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
@@ -328,7 +328,18 @@ type Story = StoryObj<typeof meta>;
  * @returns A populated Trends page with a controlled product-type filter.
  */
 function TrendsFixture() {
-  const [search, setSearch] = useState<CatalogTrendsSearch>({});
+  const [search, dispatch] = useReducer(
+    (
+      _search: CatalogTrendsSearch,
+      event: {
+        /** Filter navigation intent. */
+        type: "filtersChanged";
+        /** Next URL-filter snapshot. */
+        search: CatalogTrendsSearch;
+      },
+    ) => event.search,
+    {},
+  );
   return (
     <TrendsPage
       activityTrends={activityTrends}
@@ -336,7 +347,7 @@ function TrendsFixture() {
       collectionMaterialTrends={null}
       collectionTrends={collectionTrends}
       lifecycleTrends={lifecycleTrends}
-      onSearchChange={setSearch}
+      onSearchChange={(search) => dispatch({ type: "filtersChanged", search })}
       search={search}
       trends={trends}
     />

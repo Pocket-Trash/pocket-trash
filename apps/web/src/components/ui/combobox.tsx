@@ -8,6 +8,28 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/** Explicit catalog-popup disclosure and completed selection intent. */
+type ComboboxPopupEvent =
+  | {
+      /** Changes popup disclosure. */
+      type: "popupChanged";
+      /** Requested disclosure state. */
+      open: boolean;
+    }
+  | {
+      /** Successful selection closes the popup. */
+      type: "selected";
+    };
+/**
+ * Preserves catalog combobox disclosure and forced closing after selection.
+ * @param _open - Prior disclosure state.
+ * @param event - Current popup or selection intent.
+ * @returns Requested popup disclosure.
+ */
+function comboboxPopupReducer(_open: boolean, event: ComboboxPopupEvent) {
+  return event.type === "popupChanged" && event.open;
+}
+
 /**
  * Selectable catalog option displayed by a combobox.
  */
@@ -107,7 +129,7 @@ export function CatalogCombobox({
    */
   value: ComboboxOption | null;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, dispatch] = React.useReducer(comboboxPopupReducer, false);
 
   return (
     <div className="grid gap-2">
@@ -116,10 +138,10 @@ export function CatalogCombobox({
         isItemEqualToValue={(item, selected) => item.id === selected.id}
         itemToStringLabel={(item) => item.name}
         items={items}
-        onOpenChange={setOpen}
+        onOpenChange={(open) => dispatch({ type: "popupChanged", open })}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
-          setOpen(false);
+          dispatch({ type: "selected" });
         }}
         open={open}
         value={value}
@@ -231,7 +253,7 @@ export function CatalogMultiCombobox({
    */
   value: ComboboxOption[];
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, dispatch] = React.useReducer(comboboxPopupReducer, false);
 
   return (
     <div className="grid gap-2">
@@ -251,10 +273,10 @@ export function CatalogMultiCombobox({
         }
         multiple
         onInputValueChange={onInputValueChange}
-        onOpenChange={setOpen}
+        onOpenChange={(open) => dispatch({ type: "popupChanged", open })}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
-          setOpen(false);
+          dispatch({ type: "selected" });
         }}
         open={open}
         value={value}

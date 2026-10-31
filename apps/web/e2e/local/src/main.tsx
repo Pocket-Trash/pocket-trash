@@ -7,9 +7,10 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { StrictMode, useEffect } from "react";
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { PaginatedCards } from "@/components/paginated-cards";
+import { markHydrated } from "@/lib/hydration-marker";
 import {
   isCanonicalMakerSearch,
   parseMakerDetailSearch,
@@ -84,15 +85,8 @@ function MakerPaginationHarness() {
   const loadedProducts = makerRoute.useLoaderData() as unknown as string[];
   const navigate = useNavigate();
 
-  useEffect(() => {
-    document.documentElement.dataset.hydrated = "true";
-    return () => {
-      delete document.documentElement.dataset.hydrated;
-    };
-  }, []);
-
   return (
-    <main>
+    <main ref={markHydrated}>
       <h1>Maker pagination regression</h1>
       <PaginatedCards
         ariaLabel="Maker products"
