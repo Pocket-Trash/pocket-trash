@@ -54,7 +54,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     expect(textarea?.getAttribute("aria-label")).toBe("Description");
@@ -76,7 +76,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     act(() => {
@@ -102,7 +102,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, 4));
@@ -121,7 +121,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, 0));
@@ -147,7 +147,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(1, 3));
@@ -170,7 +170,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, 4));
@@ -193,7 +193,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, textarea.value.length));
@@ -211,10 +211,10 @@ describe("MarkdownEditor", () => {
         <MarkdownEditor defaultValue="Pocket Trash" label="Description" />,
       ),
     );
-    clickButton(container, "Source");
+    await clickButton(container, "Source");
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, 12));
-    clickButton(container, "Link");
+    await clickButton(container, "Link");
 
     const url = [...container.querySelectorAll("input")].find(
       (input) => input.labels?.[0]?.textContent === "URL",
@@ -225,7 +225,7 @@ describe("MarkdownEditor", () => {
       url.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      clickButton(container, "Insert link");
+      await clickButton(container, "Insert link");
     });
 
     expect(textarea?.value).toBe("[Pocket Trash](https://pocket-trash.app)");
@@ -243,11 +243,11 @@ describe("MarkdownEditor", () => {
         />,
       ),
     );
-    clickButton(container, "Source");
+    await clickButton(container, "Source");
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, 22));
-    clickButton(container, "Link");
-    clickButton(container, "Remove link");
+    await clickButton(container, "Link");
+    await clickButton(container, "Remove link");
 
     expect(textarea?.value).toBe("Pocket Trash nearby");
     expect(textarea?.selectionStart).toBe(0);
@@ -260,10 +260,10 @@ describe("MarkdownEditor", () => {
         <MarkdownEditor defaultValue="Email us" label="Description" />,
       ),
     );
-    clickButton(container, "Source");
+    await clickButton(container, "Source");
     const textarea = container.querySelector("textarea");
     act(() => textarea?.setSelectionRange(0, 8));
-    clickButton(container, "Link");
+    await clickButton(container, "Link");
     const url = [...container.querySelectorAll("input")].find(
       (input) => input.labels?.[0]?.textContent === "URL",
     );
@@ -273,7 +273,7 @@ describe("MarkdownEditor", () => {
       url.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      clickButton(container, "Insert link");
+      await clickButton(container, "Insert link");
     });
 
     expect(container.textContent).toContain(
@@ -284,8 +284,8 @@ describe("MarkdownEditor", () => {
 
   it("inserts a three-column Source table with one body row", async () => {
     await act(() => root.render(<MarkdownEditor label="Description" />));
-    clickButton(container, "Source");
-    clickButton(container, "Table");
+    await clickButton(container, "Source");
+    await clickButton(container, "Table");
 
     expect(container.querySelector("textarea")?.value).toBe(
       "|  |  |  |\n| --- | --- | --- |\n|  |  |  |",
@@ -305,7 +305,7 @@ describe("MarkdownEditor", () => {
     const sourceMode = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Source",
     );
-    act(() => sourceMode?.click());
+    await act(() => sourceMode?.click());
 
     const textarea = container.querySelector("textarea");
     expect(textarea?.getAttribute("aria-invalid")).toBeNull();
@@ -349,7 +349,7 @@ describe("MarkdownEditor", () => {
         />,
       ),
     );
-    clickButton(container, "Source");
+    await clickButton(container, "Source");
     const textarea = container.querySelector("textarea");
     const status = container.querySelector('[role="status"]');
     expect(status?.textContent).toContain("1 / 5");
@@ -409,13 +409,13 @@ function setInputValue(input: HTMLInputElement, value: string) {
  *
  * @param container - Rendered test container.
  * @param name - Visible text or accessible label.
- * @returns Nothing.
+ * @returns Resolves after the committed button interaction.
  */
-function clickButton(container: HTMLElement, name: string) {
+async function clickButton(container: HTMLElement, name: string) {
   const button = [...container.querySelectorAll("button")].find(
     (candidate) =>
       candidate.textContent === name ||
       candidate.getAttribute("aria-label") === name,
   );
-  act(() => button?.click());
+  await act(() => button?.click());
 }
