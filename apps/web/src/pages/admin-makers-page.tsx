@@ -17,8 +17,11 @@ import {
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useRef } from "react";
+import { toast } from "sonner";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
 import { FileDropInput } from "@/components/resource-file-input";
@@ -152,6 +155,63 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
   );
 }
 
+/** Maker schema/form feedback normalized by TanStack Form. */
+type MakerValidation = {
+  /** Existing global error key. */
+  form?: string;
+  /** Existing per-field error keys. */
+  fields?: Partial<Record<"name" | "rootUrl" | "description", string>>;
+};
+/** Maker failure feedback and any captured files still needing upload. */
+type MakerSaveOutcome = MakerValidation & {
+  /** Failed captured uploads retained for retry. */
+  failedImages?: File[];
+};
+/** Maker profile save and editor readiness. */
+type MakerEditorState = {
+  /** Whether Markdown initialization is pending. */
+  loading: boolean;
+  /** Captured profile save lifetime. */
+  save: EffectEntity<MakerEditorState, MakerEditorEvent> | undefined;
+};
+/** Maker-specific editor and save intent. */
+type MakerEditorEvent =
+  | {
+      /** Receives editor readiness. */
+      type: "editorLoadingChanged";
+      /** Current editor loading state. */
+      loading: boolean;
+    }
+  | {
+      /** Submits one validated maker profile. */
+      type: "saveRequested";
+      /** Existing profile wire values. */
+      values: {
+        /** Existing profile description. */
+        description: string;
+        /** Existing maker identity. */
+        makerId: number | null;
+        /** Existing name. */
+        name: string;
+        /** Existing root URL. */
+        rootUrl: string;
+      };
+      /** Pending image files captured at submission. */
+      images: File[];
+    }
+  | {
+      /** Stops a completed profile save. */
+      type: "saveFinished";
+    };
+/** One confirmed maker profile save. */
+type MakerEditorEffect = Extract<
+  MakerEditorEvent,
+  {
+    /** Captured intent discriminant. */
+    type: "saveRequested";
+  }
+>;
+
 /**
  * Renders the maker profile create or edit form.
  *
@@ -160,22 +220,179 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
  * @returns The maker profile form page.
  */
 export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
+  const { userId } = useAuth();
+  return (
+    <AdminMakerForm key={`${userId}:${maker?.id ?? "new"}`} maker={maker} />
+  );
+}
+
+/**
+ * Owns one account/maker profile draft and committed save.
+ * @param props - Existing maker profile.
+ * @returns Scoped maker authoring form.
+ */
+function AdminMakerForm({ maker }: AdminMakerFormPageProperties) {
   const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
-  const [name, setName] = useState(maker?.name ?? "");
-  const [rootUrl, setRootUrl] = useState(maker?.rootUrl ?? "");
-  const [description, setDescription] = useState(maker?.description ?? "");
-  const [images, setImages] = useState<File[]>([]);
-  const [existingImages, setExistingImages] = useState<CatalogImage[]>(
-    maker?.images ?? [],
+  const form = useForm({
+    defaultValues: {
+      name: maker?.name ?? "",
+      rootUrl: maker?.rootUrl ?? "",
+      description: maker?.description ?? "",
+      images: [] as File[],
+      existingImages: maker?.images ?? [],
+    },
+    validators: {
+      /**
+       * Validates the existing maker profile before any write starts.
+       * @param input - Current maker fields.
+       * @returns Existing localized form and field feedback.
+       */
+      onSubmit: ({ value }): MakerValidation | undefined => {
+        const result = makerProfileSchema.safeParse({
+          ...value,
+          makerId: savedMakerId.current,
+        });
+        if (!result.success)
+          return {
+            form: "web.catalog.error.form",
+            fields: Object.fromEntries(
+              Object.entries(result.error.flatten().fieldErrors).map(
+                ([name, errors]) => [
+                  name,
+                  Array.isArray(errors) ? errors[0] : undefined,
+                ],
+              ),
+            ),
+          };
+        return undefined;
+      },
+    },
+    /**
+     * Captures one validated profile save and selected uploads.
+     * @param input - Current form values.
+     */
+    onSubmit: ({ value }) => {
+      dispatch({
+        type: "saveRequested",
+        values: {
+          name: value.name,
+          rootUrl: value.rootUrl,
+          description: value.description,
+          makerId: savedMakerId.current,
+        },
+        images: value.images,
+      });
+    },
+  });
+  const { name, rootUrl, description, images, existingImages } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [editorLoading, setEditorLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<
-    Record<string, string[] | undefined>
-  >({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const fieldErrors = useStore(form.store, (state) => state.fieldMeta);
+  const formError = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const savedMakerId = useRef(maker?.id ?? null);
+  const task = useRef<{
+    /** Descriptor whose profile mutation must not replay. */
+    effect: MakerEditorEffect;
+    /** Server and upload result retained while suspended. */
+    promise: Promise<MakerSaveOutcome | undefined>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    MakerEditorState,
+    MakerEditorEvent,
+    MakerEditorEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "editorLoadingChanged")
+        return state.loading === event.loading
+          ? state
+          : { ...state, loading: event.loading };
+      if (event.type === "saveRequested")
+        return state.loading || state.save
+          ? state
+          : { ...state, save: exec(event) };
+      exec.stop(state.save);
+      return { ...state, save: undefined };
+    },
+    { loading: true, save: undefined },
+    {
+      /**
+       * Saves metadata before images and retains a created identity after upload failure.
+       * @param _state - Current editor/save controls.
+       * @param effect - Validated maker metadata and captured uploads.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current account observer lifetime.
+       */
+      saveRequested: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: (async (): Promise<MakerSaveOutcome | undefined> => {
+              try {
+                const result = await saveAdminMaker({
+                  data: { ...effect.values, makerId: savedMakerId.current },
+                });
+                if (!result.ok)
+                  return {
+                    form: result.formError,
+                    fields: Object.fromEntries(
+                      Object.entries(result.fieldErrors).map(
+                        ([name, errors]) => [
+                          name,
+                          Array.isArray(errors) ? errors[0] : undefined,
+                        ],
+                      ),
+                    ),
+                  };
+                savedMakerId.current = result.maker.id;
+                if (effect.images.length) {
+                  const uploads = await uploadImages({
+                    files: effect.images,
+                    getToken,
+                    locale,
+                    targetId: result.maker.id,
+                    targetType: "maker",
+                  });
+                  if (uploads.failed.length)
+                    return {
+                      form: "web.catalog.error.form",
+                      failedImages: uploads.failed,
+                    };
+                }
+                return undefined;
+              } catch {
+                return { form: "web.catalog.error.form" };
+              }
+            })(),
+          };
+        void task.current.promise.then((error) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished" });
+          if (error) {
+            const failed = error.failedImages;
+            if (failed)
+              form.setFieldValue("images", (current) => [
+                ...current.filter((file) => !effect.images.includes(file)),
+                ...failed,
+              ]);
+            form.setErrorMap({ onSubmit: error });
+          } else void navigate({ to: "/admin/makers" });
+        });
+      },
+    },
+  );
+  /**
+   * Receives editor readiness through the stable legacy editor callback contract.
+   * @param loading - Whether Markdown is initializing.
+   */
+  const receiveEditorLoading = useCallback(
+    (loading: boolean) => dispatch({ type: "editorLoadingChanged", loading }),
+    [dispatch],
+  );
+  const editorLoading = ui.loading;
+  const busy = Boolean(ui.save);
   /**
    * Formats maker-form copy for the active locale.
    *
@@ -192,62 +409,13 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
     : t("web.action.addMaker");
 
   /**
-   * Saves the current maker profile.
-   *
-   * @param event - Form submission event.
-   * @returns A promise that resolves after validation and navigation complete.
-   */
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (editorLoading || busy) return;
-    const values = {
-      description,
-      makerId: maker?.id ?? null,
-      name,
-      rootUrl,
-    };
-    const parsed = makerProfileSchema.safeParse(values);
-    if (!parsed.success) {
-      setFieldErrors(parsed.error.flatten().fieldErrors);
-      setFormError("web.catalog.error.form");
-      return;
-    }
-    setBusy(true);
-    setFieldErrors({});
-    setFormError(null);
-    const result = await saveAdminMaker({ data: values });
-    if (!result.ok) {
-      setFieldErrors(result.fieldErrors);
-      setFormError(result.formError);
-      setBusy(false);
-      return;
-    }
-    if (images.length) {
-      try {
-        await uploadImages({
-          files: images,
-          getToken,
-          locale,
-          targetId: result.maker.id,
-          targetType: "maker",
-        });
-      } catch {
-        setFormError("web.catalog.error.form");
-        setBusy(false);
-        return;
-      }
-    }
-    await navigate({ to: "/admin/makers" });
-  }
-
-  /**
    * Returns the first localized error for one maker field.
    *
    * @param field - Maker form field name.
    * @returns The localized error, or `undefined` when valid.
    */
-  function errorFor(field: string) {
-    const key = fieldErrors[field]?.[0];
+  function errorFor(field: "name" | "rootUrl" | "description") {
+    const key = fieldErrors[field]?.errors[0];
     return key ? t(key as TranslationKey) : undefined;
   }
 
@@ -261,7 +429,15 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
     >
       <main className="grid content-start gap-5 p-4 md:p-6">
         <h1 className="m-0 text-2xl font-semibold">{title}</h1>
-        <form className="grid max-w-2xl gap-5" onSubmit={submit}>
+        <form
+          className="grid max-w-2xl gap-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (busy || editorLoading) return;
+            form.setErrorMap({ onSubmit: { form: "", fields: {} } });
+            void form.handleSubmit();
+          }}
+        >
           <MakerField
             error={errorFor("name")}
             label={t("web.catalog.field.name")}
@@ -270,7 +446,9 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
               aria-invalid={Boolean(errorFor("name"))}
               disabled={busy}
               maxLength={200}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) =>
+                form.setFieldValue("name", event.target.value)
+              }
               required
               value={name}
             />
@@ -285,7 +463,9 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
             <Input
               aria-invalid={Boolean(errorFor("rootUrl"))}
               disabled={busy}
-              onChange={(event) => setRootUrl(event.target.value)}
+              onChange={(event) =>
+                form.setFieldValue("rootUrl", event.target.value)
+              }
               type="url"
               value={rootUrl}
             />
@@ -297,20 +477,30 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
             help={t("web.catalog.help.markdownDescription")}
             id="maker-description"
             label={t("web.catalog.field.description")}
-            onChange={setDescription}
-            onLoadingChange={setEditorLoading}
+            onChange={(value) => form.setFieldValue("description", value)}
+            onLoadingChange={receiveEditorLoading}
           />
           <MakerImageFields
             existingImages={existingImages}
             images={images}
             locale={locale}
-            onExistingImagesChange={setExistingImages}
-            onImagesChange={setImages}
+            onExistingImageChanged={(image) =>
+              form.setFieldValue("existingImages", (current) =>
+                current.map((candidate) =>
+                  candidate.id === image.id ? image : candidate,
+                ),
+              )
+            }
+            onImagesChange={(value) => form.setFieldValue("images", value)}
             t={t}
           />
           {formError ? (
             <p className="m-0 text-sm text-destructive" role="alert">
-              {t(formError as TranslationKey)}
+              {t(
+                (typeof formError === "string"
+                  ? formError
+                  : formError.form) as TranslationKey,
+              )}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -330,6 +520,34 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
   );
 }
 
+/** Independent maker image mutation lifetimes. */
+type MakerImageState = ReadonlyMap<
+  number,
+  EffectEntity<MakerImageState, MakerImageEvent>
+>;
+/** Maker image action and terminal cleanup. */
+type MakerImageEvent =
+  | {
+      /** Requests one archive/restore action. */
+      type: "requested";
+      /** Selected persisted image. */
+      image: CatalogImage;
+    }
+  | {
+      /** Stops one completed image action. */
+      type: "finished";
+      /** Completed persisted image. */
+      imageId: number;
+    };
+/** Captured persisted image whose archive state is changing. */
+type MakerImageEffect = Extract<
+  MakerImageEvent,
+  {
+    /** Captured intent discriminant. */
+    type: "requested";
+  }
+>;
+
 /**
  * Renders maker image upload, placeholder, archive, and restore controls.
  *
@@ -340,7 +558,7 @@ function MakerImageFields({
   existingImages,
   images,
   locale,
-  onExistingImagesChange,
+  onExistingImageChanged,
   onImagesChange,
   t,
 }: {
@@ -353,9 +571,9 @@ function MakerImageFields({
   /**
    * Receives persisted image state changes.
    *
-   * @param images - Updated persisted images.
+   * @param image - Updated persisted image.
    */
-  onExistingImagesChange(images: CatalogImage[]): void;
+  onExistingImageChanged(image: CatalogImage): void;
   /**
    * Receives pending upload changes.
    *
@@ -371,6 +589,79 @@ function MakerImageFields({
    */
   t(key: TranslationKey, values?: Readonly<Record<string, unknown>>): string;
 }) {
+  const tasks = useRef(
+    new Map<
+      number,
+      {
+        /** Descriptor whose image mutation must not replay. */
+        effect: MakerImageEffect;
+        /** Retained mutation completion. */
+        promise: Promise<boolean>;
+      }
+    >(),
+  );
+  const [pending, dispatchImage] = useEffectReducer<
+    MakerImageState,
+    MakerImageEvent,
+    MakerImageEffect
+  >(
+    (state, event, exec) => {
+      const next = new Map(state);
+      if (event.type === "requested") {
+        if (next.has(event.image.id)) return state;
+        next.set(event.image.id, exec(event));
+      } else {
+        exec.stop(next.get(event.imageId));
+        next.delete(event.imageId);
+      }
+      return next;
+    },
+    new Map(),
+    {
+      /**
+       * Observes one maker image action through its mounted account/maker form.
+       * @param _state - Current pending image actions.
+       * @param effect - Captured image and its previous archive state.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      requested: (_state, effect, dispatch, { signal }) => {
+        if (tasks.current.get(effect.image.id)?.effect !== effect)
+          tasks.current.set(effect.image.id, {
+            effect,
+            promise: Promise.resolve()
+              .then(() =>
+                effect.image.deletedAt
+                  ? restoreCatalogImage({
+                      data: { imageId: effect.image.id, targetType: "maker" },
+                    })
+                  : softDeleteCatalogImage({
+                      data: { imageId: effect.image.id, targetType: "maker" },
+                    }),
+              )
+              .then(
+                () => true,
+                () => false,
+              ),
+          });
+        void tasks.current.get(effect.image.id)?.promise.then((success) => {
+          if (signal.aborted) return;
+          tasks.current.delete(effect.image.id);
+          dispatch({ type: "finished", imageId: effect.image.id });
+          if (!success) {
+            toast.error(t("web.catalog.error.form"));
+            return;
+          }
+          onExistingImageChanged({
+            ...effect.image,
+            deletedAt: effect.image.deletedAt ? null : new Date(),
+            deletedByClerkId: null,
+            deletedByRole: effect.image.deletedAt ? null : "admin",
+          });
+        });
+      },
+    },
+  );
   const guidance = getImageUploadGuidance(locale);
   const activeImages = existingImages.filter(({ deletedAt }) => !deletedAt);
   return (
@@ -434,41 +725,8 @@ function MakerImageFields({
               ),
               fileName: image.fileName,
             })}
-            onClick={async () => {
-              if (image.deletedAt) {
-                await restoreCatalogImage({
-                  data: { imageId: image.id, targetType: "maker" },
-                });
-                onExistingImagesChange(
-                  existingImages.map((candidate) =>
-                    candidate.id === image.id
-                      ? {
-                          ...candidate,
-                          deletedAt: null,
-                          deletedByClerkId: null,
-                          deletedByRole: null,
-                        }
-                      : candidate,
-                  ),
-                );
-              } else {
-                await softDeleteCatalogImage({
-                  data: { imageId: image.id, targetType: "maker" },
-                });
-                onExistingImagesChange(
-                  existingImages.map((candidate) =>
-                    candidate.id === image.id
-                      ? {
-                          ...candidate,
-                          deletedAt: new Date(),
-                          deletedByClerkId: null,
-                          deletedByRole: "admin",
-                        }
-                      : candidate,
-                  ),
-                );
-              }
-            }}
+            disabled={pending.has(image.id)}
+            onClick={() => dispatchImage({ type: "requested", image })}
             size="sm"
             type="button"
             variant="outline"

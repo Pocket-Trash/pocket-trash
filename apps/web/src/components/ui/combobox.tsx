@@ -51,6 +51,7 @@ type RemoveLabelBuilder = (name: string) => string;
  *
  * @param props - Catalog combobox properties.
  * @param props.ariaLabel - Accessible label for the combobox input and trigger.
+ * @param props.disabled - Whether input, selection, and removal controls are disabled.
  * @param props.items - Options available for selection.
  * @param props.onValueChange - Callback invoked with the selection, or `null` when cleared.
  * @param props.placeholder - Text shown in the empty search input and when no options match.
@@ -61,6 +62,7 @@ type RemoveLabelBuilder = (name: string) => string;
  */
 export function CatalogCombobox({
   ariaLabel,
+  disabled = false,
   items,
   onValueChange,
   placeholder,
@@ -72,6 +74,8 @@ export function CatalogCombobox({
    * Accessible label for the combobox input and trigger.
    */
   ariaLabel: string;
+  /** Whether input, selection, and removal controls are disabled. */
+  disabled?: boolean;
   /**
    * Options available for selection.
    */
@@ -108,6 +112,7 @@ export function CatalogCombobox({
   return (
     <div className="grid gap-2">
       <ComboboxPrimitive.Root
+        disabled={disabled}
         isItemEqualToValue={(item, selected) => item.id === selected.id}
         itemToStringLabel={(item) => item.name}
         items={items}
@@ -125,6 +130,7 @@ export function CatalogCombobox({
       {showSelectedPill && removeLabel && value && value.id !== "default" ? (
         <SelectionPill
           className="bg-secondary text-secondary-foreground"
+          disabled={disabled}
           onRemove={() => onValueChange(null)}
           removeLabel={removeLabel}
           value={value}
