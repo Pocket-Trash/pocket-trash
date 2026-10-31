@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faMagnifyingGlass,
   faPlus,
@@ -8,23 +9,30 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useId, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  useCallback,
+  useId,
+  useReducer,
+  useRef,
+} from "react";
 import { toast } from "sonner";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AppShell } from "@/components/app-shell";
 import { FeedbackCard } from "@/components/feedback-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFeedbackAction } from "@/hooks/use-feedback-action";
+import { updateVote, useFeedbackResults } from "@/hooks/use-feedback-results";
 import {
   findDuplicateFeedback,
-  listActiveFeedback,
-  listCompletedFeedback,
-  listMyFeedback,
-  submitFeedback,
-  toggleFeedbackVote,
+  type listActiveFeedback,
+  type listCompletedFeedback,
+  type listMyFeedback,
 } from "@/lib/feedback";
 import {
-  type FeedbackCategory,
   feedbackCategories,
   feedbackCategoryKey,
   feedbackStatus,
@@ -51,34 +59,120 @@ type FeedbackFormInput = {
   /** Short feedback title. */
   title: string;
 };
+/** Duplicate lookup lifetime and current suggestions. */
+type SubmissionState = {
+  /** Current suggestions. */
+  duplicates: ActiveFeedback[];
+  /** Cancellable duplicate lookup. */
+  request?: EffectEntity<SubmissionState, SubmissionEvent>;
+};
+/** Explicit submission lookup and persisted suggestion votes. */
+type SubmissionEvent =
+  | {
+      /** Starts duplicate lookup. */
+      type: "checkRequested";
+      /** Captured form draft. */
+      value: FeedbackFormInput;
+    }
+  | {
+      /** Completes duplicate lookup. */
+      type: "checked";
+      /** Current suggestions. */
+      duplicates: ActiveFeedback[];
+    }
+  | {
+      /** Reconciles a persisted suggestion vote. */
+      type: "votePersisted";
+      /** Feedback identity. */
+      id: number;
+      /** Persisted vote. */
+      hasVoted: boolean;
+    };
+/** Captured duplicate lookup. */
+type SubmissionEffect = {
+  /** Duplicate read implementation. */
+  type: "duplicates";
+  /** Captured form draft. */
+  value: FeedbackFormInput;
+};
+/** Resets feedback drafts when the signed-in account changes.
+ * @returns The current account's feedback submission flow. */
+export function SubmitFeedbackPage() {
+  const { userId } = useAuth();
+  return <SubmitFeedbackPageContent key={userId} />;
+}
 
 /**
  * Renders the duplicate-aware feedback submission flow.
  *
  * @returns The feedback submission page.
  */
-export function SubmitFeedbackPage() {
-  const { locale } = useLocale();
+function SubmitFeedbackPageContent() {
   const formRef = useRef<HTMLFormElement>(null);
   const navigate = useNavigate();
-  const [duplicates, setDuplicates] = useState<ActiveFeedback[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const t = useFeedbackCopy();
-
-  /**
-   * Submits feedback and navigates to the user's request history on success.
-   *
-   * @param data - Validated feedback form values.
-   */
-  async function save(data: FeedbackFormInput) {
-    const result = await submitFeedback({ data });
-    if (!result.ok) {
-      toast.error(formatTranslation(result.error, {}, locale));
-      return;
-    }
-    toast.success(t("web.feedback.new.success"));
+  const action = useFeedbackAction(async () => {
     await navigate({ to: "/feedback/my-requests" });
-  }
+  });
+  const form = useForm({
+    defaultValues: { category: "", description: "", title: "" },
+    /** Captures a validated feedback draft for duplicate lookup.
+     * @param input - Current feedback draft.
+     * @returns Nothing. */
+    onSubmit: ({ value }) => dispatch({ type: "checkRequested", value }),
+  });
+  const fields = useStore(form.store, (state) => state.values);
+  const [state, dispatch] = useEffectReducer<
+    SubmissionState,
+    SubmissionEvent,
+    SubmissionEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "checkRequested") {
+        exec.stop(state.request);
+        return {
+          duplicates: [],
+          request: exec({ type: "duplicates", value: event.value }),
+        };
+      }
+      if (event.type === "votePersisted")
+        return {
+          ...state,
+          duplicates: updateVote(state.duplicates, event.id, event.hasVoted),
+        };
+      exec.stop(state.request);
+      return { ...state, request: undefined, duplicates: event.duplicates };
+    },
+    { duplicates: [] },
+    {
+      /** Loads duplicate suggestions only for the active submission attempt.
+       * @param _state - Current duplicate suggestions.
+       * @param effect - Captured draft.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current read lifetime. */
+      duplicates: (_state, effect, dispatch, { signal }) => {
+        void findDuplicateFeedback({
+          data: { title: effect.value.title },
+          signal,
+        }).then(
+          (duplicates) => {
+            if (signal.aborted) return;
+            dispatch({ type: "checked", duplicates });
+            if (!duplicates.length)
+              action.run({ kind: "submit", data: effect.value });
+          },
+          () => {
+            if (!signal.aborted) {
+              dispatch({ type: "checked", duplicates: [] });
+              toast.error(t("web.feedback.new.failure"));
+            }
+          },
+        );
+      },
+    },
+  );
+  const duplicates = state.duplicates;
+  const submitting = Boolean(state.request) || action.pending;
+  const t = useFeedbackCopy();
 
   return (
     <AppShell title={t("web.feedback.new.title")}>
@@ -87,24 +181,9 @@ export function SubmitFeedbackPage() {
           aria-busy={submitting}
           className="grid gap-6 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
           ref={formRef}
-          onSubmit={async (event) => {
+          onSubmit={(event) => {
             event.preventDefault();
-            const data = feedbackFormInput(event.currentTarget);
-            setSubmitting(true);
-            try {
-              const matches = await findDuplicateFeedback({
-                data: { title: data.title },
-              });
-              if (matches.length > 0) {
-                setDuplicates(matches);
-                return;
-              }
-              await save(data);
-            } catch {
-              toast.error(t("web.feedback.new.failure"));
-            } finally {
-              setSubmitting(false);
-            }
+            if (!submitting) void form.handleSubmit();
           }}
         >
           <p className="m-0 text-sm leading-6 text-muted-foreground">
@@ -121,6 +200,10 @@ export function SubmitFeedbackPage() {
               id="feedback-title"
               maxLength={120}
               name="title"
+              value={fields.title}
+              onChange={(event) =>
+                form.setFieldValue("title", event.target.value)
+              }
               required
             />
           </Field>
@@ -136,10 +219,19 @@ export function SubmitFeedbackPage() {
               id="feedback-description"
               maxLength={5000}
               name="description"
+              value={fields.description}
+              onChange={(event) =>
+                form.setFieldValue("description", event.target.value)
+              }
               required
             />
           </Field>
-          <CategoryField disabled={submitting} id="feedback-category" />
+          <CategoryField
+            disabled={submitting}
+            id="feedback-category"
+            value={fields.category}
+            onChange={(value) => form.setFieldValue("category", value)}
+          />
           {duplicates.length > 0 ? (
             <section
               aria-labelledby="feedback-duplicates-title"
@@ -161,25 +253,16 @@ export function SubmitFeedbackPage() {
                   item={item}
                   key={item.id}
                   onVote={(hasVoted) =>
-                    setDuplicates((current) =>
-                      updateVote(current, item.id, hasVoted),
-                    )
+                    dispatch({ type: "votePersisted", id: item.id, hasVoted })
                   }
                   voteLabel={t("web.feedback.duplicates.upvote")}
                 />
               ))}
               <Button
                 disabled={submitting}
-                onClick={async () => {
-                  if (!formRef.current?.reportValidity()) return;
-                  setSubmitting(true);
-                  try {
-                    await save(feedbackFormInput(formRef.current));
-                  } catch {
-                    toast.error(t("web.feedback.new.failure"));
-                  } finally {
-                    setSubmitting(false);
-                  }
+                onClick={() => {
+                  if (!submitting && formRef.current?.reportValidity())
+                    action.run({ kind: "submit", data: form.state.values });
                 }}
                 type="button"
                 variant="outline"
@@ -208,40 +291,36 @@ export function SubmitFeedbackPage() {
   );
 }
 
+/** Displays feedback only for the account that authorized its loader snapshot.
+ * @param props - Existing initial feedback and its optional authenticated owner.
+ * @returns The current account's feedback view. */
+export function FeedbackBoardPage(
+  props: ComponentProps<typeof FeedbackBoardPageContent> & {
+    /** Account that authorized this loader result. */
+    actorId?: string;
+  },
+) {
+  const { userId } = useAuth();
+  if (props.actorId !== undefined && props.actorId !== userId) return null;
+  return <FeedbackBoardPageContent {...props} key={userId} />;
+}
+
 /**
  * Renders the active feedback board.
  *
  * @param props - Initial active feedback data.
  * @returns The active feedback board page.
  */
-export function FeedbackBoardPage({
+function FeedbackBoardPageContent({
   initialItems,
 }: {
   /** Active feedback items loaded for the first render. */
   initialItems: ActiveFeedback[];
 }) {
-  const [error, setError] = useState(false);
-  const [items, setItems] = useState(initialItems);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const { searchForm, search, page, loading, error, load, votePersisted } =
+    useFeedbackResults("active", initialItems);
+  const items = page.items;
   const t = useFeedbackCopy();
-
-  /**
-   * Reloads active feedback using the current search.
-   *
-   * @returns A promise that resolves when loading finishes.
-   */
-  async function load() {
-    setError(false);
-    setLoading(true);
-    try {
-      setItems(await listActiveFeedback({ data: { offset: 0, search } }));
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <AppShell
@@ -280,7 +359,9 @@ export function FeedbackBoardPage({
             <Input
               id="feedback-search"
               maxLength={120}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                searchForm.setFieldValue("search", event.target.value)
+              }
               placeholder={t("web.feedback.board.searchPlaceholder")}
               type="search"
               value={search}
@@ -316,13 +397,7 @@ export function FeedbackBoardPage({
                 <FeedbackRequest
                   item={item}
                   key={item.id}
-                  onVote={(hasVoted) =>
-                    setItems((current) =>
-                      sortActiveFeedback(
-                        updateVote(current, item.id, hasVoted),
-                      ),
-                    )
-                  }
+                  onVote={(hasVoted) => votePersisted(item.id, hasVoted)}
                 />
               ))}
             </section>
@@ -333,40 +408,38 @@ export function FeedbackBoardPage({
   );
 }
 
+/** Displays feedback only for the account that authorized its loader snapshot.
+ * @param props - Existing initial feedback and its optional authenticated owner.
+ * @returns The current account's feedback view. */
+export function CompletedFeedbackPage(
+  props: ComponentProps<typeof CompletedFeedbackPageContent> & {
+    /** Account that authorized this loader result. */
+    actorId?: string;
+  },
+) {
+  const { userId } = useAuth();
+  if (props.actorId !== undefined && props.actorId !== userId) return null;
+  return <CompletedFeedbackPageContent {...props} key={userId} />;
+}
+
 /**
  * Renders completed feedback without voting controls.
  *
  * @param props - Initial completed feedback data.
  * @returns The completed feedback page.
  */
-export function CompletedFeedbackPage({
+function CompletedFeedbackPageContent({
   initialItems,
 }: {
   /** Initial completed feedback items. */
   initialItems: CompletedFeedback[];
 }) {
-  const [error, setError] = useState(false);
-  const [items, setItems] = useState(initialItems);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const { searchForm, search, page, loading, error, load } = useFeedbackResults(
+    "completed",
+    initialItems,
+  );
+  const items = page.items;
   const t = useFeedbackCopy();
-
-  /**
-   * Reloads completed feedback using the current search.
-   *
-   * @returns A promise that resolves when loading finishes.
-   */
-  async function load() {
-    setError(false);
-    setLoading(true);
-    try {
-      setItems(await listCompletedFeedback({ data: { offset: 0, search } }));
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <AppShell
@@ -405,7 +478,9 @@ export function CompletedFeedbackPage({
             <Input
               id="completed-feedback-search"
               maxLength={120}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                searchForm.setFieldValue("search", event.target.value)
+              }
               placeholder={t("web.feedback.board.searchPlaceholder")}
               type="search"
               value={search}
@@ -437,46 +512,35 @@ export function CompletedFeedbackPage({
   );
 }
 
+/** Displays feedback only for the account that authorized its loader snapshot.
+ * @param props - Existing initial feedback and its optional authenticated owner.
+ * @returns The current account's feedback view. */
+export function MyFeedbackPage(
+  props: ComponentProps<typeof MyFeedbackPageContent> & {
+    /** Account that authorized this loader result. */
+    actorId?: string;
+  },
+) {
+  const { userId } = useAuth();
+  if (props.actorId !== undefined && props.actorId !== userId) return null;
+  return <MyFeedbackPageContent {...props} key={userId} />;
+}
+
 /**
  * Renders the current user's searchable, paginated feedback history.
  *
  * @param root0 - Initial feedback page.
  * @returns The user's feedback history page.
  */
-export function MyFeedbackPage({
+function MyFeedbackPageContent({
   initialPage,
 }: {
   /** Feedback page loaded for the first render. */
   initialPage: MyFeedbackPageData;
 }) {
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(initialPage);
-  const [search, setSearch] = useState("");
+  const { searchForm, search, page, loading, error, load, offset } =
+    useFeedbackResults("mine", initialPage);
   const t = useFeedbackCopy();
-
-  /**
-   * Loads one page of the current user's feedback using the active search.
-   *
-   * @param nextOffset - Zero-based result offset to request.
-   */
-  async function load(nextOffset: number) {
-    setError(false);
-    setLoading(true);
-    try {
-      setPage(
-        await listMyFeedback({
-          data: { offset: nextOffset, search },
-        }),
-      );
-      setOffset(nextOffset);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <AppShell
@@ -506,7 +570,9 @@ export function MyFeedbackPage({
             <Input
               id="my-feedback-search"
               maxLength={120}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                searchForm.setFieldValue("search", event.target.value)
+              }
               placeholder={t("web.feedback.myRequests.searchPlaceholder")}
               type="search"
               value={search}
@@ -582,6 +648,7 @@ function FeedbackRequest({
 }: {
   /** Active feedback item to display. */
   item: ActiveFeedback;
+
   /**
    * Receives the persisted vote state after a vote change.
    *
@@ -592,7 +659,19 @@ function FeedbackRequest({
   voteLabel?: string;
 }) {
   const dialogId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [open, dispatch] = useReducer(
+    (_open: boolean, event: "opened" | "dismissed") => event === "opened",
+    false,
+  );
+  const dialogRef = useCallback((node: HTMLDialogElement | null) => {
+    if (!node) return;
+    node.showModal();
+    return () => node.close();
+  }, []);
+  const opener = useRef<HTMLButtonElement>(null);
+  const vote = useFeedbackAction((_action, outcome) => {
+    if (outcome.hasVoted !== undefined) onVote(outcome.hasVoted);
+  });
   const titleId = useId();
   const t = useFeedbackCopy();
   const status = visibleFeedbackStatus(item.status);
@@ -604,54 +683,64 @@ function FeedbackRequest({
           aria-controls={dialogId}
           aria-haspopup="dialog"
           aria-label={t("web.feedback.details.open", { title: item.title })}
-          onClick={() => dialogRef.current?.showModal()}
+          ref={opener}
+          onClick={() => dispatch("opened")}
           type="button"
           variant="outline"
         >
           {t("web.action.view")}
         </Button>
-        <VoteButton item={item} label={voteLabel} onChanged={onVote} />
+        <VoteButton
+          item={item}
+          label={voteLabel}
+          saving={vote.pending}
+          onVote={() =>
+            vote.run({ kind: "vote", data: { feedbackId: item.id } })
+          }
+        />
       </FeedbackCard>
-      <dialog
-        aria-labelledby={titleId}
-        className="m-auto w-[min(42rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-        id={dialogId}
-        ref={dialogRef}
-      >
-        <div className="grid gap-4 p-5 md:p-6">
-          <h2 className="m-0 text-xl font-semibold" id={titleId}>
-            {t("web.feedback.details.title")}
-          </h2>
-          <FeedbackCard {...item} status={status}>
-            <VoteButton item={item} label={voteLabel} onChanged={onVote} />
-          </FeedbackCard>
-          <Button
-            className="justify-self-end"
-            onClick={() => dialogRef.current?.close()}
-            type="button"
-            variant="outline"
-          >
-            {t("web.action.close")}
-          </Button>
-        </div>
-      </dialog>
+      {open ? (
+        <dialog
+          onCancel={(event) => {
+            event.preventDefault();
+            dispatch("dismissed");
+            opener.current?.focus();
+          }}
+          aria-labelledby={titleId}
+          className="m-auto w-[min(42rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+          id={dialogId}
+          ref={dialogRef}
+        >
+          <div className="grid gap-4 p-5 md:p-6">
+            <h2 className="m-0 text-xl font-semibold" id={titleId}>
+              {t("web.feedback.details.title")}
+            </h2>
+            <FeedbackCard {...item} status={status}>
+              <VoteButton
+                item={item}
+                label={voteLabel}
+                saving={vote.pending}
+                onVote={() =>
+                  vote.run({ kind: "vote", data: { feedbackId: item.id } })
+                }
+              />
+            </FeedbackCard>
+            <Button
+              className="justify-self-end"
+              onClick={() => {
+                dispatch("dismissed");
+                opener.current?.focus();
+              }}
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.close")}
+            </Button>
+          </div>
+        </dialog>
+      ) : null}
     </>
   );
-}
-
-/**
- * Reads feedback values from a submission form.
- *
- * @param form - Feedback form element.
- * @returns Normalized string values for submission.
- */
-function feedbackFormInput(form: HTMLFormElement): FeedbackFormInput {
-  const data = new FormData(form);
-  return {
-    category: String(data.get("category") ?? ""),
-    description: String(data.get("description") ?? ""),
-    title: String(data.get("title") ?? ""),
-  };
 }
 
 /**
@@ -663,20 +752,22 @@ function feedbackFormInput(form: HTMLFormElement): FeedbackFormInput {
 function VoteButton({
   item,
   label,
-  onChanged,
+  saving,
+  onVote,
 }: {
   /** Feedback item whose vote is being changed. */
   item: ActiveFeedback;
   /** Optional label for adding a vote. */
   label?: string;
+
   /**
    * Receives the persisted vote state.
    *
-   * @param hasVoted - Persisted vote state.
    */
-  onChanged: (hasVoted: boolean) => void;
+  onVote: () => void;
+  /** Whether either vote control for this request is pending. */
+  saving: boolean;
 }) {
-  const [saving, setSaving] = useState(false);
   const t = useFeedbackCopy();
 
   if (item.hasPermanentVote) return null;
@@ -685,18 +776,7 @@ function VoteButton({
     <Button
       aria-pressed={item.hasVoted}
       disabled={saving}
-      onClick={async () => {
-        setSaving(true);
-        try {
-          onChanged(
-            await toggleFeedbackVote({ data: { feedbackId: item.id } }),
-          );
-        } catch {
-          toast.error(t("web.feedback.vote.failure"));
-        } finally {
-          setSaving(false);
-        }
-      }}
+      onClick={onVote}
       type="button"
       variant={item.hasVoted ? "outline" : "default"}
     >
@@ -705,71 +785,6 @@ function VoteButton({
         : (label ?? t("web.feedback.vote.add"))}
     </Button>
   );
-}
-
-/**
- * Applies a persisted vote state to one feedback item.
- *
- * @template T - Active feedback item shape retained in the result.
- * @param items - Feedback items to update.
- * @param feedbackId - Identifier of the changed feedback item.
- * @param hasVoted - Persisted vote state.
- * @returns A new list with the matching vote state and count updated.
- */
-function updateVote<T extends ActiveFeedback>(
-  items: T[],
-  feedbackId: number,
-  hasVoted: boolean,
-) {
-  return items.map((item) => {
-    if (item.id !== feedbackId || item.hasVoted === hasVoted) return item;
-    return {
-      ...item,
-      hasVoted,
-      voteCount: item.voteCount + (hasVoted ? 1 : -1),
-    };
-  });
-}
-
-/**
- * Sorts active feedback by workflow state, votes, recency, and identifier.
- *
- * @param items - Active feedback items.
- * @returns A sorted copy of the items.
- * @throws When an item has a status outside the active workflow states.
- */
-function sortActiveFeedback(items: ActiveFeedback[]) {
-  const statusOrder = { in_progress: 0, planned: 1, requested: 2 } as const;
-  return [...items].sort((left, right) => {
-    const statusDifference =
-      statusOrder[visibleActiveStatus(left.status)] -
-      statusOrder[visibleActiveStatus(right.status)];
-    return (
-      statusDifference ||
-      right.voteCount - left.voteCount ||
-      new Date(right.updatedAt).getTime() -
-        new Date(left.updatedAt).getTime() ||
-      right.id - left.id
-    );
-  });
-}
-
-/**
- * Narrows a server feedback status to an active board status.
- *
- * @param status - Server feedback status.
- * @returns The active status.
- * @throws When the status is not visible on the active board.
- */
-function visibleActiveStatus(status: ActiveFeedback["status"]) {
-  if (
-    status === "requested" ||
-    status === "planned" ||
-    status === "in_progress"
-  ) {
-    return status;
-  }
-  throw new Error(`Unexpected active feedback status: ${status}`);
 }
 
 /**
@@ -799,12 +814,17 @@ function visibleFeedbackStatus(status: MyFeedback["status"]) {
  * @returns The localized category field.
  */
 function CategoryField({
-  defaultValue = "",
+  value,
+  onChange,
   disabled,
   id,
 }: {
-  /** Initially selected category. */
-  defaultValue?: FeedbackCategory | "";
+  /** Form-owned selected category. */
+  value: string;
+
+  /** Updates the form category.
+   * @param value - Selected category. */
+  onChange: (value: string) => void;
   /** Whether category selection is unavailable. */
   disabled: boolean;
   /** Select element identifier. */
@@ -815,7 +835,8 @@ function CategoryField({
     <Field htmlFor={id} label={t("web.feedback.new.categoryLabel")}>
       <select
         className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        defaultValue={defaultValue}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         id={id}
         name="category"

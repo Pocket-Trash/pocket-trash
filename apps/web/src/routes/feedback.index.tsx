@@ -1,6 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute } from "@tanstack/react-router";
-import { listActiveFeedback } from "@/lib/feedback";
+import { loadActiveFeedbackSnapshot } from "@/lib/feedback";
 import { FeedbackBoardPage } from "@/pages/feedback-pages";
 
 /**
@@ -10,11 +10,12 @@ export const Route = createFileRoute("/feedback/")({
   /**
    * Loads the first page of active feedback.
    *
+   * @param input - Router loader cancellation context.
    * @returns The first page of active feedback.
    * @rejects When active feedback cannot be loaded.
    */
-  loader: async () =>
-    await listActiveFeedback({ data: { offset: 0, search: "" } }),
+  loader: async ({ abortController }) =>
+    await loadActiveFeedbackSnapshot({ signal: abortController.signal }),
   component: FeedbackBoardRoute,
   /**
    * Builds document metadata for the feedback route.
@@ -32,5 +33,5 @@ export const Route = createFileRoute("/feedback/")({
  * @returns The rendered route UI.
  */
 function FeedbackBoardRoute() {
-  return <FeedbackBoardPage initialItems={Route.useLoaderData()} />;
+  return <FeedbackBoardPage {...Route.useLoaderData()} />;
 }

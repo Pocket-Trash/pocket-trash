@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { faCircleX, faMagnifyingGlass } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
@@ -8,20 +9,20 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link } from "@tanstack/react-router";
 import {
   createColumnHelper,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { type ComponentProps, useCallback, useMemo, useRef } from "react";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFeedbackAction } from "@/hooks/use-feedback-action";
 import {
-  approveFeedback,
-  denyFeedback,
   getLinearPlanOptions,
   listAdminActiveFeedback,
   listAdminAllActiveFeedback,
@@ -29,10 +30,6 @@ import {
   type listFeedbackArchiveStatuses,
   listFeedbackMergeTargets,
   listPendingFeedback,
-  mergePendingFeedback,
-  planFeedback,
-  syncFeedbackStatus,
-  updateAdminFeedback,
 } from "@/lib/feedback";
 import {
   feedbackCategories,
@@ -53,7 +50,6 @@ type MergeTarget = Awaited<ReturnType<typeof listFeedbackMergeTargets>>[number];
 type Sort = AdminFeedbackSort;
 /** A sortable feedback table field. */
 type SortField = Sort["field"];
-
 /** TanStack Table features used by the feedback table. */
 const features = tableFeatures({});
 /** Column builder configured for admin feedback items. */
@@ -67,89 +63,179 @@ type LinearPlanOptions = Extract<
   Awaited<ReturnType<typeof getLinearPlanOptions>>,
   Record<"ok", true>
 >;
+/** Committed admin query and optional debounce. */
+type AdminQuery = {
+  /** Result offset. */
+  offset: number;
+  /** Search text. */
+  search: string;
+  /** Sort criteria. */
+  sort: Sort[];
+  /** Archive status. */
+  status: ArchiveStatus | "";
+  /** Whether merge targets need refresh. */
+  targets?: boolean;
+};
+/** Current admin results and selected item. */
+type AdminState = {
+  /** Loader data identity. */
+  source: Page;
+  /** Owning account. */
+  actorId: string | null | undefined;
+  /** Current scope. */
+  scope: Scope;
+  /** Current result. */
+  page: Page;
+  /** Merge choices. */
+  targets: MergeTarget[];
+  /** Result offset. */
+  offset: number;
+  /** Sort criteria. */
+  sort: Sort[];
+  /** Archive status. */
+  status: ArchiveStatus | "";
+  /** Existing query failure. */
+  error: boolean;
+  /** Selected dialog item. */
+  selected?: Item;
+  /** Cancellable query. */
+  request?: EffectEntity<AdminState, AdminEvent>;
+};
+/** Admin table selection, query intent, and terminal reconciliation. */
+type AdminEvent =
+  | {
+      /** Opens item management. */
+      type: "opened";
+      /** Selected item. */
+      item: Item;
+    }
+  | {
+      /** Dismisses item management. */
+      type: "dismissed";
+    }
+  | {
+      /** Reconciles route data. */
+      type: "sourceReceived";
+      /** Current route data. */
+      source: Page;
+    }
+  | ({
+      /** Requests a query. */
+      type: "requested";
+      /** Whether to wait 150ms. */
+      debounce?: boolean;
+    } & AdminQuery)
+  | {
+      /** Publishes current results. */
+      type: "loaded";
+      /** Current result. */
+      page: Page;
+      /** Current merge targets. */
+      targets?: MergeTarget[];
+      /** Current offset. */
+      offset: number;
+    }
+  | {
+      /** Stops a failed query. */
+      type: "failed";
+    };
+/** Admin query implementation. */
+type AdminEffect =
+  | ({
+      /** Debounced query implementation. */
+      type: "wait";
+    } & AdminQuery)
+  | ({
+      /** Query implementation. */
+      type: "load";
+    } & AdminQuery);
+/** Selected item's planning and editing state. */
+type DialogState = {
+  /** Current dialog view. */
+  mode: "details" | "edit" | "plan";
+  /** Stable reservation nonce. */
+  uuid?: string;
+  /** Existing Linear choices. */
+  options?: LinearPlanOptions;
+  /** Existing connection failure. */
+  planError?: TranslationKey;
+  /** Cancellable options request. */
+  request?: EffectEntity<DialogState, DialogEvent>;
+};
+/** Selected-item view and planning lifetime transitions. */
+type DialogEvent =
+  | {
+      /** Changes the visible draft. */
+      type: "modeChanged";
+      /** Requested view. */
+      mode: DialogState["mode"];
+    }
+  | {
+      /** Opens planning. */
+      type: "planningOpened";
+      /** Stable reservation nonce. */
+      uuid: string;
+    }
+  | {
+      /** Settles options lookup. */
+      type: "optionsLoaded";
+      /** Existing service result. */
+      result: Awaited<ReturnType<typeof getLinearPlanOptions>>;
+    };
+/** Cancellable planning options descriptor. */
+type DialogEffect = {
+  /** Planning options implementation. */
+  type: "options";
+};
 
-/**
- * Renders pending feedback requests.
- *
- * @param props - Pending feedback page properties.
- * @param props.initialPage - Initial page of feedback.
- * @param props.mergeTargets - Feedback items available for merging.
- * @returns The pending feedback page.
- */
-export function AdminFeedbackRequestsPage({
-  initialPage,
-  mergeTargets,
-}: {
-  /** Initial page of feedback. */
-  initialPage: Page;
-  /** Feedback items available for merging. */
-  mergeTargets: MergeTarget[];
-}) {
-  return (
-    <AdminFeedbackPage
-      initialPage={initialPage}
-      mergeTargets={mergeTargets}
-      scope="pending"
-    />
-  );
+/** Renders pending feedback for the authorized administrator.
+ * @param props - Initial canonical feedback and associated choices.
+ * @returns The account-scoped feedback table. */
+export function AdminFeedbackRequestsPage(
+  props: Omit<ComponentProps<typeof AdminFeedbackPage>, "scope">,
+) {
+  return <AdminFeedbackPage {...props} scope="pending" />;
 }
 
-/**
- * Renders planned feedback.
- *
- * @param props - Planned feedback page properties.
- * @param props.initialPage - Initial page of feedback.
- * @returns The planned feedback page.
- */
-export function AdminActiveFeedbackPage({
-  initialPage,
-}: {
-  /** Initial page of feedback. */
-  initialPage: Page;
-}) {
-  return <AdminFeedbackPage initialPage={initialPage} scope="planned" />;
+/** Renders planned feedback for the authorized administrator.
+ * @param props - Initial canonical feedback and associated choices.
+ * @returns The account-scoped feedback table. */
+export function AdminActiveFeedbackPage(
+  props: Omit<ComponentProps<typeof AdminFeedbackPage>, "scope">,
+) {
+  return <AdminFeedbackPage {...props} scope="planned" />;
 }
 
-/**
- * Renders all active feedback.
- *
- * @param props - Active feedback page properties.
- * @param props.initialPage - Initial page of feedback.
- * @returns The active feedback page.
- */
-export function AdminAllActiveFeedbackPage({
-  initialPage,
-}: {
-  /** Initial page of feedback. */
-  initialPage: Page;
-}) {
-  return <AdminFeedbackPage initialPage={initialPage} scope="allActive" />;
+/** Renders allActive feedback for the authorized administrator.
+ * @param props - Initial canonical feedback and associated choices.
+ * @returns The account-scoped feedback table. */
+export function AdminAllActiveFeedbackPage(
+  props: Omit<ComponentProps<typeof AdminFeedbackPage>, "scope">,
+) {
+  return <AdminFeedbackPage {...props} scope="allActive" />;
 }
 
-/**
- * Renders archived feedback.
- *
- * @param props - Archived feedback page properties.
- * @param props.archiveStatuses - Statuses available to the archive filter.
- * @param props.initialPage - Initial page of feedback.
- * @returns The feedback archive page.
- */
-export function AdminFeedbackArchivePage({
-  archiveStatuses,
-  initialPage,
-}: {
-  /** Statuses available to the archive filter. */
-  archiveStatuses: ArchiveStatuses;
-  /** Initial page of feedback. */
-  initialPage: Page;
-}) {
-  return (
-    <AdminFeedbackPage
-      archiveStatuses={archiveStatuses}
-      initialPage={initialPage}
-      scope="archive"
-    />
-  );
+/** Renders archive feedback for the authorized administrator.
+ * @param props - Initial canonical feedback and associated choices.
+ * @returns The account-scoped feedback table. */
+export function AdminFeedbackArchivePage(
+  props: Omit<ComponentProps<typeof AdminFeedbackPage>, "scope">,
+) {
+  return <AdminFeedbackPage {...props} scope="archive" />;
+}
+
+/** Keeps moderation drafts and private loader data within their authorized account.
+ * @param props - Feedback configuration and its authenticated loader owner.
+ * @returns The current account's moderation table. */
+function AdminFeedbackPage(
+  props: ComponentProps<typeof AdminFeedbackContent> & {
+    /** Account authorizing this loader snapshot. */
+    actorId?: string;
+  },
+) {
+  const { userId } = useAuth();
+  if (props.actorId !== undefined && props.actorId !== userId) return null;
+  return <AdminFeedbackContent {...props} key={`${userId}:${props.scope}`} />;
 }
 
 /**
@@ -162,7 +248,7 @@ export function AdminFeedbackArchivePage({
  * @param props.scope - Feedback collection to display.
  * @returns The admin feedback page.
  */
-function AdminFeedbackPage({
+function AdminFeedbackContent({
   archiveStatuses = [],
   initialPage,
   mergeTargets = [],
@@ -177,84 +263,185 @@ function AdminFeedbackPage({
   /** Feedback collection to display. */
   scope: Scope;
 }) {
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [targets, setTargets] = useState(mergeTargets);
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(initialPage);
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Item>();
-  const [sort, setSort] = useState<Sort[]>([]);
-  const [status, setStatus] = useState<ArchiveStatus | "">("");
-  const [syncingId, setSyncingId] = useState<number>();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const loadRequestRef = useRef(0);
+  const { userId: actorId } = useAuth();
+  const searchForm = useForm({ defaultValues: { search: "" } });
+  const search = useStore(searchForm.store, (state) => state.values.search);
+  const [state, dispatch] = useEffectReducer<
+    AdminState,
+    AdminEvent,
+    AdminEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "opened") return { ...state, selected: event.item };
+      if (event.type === "dismissed") return { ...state, selected: undefined };
+      exec.stop(state.request);
+      if (event.type === "sourceReceived")
+        return {
+          source: event.source,
+          selected: state.selected,
+          actorId,
+          scope,
+          page: event.source,
+          targets: mergeTargets,
+          offset: 0,
+          sort: [],
+          status: "",
+          error: false,
+        };
+      if (event.type === "requested")
+        return {
+          ...state,
+          sort: event.sort,
+          status: event.status,
+          error: false,
+          request: exec({
+            type: event.debounce ? "wait" : "load",
+            offset: event.offset,
+            sort: event.sort,
+            status: event.status,
+            search: event.search,
+            targets: event.targets,
+          }),
+        };
+      if (event.type === "loaded")
+        return {
+          ...state,
+          page: event.page,
+          targets: event.targets ?? state.targets,
+          offset: event.offset,
+          request: undefined,
+          error: false,
+        };
+      return { ...state, request: undefined, error: true };
+    },
+    {
+      source: initialPage,
+      actorId,
+      scope,
+      page: initialPage,
+      targets: mergeTargets,
+      offset: 0,
+      sort: [],
+      status: "",
+      error: false,
+    },
+    {
+      /** Debounces a supersedable admin query.
+       * @param _state - Current admin results.
+       * @param effect - Captured query.
+       * @param dispatch - Query dispatcher.
+       * @returns Timer cleanup. */
+      wait: (_state, effect, dispatch) => {
+        const timer = scheduleAdminSearch(undefined, () =>
+          dispatch({ ...effect, type: "requested", debounce: false }),
+        );
+        return () => clearTimeout(timer);
+      },
+
+      /** Loads the current scope and optional merge targets through one read lifetime.
+       * @param _state - Current admin results.
+       * @param effect - Captured query.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current read lifetime. */
+      load: (_state, effect, dispatch, { signal }) => {
+        void (async () => {
+          try {
+            const data = {
+              offset: effect.offset,
+              search: effect.search,
+              sort: effect.sort,
+            };
+            const [page, targets] = await Promise.all([
+              scope === "pending"
+                ? listPendingFeedback({ data, signal })
+                : scope === "planned"
+                  ? listAdminActiveFeedback({ data, signal })
+                  : scope === "allActive"
+                    ? listAdminAllActiveFeedback({ data, signal })
+                    : listArchivedFeedback({
+                        data: {
+                          ...data,
+                          statuses: effect.status ? [effect.status] : [],
+                        },
+                        signal,
+                      }),
+              effect.targets && scope === "pending"
+                ? listFeedbackMergeTargets({ signal })
+                : Promise.resolve(undefined),
+            ]);
+            if (!signal.aborted)
+              dispatch({
+                type: "loaded",
+                page,
+                targets,
+                offset: effect.offset,
+              });
+          } catch {
+            if (!signal.aborted) dispatch({ type: "failed" });
+          }
+        })();
+      },
+    },
+  );
+  if (
+    state.source !== initialPage ||
+    state.actorId !== actorId ||
+    state.scope !== scope
+  )
+    dispatch({ type: "sourceReceived", source: initialPage });
+  const { error, page, targets, selected, offset, sort, status } = state;
+  const loading = Boolean(state.request);
+  const sync = useFeedbackAction(() => {
+    load(offset);
+  });
+  const requestSync = sync.run;
+  const syncingId =
+    sync.pending && sync.action?.kind === "sync"
+      ? sync.action.data.feedbackId
+      : undefined;
   const openerRef = useRef<HTMLElement | null>(null);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { locale } = useLocale();
   const t = useCopy();
 
-  useEffect(() => {
-    if (selected && !dialogRef.current?.open) dialogRef.current?.showModal();
-  }, [selected]);
-
-  useEffect(() => () => clearTimeout(searchTimerRef.current), []);
-
-  /**
-   * Loads one page using the current scope and filters.
-   *
-   * @param nextOffset - Result offset to load.
-   * @param nextSort - Sort entries to apply.
-   * @param nextStatus - Archive status to apply.
-   * @param nextSearch - Search text to apply.
-   * @returns A promise that resolves after page state is updated.
-   */
-  async function load(
-    nextOffset: number,
-    nextSort = sort,
-    nextStatus = status,
-    nextSearch = search,
-  ) {
-    const requestId = ++loadRequestRef.current;
-    clearTimeout(searchTimerRef.current);
-    setError(false);
-    setLoading(true);
-    try {
-      const data = { offset: nextOffset, search: nextSearch, sort: nextSort };
-      const nextPage =
-        scope === "pending"
-          ? await listPendingFeedback({ data })
-          : scope === "planned"
-            ? await listAdminActiveFeedback({ data })
-            : scope === "allActive"
-              ? await listAdminAllActiveFeedback({ data })
-              : await listArchivedFeedback({
-                  data: {
-                    ...data,
-                    statuses: nextStatus ? [nextStatus] : [],
-                  },
-                });
-      if (requestId !== loadRequestRef.current) return;
-      setPage(nextPage);
-      setOffset(nextOffset);
-      setSort(nextSort);
-      setStatus(nextStatus);
-    } catch {
-      if (requestId === loadRequestRef.current) setError(true);
-    } finally {
-      if (requestId === loadRequestRef.current) setLoading(false);
-    }
-  }
-
-  /**
-   * Opens the management dialog for a feedback item.
-   *
-   * @param item - Feedback item to manage.
-   * @param opener - Element that opened the dialog.
-   */
-  function open(item: Item, opener: HTMLElement) {
-    openerRef.current = opener;
-    setSelected(item);
+  /** Requests a replacement query using the current form draft and filters.
+   * @param nextOffset - Result offset.
+   * @param nextSort - Sort criteria.
+   * @param nextStatus - Archive status.
+   * @param nextSearch - Current search draft.
+   * @param refreshTargets - Whether to refresh eligible merge targets. */
+  const load = useCallback(
+    (
+      nextOffset: number,
+      nextSort = sort,
+      nextStatus = status,
+      nextSearch = search,
+      refreshTargets = false,
+    ) => {
+      dispatch({
+        type: "requested",
+        offset: nextOffset,
+        sort: nextSort,
+        status: nextStatus,
+        search: nextSearch,
+        targets: refreshTargets,
+      });
+    },
+    [dispatch, sort, status, search],
+  );
+  /** Opens a selected feedback item and remembers its return-focus control.
+   * @param item - Selected feedback.
+   * @param opener - Opening control. */
+  const open = useCallback(
+    (item: Item, opener: HTMLElement) => {
+      openerRef.current = opener;
+      dispatch({ type: "opened", item });
+    },
+    [dispatch],
+  );
+  /** Dismisses the controlled dialog and restores focus. */
+  function close() {
+    dispatch({ type: "dismissed" });
+    openerRef.current?.focus();
   }
 
   /**
@@ -262,24 +449,27 @@ function AdminFeedbackPage({
    *
    * @param field - Field whose sorting changes.
    */
-  function changeSort(field: SortField) {
-    const current = sort.find(
-      ({ field: sortedField }) => sortedField === field,
-    );
-    const next: Sort[] = current
-      ? current.direction === "asc"
-        ? sort.map((entry) =>
-            entry.field === field
-              ? { ...entry, direction: "desc" as const }
-              : entry,
-          )
-        : sort.filter(({ field: sortedField }) => sortedField !== field)
-      : [
-          ...(scope === "pending" ? [] : sort.slice(-1)),
-          { direction: "asc" as const, field },
-        ];
-    void load(0, next);
-  }
+  const changeSort = useCallback(
+    (field: SortField) => {
+      const current = sort.find(
+        ({ field: sortedField }) => sortedField === field,
+      );
+      const next: Sort[] = current
+        ? current.direction === "asc"
+          ? sort.map((entry) =>
+              entry.field === field
+                ? { ...entry, direction: "desc" as const }
+                : entry,
+            )
+          : sort.filter(({ field: sortedField }) => sortedField !== field)
+        : [
+            ...(scope === "pending" ? [] : sort.slice(-1)),
+            { direction: "asc" as const, field },
+          ];
+      void load(0, next);
+    },
+    [sort, scope, load],
+  );
 
   const columns = useMemo(() => {
     const title = columnHelper.accessor("title", {
@@ -301,6 +491,7 @@ function AdminFeedbackPage({
           {row.original.title}
         </button>
       ),
+
       /**
        * Renders the title column header.
        *
@@ -323,6 +514,7 @@ function AdminFeedbackPage({
         row.original.category
           ? t(feedbackCategoryKey(row.original.category))
           : t("web.feedback.category.unset"),
+
       /**
        * Renders the category column header.
        *
@@ -342,6 +534,7 @@ function AdminFeedbackPage({
        * @returns The submitter username.
        */
       cell: ({ row }) => row.original.submitterUsername ?? "",
+
       /**
        * Renders the submitter column header.
        *
@@ -367,6 +560,7 @@ function AdminFeedbackPage({
            * @returns The localized submission date.
            */
           cell: ({ row }) => formatDate(row.original.createdAt, locale),
+
           /**
            * Renders the submission-date column header.
            *
@@ -402,6 +596,7 @@ function AdminFeedbackPage({
           </span>
         );
       },
+
       /**
        * Renders the status column header.
        *
@@ -425,24 +620,12 @@ function AdminFeedbackPage({
         !["merged", "denied"].includes(row.original.status) ? (
           <Button
             disabled={syncingId === row.original.id}
-            onClick={async () => {
-              setSyncingId(row.original.id);
-              try {
-                const result = await syncFeedbackStatus({
-                  data: { feedbackId: row.original.id },
-                });
-                if (!result.ok) {
-                  toast.error(t(result.error));
-                  return;
-                }
-                toast.success(t("web.feedback.admin.sync.success"));
-                await load(offset);
-              } catch {
-                toast.error(t("web.feedback.admin.sync.failure"));
-              } finally {
-                setSyncingId(undefined);
-              }
-            }}
+            onClick={() =>
+              requestSync({
+                kind: "sync",
+                data: { feedbackId: row.original.id },
+              })
+            }
             size="sm"
             type="button"
             variant="outline"
@@ -450,6 +633,7 @@ function AdminFeedbackPage({
             {t("web.feedback.admin.sync.action")}
           </Button>
         ) : null,
+
       /**
        * Renders the synchronization column header.
        *
@@ -481,6 +665,7 @@ function AdminFeedbackPage({
          * @returns The vote count.
          */
         cell: ({ row }) => row.original.voteCount,
+
         /**
          * Renders the vote-count column header.
          *
@@ -503,6 +688,7 @@ function AdminFeedbackPage({
          */
         cell: ({ row }) =>
           formatDate(row.original.updatedAt ?? row.original.createdAt, locale),
+
         /**
          * Renders the update-date column header.
          *
@@ -517,8 +703,12 @@ function AdminFeedbackPage({
       }),
       syncColumn,
     ]);
-  }, [locale, offset, scope, search, sort, status, syncingId, t]);
-  const table = useTable({ columns, data: page.items, features });
+  }, [locale, scope, sort, syncingId, t, changeSort, open, requestSync]);
+  const table = useTable({
+    columns,
+    data: page.items,
+    features,
+  });
   const copyScope =
     scope === "pending"
       ? "requests"
@@ -568,11 +758,15 @@ function AdminFeedbackPage({
                   maxLength={120}
                   onChange={(event) => {
                     const nextSearch = event.target.value;
-                    setSearch(nextSearch);
-                    searchTimerRef.current = scheduleAdminSearch(
-                      searchTimerRef.current,
-                      () => void load(0, sort, status, nextSearch),
-                    );
+                    searchForm.setFieldValue("search", nextSearch);
+                    dispatch({
+                      type: "requested",
+                      offset: 0,
+                      sort,
+                      status,
+                      search: nextSearch,
+                      debounce: true,
+                    });
                   }}
                   placeholder={t(
                     scope === "allActive"
@@ -587,7 +781,7 @@ function AdminFeedbackPage({
                     aria-label={t("web.action.clearSearch")}
                     className="absolute top-1/2 right-1 size-7 -translate-y-1/2"
                     onClick={() => {
-                      setSearch("");
+                      searchForm.setFieldValue("search", "");
                       void load(0, sort, status, "");
                     }}
                     size="icon"
@@ -720,25 +914,18 @@ function AdminFeedbackPage({
           </nav>
         ) : null}
       </main>
-      <AdminFeedbackDialog
-        dialogRef={dialogRef}
-        item={selected}
-        mergeTargets={targets}
-        onChanged={async () => {
-          dialogRef.current?.close();
-          const [, nextTargets] = await Promise.all([
-            load(offset),
-            scope === "pending"
-              ? listFeedbackMergeTargets()
-              : Promise.resolve(targets),
-          ]);
-          setTargets(nextTargets);
-        }}
-        onClosed={() => {
-          setSelected(undefined);
-          openerRef.current?.focus();
-        }}
-      />
+      {selected ? (
+        <AdminFeedbackDialog
+          key={`${actorId}:${selected.id}`}
+          item={selected}
+          mergeTargets={targets}
+          onChanged={() => {
+            close();
+            load(offset, sort, status, search, true);
+          }}
+          onClosed={close}
+        />
+      ) : null}
     </AdminPageShell>
   );
 }
@@ -747,7 +934,6 @@ function AdminFeedbackPage({
  * Renders feedback details and management actions.
  *
  * @param props - Feedback dialog properties.
- * @param props.dialogRef - Reference to the native dialog.
  * @param props.item - Feedback item being managed.
  * @param props.mergeTargets - Feedback items available for merging.
  * @param props.onChanged - Called after feedback changes.
@@ -755,126 +941,206 @@ function AdminFeedbackPage({
  * @returns The admin feedback dialog.
  */
 function AdminFeedbackDialog({
-  dialogRef,
   item,
   mergeTargets,
   onChanged,
   onClosed,
 }: {
-  /** Reference to the native dialog. */
-  dialogRef: React.RefObject<HTMLDialogElement | null>;
   /** Feedback item being managed. */
-  item?: Item;
+  item: Item;
   /** Feedback items available for merging. */
   mergeTargets: MergeTarget[];
+
   /**
    * Handles completed feedback changes.
    *
    * @returns A promise that resolves after parent state is refreshed.
    */
-  onChanged: () => Promise<void>;
+  onChanged: () => void;
   /** Handles the dialog closing. */
   onClosed: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [planError, setPlanError] = useState<TranslationKey>();
-  const [planKind, setPlanKind] = useState<"issue" | "project">("issue");
-  const [planOptions, setPlanOptions] = useState<LinearPlanOptions>();
-  const [planReservation, setPlanReservation] = useState<{
-    /** Feedback item associated with the reservation. */
-    feedbackId: number;
-    /** Stable client identifier used when creating the Linear work item. */
-    uuid: string;
-  }>();
-  const [planning, setPlanning] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const form = useForm({
+    defaultValues: {
+      intent: "edit" as "edit" | "approve" | "merge" | "plan",
+      title: item.title,
+      description: item.description,
+      category: item.category ?? "",
+      targetId: "",
+      planKind: "issue" as "issue" | "project",
+      assignToMe: false,
+      leadProject: false,
+      labelIds: [] as string[],
+    },
+    validators: {
+      /** Validates the current moderation draft and submitted intent.
+       * @param input - Current form-owned draft and intent.
+       * @returns Existing localized feedback when an approval lacks its category. */
+      onSubmit: ({ value }): TranslationKey | undefined =>
+        value.intent === "approve" && !value.category
+          ? "web.feedback.admin.requests.categoryRequired"
+          : undefined,
+    },
+    /** Captures one validated moderation, merge, or reserved planning intent.
+     * @param input - Current validated form values. */
+    onSubmit: ({ value }) => {
+      if (saving) return;
+      if (value.intent === "plan") {
+        if (!state.options || !state.uuid) return;
+        action.run({
+          kind: "plan",
+          data: {
+            assignToMe: value.assignToMe,
+            clientUuid: state.uuid,
+            feedbackId: item.id,
+            kind: value.planKind,
+            labelIds: value.labelIds,
+            leadProject: value.leadProject,
+          },
+        });
+      } else if (value.intent === "merge")
+        action.run({
+          kind: "merge",
+          data: { feedbackId: item.id, targetId: Number(value.targetId) },
+        });
+      else
+        action.run({
+          kind: "edit",
+          approve: value.intent === "approve",
+          data: {
+            feedbackId: item.id,
+            category: value.category,
+            description: value.description,
+            title: value.title,
+          },
+        });
+    },
+  });
+  const fields = useStore(form.store, (state) => state.values);
+  const [state, dispatch] = useEffectReducer<
+    DialogState,
+    DialogEvent,
+    DialogEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "modeChanged") {
+        exec.stop(state.request);
+        return {
+          ...state,
+          mode: event.mode,
+          request: undefined,
+          planError: undefined,
+        };
+      }
+      if (event.type === "planningOpened") {
+        exec.stop(state.request);
+        return {
+          ...state,
+          mode: "plan",
+          uuid: state.uuid ?? event.uuid,
+          planError: undefined,
+          request: state.options ? undefined : exec({ type: "options" }),
+        };
+      }
+      exec.stop(state.request);
+      return {
+        ...state,
+        request: undefined,
+        options: event.result.ok ? event.result : undefined,
+        planError: event.result.ok ? undefined : event.result.error,
+      };
+    },
+    { mode: "details" },
+    {
+      /** Loads cancellable Linear planning choices for this selected item.
+       * @param _state - Current planning draft.
+       * @param _effect - Planning-options request.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current read lifetime. */
+      options: (_state, _effect, dispatch, { signal }) => {
+        void getLinearPlanOptions({ signal }).then(
+          (result) => {
+            if (signal.aborted) return;
+            if (result.ok)
+              form.setFieldValue(
+                "labelIds",
+                result.labels
+                  .filter(
+                    (label) => label.name.toLocaleLowerCase() === item.category,
+                  )
+                  .map((label) => label.id),
+              );
+            dispatch({ type: "optionsLoaded", result });
+          },
+          () => {
+            if (!signal.aborted)
+              dispatch({
+                type: "optionsLoaded",
+                result: {
+                  ok: false,
+                  error: "web.feedback.admin.plan.connectionRequired",
+                },
+              });
+          },
+        );
+      },
+    },
+  );
+  const action = useFeedbackAction(
+    () => onChanged(),
+    (error) => form.setErrorMap({ onSubmit: error }),
+  );
+  const saving = action.pending || Boolean(state.request);
+  const editing = state.mode === "edit";
+  const planning = state.mode === "plan";
+  const planOptions = state.options;
+  const planKind = fields.planKind;
+  const draftError = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const planError = draftError ?? state.planError;
+  const dialogRef = useCallback((node: HTMLDialogElement | null) => {
+    if (!node) return;
+    node.showModal();
+    return () => node.close();
+  }, []);
   const t = useCopy();
-  if (!item) return <dialog ref={dialogRef} />;
   const current = item;
   const editable = !["merged", "denied", "canceled"].includes(current.status);
-
-  /**
-   * Opens the Linear planning flow and loads its options.
-   *
-   * @returns A promise that resolves after planning options are loaded.
-   */
-  async function openPlanning() {
-    setPlanning(true);
-    setPlanKind("issue");
-    setPlanError(undefined);
-    setPlanReservation((existing) =>
-      existing?.feedbackId === current.id
-        ? existing
-        : {
-            feedbackId: current.id,
-            uuid: current.linearClientUuid ?? crypto.randomUUID(),
-          },
-    );
-    if (planOptions) return;
-    setSaving(true);
-    try {
-      const result = await getLinearPlanOptions();
-      if (result.ok) setPlanOptions(result);
-      else setPlanError(result.error);
-    } catch {
-      setPlanError("web.feedback.admin.plan.connectionRequired");
-    } finally {
-      setSaving(false);
-    }
+  /** Opens planning with a stable per-item reservation nonce. */
+  function openPlanning() {
+    form.setErrorMap({ onSubmit: undefined });
+    form.setFieldValue("planKind", "issue");
+    dispatch({
+      type: "planningOpened",
+      uuid: state.uuid ?? current.linearClientUuid ?? crypto.randomUUID(),
+    });
   }
 
-  /**
-   * Performs a moderation action for the current feedback item.
-   *
-   * @param action - Moderation action to perform.
-   * @param form - Merge form containing the target feedback item.
-   * @returns A promise that resolves after the action completes.
-   */
-  async function act(
-    action: "approve" | "deny" | "merge",
-    form?: HTMLFormElement,
-  ) {
-    setSaving(true);
-    try {
-      if (action === "approve") {
-        if (!current.category) {
-          toast.error(t("web.feedback.admin.requests.categoryRequired"));
-          setEditing(true);
-          return;
-        }
-        await approveFeedback({ data: { feedbackId: current.id } });
-        toast.success(t("web.feedback.admin.requests.approved"));
-      } else if (action === "deny") {
-        const result = await denyFeedback({ data: { feedbackId: current.id } });
-        if (!result.ok) {
-          toast.error(t(result.error));
-          return;
-        }
-        toast.success(t("web.feedback.admin.requests.denied"));
-      } else {
-        const targetId = Number(new FormData(form).get("targetId"));
-        await mergePendingFeedback({
-          data: { feedbackId: current.id, targetId },
-        });
-        toast.success(t("web.feedback.admin.requests.merged"));
-      }
-      await onChanged();
-    } catch {
-      toast.error(t("web.feedback.admin.requests.actionFailed"));
-    } finally {
-      setSaving(false);
+  /** Performs a confirmed moderation action.
+   * @param kind - Existing moderation intent. */
+  function act(kind: "approve" | "deny" | "merge") {
+    if (saving) return;
+    if (kind === "approve" && !current.category) {
+      form.setErrorMap({
+        onSubmit: "web.feedback.admin.requests.categoryRequired",
+      });
+      dispatch({ type: "modeChanged", mode: "edit" });
+      return;
     }
+    if (kind === "merge")
+      action.run({
+        kind,
+        data: { feedbackId: item.id, targetId: Number(fields.targetId) },
+      });
+    else action.run({ kind, data: { feedbackId: item.id } });
   }
 
   return (
     <dialog
       aria-labelledby="admin-feedback-dialog-title"
       className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-      onClose={() => {
-        setEditing(false);
-        setPlanError(undefined);
-        setPlanning(false);
-        onClosed();
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!saving) onClosed();
       }}
       ref={dialogRef}
     >
@@ -892,36 +1158,11 @@ function AdminFeedbackDialog({
         {planning ? (
           <form
             className="grid gap-4"
-            onSubmit={async (event) => {
+            onSubmit={(event) => {
               event.preventDefault();
-              if (!planOptions || !planReservation) return;
-              const data = new FormData(event.currentTarget);
-              setSaving(true);
-              setPlanError(undefined);
-              try {
-                const result = await planFeedback({
-                  data: {
-                    assignToMe: data.get("assignToMe") === "on",
-                    clientUuid: planReservation.uuid,
-                    feedbackId: current.id,
-                    kind: planKind,
-                    labelIds: data.getAll("labelIds").map(String),
-                    leadProject: data.get("leadProject") === "on",
-                  },
-                });
-                if (!result.ok) {
-                  setPlanError(result.error);
-                  toast.error(t(result.error));
-                  return;
-                }
-                toast.success(t("web.feedback.admin.plan.success"));
-                await onChanged();
-              } catch {
-                setPlanError("web.feedback.admin.plan.failure");
-                toast.error(t("web.feedback.admin.plan.failure"));
-              } finally {
-                setSaving(false);
-              }
+              if (saving || !planOptions || !state.uuid) return;
+              form.setFieldValue("intent", "plan");
+              void form.handleSubmit();
             }}
           >
             <fieldset className="grid gap-2">
@@ -935,7 +1176,7 @@ function AdminFeedbackDialog({
                       checked={planKind === kind}
                       disabled={saving}
                       name="planKind"
-                      onChange={() => setPlanKind(kind)}
+                      onChange={() => form.setFieldValue("planKind", kind)}
                       type="radio"
                       value={kind}
                     />
@@ -955,7 +1196,15 @@ function AdminFeedbackDialog({
             {planOptions && planKind === "issue" ? (
               <>
                 <label className="flex items-center gap-2 text-sm">
-                  <input disabled={saving} name="assignToMe" type="checkbox" />
+                  <input
+                    disabled={saving}
+                    name="assignToMe"
+                    type="checkbox"
+                    checked={fields.assignToMe}
+                    onChange={(event) =>
+                      form.setFieldValue("assignToMe", event.target.checked)
+                    }
+                  />
                   {t("web.feedback.admin.plan.assignIssue")}
                 </label>
                 <fieldset className="grid gap-2">
@@ -969,8 +1218,16 @@ function AdminFeedbackDialog({
                         key={label.id}
                       >
                         <input
-                          defaultChecked={
-                            label.name.toLocaleLowerCase() === current.category
+                          checked={fields.labelIds.includes(label.id)}
+                          onChange={(event) =>
+                            form.setFieldValue(
+                              "labelIds",
+                              event.target.checked
+                                ? [...fields.labelIds, label.id]
+                                : fields.labelIds.filter(
+                                    (id) => id !== label.id,
+                                  ),
+                            )
                           }
                           disabled={saving}
                           name="labelIds"
@@ -986,7 +1243,15 @@ function AdminFeedbackDialog({
             ) : null}
             {planOptions && planKind === "project" ? (
               <label className="flex items-center gap-2 text-sm">
-                <input disabled={saving} name="leadProject" type="checkbox" />
+                <input
+                  disabled={saving}
+                  name="leadProject"
+                  type="checkbox"
+                  checked={fields.leadProject}
+                  onChange={(event) =>
+                    form.setFieldValue("leadProject", event.target.checked)
+                  }
+                />
                 {t("web.feedback.admin.plan.leadProject")}
               </label>
             ) : null}
@@ -1009,7 +1274,9 @@ function AdminFeedbackDialog({
               </Button>
               <Button
                 disabled={saving}
-                onClick={() => setPlanning(false)}
+                onClick={() =>
+                  dispatch({ type: "modeChanged", mode: "details" })
+                }
                 type="button"
                 variant="outline"
               >
@@ -1020,42 +1287,15 @@ function AdminFeedbackDialog({
         ) : editing ? (
           <form
             className="grid gap-4"
-            onSubmit={async (event) => {
+            onSubmit={(event) => {
               event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              const approveAfterSave =
+              if (saving) return;
+              const approve =
                 (event.nativeEvent as SubmitEvent).submitter?.getAttribute(
                   "value",
                 ) === "approve" && current.status === "pending";
-              const input = {
-                category: String(data.get("category") ?? ""),
-                description: String(data.get("description") ?? ""),
-                feedbackId: item.id,
-                title: String(data.get("title") ?? ""),
-              };
-              if (approveAfterSave && !input.category) {
-                toast.error(t("web.feedback.admin.requests.categoryRequired"));
-                return;
-              }
-              setSaving(true);
-              try {
-                await updateAdminFeedback({ data: input });
-                if (approveAfterSave) {
-                  await approveFeedback({ data: { feedbackId: item.id } });
-                }
-                toast.success(
-                  t(
-                    approveAfterSave
-                      ? "web.feedback.admin.requests.approved"
-                      : "web.feedback.admin.requests.updated",
-                  ),
-                );
-                await onChanged();
-              } catch {
-                toast.error(t("web.feedback.admin.requests.actionFailed"));
-              } finally {
-                setSaving(false);
-              }
+              form.setFieldValue("intent", approve ? "approve" : "edit");
+              void form.handleSubmit();
             }}
           >
             <label
@@ -1064,7 +1304,11 @@ function AdminFeedbackDialog({
             >
               {t("web.feedback.new.titleLabel")}
               <Input
-                defaultValue={item.title}
+                value={fields.title}
+                disabled={saving}
+                onChange={(event) =>
+                  form.setFieldValue("title", event.target.value)
+                }
                 id="admin-feedback-title"
                 maxLength={120}
                 name="title"
@@ -1078,7 +1322,11 @@ function AdminFeedbackDialog({
               {t("web.catalog.field.description")}
               <textarea
                 className="min-h-32 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                defaultValue={item.description}
+                value={fields.description}
+                disabled={saving}
+                onChange={(event) =>
+                  form.setFieldValue("description", event.target.value)
+                }
                 id="admin-feedback-description"
                 maxLength={5000}
                 name="description"
@@ -1092,7 +1340,11 @@ function AdminFeedbackDialog({
               {t("web.feedback.new.categoryLabel")}
               <select
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                defaultValue={item.category ?? ""}
+                value={fields.category}
+                disabled={saving}
+                onChange={(event) =>
+                  form.setFieldValue("category", event.target.value)
+                }
                 id="admin-feedback-category"
                 name="category"
                 required={current.status !== "pending"}
@@ -1107,6 +1359,11 @@ function AdminFeedbackDialog({
                 ))}
               </select>
             </label>
+            {draftError ? (
+              <p className="m-0 text-sm text-destructive" role="alert">
+                {t(draftError)}
+              </p>
+            ) : null}
             <div className="flex gap-2">
               <Button disabled={saving} type="submit">
                 {t("action.save")}
@@ -1122,7 +1379,10 @@ function AdminFeedbackDialog({
                 </Button>
               ) : null}
               <Button
-                onClick={() => setEditing(false)}
+                disabled={saving}
+                onClick={() =>
+                  dispatch({ type: "modeChanged", mode: "details" })
+                }
                 type="button"
                 variant="outline"
               >
@@ -1147,7 +1407,9 @@ function AdminFeedbackDialog({
             <div className="flex flex-wrap gap-2">
               {editable ? (
                 <Button
-                  onClick={() => setEditing(true)}
+                  onClick={() =>
+                    dispatch({ type: "modeChanged", mode: "edit" })
+                  }
                   type="button"
                   variant="outline"
                 >
@@ -1188,7 +1450,10 @@ function AdminFeedbackDialog({
                 className="flex flex-wrap gap-2"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void act("merge", event.currentTarget);
+                  if (!saving) {
+                    form.setFieldValue("intent", "merge");
+                    void form.handleSubmit();
+                  }
                 }}
               >
                 <label className="sr-only" htmlFor="feedback-merge-target">
@@ -1196,7 +1461,11 @@ function AdminFeedbackDialog({
                 </label>
                 <select
                   className="h-9 min-w-56 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  defaultValue=""
+                  value={fields.targetId}
+                  disabled={saving}
+                  onChange={(event) =>
+                    form.setFieldValue("targetId", event.target.value)
+                  }
                   id="feedback-merge-target"
                   name="targetId"
                   required
@@ -1219,7 +1488,8 @@ function AdminFeedbackDialog({
         )}
         <Button
           className="justify-self-end"
-          onClick={() => dialogRef.current?.close()}
+          disabled={saving}
+          onClick={onClosed}
           type="button"
           variant="outline"
         >
@@ -1250,6 +1520,7 @@ function SortButton({
   children: string;
   /** Field controlled by the button. */
   field: SortField;
+
   /**
    * Changes sorting for a field.
    *
