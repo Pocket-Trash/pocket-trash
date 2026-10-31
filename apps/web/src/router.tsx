@@ -1,4 +1,6 @@
+import { loggerMessages } from "@package/logger";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { logger } from "@/lib/logger";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { RouteErrorPage } from "@/pages/route-error-page";
 import { routeTree } from "./routeTree.gen";
@@ -9,12 +11,21 @@ import { routeTree } from "./routeTree.gen";
  * @returns Configured TanStack router with scroll restoration enabled.
  */
 export function getRouter() {
-  return createTanStackRouter({
+  const router = createTanStackRouter({
+    /** Reports each caught render or loader failure through its boundary lifecycle.
+     * @param error - Current caught failure. */
+    defaultOnCatch: (error: unknown): void => {
+      logger.error(loggerMessages.web.routeError, {
+        attributes: { route: router.state.location.pathname },
+        error,
+      });
+    },
     defaultErrorComponent: RouteErrorPage,
     defaultNotFoundComponent: NotFoundPage,
     routeTree,
     scrollRestoration: true,
   });
+  return router;
 }
 
 /**

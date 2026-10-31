@@ -3,7 +3,7 @@ import type {
   WeightMeasurement,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import * as React from "react";
+import { useForm, useStore } from "@tanstack/react-form";
 import { expect, fn } from "storybook/test";
 import { withThemePanels } from "../../.storybook/theme-panels";
 import { MeasurementInput } from "./measurement-input";
@@ -14,16 +14,20 @@ import { MeasurementInput } from "./measurement-input";
  * @returns The stateful story content.
  */
 function DimensionExample() {
-  const [value, setValue] = React.useState<DimensionMeasurement>({
-    unit: "mm",
-    value: "25.4",
+  const form = useForm({
+    defaultValues: {
+      measurement: { unit: "mm", value: "25.4" } as DimensionMeasurement,
+    },
   });
+  const value = useStore(form.store, (state) => state.values.measurement);
   return (
     <div className="w-80 max-w-full">
       <MeasurementInput
         kind="dimension"
         label="Length"
-        onChange={(nextValue) => setValue(nextValue as DimensionMeasurement)}
+        onChange={(nextValue) =>
+          form.setFieldValue("measurement", nextValue as DimensionMeasurement)
+        }
         unitLabel="Length unit"
         value={value}
       />
@@ -37,16 +41,20 @@ function DimensionExample() {
  * @returns The stateful story content.
  */
 function WeightExample() {
-  const [value, setValue] = React.useState<WeightMeasurement>({
-    unit: "oz",
-    value: "3.175",
+  const form = useForm({
+    defaultValues: {
+      measurement: { unit: "oz", value: "3.175" } as WeightMeasurement,
+    },
   });
+  const value = useStore(form.store, (state) => state.values.measurement);
   return (
     <div className="w-80 max-w-full">
       <MeasurementInput
         kind="weight"
         label="Weight"
-        onChange={(nextValue) => setValue(nextValue as WeightMeasurement)}
+        onChange={(nextValue) =>
+          form.setFieldValue("measurement", nextValue as WeightMeasurement)
+        }
         unitLabel="Weight unit"
         value={value}
       />
