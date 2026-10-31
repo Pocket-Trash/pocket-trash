@@ -224,7 +224,9 @@ describe("MarkdownEditor", () => {
       setInputValue(url, "https://pocket-trash.app");
       url.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    clickButton(container, "Insert link");
+    await act(async () => {
+      clickButton(container, "Insert link");
+    });
 
     expect(textarea?.value).toBe("[Pocket Trash](https://pocket-trash.app)");
     expect(textarea?.selectionStart).toBe(1);
@@ -270,7 +272,9 @@ describe("MarkdownEditor", () => {
       setInputValue(url, "mailto:test@example.com");
       url.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    clickButton(container, "Insert link");
+    await act(async () => {
+      clickButton(container, "Insert link");
+    });
 
     expect(container.textContent).toContain(
       "Enter a relative, HTTP, or HTTPS URL.",

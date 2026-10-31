@@ -1,6 +1,7 @@
 import {
   defaultValueCtx,
   Editor,
+  EditorViewReady,
   editorViewCtx,
   editorViewOptionsCtx,
   rootCtx,
@@ -328,19 +329,18 @@ const restrictedMarkdown = [
  * @returns The visual editor root.
  */
 export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
-  const rootRef = React.useRef<HTMLDivElement>(null);
   const editorRef = React.useRef<Editor | null>(null);
   const createdRef = React.useRef(false);
   const propsRef = React.useRef(props);
-  propsRef.current = props;
 
-  React.useEffect(() => {
-    const root = rootRef.current;
+  const bindRoot = React.useCallback((root: HTMLDivElement | null) => {
     if (!root) return;
+    const surface = document.createElement("div");
+    root.append(surface);
     let canceled = false;
     const editor = Editor.make()
       .config((ctx) => {
-        ctx.set(rootCtx, root);
+        ctx.set(rootCtx, surface);
         ctx.set(defaultValueCtx, propsRef.current.value);
         ctx.set(editorViewOptionsCtx, {
           attributes: editorAttributes(propsRef.current),
@@ -356,6 +356,7 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
             const sanitized = sanitizeLinks(state, linkSchema.type(ctx));
             if (sanitized) state = state.apply(sanitized);
             this.updateState(state);
+            if (canceled) return;
             propsRef.current.onSelectionChange(activeFormats(state));
             if (
               result.transactions.some((applied) => applied.docChanged) ||
@@ -404,11 +405,27 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
       .use(restrictedMarkdown);
     editorRef.current = editor;
 
-    void editor
-      .create()
+    const creation = editor.create();
+    const viewReady = editor.ctx.wait(EditorViewReady).then(
+      () => true,
+      () => false,
+    );
+    // Milkdown leaves failed creation in OnCreate, where destroy would poll forever.
+    const failedCreationCleanup = creation.then(
+      () => undefined,
+      async () => {
+        try {
+          if (await viewReady) editor.ctx.get(editorViewCtx).destroy();
+        } catch {
+          // No view exists when initialization fails before view readiness.
+        }
+      },
+    );
+    void creation
       .then(() => {
-        if (canceled) return;
+        if (canceled || editorRef.current !== editor) return;
         createdRef.current = true;
+        applyEditorProperties(editor, propsRef.current);
         editor.action((ctx) => {
           const view = ctx.get(editorViewCtx);
           const sanitized = sanitizeLinks(view.state, linkSchema.type(ctx));
@@ -421,30 +438,41 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
            *
            * @returns The focus operation result.
            */
-          focus: () =>
-            editorRef.current?.action((ctx) => ctx.get(editorViewCtx).focus()),
+          focus: () => {
+            if (!canceled)
+              editor.action((ctx) => ctx.get(editorViewCtx).focus());
+          },
           /**
            * Applies a supported format to the current selection.
            *
            * @param format - Format to apply.
            * @returns Nothing.
            */
-          format: (format) => runFormat(editorRef.current, format),
+          format: (format) => {
+            if (!canceled) runFormat(editor, format);
+          },
           /**
            * Reads selected text and an existing link destination.
            *
            * @returns Current link selection metadata.
            */
           getLinkSelection: () =>
-            editorRef.current?.action((ctx) =>
-              currentLink(ctx.get(editorViewCtx).state, linkSchema.type(ctx)),
-            ) ?? { text: "" },
+            canceled
+              ? { text: "" }
+              : editor.action((ctx) =>
+                  currentLink(
+                    ctx.get(editorViewCtx).state,
+                    linkSchema.type(ctx),
+                  ),
+                ),
           /**
            * Removes the selected link.
            *
            * @returns Nothing.
            */
-          removeLink: () => updateLink(editorRef.current, "", ""),
+          removeLink: () => {
+            if (!canceled) updateLink(editor, "", "");
+          },
           /**
            * Inserts or updates the selected link.
            *
@@ -452,7 +480,9 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
            * @param url - Validated destination.
            * @returns Nothing.
            */
-          setLink: (text, url) => updateLink(editorRef.current, text, url),
+          setLink: (text, url) => {
+            if (!canceled) updateLink(editor, text, url);
+          },
         });
       })
       .catch(() => {
@@ -461,28 +491,47 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
 
     return () => {
       canceled = true;
-      createdRef.current = false;
-      editorRef.current = null;
-      void editor.destroy();
+      if (editorRef.current === editor) {
+        createdRef.current = false;
+        editorRef.current = null;
+      }
+      surface.remove();
+      // Creation may outlive its detached DOM; destroy it exactly once after it settles.
+      void creation.then(
+        () => editor.destroy(),
+        () => failedCreationCleanup,
+      );
     };
   }, []);
 
   React.useEffect(() => {
-    if (!createdRef.current) return;
-    editorRef.current?.action((ctx) => {
-      ctx.get(editorViewCtx).setProps({
-        attributes: editorAttributes(props),
-        /**
-         * Reports current editability.
-         *
-         * @returns Whether the current properties allow editing.
-         */
-        editable: () => !props.disabled && !props.readOnly,
-      });
-    });
+    propsRef.current = props;
+    if (createdRef.current && editorRef.current)
+      applyEditorProperties(editorRef.current, props);
   }, [props]);
 
-  return <div className="h-64 overflow-y-auto" ref={rootRef} />;
+  return <div className="h-64 overflow-y-auto" ref={bindRoot} />;
+}
+
+/**
+ * Synchronizes editor properties without replacing content, history, or selection.
+ * @param editor - Initialized editor belonging to the current DOM lifetime.
+ * @param props - Current committed visual-editor properties.
+ */
+function applyEditorProperties(
+  editor: Editor,
+  props: MarkdownVisualEditorProps,
+) {
+  editor.action((ctx) => {
+    ctx.get(editorViewCtx).setProps({
+      attributes: editorAttributes(props),
+      /**
+       * Reads current editability without recreating the editor.
+       * @returns Whether the surface accepts edits.
+       */
+      editable: () => !props.disabled && !props.readOnly,
+    });
+  });
 }
 
 /**
