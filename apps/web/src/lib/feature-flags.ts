@@ -48,6 +48,32 @@ export const listAdminFeatureFlags = createServerFn().handler(
   },
 );
 
+/** Loads administrator flags with the actor who authorized this exact request.
+ *
+ * @returns Canonical flags and their authenticated loader identity.
+ * @rejects When authorization, service loading, or flag lookup fails.
+ */
+export const loadAdminFeatureFlagSettings = createServerFn().handler(
+  async () => {
+    const actor = await requireFeatureFlagAdmin();
+    const { s } = await import("@/lib/services");
+    return { actorId: actor.clerkId, flags: await s.flags.listAdmin() };
+  },
+);
+
+/** Loads beta opt-ins with the identity that owns this exact request.
+ *
+ * @returns Canonical beta flags and their authenticated loader identity.
+ * @rejects When authentication, service loading, or flag lookup fails.
+ */
+export const loadUserBetaFeatureFlagSettings = createServerFn().handler(
+  async () => {
+    const actorId = await requireAuthenticatedUser();
+    const { s } = await import("@/lib/services");
+    return { actorId, flags: await s.flags.listUserBeta(actorId) };
+  },
+);
+
 /** Creates an administrator-managed feature flag.
  *
  * @returns The created feature flag.
