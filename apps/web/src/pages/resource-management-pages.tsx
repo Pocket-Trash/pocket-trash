@@ -18,9 +18,11 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef } from "react";
 import { toast } from "sonner";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { ResourceCard } from "@/components/resource-card";
 import { ResourceCategoryInput } from "@/components/resource-category-input";
 import {
@@ -32,13 +34,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPageShell } from "@/components/user-page-shell";
+import { useResourceUpload } from "@/hooks/use-resource-upload";
 import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
 import { updateResource } from "@/lib/resources";
 import {
   appendResourceUploadFiles,
   formatMiB,
-  getUploadErrorTranslation,
-  uploadResourceSession,
+  type ResourceUploadValidationError,
   validateResourceImages,
   validateResourceUpload,
 } from "@/lib/upload-sessions";
@@ -138,6 +140,7 @@ export function ResourceEditPage({
   detail: ResourceDetail;
 }) {
   const { locale } = useLocale();
+  const { userId } = useAuth();
   /**
    * Formats localized resource edit copy.
    *
@@ -165,15 +168,42 @@ export function ResourceEditPage({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="edit">
-          <ResourceEditForm detail={detail} />
+          <ResourceEditForm key={`${detail.id}:${userId}`} detail={detail} />
         </TabsContent>
         <TabsContent value="version">
-          <ResourceVersionUploadForm detail={detail} />
+          <ResourceVersionUploadForm
+            key={`${detail.id}:${userId}`}
+            detail={detail}
+          />
         </TabsContent>
       </Tabs>
     </UserPageShell>
   );
 }
+
+/** Pending captured resource metadata save. */
+type ResourceMetadataState =
+  | EffectEntity<ResourceMetadataState, ResourceMetadataEvent>
+  | undefined;
+/** Metadata save intent and terminal cleanup. */
+type ResourceMetadataEvent =
+  | {
+      /** Requests one validated metadata edit. */
+      type: "requested";
+      /** Captured existing multipart wire payload. */
+      data: FormData;
+    }
+  | {
+      /** Stops a completed or failed edit. */
+      type: "finished";
+    };
+/** Committed existing multipart metadata mutation. */
+type ResourceMetadataEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Captured multipart wire payload. */
+  data: FormData;
+};
 
 /**
  * Renders editable resource metadata, visibility, and images.
@@ -201,52 +231,120 @@ function ResourceEditForm({
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
-  const [selectedCategories, setSelectedCategories] = useState(
-    detail.categories.map(({ name }) => name),
+  const form = useForm({
+    defaultValues: {
+      selectedCategories: detail.categories.map(({ name }) => name),
+      imageFiles: [] as File[],
+      retainedImageIds: detail.images.map(({ id }) => id),
+    },
+    onSubmitMeta: { data: undefined as FormData | undefined },
+    validators: {
+      /**
+       * Preserves categories and retained/new image validation before metadata mutation.
+       * @param input - Current metadata selections.
+       * @returns Existing localized validation feedback.
+       */
+      onSubmit: ({ value }): ResourceUploadValidationError | undefined =>
+        value.selectedCategories.length === 0
+          ? { key: "web.resources.validation.requiredCategory" }
+          : (validateResourceImages(
+              value.imageFiles,
+              value.retainedImageIds.length + value.imageFiles.length,
+              true,
+              locale,
+            ) ?? undefined),
+    },
+    /**
+     * Reports existing validation feedback without discarding retained or new images.
+     * @param input - Invalid form and current validation result.
+     */
+    onSubmitInvalid: ({ formApi }) => {
+      const error = formApi.state.errorMap.onSubmit;
+      if (error) toast.error(t(error.key, error.params));
+    },
+    /**
+     * Completes the existing multipart payload from validated form-owned selections.
+     * @param input - Validated selections and captured native metadata.
+     */
+    onSubmit: ({ value, meta }) => {
+      if (!meta.data) return;
+      const data = meta.data;
+      data.delete("categories");
+      value.selectedCategories.forEach((category) =>
+        data.append("categories", category),
+      );
+      value.retainedImageIds.forEach((id) =>
+        data.append("retainedImageIds", String(id)),
+      );
+      value.imageFiles.forEach((image) => data.append("images", image));
+      dispatch({ type: "requested", data });
+    },
+  });
+  const { selectedCategories, imageFiles, retainedImageIds } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [retainedImageIds, setRetainedImageIds] = useState(
-    detail.images.map(({ id }) => id),
+  const task = useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: ResourceMetadataEffect;
+    /** Server completion retained across suspended observers. */
+    promise: ReturnType<typeof updateResource>;
+  } | null>(null);
+  const [save, dispatch] = useEffectReducer<
+    ResourceMetadataState,
+    ResourceMetadataEvent,
+    ResourceMetadataEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "save", data: event.data });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined,
+    {
+      /**
+       * Observes one metadata edit without publishing disposed account/resource feedback.
+       * @param _state - Current save lifetime.
+       * @param effect - Captured multipart edit.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: updateResource({ data: effect.data }),
+          };
+        void task.current.promise.then(
+          () => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            void navigate({
+              params: { resourceId: String(detail.id) },
+              to: "/resources/$resourceId",
+            });
+          },
+          () => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            toast.error(t("web.resources.error.editFailed"));
+          },
+        );
+      },
+    },
   );
-  const [submitting, setSubmitting] = useState(false);
+  const submitting = Boolean(save);
 
   return (
     <form
       className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        if (selectedCategories.length === 0) {
-          toast.error(t("web.resources.validation.requiredCategory"));
-          return;
-        }
-        const imageValidation = validateResourceImages(
-          imageFiles,
-          retainedImageIds.length + imageFiles.length,
-          true,
-          locale,
-        );
-        if (imageValidation) {
-          toast.error(t(imageValidation.key, imageValidation.params));
-          return;
-        }
-        setSubmitting(true);
-        try {
-          const formData = new FormData(event.currentTarget);
-          retainedImageIds.forEach((id) => {
-            formData.append("retainedImageIds", String(id));
-          });
-          imageFiles.forEach((image) => {
-            formData.append("images", image);
-          });
-          await updateResource({ data: formData });
-          await navigate({
-            params: { resourceId: String(detail.id) },
-            to: "/resources/$resourceId",
-          });
-        } catch {
-          toast.error(t("web.resources.error.editFailed"));
-          setSubmitting(false);
-        }
+        if (submitting) return;
+        const data = new FormData(event.currentTarget);
+        form.setErrorMap({ onSubmit: undefined });
+        void form.handleSubmit({ data });
       }}
     >
       <p className="m-0 text-sm text-muted-foreground">
@@ -292,8 +390,8 @@ function ResourceEditForm({
                 aria-label={`${t("web.resources.action.removeFile")} ${image.fileName}`}
                 className="absolute top-2 right-2"
                 onClick={() =>
-                  setRetainedImageIds(
-                    retainedImageIds.filter((id) => id !== image.id),
+                  form.setFieldValue("retainedImageIds", (current) =>
+                    current.filter((id) => id !== image.id),
                   )
                 }
                 size="icon"
@@ -320,11 +418,13 @@ function ResourceEditForm({
         label={t("web.resources.upload.imagesLabel")}
         multiple
         onFilesChange={(additions) =>
-          setImageFiles(appendResourceUploadFiles(imageFiles, additions))
+          form.setFieldValue("imageFiles", (current) =>
+            appendResourceUploadFiles(current, additions),
+          )
         }
         onRemove={(index) =>
-          setImageFiles(
-            imageFiles.filter((_, itemIndex) => itemIndex !== index),
+          form.setFieldValue("imageFiles", (current) =>
+            current.filter((_, itemIndex) => itemIndex !== index),
           )
         }
         removeFileLabel={t("web.resources.action.removeFile")}
@@ -349,7 +449,9 @@ function ResourceEditForm({
         disabled={submitting}
         label={t("web.resources.category.label")}
         noResultsLabel={t("web.resources.category.noResults")}
-        onChange={setSelectedCategories}
+        onChange={(categories) =>
+          form.setFieldValue("selectedCategories", categories)
+        }
         placeholder={t("web.resources.category.search")}
         removeLabel={(category) =>
           t("web.resources.category.remove", { category })
@@ -391,6 +493,7 @@ export function ResourceVersionUploadPage({
   detail: ResourceDetail;
 }) {
   const { locale } = useLocale();
+  const { userId } = useAuth();
   /**
    * Formats localized version upload copy.
    *
@@ -408,7 +511,10 @@ export function ResourceVersionUploadPage({
       section="resources"
       title={t("web.resources.upload.newVersionTitle", { name: detail.name })}
     >
-      <ResourceVersionUploadForm detail={detail} />
+      <ResourceVersionUploadForm
+        key={`${detail.id}:${userId}`}
+        detail={detail}
+      />
     </UserPageShell>
   );
 }
@@ -426,13 +532,8 @@ function ResourceVersionUploadForm({
   /** Resource receiving the new version. */
   detail: ResourceDetail;
 }) {
-  const { getToken } = useAuth();
   const { locale } = useLocale();
-  const navigate = useNavigate();
-  const [files, setFiles] = useState<File[]>([]);
-  const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState("");
+  const { submitting, status: uploadStatus, startUpload } = useResourceUpload();
   /**
    * Formats localized version upload copy.
    *
@@ -444,65 +545,52 @@ function ResourceVersionUploadForm({
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
+  const form = useForm({
+    defaultValues: { files: [] as File[], reason: "" },
+    validators: {
+      /**
+       * Preserves version-file validation and cross-owner staff reasons.
+       * @param input - Current selected files and reason.
+       * @returns Existing localized validation feedback.
+       */
+      onSubmit: ({ value }): ResourceUploadValidationError | undefined =>
+        !detail.isOwner && !value.reason.trim()
+          ? { key: "web.resources.moderation.reasonRequired" }
+          : (validateResourceUpload(value.files, [], false, locale) ??
+            undefined),
+    },
+    /**
+     * Reports existing file/reason validation without discarding selections.
+     * @param input - Invalid form and current feedback.
+     */
+    onSubmitInvalid: ({ formApi }) => {
+      const error = formApi.state.errorMap.onSubmit;
+      if (error) toast.error(t(error.key, error.params));
+    },
+    /**
+     * Starts one validated version upload using the current reason contract.
+     * @param input - Validated files and reason.
+     */
+    onSubmit: ({ value }) => {
+      startUpload({
+        files: value.files,
+        operation: "version",
+        reason: value.reason || undefined,
+        resourceId: detail.id,
+      });
+    },
+  });
+  const { files, reason } = useStore(form.store, (state) => state.values);
 
   return (
     <form
       aria-busy={submitting}
       className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        const validation = validateResourceUpload(files, [], false, locale);
-        if (validation) {
-          toast.error(t(validation.key, validation.params));
-          return;
-        }
-
-        setSubmitting(true);
-        setUploadStatus("");
-        try {
-          const result = await uploadResourceSession({
-            files,
-            getToken,
-            /**
-             * Reports file upload progress.
-             *
-             * @param filename - File currently uploading.
-             * @param percent - Completed percentage.
-             * @returns Nothing.
-             */
-            onProgress: (filename, percent) =>
-              setUploadStatus(
-                t("web.resources.upload.progress", { filename, percent }),
-              ),
-            /**
-             * Reports upload workflow stage changes.
-             *
-             * @param stage - Current upload stage.
-             */
-            onStage: (stage) => {
-              if (stage === "complete") {
-                setUploadStatus(t("web.resources.upload.finalizing"));
-              }
-            },
-            operation: "version",
-            reason: reason || undefined,
-            resourceId: detail.id,
-          });
-          toast.success(
-            t("web.resources.upload.versionSuccess", {
-              version: result.version,
-            }),
-          );
-          await navigate({
-            params: { resourceId: String(result.resourceId) },
-            to: "/resources/$resourceId",
-          });
-        } catch (error) {
-          const message = getUploadErrorTranslation(error);
-          toast.error(t(message.key, message.params));
-          setSubmitting(false);
-          setUploadStatus("");
-        }
+        if (submitting) return;
+        form.setErrorMap({ onSubmit: undefined });
+        void form.handleSubmit();
       }}
     >
       {!detail.isOwner ? (
@@ -511,7 +599,9 @@ function ResourceVersionUploadForm({
           <textarea
             className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             maxLength={1000}
-            onChange={(event) => setReason(event.currentTarget.value)}
+            onChange={(event) =>
+              form.setFieldValue("reason", event.currentTarget.value)
+            }
             placeholder={t("web.resources.moderation.reasonPlaceholder")}
             required
             value={reason}
@@ -530,7 +620,7 @@ function ResourceVersionUploadForm({
         fileTypes={t("web.resources.upload.fileTypes")}
         id="resource-version-file"
         label={t("web.resources.upload.filesLabel")}
-        onFilesChange={setFiles}
+        onFilesChange={(files) => form.setFieldValue("files", files)}
         removeFileLabel={t("web.resources.action.removeFile")}
       />
       <Button disabled={submitting} type="submit">

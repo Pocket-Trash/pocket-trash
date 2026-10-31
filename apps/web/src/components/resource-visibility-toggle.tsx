@@ -1,10 +1,13 @@
 import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useId, useRef, useState } from "react";
+import { useForm, useStore } from "@tanstack/react-form";
+import { useCallback, useId, useRef } from "react";
 import { toast } from "sonner";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -72,28 +75,8 @@ export function PublicResourceSwitch({
   );
 }
 
-/**
- * Renders owner and staff resource visibility controls with moderation-reason flows.
- * Owners cannot change staff-forced privacy without administrative access, and staff changes to another user's resource require a nonblank reason.
- *
- * @param props - Resource visibility state and permissions.
- * @param props.canAdminister - Whether the viewer may moderate another user's resource.
- * @param props.isAdminPrivate - Whether staff forced the resource private.
- * @param props.isOwner - Whether the viewer owns the resource.
- * @param props.isPrivate - Initial private-resource state.
- * @param props.name - Resource name shown in moderation feedback.
- * @param props.resourceId - Resource identifier sent to visibility mutations.
- * @returns The resource visibility control.
- * @throws {Error} When rendered outside `LocaleProvider`.
- */
-export function ResourceVisibilityToggle({
-  canAdminister,
-  isAdminPrivate,
-  isOwner,
-  isPrivate,
-  name,
-  resourceId,
-}: {
+/** Resource visibility state and permissions shared by its public boundary. */
+type ResourceVisibilityProps = {
   /**
    * Whether the viewer may moderate another user's resource.
    */
@@ -118,11 +101,255 @@ export function ResourceVisibilityToggle({
    * Resource identifier sent to visibility mutations.
    */
   resourceId: number;
-}) {
+};
+
+/** Resource visibility and its current moderation dialog/save. */
+type VisibilityState = {
+  /** Last route-owned privacy flag reconciled into the control. */
+  sourcePrivate: boolean;
+  /** Last route-owned forced-privacy flag. */
+  sourceAdminPrivate: boolean;
+  /** Current durable public state. */
+  isPublic: boolean;
+  /** Whether staff privacy confirmation is open. */
+  dialogOpen: boolean;
+  /** Current committed visibility mutation. */
+  save: EffectEntity<VisibilityState, VisibilityEvent> | undefined;
+};
+/** Visibility intent, confirmation disclosure, and terminal feedback. */
+type VisibilityEvent =
+  | {
+      /** Reconciles refreshed visibility without replacing the reason form. */
+      type: "visibilityReceived";
+      /** Current route-owned privacy. */
+      isPrivate: boolean;
+      /** Current route-owned forced privacy. */
+      isAdminPrivate: boolean;
+    }
+  | {
+      /** Opens staff privacy confirmation. */
+      type: "moderationOpened";
+    }
+  | {
+      /** Dismisses staff privacy confirmation. */
+      type: "moderationDismissed";
+    }
+  | {
+      /** Queues a validated visibility change. */
+      type: "saveRequested";
+      /** Requested public state. */
+      isPublic: boolean;
+      /** Whether this is a staff-forced privacy mutation. */
+      adminPrivate: boolean;
+      /** Existing moderation reason. */
+      reason?: string;
+    }
+  | {
+      /** Stops the completed visibility mutation. */
+      type: "saveFinished";
+      /** Durable public state on success. */
+      isPublic?: boolean;
+    };
+/** Committed visibility mutation inputs. */
+type VisibilityEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Requested public state. */
+  isPublic: boolean;
+  /** Whether staff-forced privacy uses its dedicated endpoint. */
+  adminPrivate: boolean;
+  /** Existing moderation reason. */
+  reason?: string;
+};
+
+/**
+ * Renders owner and staff resource visibility controls with moderation-reason flows.
+ * Owners cannot change staff-forced privacy without administrative access, and staff changes to another user's resource require a nonblank reason.
+ *
+ * @param props - Resource visibility state and permissions.
+ * @param props.canAdminister - Whether the viewer may moderate another user's resource.
+ * @param props.isAdminPrivate - Whether staff forced the resource private.
+ * @param props.isOwner - Whether the viewer owns the resource.
+ * @param props.isPrivate - Initial private-resource state.
+ * @param props.name - Resource name shown in moderation feedback.
+ * @param props.resourceId - Resource identifier sent to visibility mutations.
+ * @returns The resource visibility control.
+ * @throws {Error} When rendered outside `LocaleProvider`.
+ */
+export function ResourceVisibilityToggle(props: ResourceVisibilityProps) {
+  const { userId } = useAuth();
+  return (
+    <ResourceVisibilityControl
+      key={`${userId}:${props.resourceId}:${props.isOwner}:${props.canAdminister}`}
+      {...props}
+    />
+  );
+}
+
+/**
+ * Owns one resource/permission identity's visibility form and committed mutation.
+ * @param props - Visibility state and permission properties.
+ * @returns Scoped visibility and moderation controls.
+ */
+function ResourceVisibilityControl({
+  canAdminister,
+  isAdminPrivate,
+  isOwner,
+  isPrivate,
+  name,
+  resourceId,
+}: ResourceVisibilityProps) {
   const { locale } = useLocale();
-  const [isPublic, setIsPublic] = useState(!isPrivate);
-  const [reason, setReason] = useState("");
-  const [saving, setSaving] = useState(false);
+  const form = useForm({
+    defaultValues: { reason: "" },
+    validators: {
+      /**
+       * Requires the existing nonblank staff reason before forced privacy.
+       * @param input - Current reason field.
+       * @returns Existing required-reason feedback when blank.
+       */
+      onSubmit: ({ value }): string | undefined =>
+        value.reason.trim()
+          ? undefined
+          : "web.resources.moderation.reasonRequired",
+    },
+    /**
+     * Reports the existing required-reason message without clearing the draft.
+     */
+    onSubmitInvalid: () => {
+      toast.error(t("web.resources.moderation.reasonRequired"));
+    },
+    /**
+     * Captures the existing staff-private request and its unmodified reason.
+     * @param input - Validated reason field.
+     */
+    onSubmit: ({ value }) => {
+      dispatch({
+        type: "saveRequested",
+        isPublic: false,
+        adminPrivate: true,
+        reason: value.reason,
+      });
+    },
+  });
+  const reason = useStore(form.store, (state) => state.values.reason);
+  const canSubmit = useStore(
+    form.store,
+    (state) => state.values.reason.trim().length > 0 && !state.isSubmitting,
+  );
+  const task = useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: VisibilityEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<boolean>;
+  } | null>(null);
+  const [visibility, dispatch] = useEffectReducer<
+    VisibilityState,
+    VisibilityEvent,
+    VisibilityEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "visibilityReceived") {
+        exec.stop(state.save);
+        return {
+          ...state,
+          sourcePrivate: event.isPrivate,
+          sourceAdminPrivate: event.isAdminPrivate,
+          isPublic: !event.isPrivate,
+          save: undefined,
+        };
+      }
+      if (event.type === "moderationOpened")
+        return { ...state, dialogOpen: true };
+      if (event.type === "moderationDismissed")
+        return state.save ? state : { ...state, dialogOpen: false };
+      if (event.type === "saveRequested") {
+        if (state.save) return state;
+        return {
+          ...state,
+          save: exec({
+            type: "save",
+            isPublic: event.isPublic,
+            adminPrivate: event.adminPrivate,
+            reason: event.reason,
+          }),
+        };
+      }
+      exec.stop(state.save);
+      return {
+        ...state,
+        isPublic: event.isPublic ?? state.isPublic,
+        dialogOpen: event.isPublic === undefined ? state.dialogOpen : false,
+        save: undefined,
+      };
+    },
+    {
+      sourcePrivate: isPrivate,
+      sourceAdminPrivate: isAdminPrivate,
+      isPublic: !isPrivate,
+      dialogOpen: false,
+      save: undefined,
+    },
+    {
+      /**
+       * Persists one visibility intent and publishes only to the active resource scope.
+       * @param _state - Current visibility controls.
+       * @param effect - Captured visibility/reason mutation.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: Promise.resolve()
+              .then(() =>
+                effect.adminPrivate
+                  ? markResourcePrivate({
+                      data: { reason: effect.reason ?? "", resourceId },
+                    })
+                  : setResourceVisibility({
+                      data: {
+                        isPublic: effect.isPublic,
+                        reason: effect.reason,
+                        resourceId,
+                      },
+                    }),
+              )
+              .then(
+                () => true,
+                () => false,
+              ),
+          };
+        void task.current.promise.then((success) => {
+          if (signal.aborted) return;
+          dispatch({
+            type: "saveFinished",
+            isPublic: success ? effect.isPublic : undefined,
+          });
+          if (!success) {
+            toast.error(
+              t(
+                effect.adminPrivate
+                  ? "web.resources.moderation.failure"
+                  : "web.resources.error.editFailed",
+              ),
+            );
+            return;
+          }
+          if (effect.adminPrivate)
+            toast.success(t("web.resources.moderation.success", { name }));
+        });
+      },
+    },
+  );
+  if (
+    visibility.sourcePrivate !== isPrivate ||
+    visibility.sourceAdminPrivate !== isAdminPrivate
+  )
+    dispatch({ type: "visibilityReceived", isPrivate, isAdminPrivate });
+  const { isPublic } = visibility;
+  const saving = Boolean(visibility.save);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const locked = isAdminPrivate && isOwner && !canAdminister;
@@ -139,65 +366,45 @@ export function ResourceVisibilityToggle({
   ) => formatTranslation(key, params, locale);
 
   /**
-   * Applies a visibility change or opens the staff moderation dialog.
-   * Mutation failures are reported by toast and do not reject the returned promise.
-   *
-   * @param nextPublic - Whether the resource should be public.
-   * @returns A promise that resolves after the change is handled or canceled.
+   * Applies a visibility intent or opens the existing staff confirmation flow.
+   * @param nextPublic - Requested public state.
    */
-  async function updateVisibility(nextPublic: boolean) {
+  function updateVisibility(nextPublic: boolean) {
+    if (locked || saving) return;
     if (!nextPublic && canAdminister && !isOwner) {
-      setReason("");
-      dialogRef.current?.showModal();
+      form.reset();
+      dispatch({ type: "moderationOpened" });
       return;
     }
-    const moderationReason =
+    const reason =
       nextPublic && canAdminister && !isOwner
         ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
         : undefined;
-    if (nextPublic && canAdminister && !isOwner && !moderationReason) {
+    if (nextPublic && canAdminister && !isOwner && !reason) {
       toast.error(t("web.resources.moderation.reasonRequired"));
       return;
     }
-
-    setSaving(true);
-    try {
-      await setResourceVisibility({
-        data: { isPublic: nextPublic, reason: moderationReason, resourceId },
-      });
-      setIsPublic(nextPublic);
-    } catch {
-      toast.error(t("web.resources.error.editFailed"));
-    } finally {
-      setSaving(false);
-    }
+    dispatch({
+      type: "saveRequested",
+      isPublic: nextPublic,
+      adminPrivate: false,
+      reason,
+    });
   }
-
   /**
-   * Marks the resource private with the entered staff reason.
-   * Missing reasons and mutation failures are reported by toast.
-   *
-   * @returns A promise that resolves after validation or mutation handling.
+   * Owns the confirmation dialog through its committed DOM lifetime.
+   * @param node - Current dialog node.
+   * @returns Cleanup that closes only this mounted dialog.
    */
-  async function submitAdminPrivate() {
-    if (!reason.trim()) {
-      toast.error(t("web.resources.moderation.reasonRequired"));
-      return;
-    }
-    setSaving(true);
-    try {
-      await markResourcePrivate({
-        data: { reason, resourceId },
-      });
-      setIsPublic(false);
-      toast.success(t("web.resources.moderation.success", { name }));
-      dialogRef.current?.close();
-    } catch {
-      toast.error(t("web.resources.moderation.failure"));
-    } finally {
-      setSaving(false);
-    }
-  }
+  const bindDialog = useCallback((node: HTMLDialogElement | null) => {
+    dialogRef.current = node;
+    if (!node) return;
+    node.showModal();
+    return () => {
+      node.close();
+      if (dialogRef.current === node) dialogRef.current = null;
+    };
+  }, []);
 
   const toggle = (
     <PublicResourceSwitch
@@ -219,50 +426,63 @@ export function ResourceVisibilityToggle({
       ) : (
         toggle
       )}
-      <dialog
-        aria-labelledby={titleId}
-        className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-        ref={dialogRef}
-      >
-        <div className="grid gap-5 p-6">
-          <div className="grid gap-2">
-            <h2 className="m-0 text-xl font-semibold" id={titleId}>
-              {t("web.resources.moderation.confirmationTitle")}
-            </h2>
-            <p className="m-0 text-sm text-muted-foreground">
-              {t("web.resources.moderation.confirmationDescription", { name })}
-            </p>
+      {visibility.dialogOpen ? (
+        <dialog
+          aria-labelledby={titleId}
+          className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+          ref={bindDialog}
+          onCancel={(event) => {
+            event.preventDefault();
+            if (!saving) dispatch({ type: "moderationDismissed" });
+          }}
+        >
+          <div className="grid gap-5 p-6">
+            <div className="grid gap-2">
+              <h2 className="m-0 text-xl font-semibold" id={titleId}>
+                {t("web.resources.moderation.confirmationTitle")}
+              </h2>
+              <p className="m-0 text-sm text-muted-foreground">
+                {t("web.resources.moderation.confirmationDescription", {
+                  name,
+                })}
+              </p>
+            </div>
+            <label className="grid gap-2 text-sm font-medium">
+              {t("web.resources.moderation.reasonLabel")}
+              <textarea
+                className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                maxLength={1000}
+                onChange={(event) =>
+                  form.setFieldValue("reason", event.target.value)
+                }
+                placeholder={t("web.resources.moderation.reasonPlaceholder")}
+                value={reason}
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button
+                disabled={saving}
+                onClick={() => dispatch({ type: "moderationDismissed" })}
+                type="button"
+                variant="outline"
+              >
+                {t("action.cancel")}
+              </Button>
+              <Button
+                disabled={saving || !canSubmit}
+                onClick={() => {
+                  form.setErrorMap({ onSubmit: undefined });
+                  void form.handleSubmit();
+                }}
+                type="button"
+                variant="destructive"
+              >
+                {t("web.resources.action.markPrivate")}
+              </Button>
+            </div>
           </div>
-          <label className="grid gap-2 text-sm font-medium">
-            {t("web.resources.moderation.reasonLabel")}
-            <textarea
-              className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              maxLength={1000}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder={t("web.resources.moderation.reasonPlaceholder")}
-              value={reason}
-            />
-          </label>
-          <div className="flex justify-end gap-2">
-            <Button
-              disabled={saving}
-              onClick={() => dialogRef.current?.close()}
-              type="button"
-              variant="outline"
-            >
-              {t("action.cancel")}
-            </Button>
-            <Button
-              disabled={saving || !reason.trim()}
-              onClick={() => void submitAdminPrivate()}
-              type="button"
-              variant="destructive"
-            >
-              {t("web.resources.action.markPrivate")}
-            </Button>
-          </div>
-        </div>
-      </dialog>
+        </dialog>
+      ) : null}
     </>
   );
 }

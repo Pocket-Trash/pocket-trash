@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faChevronDown,
   faChevronUp,
@@ -14,26 +15,61 @@ import {
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useCallback, useReducer, useRef } from "react";
 import { toast } from "sonner";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AppShell } from "@/components/app-shell";
 import { ImageGallery } from "@/components/image-gallery";
 import { ResourceVisibilityToggle } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  downloadResourceFile,
-  downloadResourceVersion,
-  type getResourceDetail,
-  softDeleteResource,
-} from "@/lib/resources";
+import { useResourceDownloads } from "@/hooks/use-resource-downloads";
+import { type getResourceDetail, softDeleteResource } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 /** Resource detail returned by the resource service. */
 type ResourceDetail = NonNullable<
   Awaited<ReturnType<typeof getResourceDetail>>
 >;
+
+/** Resource deletion dialog and committed mutation lifetime. */
+type ResourceDeleteState = {
+  /** Whether deletion confirmation is open. */
+  open: boolean;
+  /** Pending confirmed deletion effect. */
+  request: EffectEntity<ResourceDeleteState, ResourceDeleteEvent> | undefined;
+};
+/** Deletion confirmation intent and terminal cleanup. */
+type ResourceDeleteEvent =
+  | {
+      /** Opens confirmation. */
+      type: "opened";
+    }
+  | {
+      /** Dismisses confirmation. */
+      type: "dismissed";
+    }
+  | {
+      /** Submits the existing reason after validation. */
+      type: "requested";
+      /** Existing optional moderation reason. */
+      reason?: string;
+    }
+  | {
+      /** Stops the completed deletion request. */
+      type: "finished";
+      /** Whether deletion committed successfully. */
+      success: boolean;
+    };
+/** Captured confirmed deletion. */
+type ResourceDeleteEffect = {
+  /** Deletion implementation. */
+  type: "remove";
+  /** Existing optional moderation reason. */
+  reason?: string;
+};
 
 /**
  * Renders resource metadata, images, files, and version history.
@@ -45,20 +81,149 @@ type ResourceDetail = NonNullable<
 export function ResourceDetailPage({
   detail,
 }: {
-  /** Resource detail to display. */
-  detail: ResourceDetail;
+  /** Resource detail to display. */ detail: ResourceDetail;
+}) {
+  const { userId } = useAuth();
+  return (
+    <ResourceDetailContent
+      key={`${userId}:${detail.id}:${detail.isOwner}:${detail.canEdit}:${detail.canAdminister}`}
+      detail={detail}
+    />
+  );
+}
+
+/**
+ * Owns one current resource/permission identity's downloads and deletion controls.
+ * @param props - Current resource detail.
+ * @returns Scoped resource detail content.
+ */
+function ResourceDetailContent({
+  detail,
+}: {
+  /** Current resource detail. */ detail: ResourceDetail;
 }) {
   const { locale } = useLocale();
   const navigate = useNavigate();
-  const [downloadingFileId, setDownloadingFileId] = useState<number>();
-  const [downloadingVersionId, setDownloadingVersionId] = useState<number>();
-  const [failedVersionIds, setFailedVersionIds] = useState<Set<number>>(
-    () => new Set(),
+  const {
+    downloadingFileId,
+    downloadingVersionId,
+    failedVersionIds,
+    startFile,
+    startVersion,
+  } = useResourceDownloads(detail.id);
+  const [historyExpanded, dispatchHistory] = useReducer(
+    (state: boolean, event: "historyToggled") =>
+      event === "historyToggled" ? !state : state,
+    false,
   );
-  const [deleting, setDeleting] = useState(false);
-  const [deleteReason, setDeleteReason] = useState("");
-  const [historyExpanded, setHistoryExpanded] = useState(false);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const form = useForm({
+    defaultValues: { reason: "" },
+    validators: {
+      /**
+       * Requires the existing staff reason for cross-owner deletion.
+       * @param input - Current reason field.
+       * @returns Existing reason feedback when invalid.
+       */
+      onSubmit: ({ value }): string | undefined =>
+        !detail.isOwner && !value.reason.trim()
+          ? "web.resources.moderation.reasonRequired"
+          : undefined,
+    },
+    /**
+     * Captures one confirmed resource deletion without changing its request payload.
+     * @param input - Validated reason field.
+     */
+    onSubmit: ({ value }) => {
+      dispatchDelete({ type: "requested", reason: value.reason || undefined });
+    },
+  });
+  const deleteReason = useStore(form.store, (state) => state.values.reason);
+  const canDelete = useStore(
+    form.store,
+    (state) => detail.isOwner || state.values.reason.trim().length > 0,
+  );
+  const task = useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: ResourceDeleteEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<boolean>;
+  } | null>(null);
+  const [deletion, dispatchDelete] = useEffectReducer<
+    ResourceDeleteState,
+    ResourceDeleteEvent,
+    ResourceDeleteEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "opened") return { ...state, open: true };
+      if (event.type === "dismissed")
+        return state.request ? state : { ...state, open: false };
+      if (event.type === "requested")
+        return state.request
+          ? state
+          : {
+              ...state,
+              request: exec({ type: "remove", reason: event.reason }),
+            };
+      exec.stop(state.request);
+      return { open: event.success ? false : state.open, request: undefined };
+    },
+    { open: false, request: undefined },
+    {
+      /**
+       * Observes one confirmed deletion through lifecycle resumption.
+       * @param _state - Current confirmation state.
+       * @param effect - Captured optional staff reason.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      remove: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: softDeleteResource({
+              data: { reason: effect.reason, resourceId: detail.id },
+            }).then(
+              () => true,
+              () => false,
+            ),
+          };
+        void task.current.promise.then((success) => {
+          if (signal.aborted) return;
+          dispatch({ type: "finished", success });
+          toast[success ? "success" : "error"](
+            t(
+              success
+                ? "web.resources.trash.softDeleteSuccess"
+                : "web.resources.trash.softDeleteFailure",
+              { name: detail.name },
+            ),
+          );
+          if (success)
+            void navigate({
+              to: detail.isOwner
+                ? "/user/resources/trash"
+                : "/admin/trash/resources",
+            });
+        });
+      },
+    },
+  );
+  const deleting = Boolean(deletion.request);
+  /**
+   * Owns confirmation through the committed dialog lifetime without dismissing preserved drafts.
+   * @param node - Current dialog node.
+   * @returns Cleanup closing this mounted dialog.
+   */
+  const bindDeleteDialog = useCallback((node: HTMLDialogElement | null) => {
+    deleteDialogRef.current = node;
+    if (!node) return;
+    node.showModal();
+    return () => {
+      node.close();
+      if (deleteDialogRef.current === node) deleteDialogRef.current = null;
+    };
+  }, []);
   /**
    * Formats localized resource copy.
    *
@@ -72,56 +237,20 @@ export function ResourceDetailPage({
   ) => formatTranslation(key, params, locale);
 
   /**
-   * Starts a download for one resource file.
-   *
+   * Requests an individual file through its current resource lifetime.
    * @param file - Resource file to download.
-   * @returns A promise that resolves after navigation or failure handling.
    */
-  async function startDownload(
+  function startDownload(
     file: ResourceDetail["currentVersion"]["files"][number],
   ) {
-    setDownloadingFileId(file.id);
-    try {
-      const url = await downloadResourceFile({
-        data: { fileId: file.id, resourceId: detail.id },
-      });
-      if (!url) throw new Error("missing download");
-      window.location.assign(url);
-    } catch {
-      toast.error(
-        t("web.resources.error.downloadUnavailable", {
-          filename: file.fileName,
-        }),
-      );
-      setDownloadingFileId(undefined);
-    }
+    startFile(file.id, file.fileName);
   }
-
   /**
-   * Starts an archive download for one resource version.
-   *
+   * Requests a version archive through its current resource lifetime.
    * @param version - Resource version to download.
-   * @returns A promise that resolves after navigation or failure handling.
    */
-  async function startVersionDownload(
-    version: ResourceDetail["versions"][number],
-  ) {
-    setDownloadingVersionId(version.id);
-    try {
-      const url = await downloadResourceVersion({
-        data: { resourceId: detail.id, versionId: version.id },
-      });
-      if (!url) throw new Error("missing download");
-      window.location.assign(url);
-    } catch {
-      toast.error(
-        t("web.resources.error.downloadUnavailable", {
-          filename: `resource-${detail.id}-v${version.version}.zip`,
-        }),
-      );
-      setFailedVersionIds((failed) => new Set(failed).add(version.id));
-      setDownloadingVersionId(undefined);
-    }
+  function startVersionDownload(version: ResourceDetail["versions"][number]) {
+    startVersion(version.id, version.version);
   }
 
   return (
@@ -170,7 +299,7 @@ export function ResourceDetailPage({
                     {t("web.resources.action.edit")}
                   </Button>
                   <Button
-                    onClick={() => deleteDialogRef.current?.showModal()}
+                    onClick={() => dispatchDelete({ type: "opened" })}
                     size="sm"
                     type="button"
                     variant="destructive"
@@ -271,7 +400,7 @@ export function ResourceDetailPage({
                   ? "web.resources.action.collapseVersionHistory"
                   : "web.resources.action.expandVersionHistory",
               )}
-              onClick={() => setHistoryExpanded((expanded) => !expanded)}
+              onClick={() => dispatchHistory("historyToggled")}
               size="icon"
               type="button"
               variant="ghost"
@@ -303,88 +432,72 @@ export function ResourceDetailPage({
             </div>
           ) : null}
         </section>
-        <dialog
-          aria-labelledby="soft-delete-resource-title"
-          className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-          ref={deleteDialogRef}
-        >
-          <div className="grid gap-5 p-6">
-            <div className="grid gap-2">
-              <h2
-                className="m-0 text-xl font-semibold"
-                id="soft-delete-resource-title"
-              >
-                {t("web.resources.trash.softDeleteConfirmationTitle")}
-              </h2>
-              <p className="m-0 text-sm text-muted-foreground">
-                {t("web.resources.trash.softDeleteConfirmationDescription", {
-                  name: detail.name,
-                })}
-              </p>
+        {deletion.open ? (
+          <dialog
+            aria-labelledby="soft-delete-resource-title"
+            className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+            ref={bindDeleteDialog}
+            onCancel={(event) => {
+              event.preventDefault();
+              if (!deleting) dispatchDelete({ type: "dismissed" });
+            }}
+          >
+            <div className="grid gap-5 p-6">
+              <div className="grid gap-2">
+                <h2
+                  className="m-0 text-xl font-semibold"
+                  id="soft-delete-resource-title"
+                >
+                  {t("web.resources.trash.softDeleteConfirmationTitle")}
+                </h2>
+                <p className="m-0 text-sm text-muted-foreground">
+                  {t("web.resources.trash.softDeleteConfirmationDescription", {
+                    name: detail.name,
+                  })}
+                </p>
+              </div>
+              {!detail.isOwner ? (
+                <label className="grid gap-2 text-sm font-medium">
+                  {t("web.resources.moderation.reasonLabel")}
+                  <textarea
+                    className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    maxLength={1000}
+                    onChange={(event) =>
+                      form.setFieldValue("reason", event.currentTarget.value)
+                    }
+                    placeholder={t(
+                      "web.resources.moderation.reasonPlaceholder",
+                    )}
+                    required
+                    value={deleteReason}
+                  />
+                </label>
+              ) : null}
+              <div className="flex justify-end gap-2">
+                <Button
+                  disabled={deleting}
+                  onClick={() => dispatchDelete({ type: "dismissed" })}
+                  type="button"
+                  variant="outline"
+                >
+                  {t("action.cancel")}
+                </Button>
+                <Button
+                  disabled={deleting || !canDelete}
+                  onClick={() => {
+                    form.setErrorMap({ onSubmit: undefined });
+                    void form.handleSubmit();
+                  }}
+                  type="button"
+                  variant="destructive"
+                >
+                  <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
+                  {t("web.resources.action.delete")}
+                </Button>
+              </div>
             </div>
-            {!detail.isOwner ? (
-              <label className="grid gap-2 text-sm font-medium">
-                {t("web.resources.moderation.reasonLabel")}
-                <textarea
-                  className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  maxLength={1000}
-                  onChange={(event) =>
-                    setDeleteReason(event.currentTarget.value)
-                  }
-                  placeholder={t("web.resources.moderation.reasonPlaceholder")}
-                  required
-                  value={deleteReason}
-                />
-              </label>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button
-                disabled={deleting}
-                onClick={() => deleteDialogRef.current?.close()}
-                type="button"
-                variant="outline"
-              >
-                {t("action.cancel")}
-              </Button>
-              <Button
-                disabled={deleting || (!detail.isOwner && !deleteReason.trim())}
-                onClick={async () => {
-                  setDeleting(true);
-                  try {
-                    await softDeleteResource({
-                      data: {
-                        reason: deleteReason || undefined,
-                        resourceId: detail.id,
-                      },
-                    });
-                    toast.success(
-                      t("web.resources.trash.softDeleteSuccess", {
-                        name: detail.name,
-                      }),
-                    );
-                    await navigate({
-                      to: detail.isOwner
-                        ? "/user/resources/trash"
-                        : "/admin/trash/resources",
-                    });
-                  } catch {
-                    toast.error(
-                      t("web.resources.trash.softDeleteFailure", {
-                        name: detail.name,
-                      }),
-                    );
-                    setDeleting(false);
-                  }
-                }}
-                type="button"
-                variant="destructive"
-              >
-                <FontAwesomeIcon aria-hidden="true" icon={faTrash} />
-                {t("web.resources.action.delete")}
-              </Button>
-            </div>
-          </div>
-        </dialog>
+          </dialog>
+        ) : null}
       </main>
     </AppShell>
   );
@@ -461,7 +574,11 @@ function VersionCard({
   /** Resource version to display. */
   version: ResourceDetail["versions"][number];
 }) {
-  const [expanded, setExpanded] = useState(!collapsible);
+  const [expanded, dispatch] = useReducer(
+    (state: boolean, event: "filesDisclosureToggled") =>
+      event === "filesDisclosureToggled" ? !state : state,
+    !collapsible,
+  );
   return (
     <article className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm">
       {title ? (
@@ -502,7 +619,7 @@ function VersionCard({
                   : "web.resources.action.expandVersion",
                 { version: version.version },
               )}
-              onClick={() => setExpanded((value) => !value)}
+              onClick={() => dispatch("filesDisclosureToggled")}
               size="icon"
               type="button"
               variant="ghost"

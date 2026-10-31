@@ -120,7 +120,7 @@ describe("resource detail", () => {
     expect(html).toContain("Reason: Inappropriate content");
     expect(html).toContain("Edit");
     expect(html).toContain("Move to trash");
-    expect(html).toContain("Move resource to trash");
+    expect(html).not.toContain("<dialog");
     expect(html).toContain('href="/resources/1000/edit"');
     expect(html).not.toContain("Upload new version");
     expect(html).not.toContain('href="/resources/1000/versions/new"');
@@ -131,3 +131,9 @@ describe("resource detail", () => {
     expect(html).not.toContain("File: clip.stl");
   });
 });
+
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /** Supplies an anonymous resource observer.
+   * @returns Account context. */
+  useAuth: () => ({ userId: null }),
+}));
