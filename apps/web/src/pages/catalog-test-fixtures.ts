@@ -1,4 +1,4 @@
-import type { CatalogProduct } from "@package/services";
+import type { CatalogProduct, UserCollectionItem } from "@package/services";
 import type { EditableCatalogProductType } from "@/lib/catalog-api";
 
 /**
@@ -82,5 +82,66 @@ export function productFixture(
     updatedAt: new Date(0),
     weight: null,
     width: null,
+  };
+}
+
+/**
+ * Creates a collection item fixture for a catalog product.
+ *
+ * @param collectionItemId - Collection item identifier.
+ * @param product - Source catalog product.
+ * @param sourceProductFinishOptionId - Source finish option identifier.
+ * @returns The collection item fixture.
+ */
+export function collectionFixture(
+  collectionItemId: number,
+  product: CatalogProduct,
+  sourceProductFinishOptionId: number,
+): UserCollectionItem {
+  return {
+    approvalStatus: "approved",
+    bearing: null,
+    bearingOverride: null,
+    canAdminister: false,
+    canEdit: true,
+    collectionId: 1000,
+    collectionItemId,
+    collectionIsPrivate: false,
+    collectionName: "Test collection",
+    compatibleButtonId: null,
+    compatibleButtonName: null,
+    displayName: product.name,
+    description: null,
+    descriptionOverride: null,
+    finishOption: product.finishOptions[0] ?? null,
+    imageCount: 0,
+    images: [],
+    effectiveSliderSetup: null,
+    isAdminPrivate: false,
+    isPrivate: false,
+    installedButtonId: null,
+    installedInsertId: null,
+    installedOnSliderId: null,
+    installedPlateId: null,
+    includedInsert: null,
+    includedPlate: null,
+    makerId: product.makerId,
+    makerName: product.makerName,
+    makerSlug: product.makerSlug,
+    makerUrl: product.makerUrl,
+    materials: product.materials[0]?.materials ?? [],
+    name: product.name,
+    ownerClerkId: "user_test",
+    ownerImageUrl: null,
+    ownerIsProfilePublic: true,
+    ownerUsername: "tester",
+    ownerUserId: 1,
+    productId: product.id,
+    productSlug: product.slug,
+    productTypeId: product.productTypeId,
+    productTypeName: product.productTypeName,
+    productTypeSlug: product.productTypeSlug,
+    productImages: [],
+    sourceProductFinishOptionId,
   };
 }

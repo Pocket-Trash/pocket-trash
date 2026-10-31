@@ -1,8 +1,4 @@
-import type {
-  CatalogProduct,
-  UserCollectionItem,
-  UserCollectionSummary,
-} from "@package/services";
+import type { CatalogProduct, UserCollectionSummary } from "@package/services";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -17,7 +13,7 @@ import {
   PensAdminEditor,
   ProductEditor,
 } from "./catalog-form-pages";
-import { productFixture } from "./catalog-test-fixtures";
+import { collectionFixture, productFixture } from "./catalog-test-fixtures";
 
 vi.mock("@tanstack/react-router", () => ({
   /**
@@ -1146,64 +1142,3 @@ describe("Pens catalog administration", () => {
     expect(html).not.toContain("Individual refill: Precise V5");
   });
 });
-
-/**
- * Creates a collection item fixture for a catalog product.
- *
- * @param collectionItemId - Collection item identifier.
- * @param product - Source catalog product.
- * @param sourceProductFinishOptionId - Source finish option identifier.
- * @returns The collection item fixture.
- */
-function collectionFixture(
-  collectionItemId: number,
-  product: CatalogProduct,
-  sourceProductFinishOptionId: number,
-): UserCollectionItem {
-  return {
-    approvalStatus: "approved",
-    bearing: null,
-    bearingOverride: null,
-    canAdminister: false,
-    canEdit: true,
-    collectionId: 1000,
-    collectionItemId,
-    collectionIsPrivate: false,
-    collectionName: "Test collection",
-    compatibleButtonId: null,
-    compatibleButtonName: null,
-    displayName: product.name,
-    description: null,
-    descriptionOverride: null,
-    finishOption: product.finishOptions[0] ?? null,
-    imageCount: 0,
-    images: [],
-    effectiveSliderSetup: null,
-    isAdminPrivate: false,
-    isPrivate: false,
-    installedButtonId: null,
-    installedInsertId: null,
-    installedOnSliderId: null,
-    installedPlateId: null,
-    includedInsert: null,
-    includedPlate: null,
-    makerId: product.makerId,
-    makerName: product.makerName,
-    makerSlug: product.makerSlug,
-    makerUrl: product.makerUrl,
-    materials: product.materials[0]?.materials ?? [],
-    name: product.name,
-    ownerClerkId: "user_test",
-    ownerImageUrl: null,
-    ownerIsProfilePublic: true,
-    ownerUsername: "tester",
-    ownerUserId: 1,
-    productId: product.id,
-    productSlug: product.slug,
-    productTypeId: product.productTypeId,
-    productTypeName: product.productTypeName,
-    productTypeSlug: product.productTypeSlug,
-    productImages: [],
-    sourceProductFinishOptionId,
-  };
-}
