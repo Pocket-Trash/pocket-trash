@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import {
+  type EffectEntity,
+  type EffectReducer,
+  type EffectsMap,
+  useEffectReducer,
+} from "use-effect-reducer";
 import {
   CatalogMultiCombobox,
   type ComboboxOption,
@@ -9,6 +15,118 @@ import { listResourceCategories } from "@/lib/resources";
  * Resource category returned by category search.
  */
 type Category = Awaited<ReturnType<typeof listResourceCategories>>[number];
+
+/** Search state and the cancellable lookup that owns its results. */
+type CategorySearchState = {
+  /** Most recently accepted category results. */
+  categories: Category[];
+  /** Current untrimmed search input. */
+  query: string;
+  /** Generation used to reject results queued before a newer query. */
+  generation: number;
+  /** Pending debounce or request, cleared on completion. */
+  search: EffectEntity<CategorySearchState, CategorySearchEvent> | undefined;
+};
+
+/** User input and terminal category-search results. */
+type CategorySearchEvent =
+  | {
+      /** Search input was edited or cleared after selection. */
+      type: "queryChanged";
+      /** Next untrimmed search input. */
+      query: string;
+    }
+  | {
+      /** A request succeeded or failed with empty results. */
+      type: "searchSettled";
+      /** Results returned by this request. */
+      categories: Category[];
+      /** Generation that initiated the request. */
+      generation: number;
+    };
+
+/** Debounced lookup queued after a committed query transition. */
+type CategorySearchEffect = {
+  /** Lookup effect implementation. */
+  type: "searchCategories";
+  /** Search text sent to the existing server function. */
+  query: string;
+  /** Generation carried into the terminal event. */
+  generation: number;
+};
+
+/**
+ * Replaces superseded lookups and explicitly stops terminal work.
+ *
+ * @param state - Current category search.
+ * @param event - Input change or request completion.
+ * @param exec - Committed effect queue.
+ * @returns The next query, results and active lookup.
+ */
+const categorySearchReducer: EffectReducer<
+  CategorySearchState,
+  CategorySearchEvent,
+  CategorySearchEffect
+> = (state, event, exec) => {
+  if (event.type === "queryChanged") {
+    if (event.query === state.query) return state;
+    const generation = state.generation + 1;
+    return {
+      ...state,
+      query: event.query,
+      generation,
+      search: exec.replace(state.search, {
+        type: "searchCategories",
+        query: event.query,
+        generation,
+      }),
+    };
+  }
+  if (event.generation !== state.generation) return state;
+  exec.stop(state.search);
+  return { ...state, categories: event.categories, search: undefined };
+};
+
+/** Committed browser work for category lookup. */
+const categorySearchEffects: EffectsMap<
+  CategorySearchState,
+  CategorySearchEvent,
+  CategorySearchEffect
+> = {
+  /**
+   * Debounces requests and ignores late responses after cancellation.
+   *
+   * @param _state - State that queued the lookup.
+   * @param effect - Search text and request generation.
+   * @param dispatch - Receives terminal search results.
+   * @param context - Effect lifetime.
+   * @param context.signal - Aborted on replacement, hiding or unmount.
+   * @returns Cleanup for the pending debounce.
+   */
+  searchCategories: (_state, effect, dispatch, { signal }) => {
+    /**
+     * Accepts results only while this request still owns its lifetime.
+     *
+     * @param categories - Matching categories, or empty results on failure.
+     */
+    const settle = (categories: Category[]) => {
+      if (!signal.aborted) {
+        dispatch({
+          type: "searchSettled",
+          categories,
+          generation: effect.generation,
+        });
+      }
+    };
+    const timeout = window.setTimeout(() => {
+      void listResourceCategories({
+        data: { search: effect.query },
+        signal,
+      }).then(settle, () => settle([]));
+    }, 150);
+    return () => window.clearTimeout(timeout);
+  },
+};
 
 /**
  * Renders a searchable category picker that emits at most ten case-insensitive unique names.
@@ -67,18 +185,17 @@ export function ResourceCategoryInput({
    */
   selected: string[];
 }) {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [query, setQuery] = useState("");
+  const [{ categories, query }, dispatch] = useEffectReducer(
+    categorySearchReducer,
+    (exec) => ({
+      categories: [],
+      query: "",
+      generation: 0,
+      search: exec({ type: "searchCategories", query: "", generation: 0 }),
+    }),
+    categorySearchEffects,
+  );
   const normalizedQuery = query.trim();
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void listResourceCategories({ data: { search: query } })
-        .then(setCategories)
-        .catch(() => setCategories([]));
-    }, 150);
-    return () => window.clearTimeout(timeout);
-  }, [query]);
 
   const options = useMemo(() => {
     if (
@@ -107,7 +224,9 @@ export function ResourceCategoryInput({
         filter={null}
         inputValue={query}
         items={options}
-        onInputValueChange={setQuery}
+        onInputValueChange={(query) =>
+          dispatch({ type: "queryChanged", query })
+        }
         onValueChange={(values) => {
           onChange(
             values
@@ -122,7 +241,7 @@ export function ResourceCategoryInput({
               )
               .slice(0, 10),
           );
-          setQuery("");
+          dispatch({ type: "queryChanged", query: "" });
         }}
         placeholder={placeholder}
         removeDisabled={disabled}

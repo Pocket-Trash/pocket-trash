@@ -81,7 +81,6 @@
     "typescript-eslint": "latest",
     "vercel": "59.26.0",
     "vitest": "4.1.12",
-    "wait-on": "^9.1.0",
     "yaml": "^2.9.0"
   }
 }
