@@ -7184,6 +7184,7 @@ export function CollectionEditPage({
           ) : null}
           {item.canEdit ? (
             <PermanentDeletionControls
+              key={item.collectionItemId}
               name={item.displayName}
               targetType="collection_item"
               reasonRequired={Boolean(item.canAdminister && !item.isOwner)}
@@ -7196,11 +7197,13 @@ export function CollectionEditPage({
                   },
                 });
                 if (!result.ok) throw new Error(result.formError);
-                await navigate({
+              }}
+              onDeleted={() =>
+                navigate({
                   params: { collectionId: item.collectionId },
                   to: "/user/collections/$collectionId",
-                });
-              }}
+                })
+              }
             />
           ) : null}
         </div>

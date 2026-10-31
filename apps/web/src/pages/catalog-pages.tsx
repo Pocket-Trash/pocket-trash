@@ -689,6 +689,7 @@ export function ProductDetailPage({
                 t={t}
               />
               <PermanentDeletionControls
+                key={product.id}
                 name={product.name}
                 reasonRequired={!product.isOwner}
                 onDelete={async (reason) => {
@@ -696,8 +697,8 @@ export function ProductDetailPage({
                     data: { confirmed: true, productId: product.id, reason },
                   });
                   if (!result.ok) throw new Error(result.formError);
-                  await navigate({ to: "/products" });
                 }}
+                onDeleted={() => navigate({ to: "/products" })}
               />
             </>
           ) : null}
