@@ -818,7 +818,9 @@ const productEditorReducer: EffectReducer<
       return { ...state, openPartRoles: roles };
     }
     case "descriptionLoadingChanged":
-      return { ...state, descriptionLoading: event.loading };
+      return state.descriptionLoading === event.loading
+        ? state
+        : { ...state, descriptionLoading: event.loading };
     case "saveRequested":
       if (state.save) return state;
       return {
@@ -1405,6 +1407,16 @@ export function ProductEditor({
    */
   const receiveOptions = (update: React.SetStateAction<CatalogOptions>) =>
     dispatch({ type: "lookupOptionsChanged", update });
+  /**
+   * Receives editor readiness through a stable callback for existing Markdown callers.
+   * @param loading - Whether the editor is initializing.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => {
+      dispatch({ type: "descriptionLoadingChanged", loading });
+    },
+    [dispatch],
+  );
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const plateDialog = React.useRef<HTMLDialogElement>(null);
   const plateTrigger = React.useRef<HTMLButtonElement>(null);
@@ -2522,9 +2534,7 @@ export function ProductEditor({
               id="product-description"
               label={t("web.catalog.field.description")}
               onChange={field.handleChange}
-              onLoadingChange={(loading) =>
-                dispatch({ type: "descriptionLoadingChanged", loading })
-              }
+              onLoadingChange={receiveDescriptionLoading}
               ref={descriptionRef}
             />
           )}
