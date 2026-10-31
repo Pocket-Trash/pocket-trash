@@ -7,7 +7,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { useRouter } from "@tanstack/react-router";
-import type { ComponentProps } from "react";
+import { type ComponentProps, useReducer } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,9 +48,28 @@ function FeedbackNotificationsContent({
 }) {
   const { locale } = useLocale();
   const router = useRouter();
-  const action = useFeedbackAction(async () => {
-    await router.invalidate();
-  });
+  const [accepted, dispatch] = useReducer(
+    (
+      state: Set<number>,
+      event: {
+        /** Acknowledged notification after its canonical refresh. */
+        type: "readConfirmed";
+        /** Current notification identity. */
+        id: number;
+      },
+    ) => new Set([...state, event.id]),
+    new Set<number>(),
+  );
+  const action = useFeedbackAction(
+    async () => {
+      await router.invalidate();
+    },
+    undefined,
+    (action) => {
+      if (action.kind === "read")
+        dispatch({ type: "readConfirmed", id: action.data.notificationId });
+    },
+  );
   const notifications = initialNotifications;
 
   /** Formats feedback notification copy for the active locale.
@@ -98,10 +117,14 @@ function FeedbackNotificationsContent({
                       )}
                     </Badge>
                     <Badge
-                      variant={notification.readAt ? "outline" : "secondary"}
+                      variant={
+                        notification.readAt || accepted.has(notification.id)
+                          ? "outline"
+                          : "secondary"
+                      }
                     >
                       {t(
-                        notification.readAt
+                        notification.readAt || accepted.has(notification.id)
                           ? "web.resources.notification.read"
                           : "web.resources.notification.unread",
                       )}
@@ -124,7 +147,11 @@ function FeedbackNotificationsContent({
                   </span>
                 </div>
                 <Button
-                  disabled={Boolean(notification.readAt) || action.pending}
+                  disabled={
+                    Boolean(notification.readAt) ||
+                    accepted.has(notification.id) ||
+                    action.pending
+                  }
                   onClick={() =>
                     action.run({
                       kind: "read",
