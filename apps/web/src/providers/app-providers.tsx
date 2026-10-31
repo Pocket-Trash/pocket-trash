@@ -33,7 +33,7 @@ export function AppProviders({
     <InitialUiPreferencesContext.Provider value={initialUiPreferences}>
       <LocaleProvider initialSettingsState={initialSettingsState}>
         <ClerkProvider>
-          <UserSettingsProvider initialSettingsState={initialSettingsState} />
+          <UserSettingsProvider />
           <ThemeProvider>
             <TooltipProvider>
               {children}

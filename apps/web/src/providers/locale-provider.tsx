@@ -9,7 +9,13 @@ import {
   type UserSettingsStore,
 } from "@/lib/user-settings-store";
 
-export { UserSettingsProvider as AuthenticatedLocaleSync } from "./user-settings-provider";
+import { UserSettingsProvider } from "./user-settings-provider";
+
+/** Compatibility name for the former locale-only bootstrap component. */
+export const AuthenticatedLocaleSync: React.ComponentType<{
+  /** Initial preferences owned by the surrounding LocaleProvider. */
+  initialSettingsState: UserSettingsState | null;
+}> = UserSettingsProvider;
 
 /** Active locale and local preference update operations. */
 type LocaleProviderValue = {

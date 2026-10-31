@@ -3,6 +3,7 @@ import {
   DEFAULT_LOCALE,
   formatTranslation,
   type SupportedLocale,
+  type TranslationKey,
 } from "@pocket-trash/localizations";
 import { atom } from "nanostores";
 import { createContext, useContext } from "react";
@@ -75,6 +76,7 @@ export function createUserSettingsStore(
   const versions = new Map<PreferenceKey, number>();
   const controllers = new Set<AbortController>();
   const pending = new Map<number, "theme" | "settings" | "locale">();
+  const earlySelections = new Map<PreferenceKey, number>();
   let epoch = 0;
   let sequence = 0;
   let connected = false;
@@ -115,20 +117,30 @@ export function createUserSettingsStore(
     });
   }
 
-  /** Persists existing browser preference keys without caching profile visibility. */
-  function persist() {
+  /**
+   * Persists affected browser keys without caching profile visibility or derived locale.
+   * @param patch - Preference fields whose browser keys changed.
+   */
+  function persist(patch: UserSettingsPatch) {
     const { settings, locale } = state.get();
     try {
-      writeStoredLocale(locale);
-      window.localStorage.setItem(themeStorageKey, settings.theme);
-      window.localStorage.setItem(
-        userSettingsStorageKey,
-        JSON.stringify({
-          currencyCode: settings.currencyCode,
-          measurementSystem: settings.measurementSystem,
-          publishTrends: settings.publishTrends,
-        }),
-      );
+      if (patch.locale != null) writeStoredLocale(locale);
+      if (patch.theme !== undefined)
+        window.localStorage.setItem(themeStorageKey, settings.theme);
+      if (
+        "currencyCode" in patch ||
+        "measurementSystem" in patch ||
+        "publishTrends" in patch ||
+        "isProfilePublic" in patch
+      )
+        window.localStorage.setItem(
+          userSettingsStorageKey,
+          JSON.stringify({
+            currencyCode: settings.currencyCode,
+            measurementSystem: settings.measurementSystem,
+            publishTrends: settings.publishTrends,
+          }),
+        );
     } catch {
       // Browser persistence is best-effort; account saves still report failures.
     }
@@ -143,7 +155,7 @@ export function createUserSettingsStore(
     for (const key of Object.keys(patch) as PreferenceKey[])
       versions.set(key, ++sequence);
     apply(patch);
-    persist();
+    persist(patch);
   }
 
   /**
@@ -153,6 +165,13 @@ export function createUserSettingsStore(
    * @param error - Failure supplied by the API, when available.
    */
   function reportFailure(kind: "load" | "save", error?: unknown) {
+    const locale = state.get().locale;
+    /**
+     * Formats feedback using the current preference owner's locale.
+     * @param key - Existing settings feedback key.
+     * @returns Localized settings feedback.
+     */
+    const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
     if (error)
       logger.warn(
         kind === "load"
@@ -161,11 +180,7 @@ export function createUserSettingsStore(
         { error },
       );
     toast.error(
-      formatTranslation(
-        kind === "load" ? "error.generic" : "web.error.settingsSaveFailed",
-        {},
-        state.get().locale,
-      ),
+      t(kind === "load" ? "error.generic" : "web.error.settingsSaveFailed"),
     );
   }
 
@@ -216,7 +231,7 @@ export function createUserSettingsStore(
             .map((key) => [key, settings[key]]),
         ),
       );
-      persist();
+      persist(patch);
       return true;
     } catch (error) {
       if (generation !== epoch || controller.signal.aborted) return false;
@@ -231,7 +246,7 @@ export function createUserSettingsStore(
             .map((key) => [key, previous[key]]),
         ),
       );
-      persist();
+      persist(patch);
       reportFailure("save", error);
       return false;
     } finally {
@@ -266,7 +281,7 @@ export function createUserSettingsStore(
     const theme = resolveThemeBootstrap(loaded, localTheme);
     const preferences = {
       ...loaded.settings,
-      locale: locale.locale ?? state.get().locale,
+      locale: locale.locale,
       theme: theme.theme,
     };
     apply(
@@ -281,8 +296,17 @@ export function createUserSettingsStore(
       accountSettingsLoaded: true,
       accountSettingsLoadFailed: false,
     });
-    persist();
-    const promotion: UserSettingsPatch = {};
+    persist({
+      ...loaded.settings,
+      locale: locale.locale,
+      theme: loaded.hasSavedSettings || localTheme ? theme.theme : undefined,
+    });
+    const promotion: UserSettingsPatch = Object.fromEntries(
+      [...earlySelections]
+        .filter(([key, version]) => versions.get(key) === version)
+        .map(([key]) => [key, state.get().settings[key]]),
+    );
+    earlySelections.clear();
     if (
       locale.shouldPersist &&
       locale.locale &&
@@ -301,61 +325,68 @@ export function createUserSettingsStore(
    * Starts committed browser/account synchronization and invalidates disposed work.
    *
    * @param nextAccountId - Loaded Clerk identity, or `null` for an anonymous visitor.
-   * @param bootstrap - Server snapshot supplied by the owning provider.
    * @returns Cleanup that aborts reads/writes without replaying mutations.
    */
-  function connect(
-    nextAccountId: string | null,
-    bootstrap: UserSettingsState | null = initialSettingsState,
-  ) {
+  function connect(nextAccountId: string | null) {
     const first = !connected;
     const changed = connected && nextAccountId !== accountId;
     connected = true;
     accountId = nextAccountId;
     const generation = ++epoch;
-    if (first || changed) {
+    if (first)
+      for (const [key, version] of versions) earlySelections.set(key, version);
+    if (changed) {
       versions.clear();
+      earlySelections.clear();
       const cached = readBrowserSettings();
-      const settings =
-        first && bootstrap && nextAccountId
-          ? { ...defaultUserSettings, ...bootstrap.settings }
-          : {
-              ...cached.settings,
-              isProfilePublic: false,
-              publishTrends: false,
-            };
+      const settings = {
+        ...cached.settings,
+        isProfilePublic: false,
+        publishTrends: false,
+      };
       state.set({
         ...initial,
         accountId,
         settings,
         locale: settings.locale ?? cached.locale,
       });
+    } else {
+      const current = state.get();
+      state.set({
+        ...current,
+        accountId,
+        settings:
+          !first && accountId
+            ? current.settings
+            : {
+                ...current.settings,
+                isProfilePublic: false,
+                publishTrends: false,
+              },
+      });
     }
     if (accountId && !state.get().accountSettingsLoaded) {
-      const readVersions = new Map(versions);
-      if (first && bootstrap) {
-        accept(bootstrap, readVersions);
-      } else {
-        const controller = new AbortController();
-        controllers.add(controller);
-        void getCurrentUserSettingsState({ signal: controller.signal })
-          .then((loaded) => {
-            if (generation !== epoch || controller.signal.aborted) return;
-            if (loaded) accept(loaded, readVersions);
-            else {
-              state.set({ ...state.get(), accountSettingsLoadFailed: true });
-              reportFailure("load");
-            }
-          })
-          .catch((error: unknown) => {
-            if (generation !== epoch || controller.signal.aborted) return;
+      const readVersions = first
+        ? new Map<PreferenceKey, number>()
+        : new Map(versions);
+      for (const key of earlySelections.keys()) readVersions.delete(key);
+      const controller = new AbortController();
+      controllers.add(controller);
+      void getCurrentUserSettingsState({ signal: controller.signal })
+        .then((loaded) => {
+          if (generation !== epoch || controller.signal.aborted) return;
+          if (loaded) accept(loaded, readVersions);
+          else {
             state.set({ ...state.get(), accountSettingsLoadFailed: true });
-            reportFailure("load", error);
-          })
-          .finally(() => controllers.delete(controller));
-      }
-    } else if (!accountId) {
-      persist();
+            reportFailure("load");
+          }
+        })
+        .catch((error: unknown) => {
+          if (generation !== epoch || controller.signal.aborted) return;
+          state.set({ ...state.get(), accountSettingsLoadFailed: true });
+          reportFailure("load", error);
+        })
+        .finally(() => controllers.delete(controller));
     }
     return () => {
       epoch++;

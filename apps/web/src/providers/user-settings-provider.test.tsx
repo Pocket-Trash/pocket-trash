@@ -169,6 +169,88 @@ describe("shared account settings providers", () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
+  it("keeps ownerless server-private preferences hidden until the current account responds", async () => {
+    let resolve: ((value: UserSettingsState) => void) | undefined;
+    mocks.fetch.mockReturnValue(
+      new Promise<UserSettingsState>((done) => {
+        resolve = done;
+      }),
+    );
+    const initial = {
+      hasSavedSettings: true,
+      settings: {
+        ...mocks.defaults,
+        isProfilePublic: true,
+        publishTrends: true,
+      },
+    };
+    await act(async () => root.render(settingsTree(initial)));
+    expect(container.querySelector("button")?.textContent).toBe(
+      "USD:false:false:false",
+    );
+    await act(async () =>
+      resolve?.({ hasSavedSettings: true, settings: mocks.defaults }),
+    );
+    expect(container.querySelector("button")?.textContent).toBe(
+      "USD:false:true:false",
+    );
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains pre-auth selections when Activity replaces the initial account read", async () => {
+    mocks.auth.isLoaded = false;
+    mocks.fetch
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValue({ hasSavedSettings: true, settings: mocks.defaults });
+    mocks.patch.mockResolvedValue({ ...mocks.defaults, theme: "dark" });
+    await act(async () =>
+      root.render(<Activity mode="visible">{settingsTree()}</Activity>),
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Theme"]')
+        ?.click(),
+    );
+    mocks.auth.isLoaded = true;
+    await act(async () =>
+      root.render(<Activity mode="visible">{settingsTree()}</Activity>),
+    );
+    await act(async () =>
+      root.render(<Activity mode="hidden">{settingsTree()}</Activity>),
+    );
+    expect(mocks.fetch.mock.calls[0]?.[0].signal.aborted).toBe(true);
+    await act(async () =>
+      root.render(<Activity mode="visible">{settingsTree()}</Activity>),
+    );
+    expect(container.querySelector("output")?.textContent).toBe("en-US:dark");
+    expect(mocks.patch).toHaveBeenCalledTimes(1);
+    expect(mocks.patch).toHaveBeenCalledWith({
+      data: { theme: "dark" },
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("preserves a selection made before the first authentication connection", async () => {
+    mocks.auth.isLoaded = false;
+    mocks.patch.mockResolvedValue({ ...mocks.defaults, theme: "dark" });
+    const initial: UserSettingsState = {
+      hasSavedSettings: true,
+      settings: { ...mocks.defaults, theme: "light" },
+    };
+    await act(async () => root.render(settingsTree(initial)));
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Theme"]')
+        ?.click(),
+    );
+    expect(container.querySelector("output")?.textContent).toBe("en-US:dark");
+    mocks.auth.isLoaded = true;
+    await act(async () => root.render(settingsTree(initial)));
+    expect(container.querySelector("output")?.textContent).toBe("en-US:dark");
+    expect(mocks.patch).toHaveBeenCalledTimes(1);
+    expect(mocks.patch.mock.calls[0]?.[0].data).toEqual({ theme: "dark" });
+  });
+
   it("discards an old account read even when the API ignores its aborted signal", async () => {
     let resolveOld: ((settings: UserSettingsState) => void) | undefined;
     mocks.fetch
@@ -331,13 +413,14 @@ describe("shared account settings providers", () => {
     act(() => root.unmount());
     container.innerHTML = first;
     const recover = vi.fn();
+    mocks.fetch.mockResolvedValue(initial);
     await act(async () => {
       root = hydrateRoot(container, settingsTree(initial), {
         onRecoverableError: recover,
       });
     });
     expect(recover).not.toHaveBeenCalled();
-    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
     expect(container.querySelector("output")?.textContent).toBe("es-MX:dark");
   });
 

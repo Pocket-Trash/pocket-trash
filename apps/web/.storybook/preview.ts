@@ -1,6 +1,8 @@
 import type { Preview } from "@storybook/tanstack-react";
-import { sb } from "storybook/test";
+import { mocked, sb } from "storybook/test";
 import { applyTheme } from "../src/lib/theme";
+import { getCurrentUserSettingsState } from "../src/lib/user-settings";
+import { mockStoryAuth, storySettings } from "./story-fixtures";
 import "../src/styles.css";
 
 sb.mock(import("@clerk/tanstack-react-start"));
@@ -15,6 +17,11 @@ sb.mock(import("../src/components/markdown-visual-editor.tsx"), { spy: true });
 
 /** Global decorators, theme control, accessibility checks, and story ordering. */
 const preview: Preview = {
+  /** Restores the anonymous auth and current-session settings fixtures. */
+  beforeEach: () => {
+    mockStoryAuth();
+    mocked(getCurrentUserSettingsState).mockResolvedValue(storySettings);
+  },
   decorators: [
     (Story, context) => {
       applyTheme(context.globals.theme === "dark" ? "dark" : "light");

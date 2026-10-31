@@ -13,7 +13,7 @@ import { useUserSettingsStore } from "@/lib/user-settings-store";
  * @throws When used outside LocaleProvider.
  */
 export function usePenSettings() {
-  const { userId, isSignedIn } = useAuth();
+  const { userId, isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const store = useUserSettingsStore();
   const snapshot = useStore(store.state, {
@@ -30,12 +30,12 @@ export function usePenSettings() {
    */
   const saveSettings = useCallback(
     (patch: UserSettingsPatch) => {
-      if (!currentAccount) return;
+      if (isLoaded && !currentAccount) return;
       void store.save(patch).then((saved) => {
         if (saved) void router.invalidate();
       });
     },
-    [currentAccount, router, store],
+    [currentAccount, isLoaded, router, store],
   );
   return {
     accountSettingsLoadFailed:
@@ -45,10 +45,14 @@ export function usePenSettings() {
     isProfilePublic:
       isSignedIn === true &&
       currentAccount &&
+      snapshot.accountSettingsLoaded &&
       snapshot.settings.isProfilePublic,
     measurementSystem: snapshot.settings.measurementSystem,
     publishTrends:
-      isSignedIn === true && currentAccount && snapshot.settings.publishTrends,
+      isSignedIn === true &&
+      currentAccount &&
+      snapshot.accountSettingsLoaded &&
+      snapshot.settings.publishTrends,
     saving: currentAccount && snapshot.saving,
     /**
      * Selects the display currency.
