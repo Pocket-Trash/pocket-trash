@@ -4,6 +4,7 @@ import { expect, fireEvent, fn, mocked, waitFor, within } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { MarkdownEditor } from "./markdown-editor";
 import type { MarkdownVisualEditorProps } from "./markdown-visual-editor";
+import { Button } from "./ui/button";
 
 /** Storybook metadata for the Markdown editor. */
 const meta = {
@@ -185,6 +186,73 @@ export const VisualHistory: Story = {
     await expect(editor).not.toHaveTextContent("Undo me");
     await userEvent.keyboard(`{${modifier}>}{Shift>}z{/Shift}{/${modifier}}`);
     await expect(editor).toHaveTextContent("Undo me");
+  },
+};
+
+/**
+ * Changes editor properties without replacing its document or history.
+ * @returns Editor with property-update controls.
+ */
+function PropertyChangesFixture() {
+  const [phase, advance] = React.useReducer(
+    (current: number) => current + 1,
+    0,
+  );
+  return (
+    <>
+      <Button onMouseDown={(event) => event.preventDefault()} onClick={advance}>
+        {phase === 0 ? "Update properties" : "Enable editing"}
+      </Button>
+      <MarkdownEditor
+        label={phase === 0 ? "Description" : "Updated description"}
+        defaultValue={phase === 0 ? "" : "Replacement content"}
+        disabled={phase === 1}
+        readOnly={phase === 1}
+      />
+    </>
+  );
+}
+
+/** Property changes preserve the same document, selection, and undo stack. */
+export const PropertyChangesPreserveHistory: Story = {
+  /**
+   * Renders the property-update fixture.
+   * @returns Editor and property controls.
+   */
+  render: () => <PropertyChangesFixture />,
+  /**
+   * Verifies committed properties do not recreate the visual editor.
+   * @param context - Story interaction context.
+   * @returns Resolves after property, selection, and history assertions.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    await userEvent.type(editor, "Undo me");
+    const selection = window.getSelection();
+    const focusNode = selection?.focusNode;
+    const focusOffset = selection?.focusOffset;
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Update properties" }),
+    );
+    const updated = canvas.getByRole("textbox", {
+      name: "Updated description",
+    });
+    await expect(updated).toBe(editor);
+    await expect(updated).toHaveTextContent("Undo me");
+    await expect(updated).toHaveAttribute("contenteditable", "false");
+    await expect(selection?.focusNode).toBe(focusNode);
+    await expect(selection?.focusOffset).toBe(focusOffset);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Enable editing" }),
+    );
+    await expect(updated).toHaveAttribute("contenteditable", "true");
+    const modifier = /Mac|iPhone|iPad/u.test(navigator.platform)
+      ? "Meta"
+      : "Control";
+    await userEvent.keyboard(`{${modifier}>}z{/${modifier}}`);
+    await expect(updated).not.toHaveTextContent("Undo me");
+    await userEvent.keyboard(`{${modifier}>}{Shift>}z{/Shift}{/${modifier}}`);
+    await expect(updated).toHaveTextContent("Undo me");
   },
 };
 
@@ -622,8 +690,16 @@ export const WordOverLimit: Story = {
  * @returns An empty visual editor element.
  */
 function FailingVisualEditor({ onError }: MarkdownVisualEditorProps) {
-  React.useEffect(onError, [onError]);
-  return <></>;
+  const reported = React.useRef(false);
+  const report = React.useCallback(
+    (node: HTMLSpanElement | null) => {
+      if (!node || reported.current) return;
+      reported.current = true;
+      onError();
+    },
+    [onError],
+  );
+  return <span hidden ref={report} />;
 }
 
 /**
