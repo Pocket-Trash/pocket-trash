@@ -1,5 +1,8 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { canManageFeatureFlags } from "@/lib/feature-flags";
+import {
+  canManageFeatureFlags,
+  loadAdminFeatureFlagSettings,
+} from "@/lib/feature-flags";
 import { AdminFeatureFlagsPage } from "@/pages/admin-feature-flags-page";
 
 /**
@@ -16,5 +19,22 @@ export const Route = createFileRoute("/admin/settings/feature-flags")({
       throw notFound();
     }
   },
-  component: AdminFeatureFlagsPage,
+  /**
+   * Loads flags and their authorizing account in one guarded server request.
+   * @param context - Current Router loader cancellation lifetime.
+   * @returns Current administrator's canonical flag snapshot.
+   * @rejects When authorization or flag loading fails.
+   */
+  loader: ({ abortController }) =>
+    loadAdminFeatureFlagSettings({ signal: abortController.signal }),
+  component: AdminFeatureFlagsRoute,
 });
+
+/**
+ * Supplies the authorized loader snapshot to account-scoped controls.
+ * @returns Current administrator's feature-flag settings.
+ */
+function AdminFeatureFlagsRoute() {
+  const { actorId, flags } = Route.useLoaderData();
+  return <AdminFeatureFlagsPage actorId={actorId} initialFlags={flags} />;
+}
