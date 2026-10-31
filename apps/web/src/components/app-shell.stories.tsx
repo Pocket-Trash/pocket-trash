@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, within } from "storybook/test";
+import { expect, mocked, within } from "storybook/test";
+import { searchPublic } from "@/lib/search";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { AppShell } from "./app-shell";
 import { Button } from "./ui/button";
@@ -89,6 +90,78 @@ export const Mobile: Story = {
 export const Dark: Story = {
   ...Default,
   globals: { theme: "dark" },
+};
+
+/** Search navigation and native dialog dismissal using only the keyboard. */
+export const SearchKeyboard: Story = {
+  ...Default,
+  /** Configures two modal results without issuing a server request. */
+  beforeEach: () => {
+    mockStoryAuth();
+    mocked(searchPublic).mockResolvedValue({
+      counts: {
+        all: 2,
+        collections: 0,
+        makers: 1,
+        materials: 0,
+        people: 0,
+        products: 1,
+        resources: 0,
+      },
+      items: [
+        {
+          highlights: [],
+          href: "/products/pens/bolt",
+          id: 1,
+          kind: "product",
+          title: "Bolt",
+        },
+        {
+          highlights: [],
+          href: "/makers/bolt-works",
+          id: 2,
+          kind: "maker",
+          title: "Bolt Works",
+        },
+      ],
+      page: 1,
+      pageSize: 7,
+      total: 2,
+    });
+  },
+  /**
+   * Verifies focus, bounded result navigation, tab cycling, and Escape dismissal.
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the story.
+   * @param context.userEvent - Keyboard interaction driver.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const trigger = canvas.getByRole("button", { name: "Open search" });
+    await userEvent.click(trigger);
+    const dialog = canvas.getByRole("dialog", { name: "Search Pocket Trash" });
+    const input = within(dialog).getByRole("combobox");
+    await expect(input).toHaveFocus();
+    await userEvent.type(input, "bolt");
+    await within(dialog).findByRole("option", { name: /Bolt Works/u });
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    await expect(input).toHaveAttribute(
+      "aria-activedescendant",
+      "global-search-result-1",
+    );
+    await userEvent.tab();
+    await expect(
+      within(dialog).getByRole("button", { name: "Close" }),
+    ).toHaveFocus();
+    await userEvent.tab();
+    await expect(
+      within(dialog).getByRole("link", { name: "See all results" }),
+    ).toHaveFocus();
+    await userEvent.tab();
+    await expect(input).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    await expect(dialog).not.toBeVisible();
+    await expect(trigger).toHaveFocus();
+  },
 };
 
 /**
