@@ -85,7 +85,7 @@ describe("CollectionForm", () => {
       'textarea[name="summary"]',
     );
 
-    act(() => {
+    await act(async () => {
       if (!textarea || !summary) return;
       setTextareaValue(textarea, "Current **description**");
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -183,7 +183,7 @@ describe("CollectionForm", () => {
     const form = container.querySelector("form");
     const atLimit = "d".repeat(5000);
 
-    act(() => {
+    await act(async () => {
       if (!textarea) return;
       setTextareaValue(textarea, atLimit);
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -194,7 +194,7 @@ describe("CollectionForm", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
 
     onSubmit.mockClear();
-    act(() => {
+    await act(async () => {
       if (!textarea) return;
       setTextareaValue(textarea, `${atLimit}x`);
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
