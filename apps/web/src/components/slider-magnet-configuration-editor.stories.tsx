@@ -1,6 +1,6 @@
 import type { TranslationKey } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import * as React from "react";
+import { useForm, useStore } from "@tanstack/react-form";
 import { SliderMagnetConfigurationEditor } from "./slider-magnet-configuration-editor";
 
 /** Minimal English copy used by the isolated editor story. */
@@ -53,11 +53,12 @@ export const Default: Story = {
    * @returns Interactive editor story.
    */
   render: function Render(args) {
-    const [value, setValue] = React.useState(args.value);
+    const form = useForm({ defaultValues: { configuration: args.value } });
+    const value = useStore(form.store, (state) => state.values.configuration);
     return (
       <SliderMagnetConfigurationEditor
         {...args}
-        onChange={setValue}
+        onChange={(value) => form.setFieldValue("configuration", value)}
         value={value}
       />
     );

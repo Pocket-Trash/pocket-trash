@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useReducer } from "react";
 import { expect, mocked, within } from "storybook/test";
 import { listResourceCategories } from "@/lib/resources";
 import { ResourceCategoryInput } from "./resource-category-input";
@@ -112,6 +112,17 @@ export const AddAndRemove: Story = {
       canvas.getByRole("button", { name: "Remove Documentation" }),
     );
     await expect(canvas.queryByText("Documentation")).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("combobox", { name: "Search categories" }),
+    );
+    await page.findByRole("option", { name: "3D printing" });
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      canvas.getByRole("button", { name: "Remove 3D printing" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("combobox", { name: "Search categories" }),
+    ).toHaveFocus();
   },
 };
 
@@ -124,11 +135,24 @@ export const AddAndRemove: Story = {
 function CategoryInputExample(
   args: React.ComponentProps<typeof ResourceCategoryInput>,
 ) {
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, dispatch] = useReducer(
+    (
+      _selected: string[],
+      event: {
+        /** User changed the selected category names. */
+        type: "selectionChanged";
+        /** Next category selection. */
+        categories: string[];
+      },
+    ) => event.categories,
+    [],
+  );
   return (
     <ResourceCategoryInput
       {...args}
-      onChange={setSelected}
+      onChange={(categories) =>
+        dispatch({ type: "selectionChanged", categories })
+      }
       selected={selected}
     />
   );

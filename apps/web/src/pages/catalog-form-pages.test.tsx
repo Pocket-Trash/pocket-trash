@@ -6,7 +6,6 @@ import type {
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { EditableCatalogProductType } from "@/lib/catalog-api";
 import {
   CollectionAddPage,
   CollectionEditPage,
@@ -18,6 +17,7 @@ import {
   PensAdminEditor,
   ProductEditor,
 } from "./catalog-form-pages";
+import { productFixture } from "./catalog-test-fixtures";
 
 vi.mock("@tanstack/react-router", () => ({
   /**
@@ -1146,90 +1146,6 @@ describe("Pens catalog administration", () => {
     expect(html).not.toContain("Individual refill: Precise V5");
   });
 });
-
-/**
- * Creates a catalog product fixture.
- *
- * @param id - Product identifier.
- * @param name - Product name.
- * @param productTypeSlug - Product type slug.
- * @returns The catalog product fixture.
- */
-function productFixture(
-  id: number,
-  name: string,
-  productTypeSlug: EditableCatalogProductType,
-): CatalogProduct {
-  return {
-    aliases: [],
-    approvalStatus: "approved",
-    bearing: null,
-    buttonDiameter: null,
-    clickCount: productTypeSlug === "slider" ? 3 : null,
-    canAdminister: false,
-    canEdit: true,
-    compatibleButtonId: null,
-    compatibleButtonName: null,
-    compatiblePens: [],
-    refillCompatibility: [],
-    compatibleParts: [],
-    createdAt: new Date(0),
-    description: null,
-    diameter: null,
-    finishOptions: [
-      {
-        colorEffect: null,
-        colors: [],
-        finishes: [{ id: id + 2, name: "Polished", slug: "polished" }],
-        id: id + 3,
-        pattern: null,
-      },
-    ],
-    imageCount: 0,
-    images: [],
-    includedInsert: null,
-    includedPlate: null,
-    id,
-    length: null,
-    makerId: 1,
-    makerName: "Maker",
-    makerSlug: "maker",
-    productLinks: [],
-    makerUrl: null,
-    magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
-    usesInserts: productTypeSlug === "slider" ? false : null,
-    materials: [
-      {
-        assignmentId: id + 1,
-        weight: null,
-        materials: [
-          {
-            specific: null,
-            id: id + 1,
-            name: "Bronze",
-            slug: "bronze",
-          },
-        ],
-      },
-    ],
-    name,
-    refillModel: null,
-    refillOfferings: [],
-    ownerClerkId: "user_test",
-    isAdminPrivate: false,
-    isPrivate: false,
-    productTypeId: 1,
-    productTypeName: productTypeSlug,
-    productTypeSlug,
-    slug: name.toLowerCase(),
-    spinDiameter: null,
-    thickness: null,
-    thicknessWithButton: null,
-    updatedAt: new Date(0),
-    weight: null,
-    width: null,
-  };
-}
 
 /**
  * Creates a collection item fixture for a catalog product.
