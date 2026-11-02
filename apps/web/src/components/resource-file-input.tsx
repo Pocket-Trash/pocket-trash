@@ -6,7 +6,14 @@ import {
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { resourceMimeTypesByExtension } from "@package/services/constants";
-import { useEffect, useState } from "react";
+import { useReducer } from "react";
+import { useImageFileValidation } from "@/hooks/use-image-file-validation";
+
+export {
+  aspectRatioDiffers,
+  imageHasDifferentAspectRatio,
+} from "@/hooks/use-image-file-validation";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { appendResourceUploadFiles } from "@/lib/upload-sessions";
@@ -219,26 +226,12 @@ export function FileDropInput({
   removeFileLabel: string;
 }) {
   const descriptionId = `${id}-description`;
-  const [dragActive, setDragActive] = useState(false);
-  const [hasAspectRatioMismatch, setHasAspectRatioMismatch] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    if (!(aspectRatio && files.length)) {
-      setHasAspectRatioMismatch(false);
-      return;
-    }
-
-    void Promise.all(
-      files.map((file) => imageHasDifferentAspectRatio(file, aspectRatio)),
-    ).then((results) => {
-      if (active) setHasAspectRatioMismatch(results.some(Boolean));
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [aspectRatio, files]);
+  const [dragActive, dispatch] = useReducer(
+    (_state: boolean, event: "dragEntered" | "dragLeft" | "filesDropped") =>
+      event === "dragEntered",
+    false,
+  );
+  const hasAspectRatioMismatch = useImageFileValidation(files, aspectRatio);
 
   /**
    * Reports enabled file additions according to the single- or multi-file mode.
@@ -276,17 +269,17 @@ export function FileDropInput({
           htmlFor={id}
           onDragEnter={(event) => {
             event.preventDefault();
-            if (!disabled) setDragActive(true);
+            if (!disabled) dispatch("dragEntered");
           }}
-          onDragLeave={() => setDragActive(false)}
+          onDragLeave={() => dispatch("dragLeft")}
           onDragOver={(event) => {
             event.preventDefault();
             event.dataTransfer.dropEffect = disabled ? "none" : "copy";
-            if (!disabled) setDragActive(true);
+            if (!disabled) dispatch("dragEntered");
           }}
           onDrop={(event) => {
             event.preventDefault();
-            setDragActive(false);
+            dispatch("filesDropped");
             addFiles(event.dataTransfer.files);
           }}
         >
@@ -368,58 +361,4 @@ export function FileDropInput({
       ) : null}
     </div>
   );
-}
-
-/**
- * Checks whether a readable image differs from an expected aspect ratio.
- * Unreadable files are treated as matching so guidance never blocks selection.
- *
- * @param file - Browser file to inspect.
- * @param expectedRatio - Expected width-to-height ratio.
- * @returns Whether the readable image differs by more than the fixed `0.01` tolerance.
- */
-export async function imageHasDifferentAspectRatio(
-  file: File,
-  expectedRatio: number,
-): Promise<boolean> {
-  const url = URL.createObjectURL(file);
-  try {
-    const { height, width } = await new Promise<{
-      /**
-       * Natural image height in pixels.
-       */
-      height: number;
-      /**
-       * Natural image width in pixels.
-       */
-      width: number;
-    }>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () =>
-        resolve({ height: image.naturalHeight, width: image.naturalWidth });
-      image.onerror = () => reject(new Error("Unable to read image size."));
-      image.src = url;
-    });
-    return aspectRatioDiffers(width, height, expectedRatio);
-  } catch {
-    return false;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-/**
- * Tests a width and height against an expected aspect ratio with a 0.01 tolerance.
- *
- * @param width - Image width in pixels.
- * @param height - Image height in pixels.
- * @param expectedRatio - Expected width-to-height ratio.
- * @returns Whether the absolute ratio difference exceeds `0.01`.
- */
-export function aspectRatioDiffers(
-  width: number,
-  height: number,
-  expectedRatio: number,
-): boolean {
-  return Math.abs(width / height - expectedRatio) > 0.01;
 }
