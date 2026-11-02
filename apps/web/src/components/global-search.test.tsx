@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { Activity, act, type ReactNode, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,6 +28,8 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 import { GlobalSearch } from "./global-search";
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 /** One complete search response for interactive tests. */
 const response = {
@@ -96,10 +98,11 @@ describe("GlobalSearch", () => {
   /**
    * Renders and opens the search surface.
    *
+   * @param tree - Search component and optional lifecycle boundary.
    * @returns The rendered search controls.
    */
-  function openSearch() {
-    act(() => root.render(<GlobalSearch />));
+  function openSearch(tree: ReactNode = <GlobalSearch />) {
+    act(() => root.render(tree));
     const trigger = container.querySelector("button");
     act(() => trigger?.click());
     return {
@@ -156,7 +159,7 @@ describe("GlobalSearch", () => {
     expect(document.activeElement).toBe(trigger);
 
     act(() => trigger.click());
-    act(() => dialog.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    act(() => dialog.dispatchEvent(new Event("pointerup", { bubbles: true })));
     expect(dialog.open).toBe(false);
     expect(document.activeElement).toBe(trigger);
   });
@@ -176,6 +179,24 @@ describe("GlobalSearch", () => {
     );
     act(() => vi.advanceTimersByTime(0));
     expect(document.querySelector('[data-slot="drawer-content"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("cancels delayed input focus when the dialog closes before its animation frame", () => {
+    let focus: FrameRequestCallback | undefined;
+    vi.mocked(window.requestAnimationFrame).mockImplementation((callback) => {
+      focus = callback;
+      return 42;
+    });
+    const cancel = vi.spyOn(window, "cancelAnimationFrame");
+    const { trigger } = openSearch();
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Close"]')
+        ?.click(),
+    );
+    expect(cancel).toHaveBeenCalledWith(42);
+    act(() => focus?.(0));
     expect(document.activeElement).toBe(trigger);
   });
 
@@ -216,6 +237,7 @@ describe("GlobalSearch", () => {
     act(() => vi.advanceTimersByTime(1));
     expect(searchPublic).toHaveBeenCalledWith({
       data: { query: "bolt", surface: "modal" },
+      signal: expect.any(AbortSignal),
     });
     await act(async () => deferred[0]?.(response));
     expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
@@ -389,5 +411,102 @@ describe("GlobalSearch", () => {
     changeInput(input, "empty");
     await finishSearch();
     expect(container.textContent).toContain("No results match this search.");
+  });
+
+  it("cancels pending work on close, ignores late responses, and allows a fresh search on reopen", async () => {
+    const deferred: Array<(value: typeof response) => void> = [];
+    searchPublic.mockImplementation(
+      () => new Promise<typeof response>((resolve) => deferred.push(resolve)),
+    );
+    const { input, trigger } = openSearch();
+    changeInput(input, "bolt");
+    await finishSearch();
+    const oldSignal = searchPublic.mock.calls[0]?.[0].signal;
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Close"]')
+        ?.click(),
+    );
+    expect(oldSignal.aborted).toBe(true);
+    act(() => trigger.click());
+    expect(input.value).toBe("");
+    changeInput(input, "maker");
+    await finishSearch();
+    await act(async () => deferred[0]?.(response));
+    expect(container.querySelector('[role="listbox"]')).toBeNull();
+    await act(async () =>
+      deferred[1]?.({ ...response, items: response.items.slice(1) }),
+    );
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(input.getAttribute("aria-activedescendant")).toBe(
+      "global-search-result-0",
+    );
+  });
+
+  it("disposes debounce and in-flight requests on unmount", async () => {
+    const { input } = openSearch();
+    changeInput(input, "bolt");
+    act(() => root.render(null));
+    await finishSearch();
+    expect(searchPublic).not.toHaveBeenCalled();
+    let resolve: ((value: typeof response) => void) | undefined;
+    searchPublic.mockReturnValue(
+      new Promise<typeof response>((done) => {
+        resolve = done;
+      }),
+    );
+    const reopened = openSearch();
+    changeInput(reopened.input, "maker");
+    await finishSearch();
+    const signal = searchPublic.mock.calls[0]?.[0].signal;
+    act(() => root.render(null));
+    expect(signal.aborted).toBe(true);
+    await act(async () => resolve?.(response));
+    expect(container.childElementCount).toBe(0);
+  });
+
+  it("clears the mobile drawer and restores focus when switching back to desktop", async () => {
+    viewport.mobile = true;
+    const { input, trigger } = openSearch();
+    changeInput(input, "bolt");
+    viewport.mobile = false;
+    act(() => root.render(<GlobalSearch />));
+    act(() => vi.advanceTimersByTime(0));
+    expect(document.querySelector('[data-slot="drawer-content"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(container.querySelector("dialog")?.open).toBe(false);
+    act(() => trigger.click());
+    const desktopInput = container.querySelector<HTMLInputElement>(
+      'input[role="combobox"]',
+    );
+    expect(desktopInput?.value).toBe("");
+    expect(document.activeElement).toBe(desktopInput);
+    await finishSearch();
+    expect(searchPublic).not.toHaveBeenCalled();
+  });
+
+  it("does not repeat completed searches through StrictMode and Activity", async () => {
+    searchPublic.mockResolvedValue(response);
+    /**
+     * Renders search through lifecycle boundary changes.
+     * @param mode - Activity visibility.
+     * @returns The search lifecycle fixture.
+     */
+    const tree = (mode: "visible" | "hidden") => (
+      <StrictMode>
+        <Activity mode={mode}>
+          <GlobalSearch />
+        </Activity>
+      </StrictMode>
+    );
+    const { input } = openSearch(tree("visible"));
+    changeInput(input, "bolt");
+    await finishSearch();
+    expect(searchPublic).toHaveBeenCalledTimes(1);
+    act(() => root.render(tree("hidden")));
+    act(() => root.render(tree("visible")));
+    await finishSearch();
+    expect(searchPublic).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
   });
 });
