@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
+import { useForm, useStore } from "@tanstack/react-form";
 import * as React from "react";
 import { expect } from "storybook/test";
 import type { CatalogOptions, ProductFormInput } from "@/lib/catalog-api";
@@ -22,27 +23,57 @@ const catalogOptions: CatalogOptions = {
 };
 
 /**
+ * Receives lookup creation through the existing shared-control contract.
+ * @param state - Current fixture lookups.
+ * @param event - Pure lookup replacement or updater.
+ * @returns Updated fixture lookups.
+ */
+function storyOptionsReducer(
+  state: CatalogOptions,
+  event: {
+    /** Lookup creation updated available choices. */
+    type: "lookupsChanged";
+    /** Existing shared callback payload. */
+    update: React.SetStateAction<CatalogOptions>;
+  },
+): CatalogOptions {
+  return typeof event.update === "function"
+    ? event.update(state)
+    : event.update;
+}
+
+/**
  * Renders the controlled appearance editor for Storybook interactions.
  *
  * @returns The interactive appearance editor fixture.
  */
 function InteractiveAppearanceEditor() {
-  const [options, setOptions] = React.useState(catalogOptions);
-  const [value, setValue] = React.useState<ProductFormInput["finishOptions"]>([
-    {
-      colorEffectId: null,
-      colorEffectSlug: null,
-      colorIds: [],
-      finishIds: [],
-      patternId: 1000,
+  const [options, dispatchOptions] = React.useReducer(
+    storyOptionsReducer,
+    catalogOptions,
+  );
+  const form = useForm({
+    defaultValues: {
+      finishes: [
+        {
+          colorEffectId: null,
+          colorEffectSlug: null,
+          colorIds: [],
+          finishIds: [],
+          patternId: 1000,
+        },
+      ] as ProductFormInput["finishOptions"],
     },
-  ]);
+  });
+  const value = useStore(form.store, (state) => state.values.finishes);
 
   return (
     <div className="max-w-2xl p-6">
       <FinishOptionsEditor
-        onChange={setValue}
-        onOptionsChange={setOptions}
+        onChange={(value) => form.setFieldValue("finishes", value)}
+        onOptionsChange={(update) =>
+          dispatchOptions({ type: "lookupsChanged", update })
+        }
         options={options}
         t={(key) => key}
         value={value}

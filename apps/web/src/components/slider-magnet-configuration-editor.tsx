@@ -58,6 +58,70 @@ function slotLabel(index: number, side: "A" | "B", t: Translate) {
   });
 }
 
+/** Local brush, presentation, and selected-position controls. */
+type MagnetEditorState = {
+  /** Whether individual positions are exposed. */
+  advanced: boolean;
+  /** Brush grade used for the selected position. */
+  grade: SliderMagnetGrade | null;
+  /** Selected physical position, scoped to its layout. */
+  position: {
+    /** Zero-based row-major position. */
+    index: number;
+    /** Layout containing the selected position. */
+    layout: SliderMagnetLayout;
+    /** Physical side containing the position. */
+    side: "sideA" | "sideB";
+  } | null;
+};
+/** Semantic magnet editing actions. */
+type MagnetEditorEvent =
+  | {
+      /** Changes position-level editing. */
+      type: "presentationChanged";
+      /** Requested presentation. */
+      advanced: boolean;
+    }
+  | {
+      /** Selects a grade brush. */
+      type: "gradeSelected";
+      /** Selected magnet grade. */
+      grade: SliderMagnetGrade | null;
+    }
+  | {
+      /** Selects one position and its current grade. */
+      type: "positionSelected";
+      /** Selected physical position. */
+      position: NonNullable<MagnetEditorState["position"]>;
+      /** Current position grade. */
+      grade: SliderMagnetGrade | null;
+    }
+  | {
+      /** Clears selection when replacing sides or the full snapshot. */
+      type: "configurationReplaced";
+    };
+/**
+ * Owns local magnet editing controls while the caller owns the snapshot.
+ * @param state - Current controls.
+ * @param event - Brush, position, or presentation action.
+ * @returns Updated controls.
+ */
+function magnetEditorReducer(
+  state: MagnetEditorState,
+  event: MagnetEditorEvent,
+): MagnetEditorState {
+  switch (event.type) {
+    case "presentationChanged":
+      return { ...state, advanced: event.advanced, position: null };
+    case "gradeSelected":
+      return { ...state, grade: event.grade };
+    case "positionSelected":
+      return { ...state, grade: event.grade, position: event.position };
+    case "configurationReplaced":
+      return { ...state, position: null };
+  }
+}
+
 /**
  * Compact accessible editor for catalog and owned-slider magnet snapshots.
  *
@@ -86,23 +150,18 @@ export function SliderMagnetConfigurationEditor({
   /** Current optional snapshot. */
   value: SliderMagnetConfiguration | null;
 }) {
-  const [advanced, setAdvanced] = React.useState(() =>
-    Boolean(
+  const [
+    { advanced, grade: selectedGrade, position: selectedPosition },
+    dispatch,
+  ] = React.useReducer(magnetEditorReducer, {
+    advanced: Boolean(
       value &&
         (value.sideB !== null ||
           !value.sideA.every((grade) => grade === value.sideA[0])),
     ),
-  );
-  const [selectedGrade, setSelectedGrade] =
-    React.useState<SliderMagnetGrade | null>("N52");
-  const [selectedPosition, setSelectedPosition] = React.useState<{
-    /** Zero-based row-major position. */
-    index: number;
-    /** Layout in which the position was selected. */
-    layout: SliderMagnetLayout;
-    /** Physical side containing the position. */
-    side: "sideA" | "sideB";
-  } | null>(null);
+    grade: "N52",
+    position: null,
+  });
   const details = sliderMagnetLayoutDetails[layout];
   const configuration = value ?? uniformMagnetConfiguration(layout, "N52");
   const activePosition =
@@ -129,7 +188,7 @@ export function SliderMagnetConfigurationEditor({
             sliderMagnetGrades.find(
               (candidate) => candidate === event.target.value,
             ) ?? null;
-          setSelectedGrade(grade);
+          dispatch({ type: "gradeSelected", grade });
           if (advanced && activePosition)
             setSlot(activePosition.side, activePosition.index, grade);
           else if (!advanced)
@@ -220,8 +279,11 @@ export function SliderMagnetConfigurationEditor({
                   className={`flex size-11 items-center justify-center rounded-full border bg-background text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-ring ring-2 ring-ring" : "border-input"}`}
                   key={id}
                   onClick={() => {
-                    setSelectedPosition({ index, layout, side });
-                    setSelectedGrade(grade);
+                    dispatch({
+                      type: "positionSelected",
+                      position: { index, layout, side },
+                      grade,
+                    });
                   }}
                   title={grade ?? t("web.slider.magnet.state.empty")}
                   type="button"
@@ -247,8 +309,7 @@ export function SliderMagnetConfigurationEditor({
           disabled={value === null}
           onChange={(event) => {
             const next = event.target.checked;
-            setAdvanced(next);
-            setSelectedPosition(null);
+            dispatch({ type: "presentationChanged", advanced: next });
             if (!next && !isUniform)
               onChange(uniformMagnetConfiguration(layout, selectedGrade));
           }}
@@ -269,7 +330,7 @@ export function SliderMagnetConfigurationEditor({
                     ({ id }) => id === Number(event.target.value),
                   );
                   if (preset) {
-                    setSelectedPosition(null);
+                    dispatch({ type: "configurationReplaced" });
                     onChange({
                       sideA: [...preset.configuration.sideA],
                       sideB: preset.configuration.sideB
@@ -295,7 +356,7 @@ export function SliderMagnetConfigurationEditor({
             <input
               checked={configuration.sideB !== null}
               onChange={(event) => {
-                setSelectedPosition(null);
+                dispatch({ type: "configurationReplaced" });
                 onChange({
                   ...configuration,
                   sideB: event.target.checked ? [...configuration.sideA] : null,
