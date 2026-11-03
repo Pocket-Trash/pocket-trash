@@ -15,6 +15,14 @@ import {
 } from "./catalog-form-pages";
 import { collectionFixture, productFixture } from "./catalog-test-fixtures";
 
+vi.mock("@/hooks/use-pen-settings", () => ({
+  /**
+   * Returns the preferred currency for form fixtures.
+   * @returns Stable preference fixture.
+   */
+  usePenSettings: () => ({ currency: "USD" }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   /**
    * Returns a navigation spy.
@@ -386,7 +394,7 @@ describe("finish option editor", () => {
 
     expect(html).toContain(">Spinner</legend>");
     expect(html).toContain(">Button</legend>");
-    expect(html.match(/<fieldset/g)).toHaveLength(3);
+    expect(html).toContain(">Ownership history</legend>");
   });
 
   it("offers only available slider components and restores the installed assembly", () => {

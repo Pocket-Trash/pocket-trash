@@ -49,6 +49,7 @@ import {
   type CollectionFormValue,
   CollectionImageUploader,
 } from "@/components/collection-form";
+import { CollectionItemPriceField } from "@/components/collection-item-price-fields";
 import { CollectionItemStatusFields } from "@/components/collection-item-status-fields";
 import { CollectionSelector } from "@/components/collection-selector";
 import type { MarkdownEditorHandle } from "@/components/markdown-editor";
@@ -80,6 +81,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { UserPageShell } from "@/components/user-page-shell";
+import { usePenSettings } from "@/hooks/use-pen-settings";
 import {
   filterButtonsByDiameter,
   finishOptionLabel,
@@ -116,6 +118,11 @@ import {
   updateCollectionItem,
 } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
+import {
+  hasCollectionSalePrice,
+  moneyFromInput,
+  moneyInput,
+} from "@/lib/catalog-money";
 import {
   collectionOwnershipEntryReasons,
   collectionOwnershipExitReasons,
@@ -4783,6 +4790,7 @@ export function CollectionAddPage({
 }) {
   const t = useCatalogCopy();
   const { locale } = useLocale();
+  const { currency } = usePenSettings();
   const imageGuidance = getImageUploadGuidance(locale);
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
@@ -4819,6 +4827,9 @@ export function CollectionAddPage({
     description: "",
     bearing: "",
     serialNumber: null as string | null,
+    pricePaidInput: moneyInput(undefined, currency),
+    priceSoldInput: moneyInput(undefined, currency),
+    pricePaidIsPublic: false,
     metadata: {
       statuses: { public: [], private: [] },
     } as CollectionItemMetadataWrite,
@@ -4879,6 +4890,13 @@ export function CollectionAddPage({
     ) {
       return "web.collectionItemMetadata.saleDateError";
     }
+    try {
+      moneyFromInput(value.pricePaidInput);
+      if (hasCollectionSalePrice(value.metadata.statuses))
+        moneyFromInput(value.priceSoldInput);
+    } catch {
+      return "web.collectionItemMetadata.moneyAmountError";
+    }
     return validateImages(value.images, locale)?.key;
   };
   const form = useForm({
@@ -4913,13 +4931,26 @@ export function CollectionAddPage({
         serialNumber,
       } = value;
       if (!product || ui.save) return;
+      const pricePaid = moneyFromInput(value.pricePaidInput);
+      const priceSold = hasCollectionSalePrice(value.metadata.statuses)
+        ? moneyFromInput(value.priceSoldInput)
+        : undefined;
       const currentDescription = value.description;
       const selectedButton =
         typeof value.button?.id === "number"
           ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
           : null;
       const data = {
-        metadata: value.metadata,
+        metadata: {
+          ...value.metadata,
+          saleDate: hasCollectionSalePrice(value.metadata.statuses)
+            ? value.metadata.saleDate || undefined
+            : undefined,
+          pricePaid: pricePaid
+            ? { ...pricePaid, isPublic: value.pricePaidIsPublic }
+            : undefined,
+          priceSold,
+        },
         bearing,
         buttonCustomFinish:
           selectedButton && buttonFinish?.id === "custom"
@@ -4986,6 +5017,9 @@ export function CollectionAddPage({
     bearing,
     serialNumber,
     metadata,
+    pricePaidInput,
+    priceSoldInput,
+    pricePaidIsPublic,
     ownership,
     installedPenPartIds,
     installedRefillProductId,
@@ -5004,7 +5038,8 @@ export function CollectionAddPage({
     form.store,
     (state) =>
       Boolean(state.errorMap.onSubmit) ||
-      state.errorMap.onChange === "web.collectionItemMetadata.saleDateError",
+      (typeof state.errorMap.onChange === "string" &&
+        state.errorMap.onChange.startsWith("web.collectionItemMetadata.")),
   );
   const collectionDialog = React.useRef<HTMLDialogElement>(null);
 
@@ -5407,11 +5442,41 @@ export function CollectionAddPage({
           value={ownership}
         />
         <CollectionItemStatusFields
+          hasPublicMetadata={
+            pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())
+          }
           warning="web.collectionItemMetadata.unapprovedWarning"
           value={metadata}
-          onChange={(value) => form.setFieldValue("metadata", value)}
+          onChange={(value) => {
+            form.setFieldValue("metadata", value);
+            if (
+              hasCollectionSalePrice(metadata.statuses) &&
+              !value.statuses.public.includes("sold") &&
+              !value.statuses.private.includes("sold")
+            )
+              form.setFieldValue(
+                "priceSoldInput",
+                moneyInput(undefined, priceSoldInput.currencyCode),
+              );
+          }}
           invalid={Boolean(metadataError)}
-        />
+        >
+          <CollectionItemPriceField
+            value={pricePaidInput}
+            isPublic={pricePaidIsPublic}
+            onChange={(value) => form.setFieldValue("pricePaidInput", value)}
+            onPublicChange={(value) =>
+              form.setFieldValue("pricePaidIsPublic", value)
+            }
+          />
+          {hasCollectionSalePrice(metadata.statuses) ? (
+            <CollectionItemPriceField
+              sold
+              value={priceSoldInput}
+              onChange={(value) => form.setFieldValue("priceSoldInput", value)}
+            />
+          ) : null}
+        </CollectionItemStatusFields>
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
         ) : null}
@@ -6367,6 +6432,7 @@ export function CollectionEditPage({
 }) {
   const t = useCatalogCopy();
   const { locale } = useLocale();
+  const { currency } = usePenSettings();
   const imageGuidance = getImageUploadGuidance(locale);
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
@@ -6391,6 +6457,9 @@ export function CollectionEditPage({
     description: item.descriptionOverride ?? "",
     bearing: item.bearingOverride ?? "",
     serialNumber: (item.serialNumber ?? null) as string | null,
+    pricePaidInput: moneyInput(ownershipPeriods.at(-1)?.pricePaid, currency),
+    priceSoldInput: moneyInput(ownershipPeriods.at(-1)?.priceSold, currency),
+    pricePaidIsPublic: ownershipPeriods.at(-1)?.pricePaid?.isPublic ?? false,
     metadata: {
       statuses: item.metadata?.statuses ?? { public: [], private: [] },
       saleDate: ownershipPeriods.at(-1)?.effectiveEndDate ?? undefined,
@@ -6486,8 +6555,17 @@ export function CollectionEditPage({
     const buttonFinishValid =
       value.buttonFinish?.id !== "custom" ||
       finishOptionSchema.safeParse(value.buttonCustomFinish).success;
+    let moneyValid = true;
+    try {
+      moneyFromInput(value.pricePaidInput);
+      if (hasCollectionSalePrice(value.metadata.statuses, value.ownership))
+        moneyFromInput(value.priceSoldInput);
+    } catch {
+      moneyValid = false;
+    }
     const valid = Boolean(
-      value.displayName.trim() &&
+      moneyValid &&
+        value.displayName.trim() &&
         value.description.length <= 5000 &&
         (product.productTypeSlug.startsWith("pen") || value.material) &&
         (value.serialNumber === null || value.serialNumber.trim()) &&
@@ -6563,6 +6641,13 @@ export function CollectionEditPage({
       const magnetConfigurationDirty = ui.magnetConfigurationDirty;
       let data: unknown;
       if (mode === "save") {
+        const pricePaid = moneyFromInput(value.pricePaidInput);
+        const priceSold = hasCollectionSalePrice(
+          value.metadata.statuses,
+          value.ownership,
+        )
+          ? moneyFromInput(value.priceSoldInput)
+          : undefined;
         let installedButton:
           | {
               /** Installed collection item identifier. */
@@ -6646,7 +6731,20 @@ export function CollectionEditPage({
               }
             : {}),
           materialAssignmentId: material?.id === -1 ? undefined : material?.id,
-          ...(item.isOwner ? { metadata: value.metadata } : {}),
+          ...(item.isOwner
+            ? {
+                metadata: {
+                  ...value.metadata,
+                  saleDate: hasCollectionSalePrice(value.metadata.statuses)
+                    ? value.metadata.saleDate || undefined
+                    : undefined,
+                  pricePaid: pricePaid
+                    ? { ...pricePaid, isPublic: value.pricePaidIsPublic }
+                    : undefined,
+                  priceSold,
+                },
+              }
+            : {}),
           ...(item.isOwner
             ? {
                 ownership: {
@@ -6691,6 +6789,9 @@ export function CollectionEditPage({
     bearing,
     serialNumber,
     metadata,
+    pricePaidInput,
+    priceSoldInput,
+    pricePaidIsPublic,
     ownership,
     installedPenPartIds,
     installedRefillProductId,
@@ -6954,22 +7055,49 @@ export function CollectionEditPage({
               value={serialNumber}
             />
           ) : null}
-          <OwnershipLifecycleFields
-            allowDeparture
-            onChange={(value) => form.setFieldValue("ownership", value)}
-            onPeriodChange={(periodId) =>
-              form.setFieldValue(
-                "ownership",
-                ownershipEditorValue(
-                  ownershipPeriods.find(({ id }) => id === periodId),
-                ),
-              )
-            }
-            periods={ownershipPeriods}
-            value={ownership}
-          />
+          <fieldset disabled={!item.isOwner}>
+            <OwnershipLifecycleFields
+              allowDeparture
+              onChange={(value) => form.setFieldValue("ownership", value)}
+              onPeriodChange={(periodId) => {
+                const period = ownershipPeriods.find(
+                  ({ id }) => id === periodId,
+                );
+                form.setFieldValue("ownership", ownershipEditorValue(period));
+                form.setFieldValue(
+                  "pricePaidInput",
+                  moneyInput(period?.pricePaid, currency),
+                );
+                form.setFieldValue(
+                  "priceSoldInput",
+                  moneyInput(period?.priceSold, currency),
+                );
+                form.setFieldValue(
+                  "pricePaidIsPublic",
+                  period?.pricePaid?.isPublic ?? false,
+                );
+                if (periodId === null)
+                  form.setFieldValue("metadata", (current) => ({
+                    ...current,
+                    statuses: {
+                      public: current.statuses.public.filter(
+                        (status) => status !== "sold",
+                      ),
+                      private: current.statuses.private.filter(
+                        (status) => status !== "sold",
+                      ),
+                    },
+                  }));
+              }}
+              periods={ownershipPeriods}
+              value={ownership}
+            />
+          </fieldset>
           {item.isOwner ? (
             <CollectionItemStatusFields
+              hasPublicMetadata={
+                pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())
+              }
               saleDateRecorded={ownershipPeriods.at(-1)?.exitReason === "sale"}
               warning={
                 item.collectionIsPrivate
@@ -6985,9 +7113,43 @@ export function CollectionEditPage({
               }
               editing
               value={metadata}
-              onChange={(value) => form.setFieldValue("metadata", value)}
+              onChange={(value) => {
+                form.setFieldValue("metadata", value);
+                if (
+                  hasCollectionSalePrice(metadata.statuses) &&
+                  !value.statuses.public.includes("sold") &&
+                  !value.statuses.private.includes("sold") &&
+                  ownership.periodId === ownershipPeriods.at(-1)?.id
+                )
+                  form.setFieldValue(
+                    "priceSoldInput",
+                    moneyInput(undefined, priceSoldInput.currencyCode),
+                  );
+              }}
               invalid={Boolean(feedback)}
-            />
+            >
+              <CollectionItemPriceField
+                value={pricePaidInput}
+                isPublic={pricePaidIsPublic}
+                onChange={(value) =>
+                  form.setFieldValue("pricePaidInput", value)
+                }
+                onPublicChange={(value) =>
+                  form.setFieldValue("pricePaidIsPublic", value)
+                }
+              />
+              {metadata.statuses.public.includes("sold") ||
+              metadata.statuses.private.includes("sold") ||
+              (!ownership.currentlyOwned && ownership.exitReason === "sale") ? (
+                <CollectionItemPriceField
+                  sold
+                  value={priceSoldInput}
+                  onChange={(value) =>
+                    form.setFieldValue("priceSoldInput", value)
+                  }
+                />
+              ) : null}
+            </CollectionItemStatusFields>
           ) : null}
           <CollectionSelector
             addLabel={t("web.collections.select.addNew")}

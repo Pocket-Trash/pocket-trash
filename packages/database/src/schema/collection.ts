@@ -19,7 +19,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { catalogTerminologyConcept } from "./pens.js";
 import { maker, material, materialSpecific, productType } from "./scraper.js";
-import { dimensionUnitEnum, weightUnitEnum } from "./user-settings.js";
+import {
+  currencyCodeEnum,
+  dimensionUnitEnum,
+  weightUnitEnum,
+} from "./user-settings.js";
 import { user } from "./users.js";
 
 /** Roles allowed to soft-delete catalog images. */
@@ -253,6 +257,13 @@ export const collectionItemOwnershipPeriod = pgTable(
     collectionItemId: bigint("collection_item_id", { mode: "number" })
       .notNull()
       .references(() => collectionItem.id, { onDelete: "cascade" }),
+    /** Purchase price in persisted currency minor units. */
+    pricePaidMinor: bigint("price_paid_minor", { mode: "number" }),
+    pricePaidCurrencyCode: currencyCodeEnum("price_paid_currency_code"),
+    pricePaidIsPublic: boolean("price_paid_is_public").default(false).notNull(),
+    /** Always-private sale price for this ownership period. */
+    priceSoldMinor: bigint("price_sold_minor", { mode: "number" }),
+    priceSoldCurrencyCode: currencyCodeEnum("price_sold_currency_code"),
     effectiveStartDate: date("effective_start_date", {
       mode: "string",
     }).notNull(),
@@ -281,6 +292,26 @@ export const collectionItemOwnershipPeriod = pgTable(
       .notNull(),
   },
   (table) => [
+    check(
+      "collection_item_price_paid_pair",
+      sql`(${table.pricePaidMinor} is null) = (${table.pricePaidCurrencyCode} is null)`,
+    ),
+    check(
+      "collection_item_price_sold_pair",
+      sql`(${table.priceSoldMinor} is null) = (${table.priceSoldCurrencyCode} is null)`,
+    ),
+    check(
+      "collection_item_price_paid_nonnegative",
+      sql`${table.pricePaidMinor} is null or ${table.pricePaidMinor} between 0 and 9007199254740991`,
+    ),
+    check(
+      "collection_item_price_sold_nonnegative",
+      sql`${table.priceSoldMinor} is null or ${table.priceSoldMinor} between 0 and 9007199254740991`,
+    ),
+    check(
+      "collection_item_price_sold_requires_sale",
+      sql`${table.priceSoldMinor} is null or ${table.exitReason} is not distinct from 'sale'`,
+    ),
     index("collection_item_ownership_period_item_date_idx").on(
       table.collectionItemId,
       table.effectiveStartDate,

@@ -33,6 +33,14 @@ import { collectionFixture, productFixture } from "./catalog-test-fixtures";
 
 /** Stable navigation observer. */
 const navigate = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-pen-settings", () => ({
+  /**
+   * Returns the preferred currency for form fixtures.
+   * @returns Stable preference fixture.
+   */
+  usePenSettings: () => ({ currency: "USD" }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   /**
    * Supplies the navigation observer.

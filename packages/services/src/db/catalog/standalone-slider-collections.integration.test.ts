@@ -272,6 +272,94 @@ describe("standalone slider collection items", () => {
         .update(schema.collectionItem)
         .set({ approvalStatus: "pending" })
         .where(eq(schema.collectionItem.id, sliderItemId));
+      await collectionsService.updateItem({
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+        metadata: {
+          statuses: { public: ["favorite"], private: ["grail"] },
+          pricePaid: { amountMinor: 0, currencyCode: "JPY", isPublic: true },
+        },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: {
+          pricePaid: { amountMinor: 0, currencyCode: "JPY", isPublic: true },
+        },
+      });
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "approved" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      await expect(
+        collectionsService.getPublicItem({
+          collectionId: destination.id,
+          collectionItemId: sliderItemId,
+          ownerUserId: owner.id,
+        }),
+      ).resolves.toMatchObject({
+        metadata: {
+          pricePaid: { amountMinor: 0, currencyCode: "JPY", isPublic: true },
+          priceSold: undefined,
+        },
+      });
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "pending" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      const priceEdit = {
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+      };
+      const incompletePrice = {
+        amountMinor: 100,
+        currencyCode: "USD",
+        isPublic: false,
+      };
+      Reflect.deleteProperty(incompletePrice, "currencyCode");
+      await expect(
+        collectionsService.updateItem({
+          ...priceEdit,
+          metadata: {
+            statuses: { public: [], private: [] },
+            pricePaid: incompletePrice,
+          },
+        }),
+      ).rejects.toThrow("moneyPairError");
+      for (const pricePaid of [
+        { amountMinor: -1, currencyCode: "USD", isPublic: false },
+        { amountMinor: 1.5, currencyCode: "JPY", isPublic: false },
+        { amountMinor: 100, currencyCode: "XXX", isPublic: false },
+      ]) {
+        await expect(
+          collectionsService.updateItem({
+            ...priceEdit,
+            displayName: "Must roll back",
+            metadata: { statuses: { public: [], private: [] }, pricePaid },
+          }),
+        ).rejects.toThrow();
+      }
+      await expect(
+        collectionsService.updateItem({
+          ...priceEdit,
+          metadata: {
+            statuses: { public: [], private: [] },
+            priceSold: { amountMinor: 100, currencyCode: "USD" },
+          },
+        }),
+      ).rejects.toThrow("soldPriceError");
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        displayName: "Moved slider",
+        metadata: { pricePaid: { amountMinor: 0, currencyCode: "JPY" } },
+      });
       const statusEdit = {
         actor,
         collectionItemId: sliderItemId,
@@ -289,12 +377,26 @@ describe("standalone slider collection items", () => {
         ...statusEdit,
         metadata: {
           saleDate: "2025-01-20",
+          pricePaid: {
+            amountMinor: 25999,
+            currencyCode: "USD",
+            isPublic: false,
+          },
+          priceSold: { amountMinor: 35999, currencyCode: "USD" },
           statuses: { public: ["sold"], private: ["sold"] },
         },
       });
       await collectionsService.updateItem({
         ...statusEdit,
-        metadata: { statuses: { public: [], private: ["sold"] } },
+        metadata: {
+          statuses: { public: [], private: ["sold"] },
+          pricePaid: {
+            amountMinor: 25999,
+            currencyCode: "USD",
+            isPublic: false,
+          },
+          priceSold: { amountMinor: 35999, currencyCode: "USD" },
+        },
       });
       await expect(
         collectionsService.getOwnedItem(actor, sliderItemId),
@@ -307,10 +409,58 @@ describe("standalone slider collection items", () => {
           }),
         ],
       });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: { priceSold: { amountMinor: 35999, currencyCode: "USD" } },
+      });
+      await expect(
+        collectionsService.getOwnedItem(
+          { clerkId: otherOwner.clerkId, role: "admin" },
+          sliderItemId,
+        ),
+      ).resolves.toMatchObject({
+        metadata: { pricePaid: undefined, priceSold: undefined },
+      });
       await collectionsService.updateItem({
         ...statusEdit,
-        metadata: { statuses: { public: [], private: [] } },
+        metadata: {
+          statuses: { public: [], private: [] },
+          pricePaid: {
+            amountMinor: 25999,
+            currencyCode: "USD",
+            isPublic: false,
+          },
+          priceSold: { amountMinor: 35999, currencyCode: "USD" },
+        },
       });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: { priceSold: undefined, pricePaid: { amountMinor: 25999 } },
+      });
+      await expect(
+        db
+          .update(schema.collectionItemOwnershipPeriod)
+          .set({ pricePaidMinor: 1, pricePaidCurrencyCode: null })
+          .where(
+            eq(
+              schema.collectionItemOwnershipPeriod.collectionItemId,
+              sliderItemId,
+            ),
+          ),
+      ).rejects.toThrow();
+      await expect(
+        db
+          .update(schema.collectionItemOwnershipPeriod)
+          .set({ priceSoldMinor: 1, priceSoldCurrencyCode: "USD" })
+          .where(
+            eq(
+              schema.collectionItemOwnershipPeriod.collectionItemId,
+              sliderItemId,
+            ),
+          ),
+      ).rejects.toThrow();
       await expect(
         collectionsService.getOwnedItem(actor, sliderItemId),
       ).resolves.toMatchObject({
@@ -379,7 +529,15 @@ describe("standalone slider collection items", () => {
           exitReason: "sale",
           periodId: initialPeriod.id,
         },
-        metadata: { statuses: { public: [], private: [] } },
+        metadata: {
+          statuses: { public: [], private: [] },
+          pricePaid: {
+            amountMinor: 12300,
+            currencyCode: "USD",
+            isPublic: true,
+          },
+          priceSold: { amountMinor: 23400, currencyCode: "USD" },
+        },
       });
       await expect(
         collectionsService.getOwnedItem(actor, sliderItemId),
@@ -434,6 +592,8 @@ describe("standalone slider collection items", () => {
           entryReason: "gift",
           exitReason: "sale",
           startedRecordedAt: initialPeriod.startedRecordedAt,
+          pricePaidMinor: 12300,
+          priceSoldMinor: 23400,
         }),
         expect.objectContaining({
           effectiveEndDate: null,

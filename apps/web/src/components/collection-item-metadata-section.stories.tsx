@@ -76,3 +76,20 @@ export const PublicPreviewUnavailable: Story = {
 export const PublicViewer: Story = {
   args: { isOwner: false, statuses: { public: ["favorite"], private: [] } },
 };
+
+/** A public paid price remains visible even when there are no status assignments. */
+export const PublicPaidPrice: Story = {
+  args: {
+    isOwner: false,
+    statuses: { public: [], private: [] },
+    pricePaid: { amountMinor: 0, currencyCode: "JPY", isPublic: true },
+  },
+  /**
+   * Checks zero-decimal JPY formatting and empty-status metadata visibility.
+   * @param context - Story canvas.
+   */
+  play: async (context) => {
+    await expect(context.canvas.getByText("Price paid")).toBeVisible();
+    await expect(context.canvas.getByText("¥0")).toBeVisible();
+  },
+};

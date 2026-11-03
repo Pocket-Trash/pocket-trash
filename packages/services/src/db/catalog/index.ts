@@ -1911,6 +1911,13 @@ export type OwnershipExitReason = (typeof schema.ownershipExitReasons)[number];
 
 /** One effective ownership interval and its Pocket Trash recording times. */
 export type CollectionItemOwnershipPeriod = {
+  /** Paid price for this period, when visible to the viewer. */
+  pricePaid?: MoneyValue & {
+    /** Saved paid-price visibility. */ isPublic: boolean;
+  };
+  /** Always-private sold price for this period. */
+  priceSold?: MoneyValue;
+
   /** Stable ownership-period identifier. */
   id: number;
   /** Effective acquisition date, formatted as YYYY-MM-DD. */
@@ -1951,6 +1958,25 @@ export type CollectionItemOwnershipStart = Pick<
   "effectiveStartDate" | "entryReason"
 >;
 
+/** An exact non-negative amount in the persisted currency's minor units. */
+export type MoneyValue = {
+  /** Integer amount in minor units, including zero. */
+  amountMinor: number;
+  /** Supported ISO currency code, retained independently of preference changes. */
+  currencyCode: string;
+};
+/** Metadata visible to an owner or already redacted for another viewer. */
+export type CollectionItemMetadata = {
+  /** Independently selected status scopes. */
+  statuses: CollectionItemStatusState;
+  /** Paid price, when visible to this viewer. */
+  pricePaid?: MoneyValue & {
+    /** Saved paid-price visibility. */ isPublic: boolean;
+  };
+  /** Sale price, available only to the owner. */
+  priceSold?: MoneyValue;
+};
+
 /** Current structured status assigned independently to each visibility scope. */
 export type CollectionItemStatus =
   (typeof schema.collectionItemStatuses)[number];
@@ -1963,6 +1989,13 @@ export type CollectionItemStatusState = {
 };
 /** Owner-managed metadata; omission preserves all saved assignments. */
 export type CollectionItemMetadataWrite = {
+  /** Replacement paid price for the selected ownership period; omit to clear. */
+  pricePaid?: MoneyValue & {
+    /** Saved paid-price visibility. */ isPublic: boolean;
+  };
+  /** Replacement sold price for the selected sale period; omit to clear. */
+  priceSold?: MoneyValue;
+
   /** Independent selections for both scopes. */
   statuses: CollectionItemStatusState;
   /** Explicit effective sale date when Sold becomes selected. */
@@ -1972,10 +2005,7 @@ export type CollectionItemMetadataWrite = {
 /** Owned collection item with its product snapshot and visibility state. */
 export type UserCollectionItem = {
   /** Already-redacted metadata for the current viewer. */
-  metadata?: {
-    /** Visibility-scoped assignments for this viewer. */
-    statuses: CollectionItemStatusState;
-  };
+  metadata?: CollectionItemMetadata;
   /** Durable administrative review state, independent of privacy. */
   approvalStatus: CatalogApprovalStatus;
   /**
@@ -6171,7 +6201,7 @@ export function createCollectionsService(
               materialSelection,
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
-            await applyCollectionItemStatuses(tx, item.id, input.metadata);
+            await applyCollectionItemMetadata(tx, item.id, input.metadata);
             if (input.productTypeSlug === "pen") {
               await tx.insert(schema.collectionDetailPen).values({
                 id: item.id,
@@ -6379,7 +6409,7 @@ export function createCollectionsService(
               spinnerItem.id,
               input.ownership,
             );
-            await applyCollectionItemStatuses(
+            await applyCollectionItemMetadata(
               tx,
               spinnerItem.id,
               input.metadata,
@@ -6487,7 +6517,7 @@ export function createCollectionsService(
               materialSelection,
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
-            await applyCollectionItemStatuses(tx, item.id, input.metadata);
+            await applyCollectionItemMetadata(tx, item.id, input.metadata);
             await tx.insert(schema.collectionDetailSpinnerButton).values({
               id: item.id,
               productSpinnerButtonId: input.productId,
@@ -6612,7 +6642,7 @@ export function createCollectionsService(
               materialSelection,
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
-            await applyCollectionItemStatuses(tx, item.id, input.metadata);
+            await applyCollectionItemMetadata(tx, item.id, input.metadata);
             if (input.productTypeSlug === "slider") {
               const magnetLayout =
                 product.includedInsertMagnetLayout ?? product.bodyMagnetLayout;
@@ -8444,14 +8474,7 @@ export function createCollectionsService(
                 });
               }
             }
-            if (input.ownership) {
-              await applyOwnershipWrite(
-                tx,
-                input.collectionItemId,
-                input.ownership,
-              );
-            }
-            await applyCollectionItemStatuses(
+            await applyCollectionItemMetadata(
               tx,
               input.collectionItemId,
               input.metadata,
@@ -8510,7 +8533,13 @@ export function createCollectionsService(
                 ...(input.ownership
                   ? {
                       ownershipPeriods: ownershipBefore.map((period) => ({
-                        ...period,
+                        id: period.id,
+                        collectionItemId: period.collectionItemId,
+                        effectiveStartDate: period.effectiveStartDate,
+                        effectiveEndDate: period.effectiveEndDate,
+                        entryReason: period.entryReason,
+                        exitReason: period.exitReason,
+                        startDateImputed: period.startDateImputed,
                         endedRecordedAt:
                           period.endedRecordedAt?.toISOString() ?? null,
                         startedRecordedAt:
@@ -9214,6 +9243,8 @@ async function applyOwnershipWrite(
             : undefined,
       entryReason: input.entryReason,
       exitReason: input.exitReason,
+      priceSoldMinor: input.exitReason === "sale" ? undefined : null,
+      priceSoldCurrencyCode: input.exitReason === "sale" ? undefined : null,
       startDateImputed: start.imputed,
       updatedAt: recordedAt,
     })
@@ -9258,15 +9289,15 @@ async function applyOwnershipWrite(
 }
 
 /**
- * Saves status scopes and synchronizes the latest ownership period atomically.
+ * Saves owner metadata and synchronizes status, lifecycle, and ownership-period prices atomically.
  * @param tx - Caller-owned item transaction after authorization and item locking.
  * @param collectionItemId - Physical item whose assignments are being changed.
- * @param metadata - Replacement selections, or undefined to preserve them.
+ * @param metadata - Replacement metadata, or undefined to preserve it.
  * @param ownership - Lifecycle write already applied in this transaction.
  * @returns Completion after assignments and current lifecycle agree.
  * @rejects When status validation, sale dates, ranges, or persistence fails.
  */
-async function applyCollectionItemStatuses(
+async function applyCollectionItemMetadata(
   tx: CatalogTransaction,
   collectionItemId: number,
   metadata?: CollectionItemMetadataWrite,
@@ -9277,6 +9308,27 @@ async function applyCollectionItemStatuses(
     .select()
     .from(schema.collectionItemStatus)
     .where(eq(schema.collectionItemStatus.collectionItemId, collectionItemId));
+  const [pricePeriodBefore] = await tx
+    .select()
+    .from(schema.collectionItemOwnershipPeriod)
+    .where(
+      and(
+        eq(
+          schema.collectionItemOwnershipPeriod.collectionItemId,
+          collectionItemId,
+        ),
+        ownership?.periodId != null
+          ? eq(schema.collectionItemOwnershipPeriod.id, ownership.periodId)
+          : undefined,
+      ),
+    )
+    .orderBy(
+      desc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
+      desc(schema.collectionItemOwnershipPeriod.startedRecordedAt),
+      desc(schema.collectionItemOwnershipPeriod.id),
+    )
+    .limit(1);
+  if (ownership) await applyOwnershipWrite(tx, collectionItemId, ownership);
   const statuses: CollectionItemStatusState = metadata
     ? {
         public: [...new Set(metadata.statuses.public)],
@@ -9399,6 +9451,91 @@ async function applyCollectionItemStatuses(
       .insert(schema.collectionItemStatus)
       .values(rows)
       .onConflictDoNothing();
+  if (metadata !== undefined)
+    await applyCollectionItemPrices(
+      tx,
+      collectionItemId,
+      metadata,
+      ownership?.periodId ?? undefined,
+      ownership?.periodId === null
+        ? false
+        : pricePeriodBefore?.exitReason === "sale",
+    );
+}
+
+/**
+ * Replaces prices on the selected period after lifecycle synchronization.
+ * @param tx - Owner-authorized item transaction.
+ * @param collectionItemId - Physical item being saved.
+ * @param metadata - Replacement owner metadata.
+ * @param periodId - Selected historical period, or undefined for the latest period.
+ * @param wasSale - Whether a sale transition is clearing previously valid sold money.
+ * @returns Completion after paired amounts, currencies, and visibility are persisted.
+ * @rejects When money is incomplete, negative, unsafe, unsupported, or attached to a non-sale.
+ */
+async function applyCollectionItemPrices(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+  metadata: CollectionItemMetadataWrite,
+  periodId: number | undefined,
+  wasSale: boolean,
+) {
+  for (const money of [metadata.pricePaid, metadata.priceSold]) {
+    if (money === undefined) continue;
+    if (money.amountMinor == null || !money.currencyCode)
+      throw new Error("web.collectionItemMetadata.moneyPairError");
+    if (!Number.isSafeInteger(money.amountMinor) || money.amountMinor < 0)
+      throw new Error("web.collectionItemMetadata.moneyAmountError");
+    if (!schema.currencyCodes.some((code) => code === money.currencyCode))
+      throw new Error("web.collectionItemMetadata.moneyCurrencyError");
+  }
+  if (metadata.pricePaid && typeof metadata.pricePaid.isPublic !== "boolean")
+    throw new Error("web.collectionItemMetadata.moneyPairError");
+  const [period] = await tx
+    .select()
+    .from(schema.collectionItemOwnershipPeriod)
+    .where(
+      and(
+        eq(
+          schema.collectionItemOwnershipPeriod.collectionItemId,
+          collectionItemId,
+        ),
+        periodId === undefined
+          ? undefined
+          : eq(schema.collectionItemOwnershipPeriod.id, periodId),
+      ),
+    )
+    .orderBy(
+      desc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
+      desc(schema.collectionItemOwnershipPeriod.startedRecordedAt),
+      desc(schema.collectionItemOwnershipPeriod.id),
+    )
+    .limit(1);
+  if (!period) throw new Error("Ownership period does not exist.");
+  if (metadata.priceSold && period.exitReason !== "sale" && !wasSale)
+    throw new Error("web.collectionItemMetadata.soldPriceError");
+  await tx
+    .update(schema.collectionItemOwnershipPeriod)
+    .set({
+      pricePaidMinor: metadata.pricePaid?.amountMinor ?? null,
+      pricePaidCurrencyCode:
+        schema.currencyCodes.find(
+          (code) => code === metadata.pricePaid?.currencyCode,
+        ) ?? null,
+      pricePaidIsPublic: metadata.pricePaid?.isPublic ?? false,
+      priceSoldMinor:
+        period.exitReason === "sale"
+          ? (metadata.priceSold?.amountMinor ?? null)
+          : null,
+      priceSoldCurrencyCode:
+        period.exitReason === "sale"
+          ? (schema.currencyCodes.find(
+              (code) => code === metadata.priceSold?.currencyCode,
+            ) ?? null)
+          : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.collectionItemOwnershipPeriod.id, period.id));
 }
 
 /**
@@ -11328,22 +11465,19 @@ async function queryOwnedItems(
             itemIds,
           ),
         ),
-      options.viewerCanManage ||
-      items.some(({ ownerClerkId }) => ownerClerkId === options.viewerClerkId)
-        ? db
-            .select()
-            .from(schema.collectionItemOwnershipPeriod)
-            .where(
-              inArray(
-                schema.collectionItemOwnershipPeriod.collectionItemId,
-                itemIds,
-              ),
-            )
-            .orderBy(
-              asc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
-              asc(schema.collectionItemOwnershipPeriod.id),
-            )
-        : Promise.resolve([]),
+      db
+        .select()
+        .from(schema.collectionItemOwnershipPeriod)
+        .where(
+          inArray(
+            schema.collectionItemOwnershipPeriod.collectionItemId,
+            itemIds,
+          ),
+        )
+        .orderBy(
+          asc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
+          asc(schema.collectionItemOwnershipPeriod.id),
+        ),
     ]);
     const itemsById = new Map(
       items.map((item) => [item.collectionItemId, item]),
@@ -11357,14 +11491,42 @@ async function queryOwnedItems(
     }
     for (const period of ownershipPeriods) {
       const item = itemsById.get(period.collectionItemId);
+      if (!item) continue;
+      const publiclyVisible = visibleRows.find(
+        (row) => row.collectionItemId === item.collectionItemId,
+      )?.metadataPubliclyVisible;
+      const pricePaid =
+        period.pricePaidMinor !== null &&
+        period.pricePaidCurrencyCode !== null &&
+        (item.isOwner || (publiclyVisible && period.pricePaidIsPublic))
+          ? {
+              amountMinor: period.pricePaidMinor,
+              currencyCode: period.pricePaidCurrencyCode,
+              isPublic: period.pricePaidIsPublic,
+            }
+          : undefined;
+      const priceSold =
+        item.isOwner &&
+        period.priceSoldMinor !== null &&
+        period.priceSoldCurrencyCode !== null
+          ? {
+              amountMinor: period.priceSoldMinor,
+              currencyCode: period.priceSoldCurrencyCode,
+            }
+          : undefined;
+      if (item.metadata) {
+        item.metadata.pricePaid = pricePaid;
+        item.metadata.priceSold = priceSold;
+      }
       if (
-        !item ||
-        (!options.viewerCanManage &&
-          item.ownerClerkId !== options.viewerClerkId)
+        !options.viewerCanManage &&
+        item.ownerClerkId !== options.viewerClerkId
       ) {
         continue;
       }
       item.ownershipPeriods?.push({
+        ...(item.isOwner && pricePaid ? { pricePaid } : {}),
+        ...(item.isOwner && priceSold ? { priceSold } : {}),
         effectiveEndDate: period.effectiveEndDate,
         effectiveStartDate: period.effectiveStartDate,
         endedRecordedAt: period.endedRecordedAt,

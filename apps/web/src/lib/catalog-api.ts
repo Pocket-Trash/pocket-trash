@@ -1002,8 +1002,26 @@ type CatalogLookupMutationResult<
 /**
  * Schema for adding a configured product and optional button to a collection.
  */
+/** Exact non-negative money validated before reaching the metadata service. */
+const collectionMoneySchema = z.object({
+  amountMinor: z
+    .number("web.collectionItemMetadata.moneyAmountError")
+    .int("web.collectionItemMetadata.moneyAmountError")
+    .nonnegative("web.collectionItemMetadata.moneyAmountError")
+    .max(
+      Number.MAX_SAFE_INTEGER,
+      "web.collectionItemMetadata.moneyAmountError",
+    ),
+  currencyCode: z.enum(
+    ["CAD", "USD", "EUR", "GBP", "AUD", "JPY", "CHF", "NZD"],
+    "web.collectionItemMetadata.moneyCurrencyError",
+  ),
+});
+
 /** Owner-only structured metadata accepted at the item write boundary. */
 const collectionItemMetadataSchema = z.object({
+  pricePaid: collectionMoneySchema.extend({ isPublic: z.boolean() }).optional(),
+  priceSold: collectionMoneySchema.optional(),
   statuses: z.object({
     public: z.array(
       z.enum(
@@ -3313,6 +3331,16 @@ function mutationFailure(error: unknown) {
             ? "materialAssignments"
             : "name"]: [error.message],
       },
+      formError: error.message,
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
+  if (
+    error instanceof Error &&
+    error.message.startsWith("web.collectionItemMetadata.")
+  )
+    return {
+      fieldErrors: { metadata: [error.message] },
       formError: error.message,
       ok: false as const,
       requiresConfirmation: false as const,
