@@ -1,6 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute } from "@tanstack/react-router";
-import { listMyFeedback } from "@/lib/feedback";
+import { loadMyFeedbackSnapshot } from "@/lib/feedback";
 import { MyFeedbackPage } from "@/pages/feedback-pages";
 
 /**
@@ -10,10 +10,12 @@ export const Route = createFileRoute("/feedback/my-requests")({
   /**
    * Loads the current user's first page of feedback requests.
    *
+   * @param input - Router loader cancellation context.
    * @returns The current user's first feedback page.
    * @rejects When the current user's feedback cannot be loaded.
    */
-  loader: async () => await listMyFeedback({ data: { offset: 0, search: "" } }),
+  loader: async ({ abortController }) =>
+    await loadMyFeedbackSnapshot({ signal: abortController.signal }),
   component: MyFeedbackRoute,
   /**
    * Builds document metadata for the feedback my requests route.
@@ -31,5 +33,5 @@ export const Route = createFileRoute("/feedback/my-requests")({
  * @returns The rendered route UI.
  */
 function MyFeedbackRoute() {
-  return <MyFeedbackPage initialPage={Route.useLoaderData()} />;
+  return <MyFeedbackPage {...Route.useLoaderData()} />;
 }

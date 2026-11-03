@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { faCheck } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -5,16 +6,13 @@ import {
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useState } from "react";
-import { toast } from "sonner";
+import { useRouter } from "@tanstack/react-router";
+import { type ComponentProps, useReducer } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useFeedbackAction } from "@/hooks/use-feedback-action";
 import type { listFeedbackNotifications } from "@/lib/feedback";
-import {
-  markFeedbackNotificationRead,
-  listFeedbackNotifications as reloadFeedbackNotifications,
-} from "@/lib/feedback";
 import { useLocale } from "@/providers/locale-provider";
 
 /** Feedback notification displayed to administrators. */
@@ -22,21 +20,58 @@ type Notification = Awaited<
   ReturnType<typeof listFeedbackNotifications>
 >[number];
 
+/** Isolates feedback notifications and pending acknowledgements by account.
+ * @param props - Canonical notifications and their authenticated loader owner.
+ * @returns Notifications for the current account. */
+export function AdminFeedbackNotificationsPage(
+  props: ComponentProps<typeof FeedbackNotificationsContent> & {
+    /** Account authorizing the loader snapshot. */
+    actorId?: string;
+  },
+) {
+  const { userId } = useAuth();
+  if (props.actorId !== undefined && props.actorId !== userId) return null;
+  return <FeedbackNotificationsContent {...props} key={userId} />;
+}
+
 /** Renders feedback notifications and read-state controls.
  *
  * @param props - Notification page properties.
  * @param props.initialNotifications - Notifications loaded for the initial render.
  * @returns The feedback notification administration page.
  */
-export function AdminFeedbackNotificationsPage({
+function FeedbackNotificationsContent({
   initialNotifications,
 }: {
   /** Notifications loaded for the initial render. */
   initialNotifications: Notification[];
 }) {
   const { locale } = useLocale();
-  const [notifications, setNotifications] = useState(initialNotifications);
-  const [acceptingId, setAcceptingId] = useState<number>();
+  const router = useRouter();
+  const [accepted, dispatch] = useReducer(
+    (
+      state: Set<number>,
+      event: {
+        /** Acknowledged notification after its canonical refresh. */
+        type: "readConfirmed";
+        /** Current notification identity. */
+        id: number;
+      },
+    ) => new Set([...state, event.id]),
+    new Set<number>(),
+  );
+  const action = useFeedbackAction(
+    async () => {
+      await router.invalidate();
+    },
+    undefined,
+    (action) => {
+      if (action.kind === "read")
+        dispatch({ type: "readConfirmed", id: action.data.notificationId });
+    },
+  );
+  const notifications = initialNotifications;
+
   /** Formats feedback notification copy for the active locale.
    *
    * @param key - Translation key to format.
@@ -47,24 +82,6 @@ export function AdminFeedbackNotificationsPage({
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
-
-  /** Marks a feedback notification read and refreshes the list.
-   *
-   * @param notificationId - Notification identifier to accept.
-   * @returns Completion after the notification list is refreshed or an error is shown.
-   */
-  async function accept(notificationId: number) {
-    setAcceptingId(notificationId);
-    try {
-      await markFeedbackNotificationRead({ data: { notificationId } });
-      setNotifications(await reloadFeedbackNotifications());
-      toast.success(t("web.resources.notification.accepted"));
-    } catch {
-      toast.error(t("web.resources.notification.acceptFailed"));
-    } finally {
-      setAcceptingId(undefined);
-    }
-  }
 
   return (
     <AdminPageShell
@@ -100,10 +117,14 @@ export function AdminFeedbackNotificationsPage({
                       )}
                     </Badge>
                     <Badge
-                      variant={notification.readAt ? "outline" : "secondary"}
+                      variant={
+                        notification.readAt || accepted.has(notification.id)
+                          ? "outline"
+                          : "secondary"
+                      }
                     >
                       {t(
-                        notification.readAt
+                        notification.readAt || accepted.has(notification.id)
                           ? "web.resources.notification.read"
                           : "web.resources.notification.unread",
                       )}
@@ -128,9 +149,15 @@ export function AdminFeedbackNotificationsPage({
                 <Button
                   disabled={
                     Boolean(notification.readAt) ||
-                    acceptingId === notification.id
+                    accepted.has(notification.id) ||
+                    action.pending
                   }
-                  onClick={() => void accept(notification.id)}
+                  onClick={() =>
+                    action.run({
+                      kind: "read",
+                      data: { notificationId: notification.id },
+                    })
+                  }
                   type="button"
                   variant="outline"
                 >

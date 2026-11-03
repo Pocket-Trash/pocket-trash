@@ -1,6 +1,9 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { canManageFeedback, listFeedbackNotifications } from "@/lib/feedback";
+import {
+  canManageFeedback,
+  loadFeedbackNotificationsSnapshot,
+} from "@/lib/feedback";
 import { AdminFeedbackNotificationsPage } from "@/pages/admin-feedback-notifications-page";
 
 /**
@@ -27,10 +30,12 @@ export const Route = createFileRoute("/admin/notifications/feedback")({
   /**
    * Loads feedback notifications for administrators.
    *
+   * @param input - Router loader cancellation context.
    * @returns Feedback-delivery notifications.
    * @rejects When feedback notifications cannot be loaded.
    */
-  loader: async () => await listFeedbackNotifications(),
+  loader: async ({ abortController }) =>
+    await loadFeedbackNotificationsSnapshot({ signal: abortController.signal }),
 });
 
 /**
@@ -39,9 +44,5 @@ export const Route = createFileRoute("/admin/notifications/feedback")({
  * @returns The rendered route UI.
  */
 function AdminFeedbackNotificationsRoute() {
-  return (
-    <AdminFeedbackNotificationsPage
-      initialNotifications={Route.useLoaderData()}
-    />
-  );
+  return <AdminFeedbackNotificationsPage {...Route.useLoaderData()} />;
 }

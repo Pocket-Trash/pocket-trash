@@ -1,10 +1,6 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import {
-  canManageFeedback,
-  listFeedbackMergeTargets,
-  listPendingFeedback,
-} from "@/lib/feedback";
+import { canManageFeedback, loadAdminFeedbackSnapshot } from "@/lib/feedback";
 import { AdminFeedbackRequestsPage } from "@/pages/admin-feedback-pages";
 
 /**
@@ -22,16 +18,15 @@ export const Route = createFileRoute("/admin/feedback/requests")({
   /**
    * Loads pending feedback and eligible merge targets.
    *
+   * @param input - Router loader cancellation context.
    * @returns The first pending-feedback page and eligible merge targets.
    * @rejects When pending feedback or merge targets cannot be loaded.
    */
-  loader: async () => {
-    const [initialPage, mergeTargets] = await Promise.all([
-      listPendingFeedback({ data: { offset: 0 } }),
-      listFeedbackMergeTargets(),
-    ]);
-    return { initialPage, mergeTargets };
-  },
+  loader: async ({ abortController }) =>
+    await loadAdminFeedbackSnapshot({
+      data: "pending",
+      signal: abortController.signal,
+    }),
   component: AdminFeedbackRequestsRoute,
   /**
    * Builds document metadata for the admin feedback requests route.
