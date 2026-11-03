@@ -133,6 +133,7 @@ export type {
   PublicSpinnerTrend,
   PublicSpinnerTrends,
   PublicSpinnerTrendValue,
+  PublicStatusProductTrendValue,
   PublicStatusTrendValue,
   PublicUserCollectionItem,
   SearchCounts,

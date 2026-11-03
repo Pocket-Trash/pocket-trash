@@ -263,6 +263,7 @@ export type {
   PublicSpinnerTrend,
   PublicSpinnerTrends,
   PublicSpinnerTrendValue,
+  PublicStatusProductTrendValue,
   PublicStatusTrendValue,
   SliderTrendMetricId,
   SpinnerTrendMetricId,

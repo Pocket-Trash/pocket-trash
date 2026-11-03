@@ -1,5 +1,6 @@
 import type {
   CollectionItemStatusTrendItem,
+  PublicStatusProductTrendValue,
   PublicStatusTrendValue,
 } from "@package/services";
 import {
@@ -36,6 +37,7 @@ export function CollectionItemStatusTrends({
   selected,
   publicView = false,
   totals,
+  anonymousProducts = [],
 }: {
   /** Authorized items, independent of composition filters. */
   items: CollectionItemStatusTrendItem[];
@@ -50,6 +52,8 @@ export function CollectionItemStatusTrends({
   publicView?: boolean;
   /** App-wide transformed totals; an empty list falls back to exact public counts. */
   totals?: PublicStatusTrendValue[];
+  /** Independently thresholded catalog groups without owner or source-item identity. */
+  anonymousProducts?: PublicStatusProductTrendValue[];
 }) {
   const { locale } = useLocale();
   const id = useId();
@@ -84,6 +88,9 @@ export function CollectionItemStatusTrends({
   const assignments = values.reduce((sum, value) => sum + value.count, 0);
   const results = items.filter(
     (item) => selected && item.statuses.includes(selected),
+  );
+  const products = anonymousProducts.filter(
+    (product) => product.status === selected,
   );
   const overlap = t("web.collectionItemStatusTrends.overlap");
   const privacy = t("web.collectionItemStatusTrends.privacy");
@@ -262,6 +269,47 @@ export function CollectionItemStatusTrends({
           ) : (
             <p role="status">{t("web.collectionItemStatusTrends.empty")}</p>
           )}
+          {products.length ? (
+            <section
+              aria-labelledby={`${id}-anonymous`}
+              className="space-y-3 border-t border-border pt-4"
+            >
+              <h4 className="font-semibold" id={`${id}-anonymous`}>
+                {t("web.collectionItemStatusTrends.anonymousProducts")}
+              </h4>
+              <ul className="space-y-3">
+                {products.map((product) => (
+                  <li
+                    className="space-y-2 rounded-md border border-border bg-card p-4"
+                    key={product.productId}
+                  >
+                    <a
+                      className="font-medium underline underline-offset-4 focus-visible:outline focus-visible:outline-ring"
+                      href={`/products/${product.productTypeSlug}/${product.productSlug}`}
+                    >
+                      {product.productName}
+                    </a>
+                    <p className="text-sm">
+                      {t(
+                        "web.collectionItemStatusTrends.anonymousProductCount",
+                        {
+                          count: numbers.format(product.approximateItemCount),
+                          product: product.productName,
+                        },
+                      )}
+                    </p>
+                    <dl className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <dt>{t("web.trends.collectors")}</dt>
+                      <dd>
+                        {numbers.format(product.contributorCountBand)}–
+                        {numbers.format(product.contributorCountBand + 4)}
+                      </dd>
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </section>
       ) : null}
     </section>

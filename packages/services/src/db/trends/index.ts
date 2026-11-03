@@ -46,6 +46,7 @@ export {
 } from "./spinner.js";
 export type {
   PublicCollectionStatusTrends,
+  PublicStatusProductTrendValue,
   PublicStatusTrendValue,
 } from "./status.js";
 

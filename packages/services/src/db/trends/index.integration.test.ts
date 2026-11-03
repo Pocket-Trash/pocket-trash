@@ -664,6 +664,14 @@ describe("public collection-item Trends", () => {
         { status: "grail", approximateItemCount: 10, contributorCountBand: 5 },
         { status: "sold", approximateItemCount: 5, contributorCountBand: 5 },
       ]);
+      expect(
+        statusTrends?.productValues.filter((value) => value.status === "sold"),
+      ).toEqual([
+        expect.objectContaining({
+          approximateItemCount: 5,
+          contributorCountBand: 5,
+        }),
+      ]);
       const generationsBefore = await db
         .select()
         .from(schema.publicTrendsGeneration);
@@ -733,11 +741,227 @@ describe("public collection-item Trends", () => {
       ).toEqual(["favorite", "grail"]);
       expect(
         (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.productValues.some((value) => value.status === "sold"),
+      ).toBe(false);
+      expect(
+        (
           await service.getPublicCollectionStatusTrends(
             new Date(generatedAt.getTime() + PUBLIC_TRENDS_STALE_MS + 1),
           )
         )?.stale,
       ).toBe(true);
+    } finally {
+      await client.close();
+    }
+  }, 30000);
+
+  it("thresholds anonymous status/product groups independently and resolves only public catalog destinations", async () => {
+    const client = new PGlite();
+    const db = drizzle({ client, relations: schema.relations });
+    const generatedAt = new Date("2026-10-14T00:00:00Z");
+    try {
+      await migratePGliteDatabase(client);
+      const fixture = await createFixture(db as unknown as Database);
+      const service = createTrendsService(db as unknown as Database);
+      const sliders = await db
+        .select({
+          id: schema.collectionItem.id,
+          ownerId: schema.collectionItem.ownerId,
+        })
+        .from(schema.collectionItem)
+        .innerJoin(
+          schema.collectionDetailSlider,
+          eq(schema.collectionDetailSlider.id, schema.collectionItem.id),
+        )
+        .where(eq(schema.collectionItem.owned, true));
+      const plates = await db
+        .select({
+          id: schema.collectionItem.id,
+          ownerId: schema.collectionItem.ownerId,
+        })
+        .from(schema.collectionItem)
+        .innerJoin(
+          schema.collectionDetailSliderPlate,
+          eq(schema.collectionDetailSliderPlate.id, schema.collectionItem.id),
+        );
+      const sliderByOwner = fixture.ownerIds.map((ownerId) => {
+        const item = sliders.find((candidate) => candidate.ownerId === ownerId);
+        if (!item) throw new Error("Product contributor fixture missing.");
+        return item.id;
+      });
+      const finalTwoPlates = fixture.ownerIds.slice(3).map((ownerId) => {
+        const item = plates.find((candidate) => candidate.ownerId === ownerId);
+        if (!item) throw new Error("Plate contributor fixture missing.");
+        return item.id;
+      });
+      await db.insert(schema.collectionItemStatus).values(
+        [...sliderByOwner.slice(0, 3), ...finalTwoPlates].map(
+          (collectionItemId) => ({
+            collectionItemId,
+            status: "want_to_trade" as const,
+            isPublic: false,
+          }),
+        ),
+      );
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (await service.getPublicCollectionStatusTrends(generatedAt))?.values,
+      ).toContainEqual({
+        status: "want-to-trade",
+        approximateItemCount: 5,
+        contributorCountBand: 5,
+      });
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.productValues.filter((value) => value.status === "want-to-trade"),
+      ).toEqual([]);
+      const fourth = sliderByOwner[3];
+      const fifth = sliderByOwner[4];
+      if (!fourth || !fifth) throw new Error("Threshold fixtures missing.");
+      await db.insert(schema.collectionItemStatus).values({
+        collectionItemId: fourth,
+        status: "want_to_trade",
+        isPublic: false,
+      });
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.productValues.filter((value) => value.status === "want-to-trade"),
+      ).toEqual([]);
+      await db.insert(schema.collectionItemStatus).values([
+        { collectionItemId: fifth, status: "want_to_trade", isPublic: false },
+        ...sliderByOwner.map((collectionItemId) => ({
+          collectionItemId,
+          status: "want_to_trade" as const,
+          isPublic: true,
+        })),
+      ]);
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.productValues.filter((value) => value.status === "want-to-trade"),
+      ).toEqual([
+        {
+          status: "want-to-trade",
+          productId: String(fixture.sliderProductId),
+          approximateItemCount: 5,
+          contributorCountBand: 5,
+          productName: "Private-source slider",
+          productSlug: "private-source-slider",
+          productTypeSlug: "slider",
+        },
+      ]);
+      const extraSliders = sliders.filter(
+        (item) => !sliderByOwner.includes(item.id),
+      );
+      await db.insert(schema.collectionItemStatus).values(
+        extraSliders.flatMap((item) =>
+          [true, false].map((isPublic) => ({
+            collectionItemId: item.id,
+            status: "want_to_trade" as const,
+            isPublic,
+          })),
+        ),
+      );
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      const productValues = (
+        await service.getPublicCollectionStatusTrends(generatedAt)
+      )?.productValues.filter((value) => value.status === "want-to-trade");
+      expect(productValues).toEqual([
+        expect.objectContaining({
+          productId: String(fixture.sliderProductId),
+          approximateItemCount: 10,
+          contributorCountBand: 5,
+        }),
+      ]);
+      expect(Object.keys(productValues?.[0] ?? {}).sort()).toEqual([
+        "approximateItemCount",
+        "contributorCountBand",
+        "productId",
+        "productName",
+        "productSlug",
+        "productTypeSlug",
+        "status",
+      ]);
+      const stored = await db
+        .select()
+        .from(schema.publicCollectionItemStatusTrend);
+      expect([
+        ...new Set(
+          stored
+            .filter(
+              (row) => row.status === "want-to-trade" && row.productId !== null,
+            )
+            .map((row) => row.productId),
+        ),
+      ]).toEqual([fixture.sliderProductId]);
+      await db
+        .update(schema.product)
+        .set({ isPrivate: true })
+        .where(eq(schema.product.id, fixture.sliderProductId));
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.productValues.filter((value) => value.status === "want-to-trade"),
+      ).toEqual([]);
+      expect(
+        (await service.getPublicCollectionStatusTrends(generatedAt))?.values,
+      ).toContainEqual({
+        status: "want-to-trade",
+        approximateItemCount: 10,
+        contributorCountBand: 5,
+      });
+      await db
+        .update(schema.product)
+        .set({ isPrivate: false, approvalStatus: "pending" })
+        .where(eq(schema.product.id, fixture.sliderProductId));
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.productValues.filter((value) => value.status === "want-to-trade"),
+      ).toEqual([]);
+      await db
+        .update(schema.product)
+        .set({
+          approvalStatus: "approved",
+          name: "Renamed slider",
+          slug: "renamed-slider",
+        })
+        .where(eq(schema.product.id, fixture.sliderProductId));
+      const active = await service.getPublicCollectionStatusTrends(generatedAt);
+      expect(active?.productValues).toEqual([
+        expect.objectContaining({
+          productName: "Renamed slider",
+          productSlug: "renamed-slider",
+        }),
+      ]);
+      const storedBefore = await db
+        .select()
+        .from(schema.publicCollectionItemStatusTrend);
+      const failing = createTrendsService(db as unknown as Database, {
+        /**
+         * Interrupts activation after total and product rows have been written.
+         * @throws When the simulated generation fails.
+         */
+        beforeActivate: () => {
+          throw new Error("Product activation failed.");
+        },
+      });
+      await expect(
+        failing.refreshPublicCollectionItemTrends(
+          new Date("2026-10-15T00:00:00Z"),
+        ),
+      ).rejects.toThrow("Product activation failed");
+      expect(
+        await service.getPublicCollectionStatusTrends(generatedAt),
+      ).toEqual(active);
+      expect(
+        await db.select().from(schema.publicCollectionItemStatusTrend),
+      ).toEqual(storedBefore);
     } finally {
       await client.close();
     }
