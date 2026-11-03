@@ -163,19 +163,19 @@ jobs:
       - name: Report preview database decisions
         env:
           DATABASE_CONTENT_CHANGED: ${{ steps.db_changes.outputs.database_content_changed }}
-          MUTATION_ISOLATION_REQUIRED: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
+          PREVIEW_ISOLATION_REQUIRED: ${{ steps.db_changes.outputs.database_content_changed == 'true' || contains(github.event.pull_request.labels.*.name, 'preview:isolated') }}
         run: |
           {
             echo "### Preview database decisions"
             echo "- Database schema/seed content changed (db-change label): $DATABASE_CONTENT_CHANGED"
-            echo "- Isolated preview database required (preview-db label): $MUTATION_ISOLATION_REQUIRED"
+            echo "- Isolated preview database required (preview-db label): $PREVIEW_ISOLATION_REQUIRED"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sync database labels
         uses: actions/github-script@v8
         env:
           DATABASE_CONTENT_CHANGED: ${{ steps.db_changes.outputs.database_content_changed }}
-          ISOLATION_REQUIRED: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
+          ISOLATION_REQUIRED: ${{ steps.db_changes.outputs.database_content_changed == 'true' || contains(github.event.pull_request.labels.*.name, 'preview:isolated') }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -284,7 +284,7 @@ jobs:
         id: db
         shell: bash
         env:
-          ISOLATION_REQUIRED: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
+          ISOLATION_REQUIRED: ${{ steps.db_changes.outputs.database_content_changed == 'true' || contains(github.event.pull_request.labels.*.name, 'preview:isolated') }}
           MAX_NEON_BRANCHES: 10
           PREVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -330,7 +330,7 @@ jobs:
         shell: bash
         env:
           LOG_DEPLOYMENT_ID: pr-${{ github.event.pull_request.number }}
-          MUTATION_E2E: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
+          MUTATION_E2E: ${{ steps.db_changes.outputs.database_content_changed == 'true' || contains(github.event.pull_request.labels.*.name, 'preview:isolated') }}
           PREVIEW_ALIAS: pr-${{ github.event.pull_request.number }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -959,7 +959,7 @@ jobs:
             }
 
       - name: Cleanup failed DB preview resources
-        if: ${{ always() && (needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e')) && (failure() || cancelled()) }}
+        if: ${{ always() && (steps.db_changes.outputs.database_content_changed == 'true' || contains(github.event.pull_request.labels.*.name, 'preview:isolated')) && (failure() || cancelled()) }}
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
@@ -1049,12 +1049,6 @@ jobs:
       - name: Build E2E workspace dependencies
         run: pnpm turbo run build --filter=@app/api
 
-      - name: Verify isolated mutation preview
-        if: needs.classify-changes.outputs.mutation_e2e == 'true'
-        env:
-          ISOLATED: ${{ needs.preview.outputs.isolated }}
-        run: test "$ISOLATED" = "true"
-
       - name: Resolve Vercel deployment URL
         id: vercel
         shell: bash
@@ -1062,14 +1056,6 @@ jobs:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
           DEPLOYMENT_ID: ${{ needs.preview.outputs.deployment_id }}
         run: bash .github/scripts/vercel-branch-database-url.sh deployment-url
-
-      - name: Resolve Neon PR database
-        if: needs.classify-changes.outputs.mutation_e2e == 'true'
-        id: db
-        shell: bash
-        env:
-          BRANCH_NAME: preview-pr-${{ github.event.pull_request.number }}
-        run: bash .github/scripts/neon-database-branch.sh branch-url
 
       - name: Install Playwright Chromium
         run: pnpm --filter @app/web exec playwright install --with-deps chromium
@@ -1080,28 +1066,93 @@ jobs:
           E2E_BASE_URL: ${{ steps.vercel.outputs.web_preview_url }}
         run: pnpm --filter @app/web test:e2e:ci
 
-      - name: Run isolated E2E mutation fixtures
-        if: needs.classify-changes.outputs.mutation_e2e == 'true'
-        env:
-          BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
-          BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
-          DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          E2E_BASE_URL: ${{ steps.vercel.outputs.web_preview_url }}
-          E2E_DATABASE_BRANCH: preview-pr-${{ github.event.pull_request.number }}
-          E2E_PR_NUMBER: ${{ github.event.pull_request.number }}
-          E2E_RUN_MUTATIONS: "true"
-          E2E_MUTATION_SPECS: ${{ needs.classify-changes.outputs.mutation_e2e_specs }}
-          E2E_VERCEL_DEPLOYMENT_ID: ${{ needs.preview.outputs.deployment_id }}
-        run: |
-          readarray -t mutation_specs < <(jq -r '.[]' <<< "$E2E_MUTATION_SPECS")
-          pnpm --filter @app/web exec playwright test "${mutation_specs[@]}" --grep @mutation
-
       - name: Upload failed Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           if-no-files-found: ignore
           name: playwright-report-${{ github.event.pull_request.number }}
+          path: apps/web/playwright-report
+          retention-days: 7
+
+  mutation-e2e:
+    name: Mutation E2E
+    needs: classify-changes
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.classify-changes.outputs.mutation_e2e == 'true'
+    concurrency:
+      group: mutations-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CI_JOB_NAME: Mutation E2E
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: tools/github/secrets
+
+      - name: Fetch web E2E secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: /apps/web
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: ./scripts/pnpm-install.sh --frozen-lockfile
+
+      - name: Clear Font Awesome package token
+        run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
+      - name: Build E2E workspace dependencies
+        run: pnpm turbo run build:ci --filter=@app/web^... --filter=@app/api
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @app/web exec playwright install --with-deps chromium
+
+      - name: Run mutation tests with disposable Postgres
+        env:
+          E2E_PR_NUMBER: ${{ github.event.pull_request.number }}
+          E2E_MUTATION_SPECS: ${{ needs.classify-changes.outputs.mutation_e2e_specs }}
+        run: |
+          readarray -t mutation_specs < <(jq -r '.[]' <<< "$E2E_MUTATION_SPECS")
+          bash scripts/e2e-mutations.sh "${mutation_specs[@]}"
+
+      - name: Upload failed Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: ignore
+          name: mutation-playwright-report-${{ github.event.pull_request.number }}
           path: apps/web/playwright-report
           retention-days: 7
 

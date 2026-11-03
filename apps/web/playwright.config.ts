@@ -32,5 +32,22 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: vercelBypassSecret ? "off" : "retain-on-failure",
   },
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI || process.env.E2E_TARGET === "local" ? 1 : undefined,
+  webServer:
+    process.env.E2E_TARGET === "local"
+      ? [
+          {
+            command: "node node_modules/vite/bin/vite.js dev --host 127.0.0.1",
+            url: "http://localhost:4005",
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+          {
+            command: `node ../api/node_modules/wrangler/bin/wrangler.js dev --config ../api/wrangler.jsonc --local --ip 127.0.0.1 --port 4006 --env preview --var APP_ENV:development --env-file "${process.env.E2E_API_ENV_FILE}"`,
+            url: "http://127.0.0.1:4006/api/v0/health",
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+        ]
+      : undefined,
 });

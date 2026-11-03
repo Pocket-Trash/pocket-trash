@@ -284,6 +284,132 @@ test("selects the union of mutation specs for explicit changed domains", () => {
   );
 });
 
+test("account, search, editor, and administration PR file sets retain required suites", () => {
+  const files = {
+    438: [
+      ".changeset/better-spiders-brake.md",
+      "apps/web/.storybook/preview.ts",
+      "apps/web/.storybook/story-fixtures.tsx",
+      "apps/web/src/components/app-shell.tsx",
+      "apps/web/src/hooks/use-pen-settings.test.tsx",
+      "apps/web/src/hooks/use-pen-settings.ts",
+      "apps/web/src/lib/locale-api.ts",
+      "apps/web/src/lib/user-settings-store.ts",
+      "apps/web/src/pages/user-settings-page.stories.tsx",
+      "apps/web/src/providers/app-providers.tsx",
+      "apps/web/src/providers/locale-provider.test.tsx",
+      "apps/web/src/providers/locale-provider.tsx",
+      "apps/web/src/providers/theme-provider.tsx",
+      "apps/web/src/providers/user-settings-provider.test.tsx",
+      "apps/web/src/providers/user-settings-provider.tsx",
+    ],
+    441: [
+      ".changeset/route-queries-stay.md",
+      "apps/web/src/components/catalog-filter-bar.stories.tsx",
+      "apps/web/src/components/catalog-filter-bar.test.tsx",
+      "apps/web/src/components/catalog-filter-bar.tsx",
+      "apps/web/src/components/directory-search.test.tsx",
+      "apps/web/src/components/directory-search.tsx",
+      "apps/web/src/hooks/use-directory-search.test.tsx",
+      "apps/web/src/hooks/use-directory-search.ts",
+      "apps/web/src/hooks/use-search-draft.ts",
+      "apps/web/src/lib/directory-search-loader.test.ts",
+      "apps/web/src/lib/directory-search.ts",
+      "apps/web/src/lib/search-navigation.test.ts",
+      "apps/web/src/lib/search-navigation.ts",
+      "apps/web/src/lib/use-catalog-filters.test.tsx",
+      "apps/web/src/lib/use-catalog-filters.ts",
+      "apps/web/src/pages/catalog-pages.test.tsx",
+      "apps/web/src/pages/catalog-pages.tsx",
+      "apps/web/src/pages/makers-directory-page.tsx",
+      "apps/web/src/pages/material-pages.tsx",
+      "apps/web/src/pages/resources-page.tsx",
+      "apps/web/src/pages/search-page.stories.tsx",
+      "apps/web/src/pages/search-page.test.tsx",
+      "apps/web/src/pages/search-page.tsx",
+      "apps/web/src/routes/collections.index.tsx",
+      "apps/web/src/routes/collections_.$userId.$collectionId.tsx",
+      "apps/web/src/routes/makers.index.tsx",
+      "apps/web/src/routes/materials.index.tsx",
+      "apps/web/src/routes/products.index.tsx",
+      "apps/web/src/routes/resources.index.tsx",
+      "apps/web/src/routes/search-navigation.test.tsx",
+      "apps/web/src/routes/search.tsx",
+      "apps/web/src/routes/user.collections.tsx",
+      "apps/web/src/routes/user.collections_.$collectionId.tsx",
+    ],
+    442: [
+      ".changeset/steady-markdown-lifetimes.md",
+      "apps/web/src/components/markdown-editor-lifecycle.test.tsx",
+      "apps/web/src/components/markdown-editor-state.ts",
+      "apps/web/src/components/markdown-editor.stories.tsx",
+      "apps/web/src/components/markdown-editor.test.tsx",
+      "apps/web/src/components/markdown-editor.tsx",
+      "apps/web/src/components/markdown-visual-editor.tsx",
+    ],
+    446: [
+      ".changeset/calm-catalog-administration.md",
+      "apps/web/src/components/ui/combobox.tsx",
+      "apps/web/src/hooks/use-product-type-configuration.test.tsx",
+      "apps/web/src/hooks/use-product-type-configuration.ts",
+      "apps/web/src/pages/admin-catalog-workflows.test.tsx",
+      "apps/web/src/pages/admin-config-pages.test.tsx",
+      "apps/web/src/pages/admin-config-pages.tsx",
+      "apps/web/src/pages/admin-makers-page.stories.tsx",
+      "apps/web/src/pages/admin-makers-page.tsx",
+      "apps/web/src/pages/admin-material-pages.tsx",
+      "apps/web/src/pages/admin-settings-page.tsx",
+      "apps/web/src/pages/admin-slider-magnet-presets-page.stories.tsx",
+      "apps/web/src/pages/admin-slider-magnet-presets-page.tsx",
+      "apps/web/src/pages/catalog-image-trash-page.tsx",
+    ],
+  };
+  assert.deepEqual(
+    classifyChanges(files[438]).mutationSpecs,
+    mutationE2eSpecs.settings,
+  );
+  assert.deepEqual(
+    classifyChanges(files[441]).mutationSpecs,
+    mutationE2eSpecs.collections,
+  );
+  assert.deepEqual(classifyChanges(files[442]).mutationSpecs, []);
+  assert.deepEqual(classifyChanges(files[446]).mutationSpecs, [
+    ...mutationE2eSpecs.makers,
+    ...mutationE2eSpecs.settings,
+  ]);
+});
+
+test("read-only search and editor PRs do not select mutation fixtures", () => {
+  for (const files of [
+    [
+      "apps/web/src/pages/makers-directory-page.tsx",
+      "apps/web/src/routes/collections.index.tsx",
+      "apps/web/src/routes/collections_.$userId.$collectionId.tsx",
+      "apps/web/src/routes/user.collections.tsx",
+      "apps/web/src/routes/user.collections_.$collectionId.tsx",
+    ],
+    [
+      "apps/web/src/components/markdown-editor.tsx",
+      "apps/web/src/components/markdown-visual-editor.tsx",
+    ],
+  ])
+    assert.equal(classifyChanges(files).domains.mutation_e2e, false);
+  assert.deepEqual(
+    classifyChanges([
+      "apps/web/src/lib/user-settings-store.ts",
+      "apps/web/src/providers/theme-provider.tsx",
+    ]).mutationSpecs,
+    mutationE2eSpecs.settings,
+  );
+  assert.equal(
+    classifyChanges([
+      "apps/web/src/pages/admin-makers-page.tsx",
+      "apps/web/src/pages/admin-settings-page.tsx",
+    ]).domains.mutation_e2e,
+    true,
+  );
+});
+
 test("classifies shared mutation surfaces by every affected product domain", () => {
   const catalogMutationSpecs = [
     ...mutationE2eSpecs.collections,
@@ -824,6 +950,8 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   assert.match(jobs.preview.if, /outputs\.preview == 'true'/u);
 
   assert.deepEqual(jobs.e2e.needs, ["classify-changes", "preview"]);
+  assert.equal(jobs["mutation-e2e"].needs, "classify-changes");
+  assert.doesNotMatch(jobs["mutation-e2e"].if, /needs.preview/u);
   assert.match(jobs.e2e.if, /outputs\.safe_e2e == 'true'/u);
   assert.match(jobs.e2e.if, /outputs\.mutation_e2e == 'true'/u);
 
@@ -852,10 +980,12 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   assert.match(resolveVercel.run, /deployment-url/u);
   assert.ok(e2eSteps.some((step) => step.name === "Run safe E2E smoke tests"));
   assert.ok(
-    e2eSteps.some((step) => step.name === "Run isolated E2E mutation fixtures"),
+    jobs["mutation-e2e"].steps.some(
+      (step) => step.name === "Run mutation tests with disposable Postgres",
+    ),
   );
-  const mutationStep = e2eSteps.find(
-    (step) => step.name === "Run isolated E2E mutation fixtures",
+  const mutationStep = jobs["mutation-e2e"].steps.find(
+    (step) => step.name === "Run mutation tests with disposable Postgres",
   );
   assert.equal(
     mutationStep.env.E2E_MUTATION_SPECS,
@@ -864,7 +994,7 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   assert.match(mutationStep.run, /readarray -t mutation_specs/u);
   assert.match(
     mutationStep.run,
-    /"\$\{mutation_specs\[@\]\}" --grep @mutation/u,
+    /bash scripts\/e2e-mutations.sh "\$\{mutation_specs\[@\]\}"/u,
   );
   assert.ok(
     e2eSteps.some((step) => step.name === "Upload failed Playwright report"),
@@ -875,7 +1005,7 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   );
   assert.match(
     prepareDatabase.env.ISOLATION_REQUIRED,
-    /outputs\.mutation_e2e/u,
+    /outputs\.database_content_changed/u,
   );
 });
 

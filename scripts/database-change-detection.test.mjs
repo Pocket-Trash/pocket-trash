@@ -128,7 +128,7 @@ test("schema-changing main deploys refresh preview after development", () => {
   assert.ok(Object.hasOwn(refreshWorkflow.on, "workflow_call"));
 });
 
-test("PR mutation isolation is independent of migration detection", () => {
+test("PR preview isolation follows database content or explicit opt-in", () => {
   const preview = deployWorkflow.jobs.preview;
   const prepareDatabase = preview.steps.find(
     (step) => step.name === "Prepare Neon preview database",
@@ -139,7 +139,7 @@ test("PR mutation isolation is independent of migration detection", () => {
 
   assert.match(
     prepareDatabase.env.ISOLATION_REQUIRED,
-    /outputs\.mutation_e2e/u,
+    /outputs\.database_content_changed/u,
   );
   assert.equal(
     readyComment.env.DB_CHANGING,
@@ -199,7 +199,7 @@ test("preview database compatibility and preflight gate deployment", () => {
     "steps.db.outputs.can_deploy == 'true'",
   );
   assert.match(cleanup.if, /always\(\)/u);
-  assert.match(cleanup.if, /mutation_e2e/u);
+  assert.match(cleanup.if, /database_content_changed/u);
   assert.match(cleanup.if, /cancelled\(\)/u);
   assert.doesNotMatch(cleanup.if, /branch_created/u);
 });
@@ -222,18 +222,18 @@ test("database labels distinguish content changes from mutation isolation", () =
     label.with.script,
     /process.env.DATABASE_CONTENT_CHANGED === "true"/u,
   );
-  assert.doesNotMatch(label.with.script, /mutation_e2e/u);
+  assert.doesNotMatch(label.with.script, /database_content_changed/u);
   const summary = steps.find(
     (step) => step.name === "Report preview database decisions",
   );
   assert.match(
-    summary.env.MUTATION_ISOLATION_REQUIRED,
-    /outputs.mutation_e2e/u,
+    summary.env.PREVIEW_ISOLATION_REQUIRED,
+    /outputs.database_content_changed/u,
   );
-  assert.match(summary.env.MUTATION_ISOLATION_REQUIRED, /test:e2e/u);
+  assert.match(summary.env.PREVIEW_ISOLATION_REQUIRED, /preview:isolated/u);
 });
 
-test("preview-db follows mutation isolation independently of database content", async () => {
+test("preview-db follows preview isolation independently of CI mutation selection", async () => {
   const steps = deployWorkflow.jobs.preview.steps;
   const sync = steps.find((step) => step.name === "Sync database labels");
   const prepare = steps.find(
@@ -241,8 +241,8 @@ test("preview-db follows mutation isolation independently of database content", 
   );
   assert.ok(sync, "database label synchronization step exists");
   assert.equal(sync.env.ISOLATION_REQUIRED, prepare.env.ISOLATION_REQUIRED);
-  assert.match(sync.env.ISOLATION_REQUIRED, /mutation_e2e/u);
-  assert.match(sync.env.ISOLATION_REQUIRED, /test:e2e/u);
+  assert.match(sync.env.ISOLATION_REQUIRED, /database_content_changed/u);
+  assert.match(sync.env.ISOLATION_REQUIRED, /preview:isolated/u);
 
   for (const [contentChanged, isolationRequired, expected] of [
     [

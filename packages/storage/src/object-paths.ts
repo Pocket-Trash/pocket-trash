@@ -9,7 +9,11 @@ import { normalizeObjectPath } from "./lib/paths.js";
  */
 export function imageFolderPrefix(value: string | undefined): string {
   const prefix = normalizeObjectPath(value ?? "");
-  if (!/^images(?:\/dev|\/preview(?:\/pr-[1-9]\d*)?)?$/u.test(prefix))
+  if (
+    !/^images(?:\/dev|\/preview(?:\/pr-[1-9]\d*(?:\/run-[1-9]\d*-[1-9]\d*)?)?)?$/u.test(
+      prefix,
+    )
+  )
     throw new Error("BUNNY_IMAGE_FOLDER_PREFIX is invalid.");
   return prefix;
 }
@@ -22,7 +26,11 @@ export function imageFolderPrefix(value: string | undefined): string {
  */
 export function resourceFolderPrefix(value: string | undefined): string {
   const prefix = normalizeObjectPath(value ?? "");
-  if (!/^resources\/(?:files|dev|preview(?:\/pr-[1-9]\d*)?)$/u.test(prefix))
+  if (
+    !/^resources\/(?:files|dev|preview(?:\/pr-[1-9]\d*(?:\/run-[1-9]\d*-[1-9]\d*)?)?)$/u.test(
+      prefix,
+    )
+  )
     throw new Error("BUNNY_RESOURCE_FOLDER_PREFIX is invalid.");
   return prefix;
 }
