@@ -70,7 +70,6 @@
     "@railway/cli": "5.62.1",
     "@storybook/builder-vite": "10.6.2",
     "@types/node": "latest",
-    "concurrently": "^10.0.5",
     "eslint": "^10.11.0",
     "eslint-plugin-jsdoc": "64.5.4",
     "railway": "3.12.0",
