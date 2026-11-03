@@ -394,7 +394,7 @@ describe("finish option editor", () => {
 
     expect(html).toContain(">Spinner</legend>");
     expect(html).toContain(">Button</legend>");
-    expect(html.match(/<fieldset/g)).toHaveLength(3);
+    expect(html).toContain(">Ownership history</legend>");
   });
 
   it("offers only available slider components and restores the installed assembly", () => {
