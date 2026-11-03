@@ -6,10 +6,8 @@
 - Do not add or modify hard-coded user-visible text in UI, components, web flows, API responses, or user-displayed errors. Use localization for any text a user can see, and use `$pocket-trash localize` to track required `@pocket-trash/localizations` keys.
 - Before modifying or creating any frontend layout or UI code, you MUST inject the design guidelines explicitly detailed inside `/docs/design-system.md`.
 - Translate all requested specs using these components directly.
-- Add complete JSDoc to stable named JavaScript and TypeScript declarations you
-  add or modify. Follow `/docs/jsdoc.md`. `pnpm lint:jsdoc` checks every eligible
-  declaration in tracked, hand-authored source, including untouched declarations;
-  staging and Git base refs do not restrict coverage.
+- Before adding or modifying stable named JavaScript/TypeScript declarations, read
+  [JSDoc standards](docs/coding-standards-references/jsdoc.md).
 - Follow [`docs/documentation.md`](docs/documentation.md) when creating or storing
   repository documentation, research, findings, or engineering decision records.
 - Every new or changed API endpoint must update the live OpenAPI contract and

@@ -1,0 +1,7 @@
+# JSDoc
+
+- Document stable named declarations: functions/components/hooks, classes/methods/accessors, function-valued variables/properties, interfaces/aliases/callable members/properties, module-level/exported values.
+- Place `/** */` directly above declarations: one contract sentence; another only for caller-visible constraints, effects, fallbacks or failures. Describe relevant units, ordering, nulls, persistence, authorization, normalization and retries truthfully. Omit filename/expression overviews.
+- Apply tags: `@param` (every root), `@returns` (non-void/rendered output), `@throws`, `@rejects`, `@template` (every generic), `@yields`, `@next`, `@default`, `@deprecated` (replacement/migration), `@example` (non-obvious public contracts), `@see`/`{@link}`, `@override`/`@inheritdoc`, `@fires`/`@listens`, `@internal`.
+- Match parameter names; give destructuring semantic roots. Describe meaning, not types; dotted members only without named-type ownership. Omit TypeScript-redundant type/visibility/async/static tags; JavaScript may express missing syntax through `@type`, `@typedef`, `@callback`, `@property`, `@enum`, `@this`.
+- `pnpm lint:jsdoc`, lint, pre-commit and CI enforce all tracked hand-authored source, including untouched/unstaged declarations; stage new files. No diff restriction/baseline. Skip deleted files, anonymous/contextual callbacks, imports/re-exports, dependencies/build/untracked output and [checker-defined generated exclusions](../../scripts/check-jsdoc.mjs).
