@@ -1474,6 +1474,30 @@ export const getPublicCollectionItemTrends = createServerFn({
   return await s.db.trends.getPublicCollectionItemTrends();
 });
 
+/**
+ * Reads the existing generation's anonymous status totals.
+ * @returns Thresholded totals, or null before the first successful refresh.
+ * @rejects When service loading or the generation query fails.
+ */
+export const getPublicCollectionStatusTrends = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { s } = await import("@/lib/services");
+  return await s.db.trends.getPublicCollectionStatusTrends();
+});
+
+/**
+ * Reads exact live public status assignments without authenticated viewer privileges.
+ * @returns Anonymous-visibility item results with no private metadata.
+ * @rejects When service loading or the public item query fails.
+ */
+export const getPublicCollectionStatusItems = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { s } = await import("@/lib/services");
+  return await s.db.collections.listPublicStatusItems();
+});
+
 /** Returns coverage-qualified Spinner characteristics and privacy-safe counts. */
 export const getPublicSpinnerTrends = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicSpinnerTrends | null> => {

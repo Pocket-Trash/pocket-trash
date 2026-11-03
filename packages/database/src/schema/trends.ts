@@ -300,3 +300,50 @@ export type PublicCollectionMakerProductTrend =
 /** Stored privacy-transformed lifecycle point. */
 export type PublicCollectionLifecycleTrend =
   typeof publicCollectionLifecycleTrend.$inferSelect;
+
+/** Anonymous status totals and optional catalog-product groups for one complete generation. */
+export const publicCollectionItemStatusTrend = pgTable(
+  "public_collection_item_status_trend",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    generationId: bigint("generation_id", { mode: "number" })
+      .notNull()
+      .references(() => publicTrendsGeneration.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: [
+        "grail",
+        "favorite",
+        "want-to-sell",
+        "want-to-trade",
+        "sold",
+        "unstatused",
+      ],
+    }).notNull(),
+    /** Null identifies a status total; product groups are independently thresholded. */
+    productId: bigint("product_id", { mode: "number" }).references(
+      () => product.id,
+      { onDelete: "cascade" },
+    ),
+    /** Item count rounded to the nearest five after the contributor threshold. */
+    approximateItemCount: integer("approximate_item_count").notNull(),
+    /** Lower bound of a five-contributor band; never an exact contributor count. */
+    contributorCountBand: integer("contributor_count_band").notNull(),
+  },
+  (table) => [
+    uniqueIndex("public_collection_item_status_trend_scope_unique").on(
+      table.generationId,
+      table.status,
+      sql`coalesce(${table.productId},0)`,
+    ),
+    check(
+      "public_collection_item_status_trend_status_valid",
+      sql`${table.status} in ('grail','favorite','want-to-sell','want-to-trade','sold','unstatused')`,
+    ),
+    check(
+      "public_collection_item_status_trend_counts_valid",
+      sql`${table.approximateItemCount} >= 5 and ${table.approximateItemCount} % 5 = 0 and ${table.contributorCountBand} >= 5 and ${table.contributorCountBand} % 5 = 0 and ${table.contributorCountBand} <= ${table.approximateItemCount}`,
+    ),
+  ],
+);

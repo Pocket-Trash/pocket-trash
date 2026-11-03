@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
@@ -482,6 +482,266 @@ describe("public collection-item Trends", () => {
       await client.close();
     }
   }, 30_000);
+
+  it("publishes only anonymous status groups with five contributors and retains the last generation on failure", async () => {
+    const client = new PGlite();
+    const db = drizzle({ client, relations: schema.relations });
+    const generatedAt = new Date("2026-10-14T00:00:00.000Z");
+    try {
+      await migratePGliteDatabase(client);
+      const service = createTrendsService(db as unknown as Database);
+      expect(
+        await service.getPublicCollectionStatusTrends(generatedAt),
+      ).toBeNull();
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        await service.getPublicCollectionStatusTrends(generatedAt),
+      ).toMatchObject({ values: [] });
+      const fixture = await createFixture(db as unknown as Database);
+      const sliders = await db
+        .select({
+          id: schema.collectionItem.id,
+          ownerId: schema.collectionItem.ownerId,
+        })
+        .from(schema.collectionItem)
+        .innerJoin(
+          schema.collectionDetailSlider,
+          eq(schema.collectionDetailSlider.id, schema.collectionItem.id),
+        )
+        .where(eq(schema.collectionItem.owned, true));
+      const firstFour = sliders.filter((item) =>
+        fixture.ownerIds.slice(0, 4).includes(item.ownerId),
+      );
+      await db.insert(schema.collectionItemStatus).values(
+        firstFour.flatMap((item) =>
+          [true, false].map((isPublic) => ({
+            collectionItemId: item.id,
+            status: "favorite" as const,
+            isPublic,
+          })),
+        ),
+      );
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.values.some((value) => value.status === "favorite"),
+      ).toBe(false);
+      const fifth = sliders.filter(
+        (item) => item.ownerId === fixture.ownerIds.at(-1),
+      );
+      await db.insert(schema.collectionItemStatus).values([
+        ...fifth.flatMap((item) =>
+          [true, false].map((isPublic) => ({
+            collectionItemId: item.id,
+            status: "favorite" as const,
+            isPublic,
+          })),
+        ),
+        ...sliders.map((item) => ({
+          collectionItemId: item.id,
+          status: "grail" as const,
+          isPublic: false,
+        })),
+      ]);
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (await service.getPublicCollectionStatusTrends(generatedAt))?.values,
+      ).toEqual(
+        expect.arrayContaining([
+          {
+            status: "favorite",
+            approximateItemCount: 10,
+            contributorCountBand: 5,
+          },
+          {
+            status: "grail",
+            approximateItemCount: 10,
+            contributorCountBand: 5,
+          },
+          {
+            status: "unstatused",
+            approximateItemCount: 10,
+            contributorCountBand: 5,
+          },
+        ]),
+      );
+      const repeatedOwnerItem = sliders.find(
+        (item) => item.ownerId === fixture.ownerIds[0],
+      );
+      if (!repeatedOwnerItem) throw new Error("Rounding fixture missing.");
+      await db
+        .delete(schema.collectionItemStatus)
+        .where(
+          and(
+            eq(
+              schema.collectionItemStatus.collectionItemId,
+              repeatedOwnerItem.id,
+            ),
+            eq(schema.collectionItemStatus.status, "favorite"),
+          ),
+        );
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.values.find((value) => value.status === "favorite")
+          ?.approximateItemCount,
+      ).toBe(5);
+      await db.insert(schema.collectionItemStatus).values(
+        [true, false].map((isPublic) => ({
+          collectionItemId: repeatedOwnerItem.id,
+          status: "favorite" as const,
+          isPublic,
+        })),
+      );
+      const plates = await db
+        .select({ id: schema.collectionDetailSliderPlate.id })
+        .from(schema.collectionDetailSliderPlate);
+      const spinners = await db
+        .select({ id: schema.collectionDetailSpinner.id })
+        .from(schema.collectionDetailSpinner);
+      const plateIds = plates.map((item) => item.id);
+      const spinnerIds = spinners.map((item) => item.id);
+      await db
+        .update(schema.collectionItem)
+        .set({ owned: false, soldAt: new Date("2026-02-01T00:00:00Z") })
+        .where(inArray(schema.collectionItem.id, [...plateIds, ...spinnerIds]));
+      await db
+        .update(schema.collectionItemOwnershipPeriod)
+        .set({
+          effectiveEndDate: "2026-02-01",
+          exitReason: "sale",
+          endedRecordedAt: generatedAt,
+        })
+        .where(
+          inArray(
+            schema.collectionItemOwnershipPeriod.collectionItemId,
+            plateIds,
+          ),
+        );
+      await db
+        .update(schema.collectionItemOwnershipPeriod)
+        .set({
+          effectiveEndDate: "2026-02-01",
+          exitReason: "gift",
+          endedRecordedAt: generatedAt,
+        })
+        .where(
+          inArray(
+            schema.collectionItemOwnershipPeriod.collectionItemId,
+            spinnerIds,
+          ),
+        );
+      await db.insert(schema.collectionItemStatus).values([
+        ...plateIds.flatMap((collectionItemId) =>
+          [true, false].map((isPublic) => ({
+            collectionItemId,
+            isPublic,
+            status: "sold" as const,
+          })),
+        ),
+        ...plateIds.map((collectionItemId) => ({
+          collectionItemId,
+          isPublic: false,
+          status: "favorite" as const,
+        })),
+        ...spinnerIds.map((collectionItemId) => ({
+          collectionItemId,
+          isPublic: false,
+          status: "sold" as const,
+        })),
+      ]);
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      const statusTrends =
+        await service.getPublicCollectionStatusTrends(generatedAt);
+      expect(statusTrends?.values).toEqual([
+        {
+          status: "favorite",
+          approximateItemCount: 10,
+          contributorCountBand: 5,
+        },
+        { status: "grail", approximateItemCount: 10, contributorCountBand: 5 },
+        { status: "sold", approximateItemCount: 5, contributorCountBand: 5 },
+      ]);
+      const generationsBefore = await db
+        .select()
+        .from(schema.publicTrendsGeneration);
+      const storedBefore = await db
+        .select()
+        .from(schema.publicCollectionItemStatusTrend);
+      expect(Object.keys(storedBefore[0] ?? {}).sort()).toEqual([
+        "approximateItemCount",
+        "contributorCountBand",
+        "generationId",
+        "id",
+        "productId",
+        "status",
+      ]);
+      const storedGeneration = storedBefore[0]?.generationId;
+      if (!storedGeneration) throw new Error("Stored generation missing.");
+      await expect(
+        db.insert(schema.publicCollectionItemStatusTrend).values({
+          generationId: storedGeneration,
+          status: "want-to-trade",
+          approximateItemCount: 5,
+          contributorCountBand: 4,
+        }),
+      ).rejects.toThrow();
+      const failing = createTrendsService(db as unknown as Database, {
+        /**
+         * Simulates a failure after all aggregate rows are written.
+         * @throws When activation is deliberately interrupted.
+         */
+        beforeActivate: () => {
+          throw new Error("Status activation failed.");
+        },
+      });
+      await expect(
+        failing.refreshPublicCollectionItemTrends(
+          new Date("2026-10-15T00:00:00Z"),
+        ),
+      ).rejects.toThrow("Status activation failed");
+      expect(
+        await service.getPublicCollectionStatusTrends(generatedAt),
+      ).toEqual(statusTrends);
+      expect(await db.select().from(schema.publicTrendsGeneration)).toEqual(
+        generationsBefore,
+      );
+      expect(
+        await db.select().from(schema.publicCollectionItemStatusTrend),
+      ).toEqual(storedBefore);
+      const reacquiredId = plateIds[0];
+      if (!reacquiredId) throw new Error("Sale fixture missing.");
+      await db
+        .update(schema.collectionItem)
+        .set({ owned: true, soldAt: null })
+        .where(eq(schema.collectionItem.id, reacquiredId));
+      await db
+        .delete(schema.collectionItemStatus)
+        .where(eq(schema.collectionItemStatus.collectionItemId, reacquiredId));
+      await db.insert(schema.collectionItemOwnershipPeriod).values({
+        collectionItemId: reacquiredId,
+        effectiveStartDate: "2026-03-01",
+        entryReason: "purchase",
+      });
+      await service.refreshPublicCollectionItemTrends(generatedAt);
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(generatedAt)
+        )?.values.map((value) => value.status),
+      ).toEqual(["favorite", "grail"]);
+      expect(
+        (
+          await service.getPublicCollectionStatusTrends(
+            new Date(generatedAt.getTime() + PUBLIC_TRENDS_STALE_MS + 1),
+          )
+        )?.stale,
+      ).toBe(true);
+    } finally {
+      await client.close();
+    }
+  }, 30000);
 
   it("rebuilds lifecycle history from current catalog truth after corrections and erasure", async () => {
     const client = new PGlite();

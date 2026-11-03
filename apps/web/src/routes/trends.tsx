@@ -7,6 +7,8 @@ import {
   getPublicCollectionLifecycleTrends,
   getPublicCollectionMakerProductTrends,
   getPublicCollectionMaterialTrends,
+  getPublicCollectionStatusItems,
+  getPublicCollectionStatusTrends,
   getPublicPartAccessoryTrends,
   getPublicPenRefillTrends,
   getPublicSliderTrends,
@@ -61,6 +63,8 @@ export const Route = createFileRoute("/trends")({
       sliderTrends,
       penRefillTrends,
       spinnerTrends,
+      statusItems,
+      statusTrends,
     ] = await Promise.all([
       listPublicProductTypeTrends(),
       getPublicCollectionItemTrends(),
@@ -73,6 +77,8 @@ export const Route = createFileRoute("/trends")({
       getPublicSliderTrends(),
       getPublicPenRefillTrends(),
       getPublicSpinnerTrends(),
+      getPublicCollectionStatusItems(),
+      getPublicCollectionStatusTrends(),
     ]);
     return {
       activityTrends,
@@ -86,6 +92,8 @@ export const Route = createFileRoute("/trends")({
       sliderTrends,
       penRefillTrends,
       spinnerTrends,
+      statusItems,
+      statusTrends,
     };
   },
   pendingComponent: TrendsPendingPage,
@@ -118,10 +126,14 @@ function TrendsRoute() {
     sliderTrends,
     penRefillTrends,
     spinnerTrends,
+    statusItems,
+    statusTrends,
   } = Route.useLoaderData();
   return (
     <TrendsPage
       activityTrends={activityTrends}
+      statusItems={statusItems}
+      statusTrends={statusTrends}
       catalogMaterialTrends={catalogMaterialTrends}
       collectionMaterialTrends={collectionMaterialTrends}
       collectionTrends={collectionTrends}
@@ -129,7 +141,7 @@ function TrendsRoute() {
       makerProductTrends={makerProductTrends}
       onSearchChange={(nextSearch) =>
         void navigate({
-          replace: true,
+          replace: nextSearch.status === search.status,
           search: nextSearch,
           to: "/trends",
         })

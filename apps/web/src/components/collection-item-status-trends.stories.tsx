@@ -166,3 +166,93 @@ export const PublicSold: Story = {
 export const PublicCurrent: Story = {
   args: { publicView: true, selected: "favorite" },
 };
+
+/** Exact current public items can grow beyond an older anonymous generation. */
+const liveFavorites: CollectionItemStatusTrendItem[] = Array.from(
+  { length: 7 },
+  (_, index) => ({
+    collectionItemId: 100 + index,
+    collectionId: 2,
+    current: true,
+    name: `Public favorite ${index + 1}`,
+    ownerUserId: 3,
+    productId: 4,
+    statuses: ["favorite"],
+  }),
+);
+
+/** An older rounded total must never be lower than its live public context. */
+export const LiveLowerBound: Story = {
+  args: {
+    publicView: true,
+    items: liveFavorites,
+    selected: "favorite",
+    totals: [
+      { status: "favorite", approximateItemCount: 5, contributorCountBand: 5 },
+    ],
+  },
+  /**
+   * Checks the safe lower bound and exact public drilldown size.
+   * @param context - App-wide status explorer.
+   * @rejects When a stale approximate value is below the exact public count.
+   */
+  play: async (context) => {
+    const table = within(
+      context.canvas.getByRole("table", {
+        name: "Collection item status assignments and counts",
+      }),
+    );
+    await expect(
+      table.getByRole("cell", { name: "Approximately 7 collection items" }),
+    ).toBeVisible();
+    await expect(
+      context.canvas.getByText("7 currently public collection items"),
+    ).toBeVisible();
+    await expect(
+      context.canvas.getByRole("link", { name: "Public favorite 7" }),
+    ).toBeVisible();
+  },
+};
+
+/** Missing or suppressed aggregate groups fall back to the live public count. */
+export const SuppressedTotals: Story = {
+  args: {
+    publicView: true,
+    items: liveFavorites,
+    selected: "favorite",
+    totals: [],
+  },
+  /**
+   * Verifies suppression does not leave a gap or imply a private count.
+   * @param context - Exact fallback presentation.
+   * @rejects When a suppressed group exposes an approximate value.
+   */
+  play: async (context) => {
+    const table = within(
+      context.canvas.getByRole("table", {
+        name: "Collection item status assignments and counts",
+      }),
+    );
+    await expect(
+      table.queryByRole("cell", { name: /^Approximately/ }),
+    ).not.toBeInTheDocument();
+    await expect(
+      context.canvas.getByText("7 currently public collection items"),
+    ).toBeVisible();
+  },
+};
+
+/** An anonymous group can exist with no public source items to reveal. */
+export const AnonymousOnly: Story = {
+  args: {
+    publicView: true,
+    items: [],
+    selected: "grail",
+    totals: [
+      { status: "grail", approximateItemCount: 20, contributorCountBand: 5 },
+    ],
+  },
+};
+
+/** Anonymous totals and empty live results remain readable in the dark theme. */
+export const Dark: Story = { ...AnonymousOnly, globals: { theme: "dark" } };

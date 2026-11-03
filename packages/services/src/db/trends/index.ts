@@ -10,6 +10,11 @@ import { getPublicPenRefillTrends as loadPublicPenRefillTrends } from "./pens.js
 import { getPublicSliderTrends as loadPublicSliderTrends } from "./slider.js";
 import { getPublicSpinnerTrends as loadPublicSpinnerTrends } from "./spinner.js";
 
+import {
+  getPublicCollectionStatusTrends as loadPublicCollectionStatusTrends,
+  writePublicCollectionStatusTrends,
+} from "./status.js";
+
 export {
   PUBLIC_TRENDS_CONTRIBUTOR_THRESHOLD,
   PUBLIC_TRENDS_ROUNDING_INCREMENT,
@@ -39,6 +44,10 @@ export {
   SPINNER_TRENDS_COVERAGE_THRESHOLD,
   spinnerTrendMetricIds,
 } from "./spinner.js";
+export type {
+  PublicCollectionStatusTrends,
+  PublicStatusTrendValue,
+} from "./status.js";
 
 /** Stable time ranges offered by recorded-activity Trends. */
 export const activityTrendRanges = [
@@ -351,6 +360,15 @@ export function createTrendsService(
   hooks: PublicTrendsRefreshHooks = {},
 ) {
   return {
+    /**
+     * Reads the active anonymous status totals alongside separately queried live public items.
+     * @param now - Current time used by the existing freshness policy.
+     * @returns Thresholded totals or null before the first successful generation.
+     * @rejects When the generation query fails.
+     */
+    async getPublicCollectionStatusTrends(now = new Date()) {
+      return await loadPublicCollectionStatusTrends(db, now);
+    },
     /**
      * Reads coverage-qualified Slider characteristics with privacy-safe item counts.
      *
@@ -1499,6 +1517,7 @@ export function createTrendsService(
             }),
           );
         }
+        await writePublicCollectionStatusTrends(tx, generation.id);
         await hooks.beforeActivate?.();
         await tx
           .update(schema.publicTrendsGeneration)
