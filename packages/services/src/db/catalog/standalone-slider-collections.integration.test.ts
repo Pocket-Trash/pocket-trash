@@ -310,6 +310,271 @@ describe("standalone slider collection items", () => {
         .update(schema.collectionItem)
         .set({ approvalStatus: "pending" })
         .where(eq(schema.collectionItem.id, sliderItemId));
+      const noteEdit = {
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+      };
+      await collectionsService.updateItem({
+        ...noteEdit,
+        metadata: {
+          statuses: { public: [], private: [] },
+          pricePaid: { amountMinor: 0, currencyCode: "JPY", isPublic: true },
+          notes: [
+            {
+              name: "Care",
+              content: "Keep the bearing dry.",
+              isPublic: true,
+              position: 0,
+            },
+            {
+              name: "Condition",
+              content: "Private **condition** notes.",
+              isPublic: false,
+              position: 0,
+            },
+          ],
+        },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: {
+          notes: [
+            expect.objectContaining({
+              name: "Care",
+              content: "Keep the bearing dry.",
+              isPublic: true,
+              position: 0,
+            }),
+            expect.objectContaining({
+              name: "Condition",
+              isPublic: false,
+              position: 0,
+            }),
+          ],
+        },
+      });
+      const savedNotes = (
+        await collectionsService.getOwnedItem(actor, sliderItemId)
+      )?.metadata?.notes;
+      const care = savedNotes?.find((note) => note.name === "Care");
+      const condition = savedNotes?.find((note) => note.name === "Condition");
+      if (!care || !condition) throw new Error("Notes missing.");
+      const noteMetadata = {
+        statuses: { public: [], private: [] },
+        pricePaid: { amountMinor: 0, currencyCode: "JPY", isPublic: true },
+      };
+      await collectionsService.updateItem({
+        ...noteEdit,
+        metadata: {
+          ...noteMetadata,
+          notes: [
+            care,
+            condition,
+            {
+              name: "Setup",
+              content: "A **ceramic** bearing.",
+              isPublic: true,
+              position: 1,
+            },
+          ],
+        },
+      });
+      const setup = (
+        await collectionsService.getOwnedItem(actor, sliderItemId)
+      )?.metadata?.notes?.find((note) => note.name === "Setup");
+      if (!setup) throw new Error("Setup note missing.");
+      const [privateBefore] = await db
+        .select()
+        .from(schema.collectionItemNote)
+        .where(eq(schema.collectionItemNote.id, condition.id));
+      await collectionsService.updateItem({
+        ...noteEdit,
+        metadata: {
+          ...noteMetadata,
+          notes: [
+            { ...care, position: 1 },
+            condition,
+            { ...setup, position: 0 },
+          ],
+        },
+      });
+      const reordered = (
+        await collectionsService.getOwnedItem(actor, sliderItemId)
+      )?.metadata?.notes;
+      expect(
+        reordered?.filter((note) => note.isPublic).map((note) => note.name),
+      ).toEqual(["Setup", "Care"]);
+      const [privateAfter] = await db
+        .select()
+        .from(schema.collectionItemNote)
+        .where(eq(schema.collectionItemNote.id, condition.id));
+      expect(privateAfter?.updatedAt).toEqual(privateBefore?.updatedAt);
+      await collectionsService.updateItem({
+        ...noteEdit,
+        metadata: {
+          ...noteMetadata,
+          notes: [
+            { ...care, isPublic: false, position: 1 },
+            condition,
+            { ...setup, position: 0 },
+          ],
+        },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: {
+          notes: [
+            expect.objectContaining({
+              name: "Setup",
+              isPublic: true,
+              position: 0,
+            }),
+            expect.objectContaining({
+              name: "Condition",
+              isPublic: false,
+              position: 0,
+            }),
+            expect.objectContaining({
+              name: "Care",
+              isPublic: false,
+              position: 1,
+            }),
+          ],
+        },
+      });
+      await collectionsService.updateItem({
+        ...noteEdit,
+        metadata: {
+          ...noteMetadata,
+          notes: [
+            { ...care, isPublic: true, position: 0 },
+            { ...setup, position: 1 },
+            condition,
+          ],
+        },
+      });
+      expect(
+        (
+          await collectionsService.getOwnedItem(actor, sliderItemId)
+        )?.metadata?.notes
+          ?.filter((note) => note.isPublic)
+          .map((note) => note.name),
+      ).toEqual(["Care", "Setup"]);
+      await collectionsService.updateItem({
+        ...noteEdit,
+        metadata: {
+          ...noteMetadata,
+          notes: [
+            { ...care, isPublic: false, position: 1 },
+            { ...setup, position: 0 },
+            condition,
+          ],
+        },
+      });
+      await expect(
+        collectionsService.updateItem({
+          ...noteEdit,
+          displayName: "Must roll back notes",
+          metadata: {
+            ...noteMetadata,
+            notes: [
+              {
+                name: "Roy's",
+                content: "First valid note.",
+                isPublic: false,
+                position: 0,
+              },
+              {
+                name: "RÓY’S",
+                content: "Second valid note.",
+                isPublic: true,
+                position: 0,
+              },
+            ],
+          },
+        }),
+      ).rejects.toThrow("duplicateNoteNameError");
+      await expect(
+        collectionsService.updateItem({
+          ...noteEdit,
+          metadata: {
+            ...noteMetadata,
+            notes: [
+              {
+                name: "Short",
+                content: "😀😀😀",
+                isPublic: false,
+                position: 0,
+              },
+            ],
+          },
+        }),
+      ).rejects.toThrow("noteContentError");
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        displayName: "Moved slider",
+        metadata: {
+          notes: expect.arrayContaining([
+            expect.objectContaining({
+              name: "Condition",
+              content: "Private **condition** notes.",
+            }),
+          ]),
+        },
+      });
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "approved" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      await expect(
+        collectionsService.getPublicItem({
+          collectionId: destination.id,
+          collectionItemId: sliderItemId,
+          ownerUserId: owner.id,
+        }),
+      ).resolves.toMatchObject({
+        metadata: {
+          notes: [
+            expect.objectContaining({
+              name: "Setup",
+              content: "A **ceramic** bearing.",
+            }),
+          ],
+        },
+      });
+      await db
+        .update(schema.userCollection)
+        .set({ isPrivate: true })
+        .where(eq(schema.userCollection.id, destination.id));
+      await expect(
+        collectionsService.getOwnedItem(
+          { clerkId: otherOwner.clerkId, role: "admin" },
+          sliderItemId,
+        ),
+      ).resolves.toMatchObject({ metadata: { notes: [] } });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: {
+          notes: expect.arrayContaining([
+            expect.objectContaining({ name: "Setup", isPublic: true }),
+          ]),
+        },
+      });
+      await db
+        .update(schema.userCollection)
+        .set({ isPrivate: false })
+        .where(eq(schema.userCollection.id, destination.id));
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "pending" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
       const priceEdit = {
         actor,
         collectionItemId: sliderItemId,
@@ -631,11 +896,26 @@ describe("standalone slider collection items", () => {
       });
       expect(duplicateItemId).not.toBe(sliderItemId);
 
+      await db.insert(schema.collectionItemNote).values({
+        id: "cascade-fixture",
+        collectionItemId: insertItemId,
+        name: "Cascade",
+        normalizedName: "cascade",
+        content: "Cascade deletion note.",
+        isPublic: false,
+        position: 0,
+      });
       await collectionsService.deleteItem({
         actor,
         collectionItemId: insertItemId,
         confirmed: true,
       });
+      await expect(
+        db
+          .select()
+          .from(schema.collectionItemNote)
+          .where(eq(schema.collectionItemNote.collectionItemId, insertItemId)),
+      ).resolves.toEqual([]);
       await expect(
         collectionsService.getOwnedItem(actor, insertItemId),
       ).resolves.toBeNull();

@@ -1018,8 +1018,38 @@ const collectionMoneySchema = z.object({
   ),
 });
 
+/** Trimmed, bounded Markdown note drafts with independent visibility and ordering. */
+const collectionItemNoteSchema = z.object({
+  id: z
+    .string("web.collectionItemMetadata.saveError")
+    .trim()
+    .min(1, "web.collectionItemMetadata.saveError")
+    .max(100, "web.collectionItemMetadata.saveError")
+    .optional(),
+  name: z
+    .string("web.collectionItemMetadata.noteNameError")
+    .trim()
+    .refine(
+      (value) => [...value].length >= 1 && [...value].length <= 100,
+      "web.collectionItemMetadata.noteNameError",
+    ),
+  content: z
+    .string("web.collectionItemMetadata.noteContentError")
+    .trim()
+    .refine(
+      (value) => [...value].length >= 5 && [...value].length <= 2000,
+      "web.collectionItemMetadata.noteContentError",
+    ),
+  isPublic: z.boolean("web.collectionItemMetadata.saveError").default(false),
+  position: z
+    .number("web.collectionItemMetadata.notePositionError")
+    .int("web.collectionItemMetadata.notePositionError")
+    .nonnegative("web.collectionItemMetadata.notePositionError"),
+});
+
 /** Owner-only structured metadata accepted at the item write boundary. */
 const collectionItemMetadataSchema = z.object({
+  notes: z.array(collectionItemNoteSchema).optional(),
   pricePaid: collectionMoneySchema.extend({ isPublic: z.boolean() }).optional(),
   priceSold: collectionMoneySchema.optional(),
   statuses: z.object({

@@ -1,4 +1,8 @@
-import type { CollectionItemStatusState, MoneyValue } from "@package/services";
+import type {
+  CollectionItemNote,
+  CollectionItemStatusState,
+  MoneyValue,
+} from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -6,6 +10,7 @@ import {
 import { type ReactNode, useReducer, useRef } from "react";
 import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { collectionStatusLabels } from "@/components/collection-item-status-fields";
+import { MarkdownContent } from "@/components/markdown-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getPublicCollectionItem } from "@/lib/catalog-api";
@@ -47,6 +52,8 @@ type PreviewEvent =
 export function CollectionItemMetadataSection(props: {
   /** Independent saved status scopes, already redacted by the service. */
   statuses: CollectionItemStatusState;
+  /** Already-redacted Markdown notes in independent saved scope order. */
+  notes?: CollectionItemNote[];
   /** Already-redacted paid price for the current ownership period. */
   pricePaid?: MoneyValue & { /** Paid price visibility. */ isPublic: boolean };
   /** Sale price supplied only to the owner. */
@@ -126,7 +133,8 @@ export function CollectionItemMetadataSection(props: {
   if (
     !props.isOwner &&
     !props.statuses.public.length &&
-    !props.pricePaid?.isPublic
+    !props.pricePaid?.isPublic &&
+    !props.notes?.some((note) => note.isPublic)
   )
     return null;
   const showPaid =
@@ -191,6 +199,22 @@ export function CollectionItemMetadataSection(props: {
           </div>
         ) : null}
       </dl>
+      {(props.notes ?? [])
+        .filter((note) =>
+          props.isOwner
+            ? note.isPublic === (scope === "public")
+            : note.isPublic,
+        )
+        .sort((a, b) => a.position - b.position)
+        .map((note) => (
+          <article
+            key={note.id}
+            className="grid gap-2 border border-border p-3"
+          >
+            <h3 className="text-sm font-semibold">{note.name}</h3>
+            <MarkdownContent markdown={note.content} />
+          </article>
+        ))}
       {props.isOwner ? (
         <dialog
           onKeyDown={(event) => {

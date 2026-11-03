@@ -62,6 +62,8 @@ export type {
   CatalogViewer,
   CollectionItemMetadata,
   CollectionItemMetadataWrite,
+  CollectionItemNote,
+  CollectionItemNoteWrite,
   CollectionItemOwnershipPeriod,
   CollectionItemOwnershipStart,
   CollectionItemOwnershipWrite,
