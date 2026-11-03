@@ -1,0 +1,6 @@
+# Package boundaries
+
+- Apps access storage through `@package/services`, never directly through `@package/storage`. Services coordinate behavior; [storage](../../packages/storage/src) owns Bunny transport, upload validation/targets, signing, delivery URLs, deletion and cleanup. Scraper uploads use services; services never call the scraper. See [storage operations](../image-cdn.md).
+- Keep `packages/database` storage-only; log database behavior in services. [App restrictions](../../packages/lint/eslint/apps.mjs) and [database restrictions](../../packages/lint/eslint/index.mjs) remain authoritative.
+- Follow the accepted [queue boundary](../../decisions/architecture/eng-497-shared-queue-boundary.md): apps define typed queues through `@package/queue`; definitions own schema, worker mode, retry/retention and completed-job deduplication. Enqueue stable identifiers; consume portable results/jobs/lifecycle handles, not BullMQ/ioredis objects or options.
+- Validate payloads before persistence and delivery. Handlers must be idempotent for at-least-once delivery. Preserve physical queue names and retained-job compatibility; transport maintenance stays in adapters. New adapters must pass the shared contract suite.

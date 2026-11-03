@@ -1,17 +1,16 @@
 
 # System Instructions
-- Before changing web state, read [coding standards](docs/coding-standards.md)
-  and its state-management reference.
+- Before changing code, read the [coding standards index](docs/coding-standards.md)
+  and every reference relevant to the change.
 - Pocket Trash repo skills come from `https://github.com/Pocket-Trash/skills` as the single source of truth for Codex and Claude Code. New worktrees install them automatically. Do not edit local skill copies directly; update the shared repo instead.
-- Do not add or modify hard-coded user-visible text in UI, components, web flows, API responses, or user-displayed errors. Use localization for any text a user can see, and use `$pocket-trash localize` to track required `@pocket-trash/localizations` keys.
-- Before modifying or creating any frontend layout or UI code, you MUST inject the design guidelines explicitly detailed inside `/docs/design-system.md`.
-- Translate all requested specs using these components directly.
-- Before adding or modifying stable named JavaScript/TypeScript declarations, read
-  [JSDoc standards](docs/coding-standards-references/jsdoc.md).
-- Follow [`docs/documentation.md`](docs/documentation.md) when creating or storing
-  repository documentation, research, findings, or engineering decision records.
-- Every new or changed API endpoint must update the live OpenAPI contract and
-  pass `pnpm lint:openapi`. Follow [`docs/api-openapi.md`](docs/api-openapi.md).
+- Before changing frontend layouts or UI, read [UI design](docs/coding-standards-references/ui-design.md)
+  and [accessibility](docs/coding-standards-references/accessibility.md).
+- Follow [localization standards](docs/coding-standards-references/localization.md)
+  for user-visible text and [JSDoc standards](docs/coding-standards-references/jsdoc.md)
+  for stable named declarations.
+- Follow [documentation placement](docs/coding-standards-references/documentation.md)
+  for guides, research and accepted decisions.
+- Before changing API endpoints, read [API contracts](docs/coding-standards-references/api-contracts.md).
 
 - After implementing features or code changes, run focused checks while iterating.
   Before the final push:
