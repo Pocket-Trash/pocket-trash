@@ -14,15 +14,11 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
-import { toast } from "sonner";
+import { type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  downloadResourceFile,
-  downloadResourceVersion,
-  type listResourceDirectory,
-} from "@/lib/resources";
+import { useResourceDownloads } from "@/hooks/use-resource-downloads";
+import { type listResourceDirectory } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
@@ -64,8 +60,16 @@ export function ResourceCard({
   resource: ResourceCardItem;
 }) {
   const { locale } = useLocale();
-  const [downloading, setDownloading] = useState(false);
-  const [archiveFailed, setArchiveFailed] = useState(false);
+  const {
+    downloadingFileId,
+    downloadingVersionId,
+    failedVersionIds,
+    startFile,
+    startVersion,
+  } = useResourceDownloads(resource.id, true);
+  const downloading =
+    downloadingFileId !== undefined || downloadingVersionId !== undefined;
+  const archiveFailed = failedVersionIds.has(resource.currentVersion.id);
   const downloadsArchive = resource.currentVersion.fileCount >= 2;
   /**
    * Formats resource-card copy for the active locale.
@@ -86,48 +90,17 @@ export function ResourceCard({
             <Button
               className="flex-1"
               disabled={downloading || archiveFailed}
-              onClick={async () => {
-                setDownloading(true);
-                try {
-                  const url = downloadsArchive
-                    ? await downloadResourceVersion({
-                        data: {
-                          resourceId: resource.id,
-                          versionId: resource.currentVersion.id,
-                        },
-                      })
-                    : await downloadResourceFile({
-                        data: {
-                          fileId: resource.currentVersion.fileId,
-                          resourceId: resource.id,
-                        },
-                      });
-                  if (!url) throw new Error("missing download");
-                  window.location.assign(url);
-                } catch {
-                  toast.error(
-                    t("web.resources.error.downloadUnavailable", {
-                      filename: downloadsArchive
-                        ? `resource-${resource.id}-v${resource.currentVersion.version}.zip`
-                        : resource.currentVersion.fileName,
-                    }),
-                    downloadsArchive
-                      ? {
-                          description: (
-                            <Link
-                              className="underline"
-                              params={{ resourceId: String(resource.id) }}
-                              to="/resources/$resourceId"
-                            >
-                              {t("web.resources.error.archiveDownloadFallback")}
-                            </Link>
-                          ),
-                        }
-                      : undefined,
+              onClick={() => {
+                if (downloadsArchive)
+                  startVersion(
+                    resource.currentVersion.id,
+                    resource.currentVersion.version,
                   );
-                  if (downloadsArchive) setArchiveFailed(true);
-                  setDownloading(false);
-                }
+                else
+                  startFile(
+                    resource.currentVersion.fileId,
+                    resource.currentVersion.fileName,
+                  );
               }}
               type="button"
             >

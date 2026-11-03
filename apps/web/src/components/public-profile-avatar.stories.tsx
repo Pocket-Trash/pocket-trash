@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useReducer } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { PublicProfileAvatar } from "./public-profile-avatar";
 
@@ -51,18 +51,19 @@ export const ProfilePicture: Story = {
  * @returns Stateful avatar scenario for browser interaction coverage.
  */
 function PictureChanges() {
-  const [imageUrl, setImageUrl] = useState<string | null>(picture);
+  const [imageUrl, dispatch] = useReducer(
+    (_imageUrl: string | null, event: "pictureReplaced" | "pictureRemoved") =>
+      event === "pictureReplaced" ? `${picture}?replacement=true` : null,
+    picture,
+  );
   return (
     <div>
       <PublicProfileAvatar imageUrl={imageUrl} username="collector" />
       <span>collector</span>
-      <button
-        type="button"
-        onClick={() => setImageUrl(`${picture}?replacement=true`)}
-      >
+      <button type="button" onClick={() => dispatch("pictureReplaced")}>
         Replace
       </button>
-      <button type="button" onClick={() => setImageUrl(null)}>
+      <button type="button" onClick={() => dispatch("pictureRemoved")}>
         Remove
       </button>
     </div>

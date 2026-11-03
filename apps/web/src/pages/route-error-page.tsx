@@ -1,4 +1,4 @@
-import { loggerMessages, serializeError } from "@package/logger";
+import { serializeError } from "@package/logger";
 import {
   DEFAULT_LOCALE,
   formatTranslation,
@@ -10,10 +10,11 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import * as React from "react";
+import { useRef } from "react";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { logger } from "@/lib/logger";
+import { useClipboardCopy } from "@/hooks/use-clipboard-copy";
 import type { UserSettingsState } from "@/lib/user-settings";
 import { useOptionalLocale } from "@/providers/locale-provider";
 
@@ -24,7 +25,7 @@ type RootLoaderData = {
 };
 
 /**
- * Logs a route failure and renders its localized recovery UI.
+ * Renders localized recovery UI for a failure reported by the router boundary.
  *
  * @param root0 - Router error-component properties.
  * @returns The route error boundary page.
@@ -56,13 +57,6 @@ export function RouteErrorPage({ error }: ErrorComponentProps) {
     },
   });
 
-  React.useEffect(() => {
-    logger.error(loggerMessages.web.routeError, {
-      attributes: { route: pathname },
-      error,
-    });
-  }, [error, pathname]);
-
   return (
     <RouteErrorView
       development={import.meta.env.DEV}
@@ -88,6 +82,48 @@ export function resolveRouteErrorLocale(
   return activeLocale ?? rootLocale ?? DEFAULT_LOCALE;
 }
 
+/** Current recovery identity and invalidation observer. */
+type RetryState = {
+  /** Current boundary error. */
+  error: unknown;
+
+  /** Current route pathname. */
+  pathname: string;
+
+  /** Current retry observer. */
+  request?: EffectEntity<RetryState, RetryEvent>;
+};
+
+/** Retry intent, boundary replacement, and terminal cleanup. */
+type RetryEvent =
+  | {
+      /** Reconciles a replaced route or error. */
+      type: "sourceChanged";
+      /** Current boundary error. */
+      error: unknown;
+      /** Current pathname. */
+      pathname: string;
+    }
+  | {
+      /** Requests loader invalidation. */
+      type: "requested";
+    }
+  | {
+      /** Stops a settled retry. */
+      type: "settled";
+    };
+
+/** Captured invalidation command. */
+type RetryEffect = {
+  /** Retry implementation. */
+  type: "retry";
+
+  /** Invalidates the current route.
+   * @returns Loader refresh completion.
+   * @rejects When route refresh fails. */
+  execute: () => Promise<unknown>;
+};
+
 /**
  * Renders route-error recovery actions and optional development diagnostics.
  *
@@ -103,54 +139,81 @@ export function RouteErrorView({
 }: {
   /** Whether technical diagnostics are visible. */
   development: boolean;
+
   /** Failure caught by the router boundary. */
   error: unknown;
+
   /** Locale used for recovery copy. */
   locale: SupportedLocale;
+
   /**
    * Invalidates the router to retry failed loaders and rendering.
    *
    * @returns The router invalidation result.
    */
   onRetry: () => Promise<unknown>;
+
   /** Failed route pathname. */
   pathname: string;
 }) {
-  const [copyStatus, setCopyStatus] = React.useState<
-    "copied" | "failed" | null
-  >(null);
-  const [retrying, setRetrying] = React.useState(false);
-  /**
-   * Formats localized route-error copy.
-   *
+  /** Formats localized route-error copy.
    * @param key - Translation key.
-   * @returns The localized message.
-   */
+   * @returns The localized message. */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const details = formatErrorDetails(pathname, error);
+  const { status: copyStatus, copy: copyDetails } = useClipboardCopy(details);
+  const task = useRef<{
+    /** Captured retry whose invalidation must not replay. */
+    effect: RetryEffect;
 
-  /** Retries the failed route while maintaining the busy state. */
-  const retry = async () => {
-    setRetrying(true);
-    try {
-      await onRetry();
-    } catch {
-      // A persistent failure leaves this boundary visible for another retry.
-    } finally {
-      setRetrying(false);
-    }
-  };
-
-  /** Copies sanitized development diagnostics to the clipboard. */
-  const copyDetails = async () => {
-    try {
-      await navigator.clipboard.writeText(details);
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("failed");
-    }
-  };
-
+    /** Settled retry acknowledgement. */
+    promise: Promise<void>;
+  } | null>(null);
+  const [state, dispatch] = useEffectReducer<
+    RetryState,
+    RetryEvent,
+    RetryEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "sourceChanged") {
+        exec.stop(state.request);
+        return { error: event.error, pathname: event.pathname };
+      }
+      if (event.type === "requested")
+        return state.request
+          ? state
+          : { ...state, request: exec({ type: "retry", execute: onRetry }) };
+      exec.stop(state.request);
+      return { ...state, request: undefined };
+    },
+    { error, pathname },
+    {
+      /** Observes the current retry without replaying invalidation on resume.
+       * @param _state - Current recovery identity.
+       * @param effect - Captured retry command.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime. */
+      retry: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: (async () => {
+              try {
+                await effect.execute();
+              } catch {
+                /* A persistent failure keeps this boundary available for another retry. */
+              }
+            })(),
+          };
+        void task.current.promise.then(() => {
+          if (!signal.aborted) dispatch({ type: "settled" });
+        });
+      },
+    },
+  );
+  if (state.error !== error || state.pathname !== pathname)
+    dispatch({ type: "sourceChanged", error, pathname });
+  const retrying = Boolean(state.request);
   return (
     <AppShell showControls={false} title={t("web.page.error.title")}>
       <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
@@ -171,7 +234,7 @@ export function RouteErrorView({
             <Button
               aria-busy={retrying}
               disabled={retrying}
-              onClick={() => void retry()}
+              onClick={() => dispatch({ type: "requested" })}
               type="button"
             >
               {t(retrying ? "web.page.error.retrying" : "web.page.error.retry")}

@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:17@sha256:3b0cda93be7c8dba2ed484d19393d93845dc3dafb88973e248ba8e6d99d784e1
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: pocket_trash_e2e
+    ports:
+      - "127.0.0.1:54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e2e -d pocket_trash_e2e"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+  proxy:
+    image: ghcr.io/neondatabase/wsproxy@sha256:7f2e2149aa6a57ba382a140102fba44f5053f3e44389ccc18adcecf896054efb
+    environment:
+      ALLOW_ADDR_REGEX: '^postgres:5432$$'
+    ports:
+      - "127.0.0.1:54330:80"
+    depends_on:
+      postgres:
+        condition: service_healthy

@@ -70,3 +70,13 @@ export const NeedsSupport: Story = {
     ).toBeVisible();
   },
 };
+
+/** Terminal completed receipts expose no pending polling actions. */
+export const Completed: Story = {
+  args: {
+    status: {
+      requestId: "7c86e5d4-0bea-4f72-9584-5df2e32d6bb6",
+      status: "completed",
+    },
+  },
+};

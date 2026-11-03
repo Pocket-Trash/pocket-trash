@@ -436,7 +436,8 @@ export function createInMemoryQueueAdapter(
                 retryTimer = setTimeout(
                   () => {
                     retryTimer = undefined;
-                    if (now() >= retryAt) wake();
+                    // The drain reschedules retries if a timer fires before its deadline.
+                    wake();
                   },
                   Math.max(0, retryAt - now()),
                 );

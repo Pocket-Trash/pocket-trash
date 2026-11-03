@@ -28,11 +28,9 @@ test("deployed preview smoke and guarded mutation suites remain enabled", () => 
   const workflow = read(".github/workflows/deploy.yml");
 
   assert.match(workflow, /test:e2e:ci/u);
-  assert.match(
-    workflow,
-    /playwright test "\$\{mutation_specs\[@\]\}" --grep @mutation/u,
-  );
-  assert.match(workflow, /Verify isolated mutation preview/u);
+  assert.match(workflow, /bash scripts\/e2e-mutations.sh/u);
+  assert.match(read("scripts/e2e-mutations.sh"), /--grep @mutation/u);
+  assert.doesNotMatch(workflow, /Verify isolated mutation preview/u);
 });
 
 test("workflow classifier fallbacks retain the complete mutation suite", () => {

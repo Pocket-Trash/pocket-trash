@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import * as React from "react";
+import { useForm, useStore } from "@tanstack/react-form";
+import React from "react";
 import { expect, waitFor, within } from "storybook/test";
 import type { CatalogOptions } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
@@ -33,6 +34,26 @@ const options: CatalogOptions = {
 };
 
 /**
+ * Receives lookup creation through the existing shared-control contract.
+ * @param state - Current fixture lookups.
+ * @param event - Pure lookup replacement or updater.
+ * @returns Updated fixture lookups.
+ */
+function storyOptionsReducer(
+  state: CatalogOptions,
+  event: {
+    /** Lookup creation updated available choices. */
+    type: "lookupsChanged";
+    /** Existing shared callback payload. */
+    update: React.SetStateAction<CatalogOptions>;
+  },
+): CatalogOptions {
+  return typeof event.update === "function"
+    ? event.update(state)
+    : event.update;
+}
+
+/**
  * Hosts the controlled editor with caller-provided material combinations.
  *
  * @param props - Story fixture properties.
@@ -54,12 +75,18 @@ function MaterialAssignmentsStory({
   initialValue?: Parameters<typeof MaterialAssignmentsEditor>[0]["value"];
 }) {
   const t = useCatalogCopy();
-  const [value, setValue] = React.useState(initialValue);
-  const [catalogOptions, setCatalogOptions] = React.useState(options);
+  const form = useForm({ defaultValues: { assignments: initialValue } });
+  const value = useStore(form.store, (state) => state.values.assignments);
+  const [catalogOptions, dispatchOptions] = React.useReducer(
+    storyOptionsReducer,
+    options,
+  );
   return (
     <MaterialAssignmentsEditor
-      onChange={setValue}
-      onOptionsChange={setCatalogOptions}
+      onChange={(value) => form.setFieldValue("assignments", value)}
+      onOptionsChange={(update) =>
+        dispatchOptions({ type: "lookupsChanged", update })
+      }
       options={catalogOptions}
       singleAssignment={false}
       t={t}

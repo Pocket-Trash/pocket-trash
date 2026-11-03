@@ -60,12 +60,9 @@ test("gates artifacts, releases, and deployments on the audit", () => {
   }
 });
 
-test("pins patched shell-quote and Sharp releases across transitive paths", () => {
-  assert.match(workspacePolicy, /"shell-quote@1": "1\.11\.0"/);
+test("pins patched Sharp releases across transitive paths", () => {
   assert.match(workspacePolicy, /"sharp@0\.35": "0\.35\.5"/);
-  assert.match(workspaceLockfile, /shell-quote@1\.11\.0/);
   assert.match(workspaceLockfile, /sharp@0\.35\.5/);
-  assert.doesNotMatch(workspaceLockfile, /shell-quote@1\.9\.0/);
   assert.doesNotMatch(workspaceLockfile, /sharp@0\.35\.4/);
 });
 

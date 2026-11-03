@@ -5,8 +5,30 @@ import {
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import * as React from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
+
+/** Explicit catalog-popup disclosure and completed selection intent. */
+type ComboboxPopupEvent =
+  | {
+      /** Changes popup disclosure. */
+      type: "popupChanged";
+      /** Requested disclosure state. */
+      open: boolean;
+    }
+  | {
+      /** Successful selection closes the popup. */
+      type: "selected";
+    };
+/**
+ * Preserves catalog combobox disclosure and forced closing after selection.
+ * @param _open - Prior disclosure state.
+ * @param event - Current popup or selection intent.
+ * @returns Requested popup disclosure.
+ */
+function comboboxPopupReducer(_open: boolean, event: ComboboxPopupEvent) {
+  return event.type === "popupChanged" && event.open;
+}
 
 /**
  * Selectable catalog option displayed by a combobox.
@@ -51,6 +73,7 @@ type RemoveLabelBuilder = (name: string) => string;
  *
  * @param props - Catalog combobox properties.
  * @param props.ariaLabel - Accessible label for the combobox input and trigger.
+ * @param props.disabled - Whether input, selection, and removal controls are disabled.
  * @param props.items - Options available for selection.
  * @param props.onValueChange - Callback invoked with the selection, or `null` when cleared.
  * @param props.placeholder - Text shown in the empty search input and when no options match.
@@ -61,6 +84,7 @@ type RemoveLabelBuilder = (name: string) => string;
  */
 export function CatalogCombobox({
   ariaLabel,
+  disabled = false,
   items,
   onValueChange,
   placeholder,
@@ -72,6 +96,8 @@ export function CatalogCombobox({
    * Accessible label for the combobox input and trigger.
    */
   ariaLabel: string;
+  /** Whether input, selection, and removal controls are disabled. */
+  disabled?: boolean;
   /**
    * Options available for selection.
    */
@@ -103,18 +129,19 @@ export function CatalogCombobox({
    */
   value: ComboboxOption | null;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, dispatch] = React.useReducer(comboboxPopupReducer, false);
 
   return (
     <div className="grid gap-2">
       <ComboboxPrimitive.Root
+        disabled={disabled}
         isItemEqualToValue={(item, selected) => item.id === selected.id}
         itemToStringLabel={(item) => item.name}
         items={items}
-        onOpenChange={setOpen}
+        onOpenChange={(open) => dispatch({ type: "popupChanged", open })}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
-          setOpen(false);
+          dispatch({ type: "selected" });
         }}
         open={open}
         value={value}
@@ -125,6 +152,7 @@ export function CatalogCombobox({
       {showSelectedPill && removeLabel && value && value.id !== "default" ? (
         <SelectionPill
           className="bg-secondary text-secondary-foreground"
+          disabled={disabled}
           onRemove={() => onValueChange(null)}
           removeLabel={removeLabel}
           value={value}
@@ -225,7 +253,7 @@ export function CatalogMultiCombobox({
    */
   value: ComboboxOption[];
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, dispatch] = React.useReducer(comboboxPopupReducer, false);
 
   return (
     <div className="grid gap-2">
@@ -245,10 +273,10 @@ export function CatalogMultiCombobox({
         }
         multiple
         onInputValueChange={onInputValueChange}
-        onOpenChange={setOpen}
+        onOpenChange={(open) => dispatch({ type: "popupChanged", open })}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
-          setOpen(false);
+          dispatch({ type: "selected" });
         }}
         open={open}
         value={value}

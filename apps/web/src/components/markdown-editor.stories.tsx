@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import * as React from "react";
+import React from "react";
 import { expect, fireEvent, fn, mocked, waitFor, within } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { MarkdownEditor } from "./markdown-editor";

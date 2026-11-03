@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "react";
 
 /** Visual viewport measurements needed to calculate keyboard overlap. */
 type ViewportMetrics = {
@@ -43,35 +43,40 @@ export function keyboardInsetFromViewport(
  * @returns Current keyboard overlap in CSS pixels.
  */
 export function useKeyboardInset(enabled: boolean) {
-  const [inset, setInset] = React.useState(0);
-
-  React.useEffect(() => {
-    const viewport = window.visualViewport;
-
-    if (!(enabled && viewport)) {
-      setInset(0);
-      return;
-    }
-
-    /** Recalculates keyboard overlap from the current visual viewport. */
-    const update = () => {
-      setInset(
-        keyboardInsetFromViewport(window.innerHeight, {
-          height: viewport.height,
-          offsetTop: viewport.offsetTop,
-        }),
-      );
-    };
-
-    update();
-    viewport.addEventListener("resize", update);
-    viewport.addEventListener("scroll", update);
-
-    return () => {
-      viewport.removeEventListener("resize", update);
-      viewport.removeEventListener("scroll", update);
+  const source = React.useMemo(() => {
+    let inset = 0;
+    return {
+      /**
+       * Reads the cached keyboard overlap.
+       * @returns Last measured overlap in CSS pixels.
+       */
+      getSnapshot: () => inset,
+      /**
+       * Observes the enabled visual viewport after commit.
+       * @param notify - React subscription notification.
+       * @returns Visual viewport listener cleanup, when supported and enabled.
+       */
+      subscribe: (notify: () => void) => {
+        const viewport = window.visualViewport;
+        if (!(enabled && viewport)) return () => {};
+        /** Recalculates overlap before notifying React. */
+        const update = () => {
+          inset = keyboardInsetFromViewport(window.innerHeight, viewport);
+          notify();
+        };
+        update();
+        viewport.addEventListener("resize", update);
+        viewport.addEventListener("scroll", update);
+        return () => {
+          viewport.removeEventListener("resize", update);
+          viewport.removeEventListener("scroll", update);
+        };
+      },
     };
   }, [enabled]);
-
-  return inset;
+  return React.useSyncExternalStore(
+    source.subscribe,
+    source.getSnapshot,
+    () => 0,
+  );
 }

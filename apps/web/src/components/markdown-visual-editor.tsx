@@ -105,7 +105,7 @@ import {
   isSafeMarkdownLink,
   markdownToHtml,
 } from "@package/markdown";
-import * as React from "react";
+import React from "react";
 import "@milkdown/prose/view/style/prosemirror.css";
 
 /** Formats supported by the restricted visual editor. */

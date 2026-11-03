@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "react";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./markdown-editor";
 
 /** Properties for catalog description Markdown fields. */

@@ -6,11 +6,14 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import * as React from "react";
+import React from "react";
 import { fn, mocked } from "storybook/test";
 import { applyTheme, type ThemeMode } from "../src/lib/theme";
 import type { UserSettingsState } from "../src/lib/user-settings";
-import { LocaleProvider } from "../src/providers/locale-provider";
+import {
+  AuthenticatedLocaleSync,
+  LocaleProvider,
+} from "../src/providers/locale-provider";
 import { ThemeContext } from "../src/providers/theme-provider";
 import { TooltipProvider } from "../src/providers/tooltip-provider";
 
@@ -80,13 +83,17 @@ export function mockStoryRole(role: Role) {
  */
 export function StoryProviders({
   children,
+  initialSettingsState = storySettings,
 }: {
+  /** Optional server settings; null exercises the mocked account fetch. */
+  initialSettingsState?: UserSettingsState | null;
   /** Story content. */
   children: React.ReactNode;
 }) {
   return (
     <StoryRouter>
-      <LocaleProvider initialSettingsState={storySettings}>
+      <LocaleProvider initialSettingsState={initialSettingsState}>
+        <AuthenticatedLocaleSync initialSettingsState={initialSettingsState} />
         <StoryThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
         </StoryThemeProvider>
@@ -147,22 +154,11 @@ function StoryThemeProvider({
   /** Story content. */
   children: React.ReactNode;
 }) {
-  const [theme, setThemeState] = React.useState<ThemeMode>(
+  const theme = React.useSyncExternalStore<ThemeMode>(
+    subscribeStorybookTheme,
     currentStorybookTheme,
+    () => "light",
   );
-
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setThemeState(currentStorybookTheme());
-    });
-
-    observer.observe(document.documentElement, {
-      attributeFilter: ["class"],
-      attributes: true,
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const value = React.useMemo(
     () => ({
@@ -173,7 +169,6 @@ function StoryThemeProvider({
        * @param nextTheme - Theme selected by the story toolbar.
        */
       setTheme: (nextTheme: ThemeMode) => {
-        setThemeState(nextTheme);
         applyTheme(nextTheme);
       },
       theme,
@@ -184,4 +179,18 @@ function StoryThemeProvider({
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
+}
+
+/**
+ * Observes Storybook theme globals without owning application preference state.
+ * @param notify - React subscription notification.
+ * @returns Disposal of the document observer.
+ */
+function subscribeStorybookTheme(notify: () => void) {
+  const observer = new MutationObserver(notify);
+  observer.observe(document.documentElement, {
+    attributeFilter: ["class"],
+    attributes: true,
+  });
+  return () => observer.disconnect();
 }

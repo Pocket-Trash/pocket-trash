@@ -30,10 +30,15 @@ import {
   sliderMagnetLayouts,
 } from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
-import * as React from "react";
+import React from "react";
 import { createPortal } from "react-dom";
+import {
+  type EffectEntity,
+  type EffectReducer,
+  useEffectReducer,
+} from "use-effect-reducer";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
@@ -141,14 +146,19 @@ export function ProductFormPage({
   options: CatalogOptions;
 }) {
   const t = useCatalogCopy();
-  const [selectedType, setSelectedType] = React.useState<ComboboxOption | null>(
-    () =>
-      initialProduct
+  const typeForm = useForm({
+    defaultValues: {
+      productType: initialProduct
         ? {
             id: initialProduct.productTypeId,
             name: initialProduct.productTypeName,
           }
-        : null,
+        : (null as ComboboxOption | null),
+    },
+  });
+  const selectedType = useStore(
+    typeForm.store,
+    (state) => state.values.productType,
   );
   const productType =
     initialProduct?.productTypeSlug ??
@@ -167,7 +177,9 @@ export function ProductFormPage({
             <CatalogCombobox
               ariaLabel={t("web.catalog.field.productType")}
               items={initialOptions.productTypes}
-              onValueChange={setSelectedType}
+              onValueChange={(value) =>
+                typeForm.setFieldValue("productType", value)
+              }
               placeholder={t("web.catalog.selectProductType")}
               value={selectedType}
             />
@@ -210,6 +222,30 @@ const pensAdminActions = [
 /** One structured Pens administration action. */
 type PensAdminAction = (typeof pensAdminActions)[number];
 
+/** Pending Pens administrative save effect. */
+type PensAdminSaveState =
+  | EffectEntity<PensAdminSaveState, PensAdminSaveEvent>
+  | undefined;
+/** Administrative mutation and terminal events. */
+type PensAdminSaveEvent =
+  | {
+      /** Submits a structured administrative mutation. */
+      type: "requested";
+      /** Existing validated server input boundary. */
+      data: unknown;
+    }
+  | {
+      /** Clears the completed save effect. */
+      type: "finished";
+    };
+/** Committed Pens administration request. */
+type PensAdminSaveEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Existing server input payload. */
+  data: unknown;
+};
+
 /**
  * Renders structured Pens administration for an existing product.
  *
@@ -236,16 +272,106 @@ export function PensAdminEditor({
    */
   const copy = (key: string) => t(`web.pens.admin.${key}` as TranslationKey);
   const admin = options.pensAdminOptions;
-  const [action, setAction] = React.useState<PensAdminAction>(
-    product.productTypeSlug === "refill"
-      ? "refill-offering"
-      : "compatibility-group",
+  const form = useForm({
+    defaultValues: {
+      action: (product.productTypeSlug === "refill"
+        ? "refill-offering"
+        : "compatibility-group") as PensAdminAction,
+      primaryId: "",
+      secondaryId: "",
+      text: "",
+      text2: "",
+    },
+    validators: {
+      /**
+       * Requires the fields used by the selected structured action.
+       * @param context - Current administrative fields.
+       * @returns Existing required-field feedback for incomplete input.
+       */
+      onSubmit: ({ value }): string | undefined => {
+        const textAction =
+          value.action === "refill-tip-style" ||
+          value.action === "refill-ink-color";
+        if (
+          textAction
+            ? !value.text.trim() || !value.text2.trim()
+            : !value.primaryId
+        )
+          return "web.catalog.error.required";
+        if (
+          value.action === "refill-offering" &&
+          (!value.secondaryId || !value.text.trim())
+        )
+          return "web.catalog.error.required";
+        if (
+          value.action === "offering-identifier" &&
+          (!value.text.trim() || !value.text2)
+        )
+          return "web.catalog.error.required";
+        return undefined;
+      },
+    },
+    /**
+     * Submits the selected structured Pens administration action.
+     * @returns Nothing; the committed save owns response handling.
+     */
+    onSubmit: () => submit(),
+  });
+  const { action, primaryId, secondaryId, text, text2 } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [primaryId, setPrimaryId] = React.useState("");
-  const [secondaryId, setSecondaryId] = React.useState("");
-  const [text, setText] = React.useState("");
-  const [text2, setText2] = React.useState("");
-  const [message, setMessage] = React.useState<string | null>(null);
+  const message = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const pending = React.useRef<ReturnType<typeof authorCatalogPensData> | null>(
+    null,
+  );
+  const [saving, dispatch] = useEffectReducer<
+    PensAdminSaveState,
+    PensAdminSaveEvent,
+    PensAdminSaveEffect
+  >(
+    (
+      state: EffectEntity<PensAdminSaveState, PensAdminSaveEvent> | undefined,
+      event: PensAdminSaveEvent,
+      exec,
+    ) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "save", data: event.data });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined as PensAdminSaveState,
+    {
+      /**
+       * Runs a single administrative mutation and observes it across resumption.
+       * @param _state - Current pending effect.
+       * @param effect - Submitted structured payload.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect: PensAdminSaveEffect, dispatch, { signal }) => {
+        pending.current ??= authorCatalogPensData({ data: effect.data });
+        void pending.current.then(
+          (result) => {
+            if (signal.aborted) return;
+            pending.current = null;
+            dispatch({ type: "finished" });
+            if (!result.ok) {
+              form.setErrorMap({ onSubmit: result.formError });
+              return;
+            }
+            window.location.reload();
+          },
+          () => {
+            if (signal.aborted) return;
+            pending.current = null;
+            dispatch({ type: "finished" });
+            form.setErrorMap({ onSubmit: "error.generic" });
+          },
+        );
+      },
+    },
+  );
   if (!admin) return null;
 
   const compatibilityMemberships = admin.compatibilityMemberships
@@ -326,9 +452,9 @@ export function PensAdminEditor({
   /**
    * Validates and submits the selected structured mutation.
    *
-   * @returns A promise that resolves after the response is handled.
+   * @returns Nothing; response handling belongs to the committed save.
    */
-  const submit = async () => {
+  const submit = () => {
     const id = Number(primaryId);
     const id2 = Number(secondaryId);
     const data: unknown =
@@ -367,12 +493,7 @@ export function PensAdminEditor({
                     name: text,
                     slug: text2,
                   };
-    const result = await authorCatalogPensData({ data });
-    if (!result.ok) {
-      setMessage(result.formError);
-      return;
-    }
-    window.location.reload();
+    dispatch({ type: "requested", data });
   };
 
   return (
@@ -384,33 +505,52 @@ export function PensAdminEditor({
         t("web.pens.admin.actionLabel" as TranslationKey),
         action,
         (value) => {
-          setAction(value as PensAdminAction);
-          setPrimaryId("");
-          setSecondaryId("");
-          setMessage(null);
+          form.setFieldValue("action", value as PensAdminAction);
+          form.setFieldValue("primaryId", "");
+          form.setFieldValue("secondaryId", "");
+          form.setErrorMap({ onSubmit: undefined });
         },
         pensAdminActions.map((id) => ({ id, name: copy(`action.${id}`) })),
       )}
       {action === "refill-offering" ? (
         <>
-          {select(copy("tipStyle"), primaryId, setPrimaryId, admin.tipStyles)}
+          {select(
+            copy("tipStyle"),
+            primaryId,
+            (value) => form.setFieldValue("primaryId", value),
+            admin.tipStyles,
+          )}
           {select(
             copy("inkColor"),
             secondaryId,
-            setSecondaryId,
+            (value) => form.setFieldValue("secondaryId", value),
             admin.inkColors,
           )}
-          {input(copy("tipSize"), text, setText)}
+          {input(copy("tipSize"), text, (value) =>
+            form.setFieldValue("text", value),
+          )}
         </>
       ) : null}
       {action === "offering-identifier" ? (
         <>
-          {select(copy("offering"), primaryId, setPrimaryId, admin.offerings)}
-          {input(copy("identifier"), text, setText)}
-          {select(copy("identifierKindLabel"), text2, setText2, [
-            { id: "maker-code", name: copy("identifierKind.makerCode") },
-            { id: "sku", name: copy("identifierKind.sku") },
-          ])}
+          {select(
+            copy("offering"),
+            primaryId,
+            (value) => form.setFieldValue("primaryId", value),
+            admin.offerings,
+          )}
+          {input(copy("identifier"), text, (value) =>
+            form.setFieldValue("text", value),
+          )}
+          {select(
+            copy("identifierKindLabel"),
+            text2,
+            (value) => form.setFieldValue("text2", value),
+            [
+              { id: "maker-code", name: copy("identifierKind.makerCode") },
+              { id: "sku", name: copy("identifierKind.sku") },
+            ],
+          )}
         </>
       ) : null}
       {action === "compatibility-membership" ? (
@@ -418,7 +558,7 @@ export function PensAdminEditor({
           {select(
             copy("compatibilityGroup"),
             primaryId,
-            setPrimaryId,
+            (value) => form.setFieldValue("primaryId", value),
             admin.compatibilityGroups,
           )}
         </>
@@ -427,27 +567,34 @@ export function PensAdminEditor({
         ? select(
             copy("compatibilityMembership"),
             primaryId,
-            setPrimaryId,
+            (value) => form.setFieldValue("primaryId", value),
             compatibilityMemberships,
           )
         : null}
       {action === "refill-tip-style" || action === "refill-ink-color" ? (
         <>
-          {input(copy("name"), text, setText)}
-          {input(copy("slug"), text2, setText2)}
+          {input(copy("name"), text, (value) =>
+            form.setFieldValue("text", value),
+          )}
+          {input(copy("slug"), text2, (value) =>
+            form.setFieldValue("text2", value),
+          )}
         </>
       ) : null}
       {action === "compatibility-group"
         ? select(
             copy("registeredGroup"),
             primaryId,
-            setPrimaryId,
+            (value) => form.setFieldValue("primaryId", value),
             admin.compatibilityGroupConcepts,
           )
         : null}
-      {message ? <Notice>{t(message as TranslationKey)}</Notice> : null}
+      {typeof message === "string" ? (
+        <Notice>{t(message as TranslationKey)}</Notice>
+      ) : null}
       <Button
-        onClick={() => void submit()}
+        disabled={Boolean(saving)}
+        onClick={() => void form.handleSubmit()}
         type="button"
         variant={action.endsWith("-remove") ? "destructive" : "default"}
       >
@@ -541,6 +688,163 @@ type ProductEditorValue = Omit<
   width: EditableDimensionMeasurement;
 };
 
+/** Product save feedback owned by TanStack Form. */
+type ProductValidation = {
+  /** Localized form feedback. */
+  form: string;
+  /** Field errors returned by the existing schema or server. */
+  fields?: Record<string, string[] | undefined>;
+};
+/** Product editor disclosures, shared options, and committed save lifetime. */
+type ProductEditorState = {
+  /** Current shared lookup choices. */
+  options: CatalogOptions;
+  /** Identifier retained after saving before an upload retry. */
+  savedProductId: number | null;
+  /** Whether assignment weight fields are exposed. */
+  showMaterialWeights: boolean;
+  /** Whether changing layout discarded an incompatible snapshot. */
+  magnetConfigurationNotice: boolean;
+  /** Part type currently being created. */
+  activePartType: PenPartProductType | null;
+  /** Disclosed part compatibility roles. */
+  openPartRoles: Set<PenPartProductType>;
+  /** Whether Markdown initialization is pending. */
+  descriptionLoading: boolean;
+  /** Current save effect, absent after terminal feedback. */
+  save: EffectEntity<ProductEditorState, ProductEditorEvent> | undefined;
+};
+/** Product editing intents and save completion. */
+type ProductEditorEvent =
+  | {
+      /** Accepts the stable shared-control options callback. */
+      type: "lookupOptionsChanged";
+      /** Complete choices or a pure updater from an existing caller. */
+      update: React.SetStateAction<CatalogOptions>;
+    }
+  | {
+      /** Changes assignment weight disclosure. */
+      type: "materialWeightsToggled";
+    }
+  | {
+      /** Records a discarded incompatible magnet snapshot. */
+      type: "magnetSnapshotDiscarded";
+    }
+  | {
+      /** Opens or closes embedded part creation. */
+      type: "partCreationChanged";
+      /** Part type being created, absent when closed. */
+      partType: PenPartProductType | null;
+    }
+  | {
+      /** Toggles one compatibility role disclosure. */
+      type: "partRoleToggled";
+      /** Compatibility role to disclose. */
+      role: PenPartProductType;
+    }
+  | {
+      /** Receives committed editor readiness. */
+      type: "descriptionLoadingChanged";
+      /** Whether initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Submits validated fields and the current file selection. */
+      type: "saveRequested";
+      /** Validated product fields. */
+      value: ProductEditorValue;
+      /** Optional moderation reason. */
+      reason?: string;
+      /** Files belonging to this save attempt. */
+      files: File[];
+    }
+  | {
+      /** Completes a save attempt, including a retryable upload failure. */
+      type: "saveFinished";
+      /** Identifier returned before any image upload. */
+      productId?: number;
+    };
+/** One validated product save and its ordered uploads. */
+type ProductEditorEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Captured validated fields, including the last saved identifier. */
+  value: ProductEditorValue;
+  /** Optional moderation reason. */
+  reason?: string;
+  /** Files selected at submission. */
+  files: File[];
+};
+/** Product save result retained while its UI is suspended. */
+type ProductSaveResult = {
+  /** Saved product, including when a subsequent upload failed. */
+  product?: CatalogProduct;
+  /** Files requiring retry. */
+  files: File[];
+  /** Existing localized failure response. */
+  error?: ProductValidation;
+};
+/**
+ * Owns product UI and save transitions without performing mutations in render.
+ * @param state - Current editor controls and save lifetime.
+ * @param event - Editing intent or terminal save event.
+ * @param exec - Committed effect queue.
+ * @returns Updated controls and pending save.
+ */
+const productEditorReducer: EffectReducer<
+  ProductEditorState,
+  ProductEditorEvent,
+  ProductEditorEffect
+> = (state, event, exec) => {
+  switch (event.type) {
+    case "lookupOptionsChanged":
+      return {
+        ...state,
+        options:
+          typeof event.update === "function"
+            ? event.update(state.options)
+            : event.update,
+      };
+    case "materialWeightsToggled":
+      return { ...state, showMaterialWeights: !state.showMaterialWeights };
+    case "magnetSnapshotDiscarded":
+      return { ...state, magnetConfigurationNotice: true };
+    case "partCreationChanged":
+      return { ...state, activePartType: event.partType };
+    case "partRoleToggled": {
+      const roles = new Set(state.openPartRoles);
+      if (roles.has(event.role)) roles.delete(event.role);
+      else roles.add(event.role);
+      return { ...state, openPartRoles: roles };
+    }
+    case "descriptionLoadingChanged":
+      return state.descriptionLoading === event.loading
+        ? state
+        : { ...state, descriptionLoading: event.loading };
+    case "saveRequested":
+      if (state.save) return state;
+      return {
+        ...state,
+        save: exec({
+          type: "save",
+          value: {
+            ...event.value,
+            productId: state.savedProductId ?? event.value.productId,
+          },
+          reason: event.reason,
+          files: event.files,
+        }),
+      };
+    case "saveFinished":
+      exec.stop(state.save);
+      return {
+        ...state,
+        savedProductId: event.productId ?? state.savedProductId,
+        save: undefined,
+      };
+  }
+};
+
 /** Properties for the product material-combination editor. */
 type MaterialAssignmentsEditorProps = {
   /**
@@ -561,6 +865,33 @@ type MaterialAssignmentsEditorProps = {
   value: ProductEditorValue["materialAssignments"];
 };
 
+/** Material sheet context; edited fields belong to its form. */
+type MaterialAssignmentSession = {
+  /** Whether the sheet is visible. */
+  open: boolean;
+  /** Initial assignment and its identity in this form session. */
+  initial: {
+    /** Existing assignment position, or new assignment. */
+    index: number | null;
+    /** Editable component and weight fields. */
+    assignment: ProductEditorValue["materialAssignments"][number];
+  };
+};
+/** Material sheet disclosure events. */
+type MaterialAssignmentEvent =
+  | {
+      /** Begins editing an existing or new assignment. */
+      type: "opened";
+      /** Existing assignment position. */
+      index: number | null;
+      /** Initial editable assignment. */
+      assignment: MaterialAssignmentSession["initial"]["assignment"];
+    }
+  | {
+      /** Dismisses or saves this editing session. */
+      type: "closed";
+    };
+
 /**
  * Edits each material combination in a focused modal.
  *
@@ -575,15 +906,87 @@ export function MaterialAssignmentsEditor({
   t,
   value,
 }: MaterialAssignmentsEditorProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
-  const [draft, setDraft] = React.useState<
-    ProductEditorValue["materialAssignments"][number]
-  >({
-    materials: [{ materialId: 0, materialSpecificId: null }],
-    weight: { unit: "g", value: "" },
+  const [editing, dispatch] = React.useReducer(
+    (
+      state: MaterialAssignmentSession,
+      event: MaterialAssignmentEvent,
+    ): MaterialAssignmentSession => {
+      switch (event.type) {
+        case "opened":
+          return {
+            open: true,
+            initial: { index: event.index, assignment: event.assignment },
+          };
+        case "closed":
+          return { ...state, open: false };
+      }
+    },
+    {
+      open: false,
+      initial: {
+        index: null,
+        assignment: {
+          materials: [{ materialId: 0, materialSpecificId: null }],
+          weight: { unit: "g", value: "" },
+        },
+      },
+    },
+  );
+  /**
+   * Validates component completeness and uniqueness within this draft and product.
+   * @param input - Draft fields and the existing assignment identity.
+   * @returns Existing immediate validation categories, when invalid.
+   */
+  const validateDraft = ({
+    value: current,
+  }: {
+    /** Draft form values. */ value: MaterialAssignmentSession["initial"];
+  }) => {
+    const signatures = current.assignment.materials
+      .filter(({ materialId }) => materialId !== 0)
+      .map(
+        ({ materialId, materialSpecificId }) =>
+          `${materialId}:${materialSpecificId ?? "general"}`,
+      );
+    const incomplete =
+      current.assignment.materials.length === 0 ||
+      current.assignment.materials.some(({ materialId }) => materialId === 0);
+    const duplicate =
+      new Set(signatures).size !== signatures.length ||
+      value.some(
+        (assignment, index) =>
+          index !== current.index &&
+          materialCombinationSignature(assignment) ===
+            materialCombinationSignature(current.assignment),
+      );
+    return incomplete || duplicate ? { incomplete, duplicate } : undefined;
+  };
+  const draftForm = useForm({
+    defaultValues: editing.initial,
+    validators: {
+      onMount: validateDraft,
+      onChange: validateDraft,
+      onSubmit: validateDraft,
+    },
+    /**
+     * Applies one valid combination through the existing controlled callback.
+     * @param input - Validated assignment and its edit identity.
+     */
+    onSubmit: ({ value: current }) => {
+      onChange(
+        current.index === null
+          ? [...value, current.assignment]
+          : value.map((assignment, index) =>
+              index === current.index ? current.assignment : assignment,
+            ),
+      );
+      dispatch({ type: "closed" });
+    },
   });
-
+  const draft = useStore(draftForm.store, (state) => state.values.assignment);
+  const feedback = useStore(draftForm.store, (state) => state.errors[0]);
+  const canSave = useStore(draftForm.store, (state) => state.canSubmit);
+  const isOpen = editing.open;
   /**
    * Opens a new or existing material combination.
    *
@@ -602,9 +1005,10 @@ export function MaterialAssignmentsEditor({
           }
         : value[index];
     if (!assignment) return;
-    setEditingIndex(index);
-    setDraft(structuredClone(assignment));
-    setIsOpen(true);
+    const initial = structuredClone(assignment);
+    draftForm.reset({ index, assignment: initial });
+    void draftForm.validate("mount");
+    dispatch({ type: "opened", index, assignment: initial });
   };
   /**
    * Resolves one stored combination to its current display label.
@@ -627,25 +1031,6 @@ export function MaterialAssignmentsEditor({
         };
       }),
     );
-  const componentSignatures = draft.materials
-    .filter(({ materialId }) => materialId !== 0)
-    .map(
-      ({ materialId, materialSpecificId }) =>
-        `${materialId}:${materialSpecificId ?? "general"}`,
-    );
-  const hasDuplicateComponent =
-    new Set(componentSignatures).size !== componentSignatures.length;
-  const hasDuplicateAssignment = value.some(
-    (assignment, index) =>
-      index !== editingIndex &&
-      materialCombinationSignature(assignment) ===
-        materialCombinationSignature(draft),
-  );
-  const hasIncompleteComponent =
-    draft.materials.length === 0 ||
-    draft.materials.some(({ materialId }) => materialId === 0);
-  const hasInvalidDraft =
-    hasIncompleteComponent || hasDuplicateComponent || hasDuplicateAssignment;
 
   return (
     <>
@@ -693,16 +1078,18 @@ export function MaterialAssignmentsEditor({
               a.name.localeCompare(b.name),
             ),
           }));
-          setDraft((current) => ({
-            ...current,
-            materials: [
-              ...current.materials.filter(({ materialId }) => materialId !== 0),
-              { materialId: material.id, materialSpecificId: null },
-            ],
-          }));
+          draftForm.setFieldValue("assignment.materials", (current) => [
+            ...current.filter(({ materialId }) => materialId !== 0),
+            { materialId: material.id, materialSpecificId: null },
+          ]);
         }}
       />
-      <Sheet onOpenChange={setIsOpen} open={isOpen}>
+      <Sheet
+        onOpenChange={(open) => {
+          if (!open) dispatch({ type: "closed" });
+        }}
+        open={isOpen}
+      >
         <SheetContent className="sm:w-[40rem] sm:max-w-[90vw]">
           <SheetHeader>
             <SheetTitle>
@@ -721,9 +1108,8 @@ export function MaterialAssignmentsEditor({
                   })}
                   items={options.materials}
                   onValueChange={(material) =>
-                    setDraft((current) => ({
-                      ...current,
-                      materials: current.materials.map((row, i) =>
+                    draftForm.setFieldValue("assignment.materials", (current) =>
+                      current.map((row, i) =>
                         i === index
                           ? {
                               materialId: Number(material?.id ?? 0),
@@ -731,7 +1117,7 @@ export function MaterialAssignmentsEditor({
                             }
                           : row,
                       ),
-                    }))
+                    )
                   }
                   placeholder={t("web.catalog.selectMaterial")}
                   value={
@@ -746,9 +1132,8 @@ export function MaterialAssignmentsEditor({
                     ({ materialId }) => materialId === selection.materialId,
                   )}
                   onValueChange={(specific) =>
-                    setDraft((current) => ({
-                      ...current,
-                      materials: current.materials.map((row, i) =>
+                    draftForm.setFieldValue("assignment.materials", (current) =>
+                      current.map((row, i) =>
                         i === index
                           ? {
                               ...row,
@@ -758,7 +1143,7 @@ export function MaterialAssignmentsEditor({
                             }
                           : row,
                       ),
-                    }))
+                    )
                   }
                   placeholder={t("web.materials.specific.general")}
                   removeLabel={t("web.action.close")}
@@ -772,12 +1157,9 @@ export function MaterialAssignmentsEditor({
                 <Button
                   aria-label={t("web.action.close")}
                   onClick={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      materials: current.materials.filter(
-                        (_, i) => i !== index,
-                      ),
-                    }))
+                    draftForm.setFieldValue("assignment.materials", (current) =>
+                      current.filter((_, i) => i !== index),
+                    )
                   }
                   type="button"
                   variant="outline"
@@ -788,49 +1170,37 @@ export function MaterialAssignmentsEditor({
             ))}
             <Button
               onClick={() =>
-                setDraft((current) => ({
+                draftForm.setFieldValue("assignment.materials", (current) => [
                   ...current,
-                  materials: [
-                    ...current.materials,
-                    { materialId: 0, materialSpecificId: null },
-                  ],
-                }))
+                  { materialId: 0, materialSpecificId: null },
+                ])
               }
               type="button"
               variant="outline"
             >
               {t("web.catalog.materialCombination.addSingle")}
             </Button>
-            {hasIncompleteComponent ? (
+            {feedback?.incomplete ? (
               <p className="text-sm text-destructive" role="alert">
                 {t("web.catalog.materialCombination.empty")}
               </p>
             ) : null}
-            {hasDuplicateComponent || hasDuplicateAssignment ? (
+            {feedback?.duplicate ? (
               <p className="text-sm text-destructive" role="alert">
                 {t("web.catalog.materialCombination.duplicate")}
               </p>
             ) : null}
             <div className="flex justify-end gap-2">
               <Button
-                onClick={() => setIsOpen(false)}
+                onClick={() => dispatch({ type: "closed" })}
                 type="button"
                 variant="outline"
               >
                 {t("action.cancel")}
               </Button>
               <Button
-                disabled={hasInvalidDraft}
-                onClick={() => {
-                  onChange(
-                    editingIndex === null
-                      ? [...value, draft]
-                      : value.map((assignment, index) =>
-                          index === editingIndex ? draft : assignment,
-                        ),
-                  );
-                  setIsOpen(false);
-                }}
+                disabled={!canSave}
+                onClick={() => void draftForm.handleSubmit()}
                 type="button"
               >
                 {t("action.save")}
@@ -885,28 +1255,168 @@ export function ProductEditor({
   const imageGuidance = getImageUploadGuidance(locale);
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [options, setOptions] = React.useState(initialOptions);
-  const [images, setImages] = React.useState<File[]>([]);
-  const [existingImages, setExistingImages] = React.useState(
-    initialProduct?.images ?? [],
+  const imageForm = useForm({
+    defaultValues: {
+      pending: [] as File[],
+      existing: initialProduct?.images ?? [],
+    },
+  });
+  const images = useStore(imageForm.store, (state) => state.values.pending);
+  const existingImages = useStore(
+    imageForm.store,
+    (state) => state.values.existing,
   );
-  const [savedProductId, setSavedProductId] = React.useState<number | null>(
-    initialProduct?.id ?? null,
+  const pendingSave = React.useRef<Promise<ProductSaveResult> | null>(null);
+  const [ui, dispatch] = useEffectReducer(
+    productEditorReducer,
+    () => ({
+      options: initialOptions,
+      savedProductId: initialProduct?.id ?? null,
+      showMaterialWeights:
+        initialProduct?.materials.some(({ weight }) => weight !== null) ??
+        false,
+      magnetConfigurationNotice: false,
+      activePartType: null,
+      openPartRoles: new Set(
+        initialProduct?.compatibleParts.map(
+          ({ productTypeSlug }) => productTypeSlug as PenPartProductType,
+        ) ?? [],
+      ),
+      descriptionLoading: true,
+      save: undefined,
+    }),
+    {
+      /**
+       * Runs one submitted mutation and reattaches to it after Activity resumption.
+       * @param _state - State that queued this attempt.
+       * @param effect - Captured validated submission.
+       * @param dispatch - Terminal save dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        // Retain the mutation promise across Activity; resumption only reattaches feedback.
+        pendingSave.current ??= (async (): Promise<ProductSaveResult> => {
+          let product: CatalogProduct | undefined;
+          try {
+            const result = await saveCatalogProduct({
+              data: { ...effect.value, reason: effect.reason },
+            });
+            if (!result.ok)
+              return {
+                files: effect.files,
+                error: { form: result.formError, fields: result.fieldErrors },
+              };
+            product = result.product;
+            if (quickCreate || effect.files.length === 0)
+              return { product, files: [] };
+            const uploads = await uploadImages({
+              locale,
+              files: effect.files,
+              getToken,
+              /**
+               * Offers to restore an owner-deleted duplicate before continuing uploads.
+               * @param imageId - Duplicate image identifier.
+               * @returns Whether the owner accepted and restored the image.
+               */
+              onOwnerDeletedDuplicate: async (imageId) => {
+                if (
+                  !window.confirm(
+                    t("web.resources.trash.restoreConfirmationDescription", {
+                      name: result.product.name,
+                    }),
+                  )
+                )
+                  return false;
+                await restoreCatalogImage({
+                  data: {
+                    imageId,
+                    reason: effect.reason,
+                    targetType: "product",
+                  },
+                });
+                return true;
+              },
+              targetId: product.id,
+              targetType: "product",
+              reason: effect.reason,
+            });
+            return {
+              product,
+              files: uploads.failed,
+              error: uploads.failed.length
+                ? { form: "web.resources.upload.sessionFailure" }
+                : undefined,
+            };
+          } catch (error) {
+            return {
+              product,
+              files: effect.files,
+              error: {
+                form: (error as ImageUploadError).key ?? "error.generic",
+              },
+            };
+          }
+        })();
+        void pendingSave.current.then((result) => {
+          if (signal.aborted) return;
+          pendingSave.current = null;
+          dispatch({ type: "saveFinished", productId: result.product?.id });
+          imageForm.setFieldValue("pending", (current) =>
+            current.filter(
+              (file) =>
+                !effect.files.includes(file) || result.files.includes(file),
+            ),
+          );
+          if (result.error) {
+            form.setErrorMap({ onSubmit: result.error });
+            return;
+          }
+          if (!result.product) return;
+          if (onCreated) {
+            onCreated(result.product);
+            return;
+          }
+          if (!quickCreate)
+            void navigate({
+              params: {
+                productSlug: result.product.slug,
+                productTypeSlug: result.product.productTypeSlug,
+              },
+              to: "/products/$productTypeSlug/$productSlug",
+            });
+        });
+      },
+    },
   );
-  const [serverErrors, setServerErrors] = React.useState<
-    Record<string, string[] | undefined>
-  >({});
-  const [formError, setFormError] = React.useState<string | null>(null);
+  const {
+    options,
+    showMaterialWeights,
+    magnetConfigurationNotice,
+    activePartType,
+    openPartRoles,
+    descriptionLoading,
+  } = ui;
   const supportsMaterialWeights =
     productTypeSlug === "spinner" ||
     productTypeSlug === "spinner-button" ||
     productTypeSlug === "slider";
-  const [showMaterialWeights, setShowMaterialWeights] = React.useState(
-    () =>
-      initialProduct?.materials.some(({ weight }) => weight !== null) ?? false,
+  /**
+   * Accepts the existing shared-control lookup update contract.
+   * @param update - Replacement choices or a pure options updater.
+   * @returns Nothing.
+   */
+  const receiveOptions = (update: React.SetStateAction<CatalogOptions>) =>
+    dispatch({ type: "lookupOptionsChanged", update });
+  /**
+   * Receives editor readiness through a stable callback for existing Markdown callers.
+   * @param loading - Whether the editor is initializing.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => {
+      dispatch({ type: "descriptionLoadingChanged", loading });
+    },
+    [dispatch],
   );
-  const [magnetConfigurationNotice, setMagnetConfigurationNotice] =
-    React.useState(false);
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const plateDialog = React.useRef<HTMLDialogElement>(null);
   const plateTrigger = React.useRef<HTMLButtonElement>(null);
@@ -917,20 +1427,20 @@ export function ProductEditor({
   const partDialog = React.useRef<HTMLDialogElement>(null);
   const partTrigger = React.useRef<HTMLButtonElement>(null);
   const partDialogTitleId = React.useId();
-  const [activePartType, setActivePartType] =
-    React.useState<PenPartProductType | null>(null);
-  const [openPartRoles, setOpenPartRoles] = React.useState(
-    () =>
-      new Set(
-        initialProduct?.compatibleParts.map(
-          ({ productTypeSlug }) => productTypeSlug as PenPartProductType,
-        ) ?? [],
-      ),
-  );
-  React.useEffect(() => {
-    if (activePartType) partDialog.current?.showModal();
-  }, [activePartType]);
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
+  /**
+   * Owns the part-creation modal from its committed DOM lifetime.
+   * @param node - Current modal node.
+   * @returns Cleanup closing only this mounted dialog.
+   */
+  const bindPartDialog = React.useCallback((node: HTMLDialogElement | null) => {
+    partDialog.current = node;
+    if (!node) return;
+    node.showModal();
+    return () => {
+      node.close();
+      if (partDialog.current === node) partDialog.current = null;
+    };
+  }, []);
   const defaultValues: ProductEditorValue = {
     aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
@@ -1002,19 +1512,33 @@ export function ProductEditor({
   };
   const form = useForm({
     defaultValues,
+    validators: {
+      /**
+       * Keeps schema and file validation in the form before any mutation starts.
+       * @param context - Current form values.
+       * @returns Existing field and form errors, if validation fails.
+       */
+      onSubmit: ({ value }): ProductValidation | undefined => {
+        const result = productFormSchema.safeParse(value);
+        if (!result.success)
+          return {
+            fields: z.flattenError(result.error).fieldErrors,
+            form: "web.catalog.error.form",
+          };
+        const imageError = validateImages(
+          imageForm.state.values.pending,
+          locale,
+        );
+        if (imageError) return { form: imageError.key };
+        return undefined;
+      },
+    },
     /**
-     * Saves the current product editor values.
-     *
-     * @param root0 - Form submission state.
-     * @param root0.value - Current product field values.
-     * @returns A promise that resolves after the save flow completes.
+     * Queues one validated save with its moderation reason and selected files.
+     * @param context - Validated form submission.
      */
-    onSubmit: async ({ value }) => {
-      if (descriptionRef.current?.isLoading()) return;
-      const currentValue = {
-        ...value,
-        description: descriptionRef.current?.getValue() ?? value.description,
-      };
+    onSubmit: ({ value }) => {
+      if (descriptionRef.current?.isLoading() || ui.save) return;
       const moderating = Boolean(
         initialProduct?.canAdminister && !initialProduct.isOwner,
       );
@@ -1022,87 +1546,16 @@ export function ProductEditor({
         ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
         : undefined;
       if (moderating && !reason) return;
-      const clientResult = productFormSchema.safeParse(currentValue);
-      if (!clientResult.success) {
-        setServerErrors(z.flattenError(clientResult.error).fieldErrors);
-        setFormError("web.catalog.error.form");
-        return;
-      }
-      const imageError = validateImages(images, locale);
-      if (imageError) {
-        setFormError(imageError.key);
-        return;
-      }
-      const result = await saveCatalogProduct({
-        data: {
-          ...currentValue,
-          productId: savedProductId ?? value.productId,
-          reason,
-        },
-      });
-      if (!result.ok) {
-        setServerErrors(result.fieldErrors);
-        setFormError(result.formError);
-        return;
-      }
-      setSavedProductId(result.product.id);
-      if (quickCreate) {
-        onCreated?.(result.product);
-        return;
-      }
-      if (images.length) {
-        try {
-          const uploads = await uploadImages({
-            locale,
-            files: images,
-            getToken,
-            /**
-             * Offers to restore an owner-deleted duplicate image.
-             *
-             * @param imageId - Duplicate image identifier.
-             * @returns Whether the duplicate was restored.
-             */
-            onOwnerDeletedDuplicate: async (imageId) => {
-              if (
-                !window.confirm(
-                  t("web.resources.trash.restoreConfirmationDescription", {
-                    name: result.product.name,
-                  }),
-                )
-              )
-                return false;
-              await restoreCatalogImage({
-                data: { imageId, reason, targetType: "product" },
-              });
-              return true;
-            },
-            targetId: result.product.id,
-            targetType: "product",
-            reason,
-          });
-          setImages(uploads.failed);
-          if (uploads.failed.length) {
-            setFormError("web.resources.upload.sessionFailure");
-            return;
-          }
-        } catch (error) {
-          setFormError((error as ImageUploadError).key ?? "error.generic");
-          return;
-        }
-      }
-      if (onCreated) {
-        onCreated(result.product);
-        return;
-      }
-      await navigate({
-        params: {
-          productSlug: result.product.slug,
-          productTypeSlug: result.product.productTypeSlug,
-        },
-        to: "/products/$productTypeSlug/$productSlug",
+      dispatch({
+        type: "saveRequested",
+        value,
+        reason,
+        files: imageForm.state.values.pending,
       });
     },
   });
+  const serverErrors = useStore(form.store, (state) => state.fieldMeta);
+  const formError = useStore(form.store, (state) => state.errorMap.onSubmit);
 
   /**
    * Replaces the layout and clears an incompatible snapshot.
@@ -1115,7 +1568,7 @@ export function ProductEditor({
       form.state.values.magnetConfiguration !== null
     ) {
       form.setFieldValue("magnetConfiguration", null);
-      setMagnetConfigurationNotice(true);
+      dispatch({ type: "magnetSnapshotDiscarded" });
     }
     form.setFieldValue("magnetLayout", layout);
   };
@@ -1126,6 +1579,12 @@ export function ProductEditor({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        if (descriptionRef.current?.isLoading() || ui.save) return;
+        form.setFieldValue(
+          "description",
+          descriptionRef.current?.getValue() ?? form.state.values.description,
+        );
+        form.setErrorMap({ onSubmit: { form: "", fields: {} } });
         void form.handleSubmit();
       }}
     >
@@ -1141,7 +1600,7 @@ export function ProductEditor({
                 required
                 value={field.state.value}
               />
-              <FieldError error={serverErrors.name?.[0]} t={t} />
+              <FieldError error={serverErrors.name?.errors[0]} t={t} />
             </Field>
           )}
         </form.Field>
@@ -1176,7 +1635,7 @@ export function ProductEditor({
                 <LookupDialog
                   kind="maker"
                   onCreated={(maker) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       makers: [...current.makers, maker].sort((a, b) =>
                         a.name.localeCompare(b.name),
@@ -1186,7 +1645,7 @@ export function ProductEditor({
                   }}
                   t={t}
                 />
-                <FieldError error={serverErrors.makerId?.[0]} t={t} />
+                <FieldError error={serverErrors.makerId?.errors[0]} t={t} />
               </Field>
             );
           }}
@@ -1215,7 +1674,7 @@ export function ProductEditor({
                     kind="terminologyAlias"
                     makerId={makerId}
                     onCreated={(terminologyAlias) =>
-                      setOptions((current) => ({
+                      receiveOptions((current) => ({
                         ...current,
                         terminologyAliases: [
                           ...(current.terminologyAliases ?? []),
@@ -1326,7 +1785,10 @@ export function ProductEditor({
                 >
                   {t("web.catalog.help.productLinks")}
                 </p>
-                <FieldError error={serverErrors.productLinks?.[0]} t={t} />
+                <FieldError
+                  error={serverErrors.productLinks?.errors[0]}
+                  t={t}
+                />
               </Field>
             )}
           </form.Field>
@@ -1347,7 +1809,7 @@ export function ProductEditor({
                   }
                   value={field.state.value.join(", ")}
                 />
-                <FieldError error={serverErrors.aliases?.[0]} t={t} />
+                <FieldError error={serverErrors.aliases?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1369,7 +1831,7 @@ export function ProductEditor({
                     ) ?? null
                   }
                 />
-                <FieldError error={serverErrors.mechanismId?.[0]} t={t} />
+                <FieldError error={serverErrors.mechanismId?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1385,7 +1847,7 @@ export function ProductEditor({
                   required
                   value={field.state.value ?? ""}
                 />
-                <FieldError error={serverErrors.refillModel?.[0]} t={t} />
+                <FieldError error={serverErrors.refillModel?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1396,7 +1858,7 @@ export function ProductEditor({
               <Field label={t("web.catalog.field.materials")}>
                 <MaterialAssignmentsEditor
                   onChange={field.handleChange}
-                  onOptionsChange={setOptions}
+                  onOptionsChange={receiveOptions}
                   options={options}
                   singleAssignment={productTypeSlug === "slider-insert"}
                   t={t}
@@ -1407,7 +1869,9 @@ export function ProductEditor({
                     <Button
                       aria-pressed={showMaterialWeights}
                       className="w-fit"
-                      onClick={() => setShowMaterialWeights((shown) => !shown)}
+                      onClick={() =>
+                        dispatch({ type: "materialWeightsToggled" })
+                      }
                       type="button"
                       variant="outline"
                     >
@@ -1482,7 +1946,7 @@ export function ProductEditor({
                   </div>
                 ) : null}
                 <FieldError
-                  error={serverErrors.materialAssignments?.[0]}
+                  error={serverErrors.materialAssignments?.errors[0]}
                   t={t}
                 />
               </Field>
@@ -1496,14 +1960,14 @@ export function ProductEditor({
               {(field) => (
                 <FinishOptionsEditor
                   onChange={field.handleChange}
-                  onOptionsChange={setOptions}
+                  onOptionsChange={receiveOptions}
                   options={options}
                   t={t}
                   value={field.state.value}
                 />
               )}
             </form.Field>
-            <FieldError error={serverErrors.finishOptions?.[0]} t={t} />
+            <FieldError error={serverErrors.finishOptions?.errors[0]} t={t} />
           </>
         ) : null}
 
@@ -1585,7 +2049,7 @@ export function ProductEditor({
                       value={selected}
                     />
                     <FieldError
-                      error={serverErrors.refillCompatibility?.[0]}
+                      error={serverErrors.refillCompatibility?.errors[0]}
                       t={t}
                     />
                   </Field>
@@ -1614,11 +2078,9 @@ export function ProductEditor({
                           <input
                             checked={checked}
                             onChange={(event) => {
-                              setOpenPartRoles((current) => {
-                                const next = new Set(current);
-                                if (event.target.checked) next.add(role.type);
-                                else next.delete(role.type);
-                                return next;
+                              dispatch({
+                                type: "partRoleToggled",
+                                role: role.type,
                               });
                               if (!event.target.checked)
                                 field.handleChange(
@@ -1661,7 +2123,10 @@ export function ProductEditor({
                               aria-haspopup="dialog"
                               onClick={(event) => {
                                 partTrigger.current = event.currentTarget;
-                                setActivePartType(role.type);
+                                dispatch({
+                                  type: "partCreationChanged",
+                                  partType: role.type,
+                                });
                               }}
                               type="button"
                               variant="outline"
@@ -1674,7 +2139,7 @@ export function ProductEditor({
                     );
                   })}
                   <FieldError
-                    error={serverErrors.compatiblePartProductIds?.[0]}
+                    error={serverErrors.compatiblePartProductIds?.errors[0]}
                     t={t}
                   />
                 </fieldset>
@@ -1733,7 +2198,7 @@ export function ProductEditor({
                     })}
                     value={field.state.value as never}
                   />
-                  <FieldError error={serverErrors[name]?.[0]} t={t} />
+                  <FieldError error={serverErrors[name]?.errors[0]} t={t} />
                 </Field>
               )}
             </form.Field>
@@ -1779,7 +2244,7 @@ export function ProductEditor({
                     {t("web.slider.relationship.addPlates")}
                   </Button>
                   <FieldError
-                    error={serverErrors.includedPlateProductId?.[0]}
+                    error={serverErrors.includedPlateProductId?.errors[0]}
                     t={t}
                   />
                 </Field>
@@ -1804,7 +2269,7 @@ export function ProductEditor({
                   />
                   {t("web.slider.capability.usesInserts")}
                 </label>
-                <FieldError error={serverErrors.usesInserts?.[0]} t={t} />
+                <FieldError error={serverErrors.usesInserts?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -1860,7 +2325,7 @@ export function ProductEditor({
                               form.state.values.magnetConfiguration !== null
                             ) {
                               form.setFieldValue("magnetConfiguration", null);
-                              setMagnetConfigurationNotice(true);
+                              dispatch({ type: "magnetSnapshotDiscarded" });
                             }
                           }}
                           placeholder={t(
@@ -1882,7 +2347,9 @@ export function ProductEditor({
                           {t("web.slider.relationship.addInsert")}
                         </Button>
                         <FieldError
-                          error={serverErrors.includedInsertProductId?.[0]}
+                          error={
+                            serverErrors.includedInsertProductId?.errors[0]
+                          }
                           t={t}
                         />
                       </Field>
@@ -1941,7 +2408,7 @@ export function ProductEditor({
                           </p>
                         ) : null}
                         <FieldError
-                          error={serverErrors.magnetLayout?.[0]}
+                          error={serverErrors.magnetLayout?.errors[0]}
                           t={t}
                         />
                       </Field>
@@ -1999,7 +2466,7 @@ export function ProductEditor({
                   onChange={(event) => field.handleChange(event.target.value)}
                   value={field.state.value}
                 />
-                <FieldError error={serverErrors.bearing?.[0]} t={t} />
+                <FieldError error={serverErrors.bearing?.errors[0]} t={t} />
               </Field>
             )}
           </form.Field>
@@ -2041,7 +2508,7 @@ export function ProductEditor({
                         value={selected}
                       />
                       <FieldError
-                        error={serverErrors.compatibleButtonId?.[0]}
+                        error={serverErrors.compatibleButtonId?.errors[0]}
                         t={t}
                       />
                     </Field>
@@ -2059,15 +2526,15 @@ export function ProductEditor({
             <CatalogMarkdownEditor
               defaultValue={field.state.value}
               error={
-                serverErrors.description?.[0]
-                  ? t(serverErrors.description[0])
+                serverErrors.description?.errors[0]
+                  ? t(serverErrors.description.errors[0])
                   : undefined
               }
               help={t("web.catalog.help.markdownDescription")}
               id="product-description"
               label={t("web.catalog.field.description")}
               onChange={field.handleChange}
-              onLoadingChange={setDescriptionLoading}
+              onLoadingChange={receiveDescriptionLoading}
               ref={descriptionRef}
             />
           )}
@@ -2075,6 +2542,7 @@ export function ProductEditor({
         {!quickCreate ? (
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
+            disabled={Boolean(ui.save)}
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -2091,10 +2559,13 @@ export function ProductEditor({
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImages((current) => [...current, ...additions])
+              imageForm.setFieldValue("pending", (current) => [
+                ...current,
+                ...additions,
+              ])
             }
             onRemove={(index) =>
-              setImages((current) =>
+              imageForm.setFieldValue("pending", (current) =>
                 current.filter((_, candidate) => candidate !== index),
               )
             }
@@ -2112,7 +2583,7 @@ export function ProductEditor({
                 : undefined
             }
             images={existingImages}
-            onChange={setExistingImages}
+            onChange={(value) => imageForm.setFieldValue("existing", value)}
             t={t}
             targetType="product"
           />
@@ -2125,7 +2596,9 @@ export function ProductEditor({
       </div>
       {formError ? (
         <div className="lg:col-span-2">
-          <Notice>{t(formError)}</Notice>
+          <Notice>
+            {t(typeof formError === "string" ? formError : formError.form)}
+          </Notice>
         </div>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
@@ -2159,6 +2632,7 @@ export function ProductEditor({
             <Button
               disabled={
                 Boolean(isSubmitting) ||
+                Boolean(ui.save) ||
                 descriptionLoading ||
                 String(description).length > 5000
               }
@@ -2186,7 +2660,7 @@ export function ProductEditor({
                     plateTrigger.current?.focus();
                   }}
                   onCreated={(plate) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       relationshipProducts: [
                         ...current.relationshipProducts,
@@ -2213,11 +2687,12 @@ export function ProductEditor({
             <dialog
               aria-labelledby={partDialogTitleId}
               className="m-auto w-[min(64rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
-              onClose={() => {
-                setActivePartType(null);
+              onCancel={(event) => {
+                event.preventDefault();
+                dispatch({ type: "partCreationChanged", partType: null });
                 partTrigger.current?.focus();
               }}
-              ref={partDialog}
+              ref={bindPartDialog}
             >
               <div className="grid gap-4 p-6">
                 <h2 className="text-lg font-semibold" id={partDialogTitleId}>
@@ -2226,11 +2701,11 @@ export function ProductEditor({
                 <ProductEditor
                   onCancel={() => {
                     partDialog.current?.close();
-                    setActivePartType(null);
+                    dispatch({ type: "partCreationChanged", partType: null });
                     partTrigger.current?.focus();
                   }}
                   onCreated={(part) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       relationshipProducts: [
                         ...current.relationshipProducts,
@@ -2242,7 +2717,7 @@ export function ProductEditor({
                       part.id,
                     ]);
                     partDialog.current?.close();
-                    setActivePartType(null);
+                    dispatch({ type: "partCreationChanged", partType: null });
                     partTrigger.current?.focus();
                   }}
                   options={options}
@@ -2270,7 +2745,7 @@ export function ProductEditor({
                     insertTrigger.current?.focus();
                   }}
                   onCreated={(insert) => {
-                    setOptions((current) => ({
+                    receiveOptions((current) => ({
                       ...current,
                       relationshipProducts: [
                         ...current.relationshipProducts,
@@ -2637,6 +3112,74 @@ type LookupDialogProps = (
   t: ReturnType<typeof useCatalogCopy>;
 };
 
+/** Inline lookup fields owned by the dialog form. */
+type LookupFields = {
+  /** Canonical lookup name or maker terminology label. */
+  name: string;
+  /** Color hex input. */
+  hex: string;
+  /** Optional maker root URL. */
+  rootUrl: string;
+  /** Preferred maker terminology choice. */
+  isPreferred: boolean;
+};
+/** Created lookup discriminated by its stable caller contract. */
+type CreatedLookup =
+  | {
+      /** Maker result. */
+      kind: "maker";
+      /** Created maker. */
+      value: CatalogMaker;
+    }
+  | {
+      /** Color result. */
+      kind: "color";
+      /** Created color. */
+      value: CatalogColor;
+    }
+  | {
+      /** Maker terminology result. */
+      kind: "terminologyAlias";
+      /** Created terminology alias. */
+      value: CatalogTerminologyAlias;
+    }
+  | {
+      /** Shared lookup result. */
+      kind: "finish" | "material" | "pattern";
+      /** Created canonical lookup. */
+      value: CatalogLookup;
+    };
+/** Inline lookup result retained across lifecycle resumption. */
+type LookupSaveResult = {
+  /** Created value on success. */
+  created?: CreatedLookup;
+  /** Existing field and form failures. */
+  error?: ProductValidation;
+};
+/** Pending inline lookup creation. */
+type LookupSaveState =
+  | EffectEntity<LookupSaveState, LookupSaveEvent>
+  | undefined;
+/** Creation, dismissal, and terminal lookup events. */
+type LookupSaveEvent =
+  | {
+      /** Submits captured inline fields. */
+      type: "requested";
+      /** Fields validated by the dialog form. */
+      fields: LookupFields;
+    }
+  | {
+      /** Disposes a dismissed or completed lookup. */
+      type: "closed" | "finished";
+    };
+/** Committed inline lookup creation. */
+type LookupSaveEffect = {
+  /** Creation implementation. */
+  type: "create";
+  /** Captured inline form values. */
+  fields: LookupFields;
+};
+
 /**
  * Renders a modal for creating one catalog lookup value.
  *
@@ -2648,14 +3191,103 @@ function LookupDialog(props: LookupDialogProps) {
   const ref = React.useRef<HTMLDialogElement>(null);
   const dialogId = React.useId();
   const titleId = React.useId();
-  const [name, setName] = React.useState("");
-  const [hex, setHex] = React.useState("#808080");
-  const [rootUrl, setRootUrl] = React.useState("");
-  const [isPreferred, setIsPreferred] = React.useState(false);
-  const [fieldErrors, setFieldErrors] = React.useState<
-    Record<string, string[] | undefined>
-  >({});
-  const [error, setError] = React.useState<string | null>(null);
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      hex: "#808080",
+      rootUrl: "",
+      isPreferred: false,
+    },
+    validators: {
+      /**
+       * Requires a lookup name before creation.
+       * @param context - Current lookup fields.
+       * @returns Existing localized validation feedback.
+       */
+      onSubmit: ({ value }): ProductValidation | undefined =>
+        value.name.trim()
+          ? undefined
+          : {
+              form: "web.catalog.error.form",
+              fields: { name: ["web.catalog.error.required"] },
+            },
+    },
+    /**
+     * Queues the validated lookup without restarting completed mutations.
+     * @param context - Current form submission.
+     * @returns Nothing.
+     */
+    onSubmit: ({ value }) => dispatch({ type: "requested", fields: value }),
+  });
+  const { name, hex, rootUrl, isPreferred } = useStore(
+    form.store,
+    (state) => state.values,
+  );
+  const fieldErrors = useStore(form.store, (state) => state.fieldMeta);
+  const error = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const pending = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: LookupSaveEffect;
+    /** Mutation completion retained across suspended observers. */
+    promise: Promise<LookupSaveResult>;
+  } | null>(null);
+  const [saving, dispatch] = useEffectReducer<
+    LookupSaveState,
+    LookupSaveEvent,
+    LookupSaveEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "create", fields: event.fields });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined,
+    {
+      /**
+       * Creates one lookup and publishes only to its active dialog observer.
+       * @param _state - Current creation lifetime.
+       * @param effect - Captured fields.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      create: (_state, effect, dispatch, { signal }) => {
+        if (pending.current?.effect !== effect)
+          pending.current = { effect, promise: create(effect.fields) };
+        void pending.current.promise.then((result) => {
+          if (signal.aborted) return;
+          pending.current = null;
+          dispatch({ type: "finished" });
+          if (result.error) {
+            form.setErrorMap({ onSubmit: result.error });
+            return;
+          }
+          const created = result.created;
+          if (!created) return;
+          if (created.kind === "maker" && props.kind === "maker")
+            props.onCreated(created.value);
+          else if (created.kind === "color" && props.kind === "color")
+            props.onCreated(created.value);
+          else if (
+            created.kind === "terminologyAlias" &&
+            props.kind === "terminologyAlias"
+          )
+            props.onCreated(created.value);
+          else if (
+            (created.kind === "finish" ||
+              created.kind === "material" ||
+              created.kind === "pattern") &&
+            (props.kind === "finish" ||
+              props.kind === "material" ||
+              props.kind === "pattern")
+          )
+            props.onCreated(created.value);
+          form.reset();
+          ref.current?.close();
+        });
+      },
+    },
+  );
   const action = {
     color: "web.action.addColor",
     finish: "web.action.addFinish",
@@ -2666,75 +3298,67 @@ function LookupDialog(props: LookupDialogProps) {
   }[kind] as TranslationKey;
 
   /**
-   * Creates the configured lookup and closes the dialog on success.
-   *
-   * @returns A promise that resolves after creation is attempted.
+   * Creates the configured lookup using captured fields.
+   * @param input - Validated inline lookup fields.
+   * @returns Created lookup or existing localized failures.
    */
-  const create = async () => {
-    if (props.kind === "maker") {
-      const result = await createCatalogMaker({ data: { name, rootUrl } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+  const create = async ({
+    name,
+    hex,
+    rootUrl,
+    isPreferred,
+  }: LookupFields): Promise<LookupSaveResult> => {
+    try {
+      if (props.kind === "maker") {
+        const result = await createCatalogMaker({ data: { name, rootUrl } });
+        return result.ok
+          ? { created: { kind: "maker", value: result.maker } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.maker);
-    } else if (props.kind === "terminologyAlias") {
-      const result = await createCatalogTerminologyAlias({
-        data: {
-          canonicalKey: props.canonicalKey,
-          canonicalNamespace: "product-type",
-          isPreferred,
-          label: name,
-          makerId: props.makerId,
-        },
-      });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "terminologyAlias") {
+        const result = await createCatalogTerminologyAlias({
+          data: {
+            canonicalKey: props.canonicalKey,
+            canonicalNamespace: "product-type",
+            isPreferred,
+            label: name,
+            makerId: props.makerId,
+          },
+        });
+        return result.ok
+          ? {
+              created: {
+                kind: "terminologyAlias",
+                value: result.terminologyAlias,
+              },
+            }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.terminologyAlias);
-    } else if (props.kind === "material") {
-      const result = await createCatalogMaterial({ data: { name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "material") {
+        const result = await createCatalogMaterial({ data: { name } });
+        return result.ok
+          ? { created: { kind: "material", value: result.material } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.material);
-    } else if (props.kind === "finish") {
-      const result = await createCatalogFinish({ data: { name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "finish") {
+        const result = await createCatalogFinish({ data: { name } });
+        return result.ok
+          ? { created: { kind: "finish", value: result.finish } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.finish);
-    } else if (props.kind === "pattern") {
-      const result = await createCatalogPattern({ data: { name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
+      if (props.kind === "pattern") {
+        const result = await createCatalogPattern({ data: { name } });
+        return result.ok
+          ? { created: { kind: "pattern", value: result.pattern } }
+          : { error: { form: result.formError, fields: result.fieldErrors } };
       }
-      props.onCreated(result.pattern);
-    } else {
       const result = await createCatalogColor({ data: { hex, name } });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setError(result.formError);
-        return;
-      }
-      props.onCreated(result.color);
+      return result.ok
+        ? { created: { kind: "color", value: result.color } }
+        : { error: { form: result.formError, fields: result.fieldErrors } };
+    } catch {
+      return { error: { form: "error.generic" } };
     }
-    setName("");
-    setHex("#808080");
-    setRootUrl("");
-    setIsPreferred(false);
-    setFieldErrors({});
-    setError(null);
-    ref.current?.close();
   };
 
   return (
@@ -2743,8 +3367,7 @@ function LookupDialog(props: LookupDialogProps) {
         aria-controls={dialogId}
         aria-haspopup="dialog"
         onClick={() => {
-          setFieldErrors({});
-          setError(null);
+          form.setErrorMap({ onSubmit: undefined });
           ref.current?.showModal();
         }}
         type="button"
@@ -2757,30 +3380,43 @@ function LookupDialog(props: LookupDialogProps) {
         className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
         id={dialogId}
         ref={ref}
+        onClose={() => dispatch({ type: "closed" })}
       >
         <div className="grid gap-4 p-6">
           <h2 className="text-lg font-semibold" id={titleId}>
             {t(action)}
           </h2>
-          <Field label={t("web.catalog.field.name")}>
-            <Input
-              aria-label={t("web.catalog.field.name")}
-              onChange={(event) => setName(event.target.value)}
-              required
-              value={name}
-            />
-            <FieldError error={fieldErrors.name?.[0]} t={t} />
-          </Field>
+          <form.Field name="name">
+            {() => (
+              <Field label={t("web.catalog.field.name")}>
+                <Input
+                  aria-label={t("web.catalog.field.name")}
+                  onChange={(event) =>
+                    form.setFieldValue("name", event.target.value)
+                  }
+                  required
+                  value={name}
+                />
+                <FieldError error={fieldErrors.name?.errors[0]} t={t} />
+              </Field>
+            )}
+          </form.Field>
           {kind === "maker" ? (
-            <Field label={t("web.catalog.field.rootUrl")}>
-              <Input
-                aria-label={t("web.catalog.field.rootUrl")}
-                onChange={(event) => setRootUrl(event.target.value)}
-                type="url"
-                value={rootUrl}
-              />
-              <FieldError error={fieldErrors.rootUrl?.[0]} t={t} />
-            </Field>
+            <form.Field name="rootUrl">
+              {() => (
+                <Field label={t("web.catalog.field.rootUrl")}>
+                  <Input
+                    aria-label={t("web.catalog.field.rootUrl")}
+                    onChange={(event) =>
+                      form.setFieldValue("rootUrl", event.target.value)
+                    }
+                    type="url"
+                    value={rootUrl}
+                  />
+                  <FieldError error={fieldErrors.rootUrl?.errors[0]} t={t} />
+                </Field>
+              )}
+            </form.Field>
           ) : kind === "terminologyAlias" ? null : (
             <Field label={t("web.catalog.field.slug")}>
               <Input
@@ -2794,7 +3430,9 @@ function LookupDialog(props: LookupDialogProps) {
             <label className="flex items-center gap-2 text-sm">
               <input
                 checked={isPreferred}
-                onChange={(event) => setIsPreferred(event.target.checked)}
+                onChange={(event) =>
+                  form.setFieldValue("isPreferred", event.target.checked)
+                }
                 type="checkbox"
               />
               {t("web.slider.alias.preferred")}
@@ -2804,14 +3442,18 @@ function LookupDialog(props: LookupDialogProps) {
             <Field label={t("web.catalog.field.colors")}>
               <Input
                 aria-label={t("web.catalog.field.colors")}
-                onChange={(event) => setHex(event.target.value.toUpperCase())}
+                onChange={(event) =>
+                  form.setFieldValue("hex", event.target.value.toUpperCase())
+                }
                 required
                 type="color"
                 value={hex}
               />
             </Field>
           ) : null}
-          {error ? <Notice>{t(error)}</Notice> : null}
+          {error ? (
+            <Notice>{t(typeof error === "string" ? error : error.form)}</Notice>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button
               onClick={() => ref.current?.close()}
@@ -2820,7 +3462,14 @@ function LookupDialog(props: LookupDialogProps) {
             >
               {t("action.cancel")}
             </Button>
-            <Button onClick={() => void create()} type="button">
+            <Button
+              disabled={Boolean(saving)}
+              onClick={() => {
+                form.setErrorMap({ onSubmit: { form: "", fields: {} } });
+                void form.handleSubmit();
+              }}
+              type="button"
+            >
               {t(action)}
             </Button>
           </div>
@@ -2829,6 +3478,95 @@ function LookupDialog(props: LookupDialogProps) {
     </>
   );
 }
+
+/** One collection metadata, cover, or gallery operation. */
+type CollectionPageOperation =
+  | {
+      /** Saves metadata before initial images. */
+      kind: "save";
+      /** Submitted metadata. */
+      value: CollectionFormValue;
+      /** Initial collection images. */
+      files: File[];
+      /** Existing or just-created collection identifier. */
+      collectionId: number | null;
+      /** Optional moderation reason. */
+      reason?: string;
+      /** Resolves the existing form callback after terminal feedback. */
+      complete(): void;
+    }
+  | {
+      /** Changes or deletes an existing cover. */
+      kind: "cover";
+      /** Existing authorized cover callback. */
+      action: CollectionCoverAction;
+      /** Optional moderation reason. */
+      reason?: string;
+      /** Resolves the existing cover callback. */
+      complete(): void;
+    }
+  | {
+      /** Uploads an existing collection gallery batch. */
+      kind: "gallery";
+      /** Collection receiving the batch. */
+      collectionId: number;
+      /** Selected image batch. */
+      files: File[];
+      /**
+       * Resolves the existing uploader callback.
+       * @param clear - Whether all selected files uploaded.
+       */
+      complete(clear: boolean): void;
+    };
+/** Durable outcome retained while collection UI is suspended. */
+type CollectionPageResult = {
+  /** Saved collection, including after upload failure. */
+  collection?: UserCollectionSummary;
+  /** Localized metadata/cover failure. */
+  error?: string;
+  /** Localized gallery failure. */
+  uploadError?: string;
+  /** Whether the successful gallery batch may be cleared. */
+  uploaded?: boolean;
+  /** Destination after a successful metadata save. */
+  navigateId?: number;
+  /** Whether cover/gallery data should be reloaded after success. */
+  reload?: boolean;
+};
+/** Collection page data and its one active workflow. */
+type CollectionPageState = {
+  /** Latest durable collection. */
+  current: UserCollectionSummary | undefined;
+  /** Localized metadata or cover failure. */
+  error: string | null;
+  /** Localized gallery failure. */
+  uploadError: string | null;
+  /** Active metadata, gallery, or cover effect. */
+  operation: EffectEntity<CollectionPageState, CollectionPageEvent> | undefined;
+};
+/** Collection-page operation requests and terminal feedback. */
+type CollectionPageEvent =
+  | {
+      /** Requests one authorized workflow. */
+      type: "requested";
+      /** Captured operation and existing callback completion. */
+      operation: CollectionPageOperation;
+    }
+  | {
+      /** Delivers the operation result and stops its effect. */
+      type: "finished";
+      /** Operation whose feedback should be updated. */
+      kind: CollectionPageOperation["kind"];
+      /** Durable result. */
+      result: CollectionPageResult;
+    };
+/** Committed collection-page operation. */
+type CollectionPageEffect = {
+  /** Workflow implementation. */
+  type: "run";
+  /** Immutable operation and completion callback. */
+  operation: CollectionPageOperation;
+};
 
 /**
  * Renders the collection create or edit form.
@@ -2856,10 +3594,148 @@ export function CollectionFormPage({
   const t = useCatalogCopy();
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [current, setCurrent] = React.useState(collection);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionPageEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CollectionPageResult>;
+  } | null>(null);
+  const active = React.useRef(false);
+  const [page, dispatch] = useEffectReducer<
+    CollectionPageState,
+    CollectionPageEvent,
+    CollectionPageEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested") {
+        if (state.operation) return state;
+        return {
+          ...state,
+          error: event.operation.kind === "gallery" ? state.error : null,
+          uploadError:
+            event.operation.kind === "gallery" ? null : state.uploadError,
+          operation: exec({ type: "run", operation: event.operation }),
+        };
+      }
+      exec.stop(state.operation);
+      return {
+        ...state,
+        current: event.result.collection ?? state.current,
+        error:
+          event.kind === "gallery" ? state.error : (event.result.error ?? null),
+        uploadError:
+          event.kind === "gallery"
+            ? (event.result.uploadError ?? null)
+            : state.uploadError,
+        operation: undefined,
+      };
+    },
+    {
+      current: collection,
+      error: null,
+      uploadError: null,
+      operation: undefined,
+    },
+    {
+      /**
+       * Runs one collection mutation and observes it across lifecycle resumption.
+       * @param _state - Current page data.
+       * @param effect - Captured authorized operation.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      run: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: perform(effect.operation) };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          active.current = false;
+          dispatch({ type: "finished", kind: effect.operation.kind, result });
+          if (effect.operation.kind === "gallery")
+            effect.operation.complete(result.uploaded ?? false);
+          else effect.operation.complete();
+          if (result.reload) window.location.reload();
+          else if (result.navigateId !== undefined)
+            void navigate({
+              params: { collectionId: result.navigateId },
+              to: "/user/collections/$collectionId",
+            });
+        });
+      },
+    },
+  );
+  const { current, error, uploadError } = page;
+  const saving = Boolean(page.operation);
+  /**
+   * Performs metadata, cover, or gallery I/O without publishing disposed UI feedback.
+   * @param operation - Captured authorized operation.
+   * @returns Durable result retained for the active observer.
+   */
+  async function perform(
+    operation: CollectionPageOperation,
+  ): Promise<CollectionPageResult> {
+    if (operation.kind === "gallery") {
+      try {
+        const upload = await uploadImages({
+          locale,
+          files: operation.files,
+          getToken,
+          targetId: operation.collectionId,
+          targetType: "collection",
+        });
+        return upload.failed.length
+          ? { uploadError: t("web.collections.error.upload"), uploaded: false }
+          : { uploaded: true, reload: true };
+      } catch (error) {
+        const failure = error as ImageUploadError;
+        return {
+          uploadError: t(failure.key ?? "error.generic", failure.params),
+          uploaded: false,
+        };
+      }
+    }
+    if (operation.kind === "cover") {
+      try {
+        await operation.action(operation.reason);
+        return { reload: true };
+      } catch {
+        return { error: t("error.generic") };
+      }
+    }
+    let saved: UserCollectionSummary | undefined;
+    try {
+      const result = await saveCollection({
+        data: {
+          collectionId: operation.collectionId,
+          ...operation.value,
+          reason: operation.reason,
+        },
+      });
+      if (!result.ok) return { error: t(result.formError) };
+      saved = result.collection;
+      if (operation.files.length) {
+        const upload = await uploadImages({
+          locale,
+          files: operation.files,
+          getToken,
+          reason: operation.reason,
+          targetId: saved.id,
+          targetType: "collection",
+        });
+        if (upload.failed.length)
+          return {
+            collection: saved,
+            error: t("web.collections.error.upload"),
+          };
+      }
+      return { collection: saved, navigateId: saved.id };
+    } catch {
+      return {
+        collection: saved,
+        error: t(saved ? "web.collections.error.upload" : "error.generic"),
+      };
+    }
+  }
   const copy = {
     browse: t("web.resources.upload.browseFiles"),
     cancel: t("action.cancel"),
@@ -2882,88 +3758,52 @@ export function CollectionFormPage({
   };
 
   /**
-   * Saves the collection and uploads its initial images.
-   *
-   * @param value - Collection form values.
-   * @param images - Initial collection images.
-   * @returns A promise that resolves after the save flow completes.
+   * Queues metadata and initial images with any required staff reason.
+   * @param value - Collection metadata.
+   * @param images - Initial image batch.
+   * @returns Completion after active terminal feedback.
    */
-  async function submit(value: CollectionFormValue, images: File[]) {
-    setSaving(true);
-    setError(null);
+  function submit(value: CollectionFormValue, images: File[]): Promise<void> {
+    if (active.current) return Promise.resolve();
     const moderating = Boolean(current?.canAdminister && !current.isOwner);
     const reason = moderating
       ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
       : undefined;
-    if (moderating && !reason) {
-      setSaving(false);
-      return;
-    }
-    const result = await saveCollection({
-      data: {
-        collectionId: current?.id ?? null,
-        description: value.description,
-        isPrivate: value.isPrivate,
-        name: value.name,
-        reason,
-        summary: value.summary,
-      },
-    });
-    if (!result.ok) {
-      setError(t(result.formError));
-      setSaving(false);
-      return;
-    }
-    setCurrent(result.collection);
-    if (images.length) {
-      try {
-        const upload = await uploadImages({
-          locale,
+    if (moderating && !reason) return Promise.resolve();
+    active.current = true;
+    return new Promise((complete) =>
+      dispatch({
+        type: "requested",
+        operation: {
+          kind: "save",
+          value,
           files: images,
-          getToken,
+          collectionId: current?.id ?? null,
           reason,
-          targetId: result.collection.id,
-          targetType: "collection",
-        });
-        if (upload.failed.length) {
-          setError(t("web.collections.error.upload"));
-          setSaving(false);
-          return;
-        }
-      } catch {
-        setError(t("web.collections.error.upload"));
-        setSaving(false);
-        return;
-      }
-    }
-    await navigate({
-      params: { collectionId: result.collection.id },
-      to: "/user/collections/$collectionId",
-    });
+          complete,
+        },
+      }),
+    );
   }
-
   /**
-   * Runs a collection cover action with any required moderation reason.
-   *
-   * @param action - Cover action to perform.
-   * @returns A promise that resolves after the action completes.
+   * Queues an existing cover action after its staff-reason check.
+   * @param action - Authorized cover operation.
+   * @returns Completion after active terminal feedback.
    */
-  async function updateCover(action: CollectionCoverAction) {
-    if (!current) return;
+  function updateCover(action: CollectionCoverAction): Promise<void> {
+    if (!current || active.current) return Promise.resolve();
     const moderating = Boolean(current.canAdminister && !current.isOwner);
     const reason = moderating
       ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
       : undefined;
-    if (moderating && !reason) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await action(reason);
-      window.location.reload();
-    } catch {
-      setError(t("error.generic"));
-      setSaving(false);
-    }
+    if (moderating && !reason) return Promise.resolve();
+    active.current = true;
+    return new Promise((complete) =>
+      dispatch({
+        type: "requested",
+        operation: { kind: "cover", action, reason, complete },
+      }),
+    );
   }
 
   return (
@@ -3014,32 +3854,20 @@ export function CollectionFormPage({
                   disabled={saving}
                   embedded
                   error={uploadError}
-                  onUpload={async (files) => {
-                    setSaving(true);
-                    setUploadError(null);
-                    try {
-                      const upload = await uploadImages({
-                        locale,
-                        files,
-                        getToken,
-                        targetId: current.id,
-                        targetType: "collection",
-                      });
-                      if (upload.failed.length) {
-                        setUploadError(t("web.collections.error.upload"));
-                        setSaving(false);
-                        return false;
-                      }
-                      window.location.reload();
-                      return true;
-                    } catch (uploadFailure) {
-                      const failure = uploadFailure as ImageUploadError;
-                      setUploadError(
-                        t(failure.key ?? "error.generic", failure.params),
-                      );
-                      setSaving(false);
-                      return false;
-                    }
+                  onUpload={(files) => {
+                    if (active.current) return Promise.resolve(false);
+                    active.current = true;
+                    return new Promise((complete) =>
+                      dispatch({
+                        type: "requested",
+                        operation: {
+                          kind: "gallery",
+                          collectionId: current.id,
+                          files,
+                          complete,
+                        },
+                      }),
+                    );
                   }}
                 />
                 {current.coverImages.length ? (
@@ -3165,6 +3993,41 @@ export function CollectionFormPage({
   );
 }
 
+/** Collection lifecycle confirmation fields. */
+type CollectionDeletionFields = {
+  /** Archive, delete, or move operation. */
+  choice: "archive" | "delete" | "move";
+  /** Explicit destructive-action confirmation. */
+  confirmed: boolean;
+  /** Same-owner destination for a move. */
+  destinationId: number | null;
+  /** Cross-owner moderation reason. */
+  reason: string;
+};
+/** Pending confirmed collection lifecycle operation. */
+type CollectionDeletionState =
+  | EffectEntity<CollectionDeletionState, CollectionDeletionEvent>
+  | undefined;
+/** Confirmation submission and terminal feedback. */
+type CollectionDeletionEvent =
+  | {
+      /** Commits validated confirmation fields. */
+      type: "requested";
+      /** Captured confirmation fields. */
+      fields: CollectionDeletionFields;
+    }
+  | {
+      /** Stops the completed operation. */
+      type: "finished";
+    };
+/** Committed collection lifecycle request. */
+type CollectionDeletionEffect = {
+  /** Lifecycle operation implementation. */
+  type: "commit";
+  /** Validated confirmation fields. */
+  fields: CollectionDeletionFields;
+};
+
 /**
  * Renders the archive and deletion choices for an existing collection.
  *
@@ -3204,17 +4067,101 @@ export function CollectionDeletionSection({
 }) {
   const t = useCatalogCopy();
   const dialog = React.useRef<HTMLDialogElement>(null);
-  const [choice, setChoice] = React.useState<"archive" | "delete" | "move">(
-    "archive",
+  const moderating = Boolean(collection.canAdminister && !collection.isOwner);
+  /**
+   * Enforces the current action's confirmation, destination, and staff reason.
+   * @param input - Current confirmation fields.
+   * @returns Whether a required confirmation field is missing.
+   */
+  const validate = ({
+    value,
+  }: {
+    /** Current confirmation fields. */ value: CollectionDeletionFields;
+  }) =>
+    (value.choice !== "archive" && !value.confirmed) ||
+    (value.choice === "move" && value.destinationId === null) ||
+    (moderating && !value.reason.trim())
+      ? true
+      : undefined;
+  const form = useForm({
+    defaultValues: {
+      choice: "archive",
+      confirmed: false,
+      destinationId: null,
+      reason: "",
+    } as CollectionDeletionFields,
+    validators: { onMount: validate, onChange: validate, onSubmit: validate },
+    /**
+     * Queues the validated lifecycle operation.
+     * @param input - Current confirmation fields.
+     */
+    onSubmit: ({ value }) => {
+      dispatch({ type: "requested", fields: value });
+    },
+  });
+  const { choice, confirmed, destinationId, reason } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [confirmed, setConfirmed] = React.useState(false);
-  const [destinationId, setDestinationId] = React.useState<number | null>(null);
-  const [submitting, setSubmitting] = React.useState(false);
-  const [failed, setFailed] = React.useState(false);
-  const [reason, setReason] = React.useState("");
+  const failed = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const canSubmit = useStore(
+    form.store,
+    (state) => !validate({ value: state.values }) && !state.isSubmitting,
+  );
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionDeletionEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<void>;
+  } | null>(null);
+  const [pending, dispatch] = useEffectReducer<
+    CollectionDeletionState,
+    CollectionDeletionEvent,
+    CollectionDeletionEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "requested")
+        return state ?? exec({ type: "commit", fields: event.fields });
+      exec.stop(state);
+      return undefined;
+    },
+    undefined,
+    {
+      /**
+       * Runs a confirmed lifecycle operation once across Activity resumption.
+       * @param _state - Pending request.
+       * @param effect - Captured confirmation fields.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      commit: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: onSubmit(
+              effect.fields.choice,
+              effect.fields.destinationId,
+              moderating ? effect.fields.reason.trim() : undefined,
+            ),
+          };
+        void task.current.promise.then(
+          () => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            dialog.current?.close();
+          },
+          () => {
+            if (signal.aborted) return;
+            dispatch({ type: "finished" });
+            form.setErrorMap({ onSubmit: true });
+          },
+        );
+      },
+    },
+  );
+  const submitting = Boolean(pending);
   const reasonId = React.useId();
   const titleId = React.useId();
-  const moderating = Boolean(collection.canAdminister && !collection.isOwner);
   const destination = destinations.find(({ id }) => id === destinationId);
   const destructive = choice !== "archive";
 
@@ -3231,13 +4178,7 @@ export function CollectionDeletionSection({
       <dialog
         aria-labelledby={titleId}
         className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
-        onClose={() => {
-          setChoice("archive");
-          setConfirmed(false);
-          setDestinationId(null);
-          setFailed(false);
-          setReason("");
-        }}
+        onClose={() => form.reset()}
         onCancel={(event) => {
           if (submitting) event.preventDefault();
         }}
@@ -3245,30 +4186,9 @@ export function CollectionDeletionSection({
       >
         <form
           className="grid gap-5 p-6"
-          onSubmit={async (event) => {
+          onSubmit={(event) => {
             event.preventDefault();
-            if (
-              submitting ||
-              (destructive && !confirmed) ||
-              (choice === "move" && destinationId === null) ||
-              (moderating && !reason.trim())
-            ) {
-              return;
-            }
-            setFailed(false);
-            setSubmitting(true);
-            try {
-              await onSubmit(
-                choice,
-                destinationId,
-                moderating ? reason.trim() : undefined,
-              );
-              dialog.current?.close();
-            } catch {
-              setFailed(true);
-            } finally {
-              setSubmitting(false);
-            }
+            if (!submitting) void form.handleSubmit();
           }}
         >
           <fieldset className="grid gap-3">
@@ -3292,8 +4212,8 @@ export function CollectionDeletionSection({
                   disabled={submitting}
                   name="collection-deletion-choice"
                   onChange={() => {
-                    setChoice(value);
-                    setConfirmed(false);
+                    form.setFieldValue("choice", value);
+                    form.setFieldValue("confirmed", false);
                   }}
                   type="radio"
                   value={value}
@@ -3312,7 +4232,9 @@ export function CollectionDeletionSection({
                   addLabel={t("web.action.addCollection")}
                   collections={destinations}
                   label={t("web.collections.deletion.destination")}
-                  onChange={setDestinationId}
+                  onChange={(value) =>
+                    form.setFieldValue("destinationId", value)
+                  }
                   placeholder={t("web.collections.select.placeholder")}
                   selectedId={destinationId}
                 />
@@ -3337,7 +4259,9 @@ export function CollectionDeletionSection({
                 checked={confirmed}
                 className="mt-0.5 size-4"
                 disabled={submitting}
-                onChange={(event) => setConfirmed(event.target.checked)}
+                onChange={(event) =>
+                  form.setFieldValue("confirmed", event.target.checked)
+                }
                 type="checkbox"
               />
               <span>
@@ -3361,7 +4285,9 @@ export function CollectionDeletionSection({
                 maxLength={1000}
                 disabled={submitting}
                 value={reason}
-                onChange={(event) => setReason(event.target.value)}
+                onChange={(event) =>
+                  form.setFieldValue("reason", event.target.value)
+                }
               />
             </div>
           ) : null}
@@ -3380,12 +4306,7 @@ export function CollectionDeletionSection({
               {t("action.cancel")}
             </Button>
             <Button
-              disabled={
-                submitting ||
-                (destructive && !confirmed) ||
-                (choice === "move" && destinationId === null) ||
-                (moderating && !reason.trim())
-              }
+              disabled={submitting || !canSubmit}
               type="submit"
               variant={destructive ? "destructive" : "default"}
             >
@@ -3720,6 +4641,108 @@ function collectionProductDefaults(
   };
 }
 
+/** Collection-item creation response retained through Activity suspension. */
+type CollectionAddResult = {
+  /** Created item identifier, including after upload failure. */
+  itemId: number | null;
+  /** Created or selected collection identifier. */
+  collectionId: number | null;
+  /** Item images still needing upload. */
+  images: File[];
+  /** Collection images still needing upload. */
+  collectionImages: File[];
+  /** Duplicate confirmation counts returned by the existing endpoint. */
+  duplicateCounts?: Record<number, number>;
+  /** Existing localized failure. */
+  error?: string;
+  /** Whether all ordered creation/upload work completed. */
+  complete?: boolean;
+};
+/** Committed collection-item creation and ordered image uploads. */
+type CollectionAddEffect = {
+  /** Creation implementation. */
+  type: "save";
+  /** Existing server input, validated by its unchanged endpoint. */
+  data: unknown;
+  /** Captured product name for duplicate-image confirmation. */
+  productName: string;
+  /** Existing item identifier retained for upload-only retry. */
+  itemId: number | null;
+  /** Existing destination retained for upload-only retry. */
+  collectionId: number | null;
+  /** Captured item images. */
+  images: File[];
+  /** Captured initial collection images. */
+  collectionImages: File[];
+};
+/** Collection creation disclosures, lookup choices, and mutation lifetime. */
+type CollectionAddState = {
+  /** Available lookup choices. */
+  options: CatalogOptions;
+  /** Last saved item identifier. */
+  savedItemId: number | null;
+  /** Last saved destination identifier. */
+  savedCollectionId: number | null;
+  /** Whether the Markdown surface is initializing. */
+  descriptionLoading: boolean;
+  /** Duplicate counts awaiting confirmation. */
+  duplicateCounts: Record<number, number>;
+  /** Whether the product chooser is disclosed. */
+  productSelectorOpen: boolean;
+  /** Current product chooser page. */
+  productPage: number;
+  /** Pending ordered creation workflow. */
+  save: EffectEntity<CollectionAddState, CollectionAddEvent> | undefined;
+};
+/** Product selection, disclosure, and creation events. */
+type CollectionAddEvent =
+  | {
+      /** Dismisses duplicate confirmation after changing a dependent choice. */
+      type: "confirmationDismissed";
+    }
+  | {
+      /** Accepts the existing shared lookup callback. */
+      type: "lookupOptionsChanged";
+      /** Pure replacement or updater. */
+      update: React.SetStateAction<CatalogOptions>;
+    }
+  | {
+      /** Applies a different product and clears stale creation state. */
+      type: "productSelected";
+      /** Whether selection is complete or the chooser remains open. */
+      selected: boolean;
+    }
+  | {
+      /** Changes product chooser disclosure. */
+      type: "selectorChanged";
+      /** Requested disclosure. */
+      open: boolean;
+    }
+  | {
+      /** Selects a product chooser page. */
+      type: "pageSelected";
+      /** Zero-based chooser page. */
+      page: number;
+    }
+  | {
+      /** Receives committed Markdown readiness. */
+      type: "descriptionLoadingChanged";
+      /** Whether initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Queues a validated creation attempt. */
+      type: "saveRequested";
+      /** Captured creation inputs. */
+      request: Omit<CollectionAddEffect, "type" | "itemId" | "collectionId">;
+    }
+  | {
+      /** Settles an ordered creation workflow. */
+      type: "saveFinished";
+      /** Durable result retained across resumption. */
+      result: CollectionAddResult;
+    };
+
 /**
  * Renders the form for adding a product to a collection.
  *
@@ -3762,238 +4785,123 @@ export function CollectionAddPage({
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [images, setImages] = React.useState<File[]>([]);
-  const collectionDialog = React.useRef<HTMLDialogElement>(null);
-  const [newCollection, setNewCollection] =
-    React.useState<CollectionFormValue | null>(() =>
-      collections.length === 0 && defaultCollectionName
-        ? {
-            description: "",
-            isPrivate: true,
-            name: defaultCollectionName,
-            summary: "",
-          }
-        : null,
-    );
-  const [collectionImages, setCollectionImages] = React.useState<File[]>([]);
-  const [selectedCollectionId, setSelectedCollectionId] = React.useState<
-    number | null
-  >(() =>
-    collections.length === 1
-      ? (collections[0]?.id ?? null)
-      : newCollection
-        ? -1
-        : null,
-  );
-  const [savedItemId, setSavedItemId] = React.useState<number | null>(null);
-  const [savedCollectionId, setSavedCollectionId] = React.useState<
-    number | null
-  >(null);
-  const [options, setOptions] = React.useState(initialOptions);
   const initialProduct = products.find(({ id }) => id === initialProductId);
-  const [type, setType] = React.useState<ComboboxOption | null>(() =>
-    initialProduct
+  const initialDefaults = collectionProductDefaults(initialProduct, t);
+  const initialNewCollection = (
+    collections.length === 0 && defaultCollectionName
+      ? {
+          description: "",
+          isPrivate: true,
+          name: defaultCollectionName,
+          summary: "",
+        }
+      : null
+  ) as CollectionFormValue | null;
+  /** Initial collection-item fields. */
+  const defaultValues = {
+    images: [] as File[],
+    newCollection: initialNewCollection,
+    collectionImages: [] as File[],
+    selectedCollectionId: (collections.length === 1
+      ? (collections[0]?.id ?? null)
+      : initialNewCollection
+        ? -1
+        : null) as number | null,
+    type: (initialProduct
       ? (initialOptions.productTypes.find(
           ({ slug }) => slug === initialProduct.productTypeSlug,
         ) ?? null)
-      : null,
-  );
-  const [product, setProduct] = React.useState<CatalogProduct | null>(
-    initialProduct ?? null,
-  );
-  const initialDefaults = collectionProductDefaults(initialProduct, t);
-  const [displayName, setDisplayName] = React.useState(
-    initialDefaults.displayName,
-  );
-  const [description, setDescription] = React.useState("");
-  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
-  const [bearing, setBearing] = React.useState("");
-  const [serialNumber, setSerialNumber] = React.useState<string | null>(null);
-  const [ownership, setOwnership] = React.useState<OwnershipEditorValue>(() =>
-    ownershipEditorValue(),
-  );
-  const [installedPenPartIds, setInstalledPenPartIds] = React.useState<
-    number[]
-  >([]);
-  const [installedRefillProductId, setInstalledRefillProductId] =
-    React.useState<number | null>(null);
-  const [installedRefillOfferingId, setInstalledRefillOfferingId] =
-    React.useState<number | null>(null);
-  const [material, setMaterial] = React.useState<CatalogLookup | null>(
-    initialDefaults.material,
-  );
-  const [finish, setFinish] = React.useState<ComboboxOption | null>(
-    initialDefaults.finish,
-  );
-  const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
-  const [button, setButton] = React.useState<
-    CatalogProduct | ComboboxOption | null
-  >(null);
-  const [buttonMaterial, setButtonMaterial] =
-    React.useState<CatalogLookup | null>(null);
-  const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
-    null,
-  );
-  const [buttonCustomFinish, setButtonCustomFinish] =
-    React.useState(emptyFinishOption);
-  const [duplicateCounts, setDuplicateCounts] = React.useState<
-    Record<number, number>
-  >({});
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [productSelectorOpen, setProductSelectorOpen] = React.useState(
-    !initialProduct,
-  );
-  const [productQuery, setProductQuery] = React.useState("");
-  const [productPage, setProductPage] = React.useState(0);
-  const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
-  const matchingProducts = products.filter(
-    (candidate) =>
-      candidate.productTypeSlug === slug &&
-      `${candidate.name} ${candidate.makerName}`
-        .toLocaleLowerCase(locale)
-        .includes(productQuery.trim().toLocaleLowerCase(locale)),
-  );
-  const productPageCount = Math.max(1, Math.ceil(matchingProducts.length / 12));
-  const currentProductPage = Math.min(productPage, productPageCount - 1);
-  const visibleProducts = matchingProducts.slice(
-    currentProductPage * 12,
-    (currentProductPage + 1) * 12,
-  );
-  const selectedButton =
-    typeof button?.id === "number"
-      ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
-      : null;
-  const customFinishIsValid =
-    finishOptionSchema.safeParse(customFinish).success;
-  const buttonCustomFinishIsValid =
-    finishOptionSchema.safeParse(buttonCustomFinish).success;
-  const selectedCollection = collections.find(
-    ({ id }) => id === selectedCollectionId,
-  );
-  const collectionIsPrivate =
-    selectedCollection?.isPrivate ?? newCollection?.isPrivate ?? true;
-  const collectionChoices = newCollection
-    ? [
-        ...collections,
-        {
-          coverImage: null,
-          coverImages: [],
-          createdAt: new Date(0),
-          description: newCollection.description || null,
-          id: -1,
-          isAdminPrivate: false,
-          isPrivate: newCollection.isPrivate,
-          itemCount: 0,
-          name: newCollection.name,
-          ownerUserId: 0,
-          summary: newCollection.summary || null,
-          updatedAt: new Date(0),
-        },
-      ]
-    : collections;
-  const serialNumberIsValid =
-    serialNumber === null || serialNumber.trim().length > 0;
-
-  /**
-   * Selects one product, applies its unambiguous defaults, and clears stale ownership state.
-   *
-   * @param candidate - Product selected from the catalog.
-   */
-  const selectProduct = (candidate: CatalogProduct) => {
-    const defaults = collectionProductDefaults(candidate, t);
-    setProduct(candidate);
-    setDisplayName(defaults.displayName);
-    setDescription("");
-    setBearing("");
-    setSerialNumber(null);
-    setInstalledPenPartIds([]);
-    setInstalledRefillProductId(null);
-    setInstalledRefillOfferingId(null);
-    setMaterial(defaults.material);
-    setFinish(defaults.finish);
-    setCustomFinish(emptyFinishOption());
-    setButton(null);
-    setButtonMaterial(null);
-    setButtonFinish(null);
-    setButtonCustomFinish(emptyFinishOption());
-    setDuplicateCounts({});
-    setFormError(null);
-    setProductSelectorOpen(false);
+      : null) as ComboboxOption | null,
+    product: (initialProduct ?? null) as CatalogProduct | null,
+    displayName: initialDefaults.displayName,
+    description: "",
+    bearing: "",
+    serialNumber: null as string | null,
+    ownership: ownershipEditorValue() as OwnershipEditorValue,
+    installedPenPartIds: [] as number[],
+    installedRefillProductId: null as number | null,
+    installedRefillOfferingId: null as number | null,
+    material: initialDefaults.material as CatalogLookup | null,
+    finish: initialDefaults.finish as ComboboxOption | null,
+    customFinish: emptyFinishOption(),
+    button: null as CatalogProduct | ComboboxOption | null,
+    buttonMaterial: null as CatalogLookup | null,
+    buttonFinish: null as ComboboxOption | null,
+    buttonCustomFinish: emptyFinishOption(),
+    productQuery: "",
   };
-
   /**
-   * Saves the current collection-item fields.
-   *
-   * @param confirmed - Whether duplicate items were confirmed.
-   * @returns A promise that resolves after the save flow completes.
+   * Validates collection-item and compatibility fields before enabling a submission.
+   * @param input - Current form fields.
+   * @returns Existing localized validation feedback, when invalid.
    */
-  const submit = async (confirmed: boolean) => {
-    const currentDescription =
-      descriptionRef.current?.getValue() ?? description;
-    setFormError(null);
+  const validateDraft = ({
+    value,
+  }: {
+    /** Current collection-item fields. */ value: typeof defaultValues;
+  }): string | undefined => {
+    const selected =
+      typeof value.button?.id === "number"
+        ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
+        : null;
     if (
-      descriptionRef.current?.isLoading() ||
-      currentDescription.length > 5000 ||
-      !product ||
-      !displayName.trim() ||
-      selectedCollectionId === null ||
-      (!product.productTypeSlug.startsWith("pen") && !material) ||
-      !serialNumberIsValid ||
-      (finish?.id === "custom" && !customFinishIsValid) ||
-      !collectionProductTypeIsSupported(product.productTypeSlug) ||
-      (selectedButton &&
-        (!buttonMaterial ||
-          (buttonFinish?.id === "custom" && !buttonCustomFinishIsValid)))
-    ) {
-      return;
-    }
-    const imageError = validateImages(images, locale);
-    if (imageError) {
-      setFormError(imageError.key);
-      return;
-    }
-    if (savedItemId && savedCollectionId) {
-      try {
-        if (images.length) {
-          const uploads = await uploadImages({
-            locale,
-            files: images,
-            getToken,
-            targetId: savedItemId,
-            targetType: "collection_item",
-          });
-          setImages(uploads.failed);
-          if (uploads.failed.length) {
-            setFormError("web.resources.upload.sessionFailure");
-            return;
-          }
-        }
-        if (collectionImages.length) {
-          const coverUpload = await uploadImages({
-            locale,
-            files: collectionImages,
-            getToken,
-            targetId: savedCollectionId,
-            targetType: "collection",
-          });
-          if (coverUpload.failed.length) {
-            setFormError("web.collections.error.upload");
-            return;
-          }
-          setCollectionImages([]);
-        }
-        await navigate({
-          params: { collectionId: savedCollectionId },
-          to: "/user/collections/$collectionId",
-        });
-      } catch (error) {
-        setFormError((error as ImageUploadError).key ?? "error.generic");
-      }
-      return;
-    }
-    const result = await addCollectionProduct({
-      data: {
+      !value.product ||
+      !value.displayName.trim() ||
+      value.description.length > 5000 ||
+      value.selectedCollectionId === null ||
+      (!value.product.productTypeSlug.startsWith("pen") &&
+        (!value.material || !value.finish)) ||
+      (value.serialNumber !== null && !value.serialNumber.trim()) ||
+      (value.finish?.id === "custom" &&
+        !finishOptionSchema.safeParse(value.customFinish).success) ||
+      !collectionProductTypeIsSupported(value.product.productTypeSlug) ||
+      (selected &&
+        (!value.buttonMaterial ||
+          !value.buttonFinish ||
+          (value.buttonFinish?.id === "custom" &&
+            !finishOptionSchema.safeParse(value.buttonCustomFinish).success)))
+    )
+      return "web.catalog.error.form";
+    return validateImages(value.images, locale)?.key;
+  };
+  const form = useForm({
+    onSubmitMeta: { confirmed: false },
+    defaultValues,
+    validators: {
+      onMount: validateDraft,
+      onChange: validateDraft,
+      onSubmit: validateDraft,
+    },
+    /**
+     * Captures one valid item creation without changing its server payload.
+     * @param input - Validated fields and duplicate-confirmation metadata.
+     */
+    onSubmit: ({ value, meta: { confirmed } }) => {
+      const {
+        bearing,
+        buttonCustomFinish,
+        buttonFinish,
+        buttonMaterial,
+        selectedCollectionId,
+        installedPenPartIds,
+        customFinish,
+        displayName,
+        finish,
+        installedRefillOfferingId,
+        installedRefillProductId,
+        material,
+        newCollection,
+        product,
+        ownership,
+        serialNumber,
+      } = value;
+      if (!product || ui.save) return;
+      const currentDescription = value.description;
+      const selectedButton =
+        typeof value.button?.id === "number"
+          ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
+          : null;
+      const data = {
         bearing,
         buttonCustomFinish:
           selectedButton && buttonFinish?.id === "custom"
@@ -4037,79 +4945,385 @@ export function CollectionAddPage({
           entryReason: ownership.entryReason,
         },
         serialNumber,
+      };
+      dispatch({
+        type: "saveRequested",
+        request: {
+          data,
+          productName: product.name,
+          images: value.images,
+          collectionImages: value.collectionImages,
+        },
+      });
+    },
+  });
+  const {
+    images,
+    product,
+    newCollection,
+    selectedCollectionId,
+    type,
+    displayName,
+    description,
+    bearing,
+    serialNumber,
+    ownership,
+    installedPenPartIds,
+    installedRefillProductId,
+    installedRefillOfferingId,
+    material,
+    finish,
+    customFinish,
+    button,
+    buttonMaterial,
+    buttonFinish,
+    buttonCustomFinish,
+    productQuery,
+  } = useStore(form.store, (state) => state.values);
+
+  const collectionDialog = React.useRef<HTMLDialogElement>(null);
+
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionAddEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CollectionAddResult>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    CollectionAddState,
+    CollectionAddEvent,
+    CollectionAddEffect
+  >(
+    (state, event, exec) => {
+      switch (event.type) {
+        case "lookupOptionsChanged":
+          return {
+            ...state,
+            options:
+              typeof event.update === "function"
+                ? event.update(state.options)
+                : event.update,
+          };
+        case "productSelected":
+          exec.stop(state.save);
+          return {
+            ...state,
+            savedItemId: null,
+            savedCollectionId: null,
+            duplicateCounts: {},
+            productSelectorOpen: !event.selected,
+            save: undefined,
+          };
+        case "confirmationDismissed":
+          return { ...state, duplicateCounts: {} };
+        case "selectorChanged":
+          return { ...state, productSelectorOpen: event.open };
+        case "pageSelected":
+          return { ...state, productPage: event.page };
+        case "descriptionLoadingChanged":
+          return state.descriptionLoading === event.loading
+            ? state
+            : { ...state, descriptionLoading: event.loading };
+        case "saveRequested":
+          if (state.save) return state;
+          return {
+            ...state,
+            duplicateCounts: {},
+            save: exec({
+              type: "save",
+              ...event.request,
+              itemId: state.savedItemId,
+              collectionId: state.savedCollectionId,
+            }),
+          };
+        case "saveFinished":
+          exec.stop(state.save);
+          return {
+            ...state,
+            savedItemId: event.result.itemId,
+            savedCollectionId: event.result.collectionId,
+            duplicateCounts: event.result.duplicateCounts ?? {},
+            save: undefined,
+          };
+      }
+    },
+    {
+      options: initialOptions,
+      savedItemId: null,
+      savedCollectionId: null,
+      descriptionLoading: true,
+      duplicateCounts: {},
+      productSelectorOpen: !initialProduct,
+      productPage: 0,
+      save: undefined,
+    },
+    {
+      /**
+       * Observes one creation/upload pipeline without replaying completed mutations.
+       * @param _state - Current creation UI.
+       * @param effect - Captured creation and image inputs.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: performCreation(effect) };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished", result });
+          form.setFieldValue("images", (current) =>
+            current.filter(
+              (file) =>
+                !effect.images.includes(file) || result.images.includes(file),
+            ),
+          );
+          form.setFieldValue("collectionImages", (current) =>
+            current.filter(
+              (file) =>
+                !effect.collectionImages.includes(file) ||
+                result.collectionImages.includes(file),
+            ),
+          );
+          if (result.error) form.setErrorMap({ onSubmit: result.error });
+          if (result.complete && result.collectionId)
+            void navigate({
+              params: { collectionId: result.collectionId },
+              to: "/user/collections/$collectionId",
+            });
+        });
       },
-    });
-    if (!result.ok && result.requiresConfirmation) {
-      setDuplicateCounts(result.duplicateCounts);
-      return;
-    }
-    if (!result.ok) {
-      setFormError(result.formError);
-      return;
-    }
-    setSavedItemId(result.collectionItemId);
-    setSavedCollectionId(result.collectionId);
-    if (images.length) {
-      try {
-        const uploads = await uploadImages({
+    },
+  );
+  const {
+    options,
+    descriptionLoading,
+    duplicateCounts,
+    productSelectorOpen,
+    productPage,
+  } = ui;
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  /**
+   * Receives readiness without changing callback identity for legacy Markdown callers.
+   * @param loading - Whether initialization is pending.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => {
+      dispatch({ type: "descriptionLoadingChanged", loading });
+    },
+    [dispatch],
+  );
+  /**
+   * Accepts the stable shared-control lookup contract.
+   * @param update - Pure catalog replacement or updater.
+   */
+  const receiveOptions = (update: React.SetStateAction<CatalogOptions>) => {
+    dispatch({ type: "lookupOptionsChanged", update });
+  };
+  const canSubmit = useStore(
+    form.store,
+    (state) =>
+      validateDraft({ value: state.values }) === undefined &&
+      !state.isSubmitting,
+  );
+  const formError = useStore(form.store, (state) => state.errorMap.onSubmit);
+  /**
+   * Creates an item, uploads item images, then uploads collection images in the existing order.
+   * @param request - Captured submission or upload-only retry.
+   * @returns Durable identifiers, retained files, and existing failure feedback.
+   */
+  async function performCreation(
+    request: CollectionAddEffect,
+  ): Promise<CollectionAddResult> {
+    let itemId = request.itemId;
+    let collectionId = request.collectionId;
+    let images = request.images;
+    let collectionImages = request.collectionImages;
+    let created = false;
+    try {
+      if (!itemId || !collectionId) {
+        const result = await addCollectionProduct({ data: request.data });
+        if (!result.ok && result.requiresConfirmation)
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            duplicateCounts: result.duplicateCounts,
+          };
+        if (!result.ok)
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            error: result.formError,
+          };
+        itemId = result.collectionItemId;
+        collectionId = result.collectionId;
+        created = true;
+      }
+      if (images.length) {
+        const uploaded = await uploadImages({
           locale,
           files: images,
           getToken,
+          targetId: itemId,
+          targetType: "collection_item",
           /**
-           * Offers to restore an owner-deleted duplicate image.
-           *
-           * @param imageId - Duplicate image identifier.
+           * Offers the existing restore choice for duplicate images on initial creation.
+           * @param imageId - Owner-deleted duplicate identifier.
            * @returns Whether the duplicate was restored.
            */
-          onOwnerDeletedDuplicate: async (imageId) => {
-            if (
-              !window.confirm(
-                t("web.resources.trash.restoreConfirmationDescription", {
-                  name: product.name,
-                }),
-              )
-            )
-              return false;
-            await restoreCatalogImage({
-              data: { imageId, targetType: "collection_item" },
-            });
-            return true;
-          },
-          targetId: result.collectionItemId,
-          targetType: "collection_item",
+          onOwnerDeletedDuplicate: created
+            ? async (imageId) => {
+                if (
+                  !window.confirm(
+                    t("web.resources.trash.restoreConfirmationDescription", {
+                      name: request.productName,
+                    }),
+                  )
+                )
+                  return false;
+                await restoreCatalogImage({
+                  data: { imageId, targetType: "collection_item" },
+                });
+                return true;
+              }
+            : undefined,
         });
-        setImages(uploads.failed);
-        if (uploads.failed.length) {
-          setFormError("web.resources.upload.sessionFailure");
-          return;
-        }
-      } catch (error) {
-        setFormError((error as ImageUploadError).key ?? "error.generic");
-        return;
+        images = uploaded.failed;
+        if (images.length)
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            error: "web.resources.upload.sessionFailure",
+          };
       }
-    }
-    if (collectionImages.length) {
-      try {
-        const upload = await uploadImages({
-          locale,
-          files: collectionImages,
-          getToken,
-          targetId: result.collectionId,
-          targetType: "collection",
-        });
-        if (upload.failed.length) {
-          setFormError("web.collections.error.upload");
-          return;
+      if (collectionImages.length) {
+        try {
+          const uploaded = await uploadImages({
+            locale,
+            files: collectionImages,
+            getToken,
+            targetId: collectionId,
+            targetType: "collection",
+          });
+          collectionImages = uploaded.failed;
+          if (collectionImages.length)
+            return {
+              itemId,
+              collectionId,
+              images,
+              collectionImages,
+              error: "web.collections.error.upload",
+            };
+        } catch {
+          return {
+            itemId,
+            collectionId,
+            images,
+            collectionImages,
+            error: "web.collections.error.upload",
+          };
         }
-      } catch {
-        setFormError("web.collections.error.upload");
-        return;
       }
+      return { itemId, collectionId, images, collectionImages, complete: true };
+    } catch (error) {
+      return {
+        itemId,
+        collectionId,
+        images,
+        collectionImages,
+        error: (error as ImageUploadError).key ?? "error.generic",
+      };
     }
-    await navigate({
-      params: { collectionId: result.collectionId },
-      to: "/user/collections/$collectionId",
-    });
+  }
+  const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
+  const matchingProducts = products.filter(
+    (candidate) =>
+      candidate.productTypeSlug === slug &&
+      `${candidate.name} ${candidate.makerName}`
+        .toLocaleLowerCase(locale)
+        .includes(productQuery.trim().toLocaleLowerCase(locale)),
+  );
+  const productPageCount = Math.max(1, Math.ceil(matchingProducts.length / 12));
+  const currentProductPage = Math.min(productPage, productPageCount - 1);
+  const visibleProducts = matchingProducts.slice(
+    currentProductPage * 12,
+    (currentProductPage + 1) * 12,
+  );
+  const selectedButton =
+    typeof button?.id === "number"
+      ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
+      : null;
+  const selectedCollection = collections.find(
+    ({ id }) => id === selectedCollectionId,
+  );
+  const collectionIsPrivate =
+    selectedCollection?.isPrivate ?? newCollection?.isPrivate ?? true;
+  const collectionChoices = newCollection
+    ? [
+        ...collections,
+        {
+          coverImage: null,
+          coverImages: [],
+          createdAt: new Date(0),
+          description: newCollection.description || null,
+          id: -1,
+          isAdminPrivate: false,
+          isPrivate: newCollection.isPrivate,
+          itemCount: 0,
+          name: newCollection.name,
+          ownerUserId: 0,
+          summary: newCollection.summary || null,
+          updatedAt: new Date(0),
+        },
+      ]
+    : collections;
+
+  /**
+   * Selects one product, applies its unambiguous defaults, and clears stale ownership state.
+   *
+   * @param candidate - Product selected from the catalog.
+   */
+  const selectProduct = (candidate: CatalogProduct) => {
+    const defaults = collectionProductDefaults(candidate, t);
+    form.setFieldValue("product", candidate);
+    dispatch({ type: "productSelected", selected: true });
+    form.setFieldValue("displayName", defaults.displayName);
+    form.setFieldValue("description", "");
+    form.setFieldValue("bearing", "");
+    form.setFieldValue("serialNumber", null);
+    form.setFieldValue("installedPenPartIds", []);
+    form.setFieldValue("installedRefillProductId", null);
+    form.setFieldValue("installedRefillOfferingId", null);
+    form.setFieldValue("material", defaults.material);
+    form.setFieldValue("finish", defaults.finish);
+    form.setFieldValue("customFinish", emptyFinishOption());
+    form.setFieldValue("button", null);
+    form.setFieldValue("buttonMaterial", null);
+    form.setFieldValue("buttonFinish", null);
+    form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+    form.setErrorMap({ onSubmit: undefined });
+    dispatch({ type: "selectorChanged", open: false });
+  };
+
+  /**
+   * Saves the current collection-item fields.
+   *
+   * @param confirmed - Whether duplicate items were confirmed.
+   * @returns A promise that resolves after the save flow completes.
+   */
+  const submit = (confirmed: boolean) => {
+    if (descriptionRef.current?.isLoading() || ui.save) return;
+    form.setFieldValue(
+      "description",
+      descriptionRef.current?.getValue() ?? form.state.values.description,
+    );
+    form.setErrorMap({ onSubmit: undefined });
+    void form.handleSubmit({ confirmed });
   };
 
   return (
@@ -4124,7 +5338,9 @@ export function CollectionAddPage({
           <Input
             aria-label={displayNameLabel}
             disabled={!product}
-            onChange={(event) => setDisplayName(event.target.value)}
+            onChange={(event) =>
+              form.setFieldValue("displayName", event.target.value)
+            }
             required
             value={displayName}
           />
@@ -4136,8 +5352,8 @@ export function CollectionAddPage({
           id="collection-item-description"
           key={product?.id ?? "no-product"}
           label={t("web.catalog.field.description")}
-          onChange={setDescription}
-          onLoadingChange={setDescriptionLoading}
+          onChange={(value) => form.setFieldValue("description", value)}
+          onLoadingChange={receiveDescriptionLoading}
           ref={descriptionRef}
         />
         {product?.productTypeSlug === "spinner" ? (
@@ -4145,7 +5361,9 @@ export function CollectionAddPage({
             <Input
               aria-label={t("web.catalog.field.bearing")}
               maxLength={200}
-              onChange={(event) => setBearing(event.target.value)}
+              onChange={(event) =>
+                form.setFieldValue("bearing", event.target.value)
+              }
               value={bearing}
             />
           </Field>
@@ -4153,14 +5371,14 @@ export function CollectionAddPage({
         {product &&
         collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
           <SerialNumberFields
-            onChange={setSerialNumber}
+            onChange={(value) => form.setFieldValue("serialNumber", value)}
             t={t}
             value={serialNumber}
           />
         ) : null}
         <OwnershipLifecycleFields
           allowDeparture={false}
-          onChange={setOwnership}
+          onChange={(value) => form.setFieldValue("ownership", value)}
           value={ownership}
         />
         {syncIncomplete ? (
@@ -4172,10 +5390,10 @@ export function CollectionAddPage({
           label={t("web.collections.field.collection")}
           onAdd={() => collectionDialog.current?.showModal()}
           onChange={(collectionId) => {
-            setSelectedCollectionId(collectionId);
+            form.setFieldValue("selectedCollectionId", collectionId);
             if (collectionId !== -1) {
-              setNewCollection(null);
-              setCollectionImages([]);
+              form.setFieldValue("newCollection", null);
+              form.setFieldValue("collectionImages", []);
             }
           }}
           placeholder={t("web.collections.select.placeholder")}
@@ -4210,9 +5428,9 @@ export function CollectionAddPage({
                 summaryPlaceholder: t("web.collections.placeholder.summary"),
               }}
               onSubmit={(value, collectionImages) => {
-                setNewCollection(value);
-                setCollectionImages(collectionImages);
-                setSelectedCollectionId(-1);
+                form.setFieldValue("newCollection", value);
+                form.setFieldValue("collectionImages", collectionImages);
+                form.setFieldValue("selectedCollectionId", -1);
                 collectionDialog.current?.close();
               }}
             />
@@ -4227,7 +5445,12 @@ export function CollectionAddPage({
           </div>
         </dialog>
         <details
-          onToggle={(event) => setProductSelectorOpen(event.currentTarget.open)}
+          onToggle={(event) =>
+            dispatch({
+              type: "selectorChanged",
+              open: event.currentTarget.open,
+            })
+          }
           open={productSelectorOpen}
         >
           <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
@@ -4239,26 +5462,27 @@ export function CollectionAddPage({
                 ariaLabel={t("web.catalog.field.productType")}
                 items={options.productTypes}
                 onValueChange={(value) => {
-                  setType(value);
-                  setProductPage(0);
-                  setProductQuery("");
-                  setProduct(null);
-                  setDisplayName("");
-                  setDescription("");
-                  setBearing("");
-                  setSerialNumber(null);
-                  setInstalledPenPartIds([]);
-                  setInstalledRefillProductId(null);
-                  setInstalledRefillOfferingId(null);
-                  setMaterial(null);
-                  setFinish(null);
-                  setCustomFinish(emptyFinishOption());
-                  setButton(null);
-                  setButtonMaterial(null);
-                  setButtonFinish(null);
-                  setButtonCustomFinish(emptyFinishOption());
-                  setDuplicateCounts({});
-                  setFormError(null);
+                  form.setFieldValue("type", value);
+                  dispatch({ type: "pageSelected", page: 0 });
+                  form.setFieldValue("productQuery", "");
+                  form.setFieldValue("product", null);
+                  dispatch({ type: "productSelected", selected: false });
+                  form.setFieldValue("displayName", "");
+                  form.setFieldValue("description", "");
+                  form.setFieldValue("bearing", "");
+                  form.setFieldValue("serialNumber", null);
+                  form.setFieldValue("installedPenPartIds", []);
+                  form.setFieldValue("installedRefillProductId", null);
+                  form.setFieldValue("installedRefillOfferingId", null);
+                  form.setFieldValue("material", null);
+                  form.setFieldValue("finish", null);
+                  form.setFieldValue("customFinish", emptyFinishOption());
+                  form.setFieldValue("button", null);
+                  form.setFieldValue("buttonMaterial", null);
+                  form.setFieldValue("buttonFinish", null);
+                  form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+                  dispatch({ type: "confirmationDismissed" });
+                  form.setErrorMap({ onSubmit: undefined });
                 }}
                 placeholder={t("web.catalog.selectProductType")}
                 value={type}
@@ -4270,8 +5494,8 @@ export function CollectionAddPage({
             <Input
               aria-label={t("web.action.search")}
               onChange={(event) => {
-                setProductQuery(event.target.value);
-                setProductPage(0);
+                form.setFieldValue("productQuery", event.target.value);
+                dispatch({ type: "pageSelected", page: 0 });
               }}
               placeholder={t("web.archive.searchPlaceholder")}
               type="search"
@@ -4318,7 +5542,12 @@ export function CollectionAddPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Button
                 disabled={currentProductPage === 0}
-                onClick={() => setProductPage(currentProductPage - 1)}
+                onClick={() =>
+                  dispatch({
+                    type: "pageSelected",
+                    page: currentProductPage - 1,
+                  })
+                }
                 type="button"
                 variant="outline"
               >
@@ -4332,7 +5561,12 @@ export function CollectionAddPage({
               </span>
               <Button
                 disabled={currentProductPage + 1 === productPageCount}
-                onClick={() => setProductPage(currentProductPage + 1)}
+                onClick={() =>
+                  dispatch({
+                    type: "pageSelected",
+                    page: currentProductPage + 1,
+                  })
+                }
                 type="button"
                 variant="outline"
               >
@@ -4346,10 +5580,12 @@ export function CollectionAddPage({
             customFinish={customFinish}
             finish={finish}
             material={material}
-            onCustomFinishChange={setCustomFinish}
-            onFinishChange={setFinish}
-            onMaterialChange={setMaterial}
-            onOptionsChange={setOptions}
+            onCustomFinishChange={(value) =>
+              form.setFieldValue("customFinish", value)
+            }
+            onFinishChange={(value) => form.setFieldValue("finish", value)}
+            onMaterialChange={(value) => form.setFieldValue("material", value)}
+            onOptionsChange={receiveOptions}
             options={options}
             product={product}
             t={t}
@@ -4358,9 +5594,15 @@ export function CollectionAddPage({
         {product?.productTypeSlug === "pen" ? (
           <PenCollectionFields
             allProducts={products}
-            onRefillOfferingChange={setInstalledRefillOfferingId}
-            onRefillProductChange={setInstalledRefillProductId}
-            onInstalledPartIdsChange={setInstalledPenPartIds}
+            onRefillOfferingChange={(value) =>
+              form.setFieldValue("installedRefillOfferingId", value)
+            }
+            onRefillProductChange={(value) =>
+              form.setFieldValue("installedRefillProductId", value)
+            }
+            onInstalledPartIdsChange={(value) =>
+              form.setFieldValue("installedPenPartIds", value)
+            }
             ownedItems={ownedItems}
             product={product}
             refillOfferingId={installedRefillOfferingId}
@@ -4408,17 +5650,18 @@ export function CollectionAddPage({
                 ...options.spinnerButtons,
               ]}
               onValueChange={(value) => {
-                setButton(
+                form.setFieldValue(
+                  "button",
                   typeof value?.id === "number"
                     ? (options.spinnerButtons.find(
                         ({ id }) => id === value.id,
                       ) ?? null)
                     : value,
                 );
-                setButtonMaterial(null);
-                setButtonFinish(null);
-                setButtonCustomFinish(emptyFinishOption());
-                setDuplicateCounts({});
+                form.setFieldValue("buttonMaterial", null);
+                form.setFieldValue("buttonFinish", null);
+                form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+                dispatch({ type: "confirmationDismissed" });
               }}
               placeholder={t("web.catalog.defaultButton")}
               removeLabel={t("web.action.close")}
@@ -4432,10 +5675,16 @@ export function CollectionAddPage({
             customFinish={buttonCustomFinish}
             finish={buttonFinish}
             material={buttonMaterial}
-            onCustomFinishChange={setButtonCustomFinish}
-            onFinishChange={setButtonFinish}
-            onMaterialChange={setButtonMaterial}
-            onOptionsChange={setOptions}
+            onCustomFinishChange={(value) =>
+              form.setFieldValue("buttonCustomFinish", value)
+            }
+            onFinishChange={(value) =>
+              form.setFieldValue("buttonFinish", value)
+            }
+            onMaterialChange={(value) =>
+              form.setFieldValue("buttonMaterial", value)
+            }
+            onOptionsChange={receiveOptions}
             options={options}
             product={selectedButton}
             t={t}
@@ -4466,6 +5715,7 @@ export function CollectionAddPage({
         {product ? (
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
+            disabled={Boolean(ui.save)}
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -4482,10 +5732,13 @@ export function CollectionAddPage({
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImages((current) => [...current, ...additions])
+              form.setFieldValue("images", (current) => [
+                ...current,
+                ...additions,
+              ])
             }
             onRemove={(index) =>
-              setImages((current) =>
+              form.setFieldValue("images", (current) =>
                 current.filter((_, candidate) => candidate !== index),
               )
             }
@@ -4495,20 +5748,7 @@ export function CollectionAddPage({
         {formError ? <Notice>{t(formError)}</Notice> : null}
         {product ? (
           <Button
-            disabled={Boolean(
-              (!product.productTypeSlug.startsWith("pen") && !material) ||
-                descriptionLoading ||
-                description.length > 5000 ||
-                !displayName.trim() ||
-                !serialNumberIsValid ||
-                (!product.productTypeSlug.startsWith("pen") && !finish) ||
-                (finish?.id === "custom" && !customFinishIsValid) ||
-                (selectedButton &&
-                  (!buttonMaterial ||
-                    !buttonFinish ||
-                    (buttonFinish.id === "custom" &&
-                      !buttonCustomFinishIsValid))),
-            )}
+            disabled={descriptionLoading || Boolean(ui.save) || !canSubmit}
             onClick={() => void submit(Object.keys(duplicateCounts).length > 0)}
             type="button"
           >
@@ -4963,6 +6203,90 @@ function localizedFinishLabel(
   });
 }
 
+/** Localized collection-item validation or save feedback. */
+type CollectionEditFeedback = {
+  /** Existing primary failure key. */
+  message: string;
+  /** Optional privacy/compatibility explanation from the endpoint. */
+  detail?: {
+    /** Existing secondary localization key. */
+    key: string;
+    /** Existing interpolation values. */
+    values?: Readonly<Record<string, unknown>>;
+  };
+};
+/** Committed collection-item edit and preceding image uploads. */
+type CollectionEditEffect = {
+  /** Save implementation. */
+  type: "save";
+  /** Unchanged server payload, absent for an upload-only save. */
+  data: unknown;
+  /** Whether details should be saved after images. */
+  mode: "save" | "upload";
+  /** Captured image batch. */
+  files: File[];
+  /** Edited item identifier. */
+  itemId: number;
+  /** Item name for duplicate-image restore confirmation. */
+  itemName: string;
+  /** Destination after success. */
+  collectionId: number;
+  /** Existing optional moderation reason. */
+  reason?: string;
+};
+/** Edit outcome retained across lifecycle suspension. */
+type CollectionEditResult = {
+  /** Images requiring retry. */
+  files: File[];
+  /** Existing localized failure response. */
+  error?: CollectionEditFeedback;
+};
+/** Collection-item controls and committed edit lifetime. */
+type CollectionEditState = {
+  /** Available lookup choices. */
+  options: CatalogOptions;
+  /** Whether Markdown is still initializing. */
+  descriptionLoading: boolean;
+  /** Whether the magnet override must be saved. */
+  magnetConfigurationDirty: boolean;
+  /** Whether a layout change discarded an incompatible snapshot. */
+  magnetConfigurationNotice: boolean;
+  /** Pending ordered image/upload operation. */
+  save: EffectEntity<CollectionEditState, CollectionEditEvent> | undefined;
+};
+/** Editing control and terminal save events. */
+type CollectionEditEvent =
+  | {
+      /** Accepts the shared lookup callback. */
+      type: "lookupOptionsChanged";
+      /** Pure replacement or updater. */
+      update: React.SetStateAction<CatalogOptions>;
+    }
+  | {
+      /** Receives committed editor readiness. */
+      type: "descriptionLoadingChanged";
+      /** Whether initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Records an explicit magnet override edit. */
+      type: "magnetConfigurationEdited";
+    }
+  | {
+      /** Records a discarded incompatible magnet override. */
+      type: "magnetLayoutChanged";
+    }
+  | {
+      /** Queues validated fields and image files. */
+      type: "saveRequested";
+      /** Immutable edit inputs. */
+      request: Omit<CollectionEditEffect, "type">;
+    }
+  | {
+      /** Stops the completed edit workflow. */
+      type: "saveFinished";
+    };
+
 /**
  * Renders the collection-item edit page.
  *
@@ -5016,88 +6340,9 @@ export function CollectionEditPage({
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [images, setImages] = React.useState<File[]>([]);
-  const [existingImages, setExistingImages] = React.useState(item.images);
-  const [collectionId, setCollectionId] = React.useState(item.collectionId);
-  const [displayName, setDisplayName] = React.useState(item.displayName);
-  const [description, setDescription] = React.useState(
-    item.descriptionOverride ?? "",
-  );
-  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
-  const [bearing, setBearing] = React.useState(item.bearingOverride ?? "");
-  const [serialNumber, setSerialNumber] = React.useState<string | null>(
-    item.serialNumber ?? null,
-  );
   const ownershipPeriods = item.ownershipPeriods ?? [];
-  const [ownership, setOwnership] = React.useState<OwnershipEditorValue>(() =>
-    ownershipEditorValue(ownershipPeriods.at(-1)),
-  );
-  const [installedPenPartIds, setInstalledPenPartIds] = React.useState<
-    number[]
-  >(item.installedPenPartCollectionItemIds ?? []);
-  const [installedRefillProductId, setInstalledRefillProductId] =
-    React.useState(item.installedRefillProductId ?? null);
-  const [installedRefillOfferingId, setInstalledRefillOfferingId] =
-    React.useState(item.installedRefillOfferingId ?? null);
-  const [options, setOptions] = React.useState(initialOptions);
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [formErrorDetail, setFormErrorDetail] = React.useState<{
-    /** Secondary localized error key. */
-    key: string;
-    /** Interpolation values for the secondary error. */
-    values?: Readonly<Record<string, unknown>>;
-  } | null>(null);
-  const [material, setMaterial] = React.useState<CatalogLookup | null>(
-    collectionMaterialChoice(product, item.materials),
-  );
-  const [finish, setFinish] = React.useState<ComboboxOption | null>(() =>
-    item.finishOption
-      ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
-      : null,
-  );
-  const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
-  const [magnetConfiguration, setMagnetConfiguration] =
-    React.useState<SliderMagnetConfiguration | null>(
-      item.magnetConfiguration ??
-        item.effectiveSliderSetup?.configuration ??
-        null,
-    );
-  const [magnetConfigurationDirty, setMagnetConfigurationDirty] =
-    React.useState(false);
-  const [magnetConfigurationNotice, setMagnetConfigurationNotice] =
-    React.useState(false);
   const initialButton = ownedButtons.find(
     ({ collectionItemId }) => collectionItemId === item.installedButtonId,
-  );
-  const [button, setButton] = React.useState<ComboboxOption | null>(() => {
-    return initialButton
-      ? { id: initialButton.collectionItemId, name: initialButton.displayName }
-      : { id: "default", name: t("web.catalog.defaultButton") };
-  });
-  const [buttonMaterial, setButtonMaterial] =
-    React.useState<CatalogLookup | null>(
-      collectionMaterialChoice(
-        buttonProducts.find(({ id }) => id === initialButton?.productId),
-        initialButton?.materials,
-      ),
-    );
-  const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
-    () =>
-      initialButton?.finishOption
-        ? {
-            id: "current",
-            name: localizedFinishLabel(initialButton.finishOption, t),
-          }
-        : null,
-  );
-  const [buttonCustomFinish, setButtonCustomFinish] =
-    React.useState(emptyFinishOption);
-  const selectedButton = ownedButtons.find(
-    ({ collectionItemId }) => collectionItemId === button?.id,
-  );
-  const selectedButtonProduct = buttonProducts.find(
-    ({ id }) => id === selectedButton?.productId,
   );
   const initialPlate = ownedSliderComponents.find(
     ({ collectionItemId }) => collectionItemId === item.installedPlateId,
@@ -5105,16 +6350,510 @@ export function CollectionEditPage({
   const initialInsert = ownedSliderComponents.find(
     ({ collectionItemId }) => collectionItemId === item.installedInsertId,
   );
-  const [plate, setPlate] = React.useState<ComboboxOption | null>(() =>
-    initialPlate
-      ? { id: initialPlate.collectionItemId, name: initialPlate.displayName }
-      : { id: "default", name: t("web.slider.component.noPlate") },
+
+  /** Initial collection-item editing fields. */
+  const defaultValues = {
+    images: [] as File[],
+    existingImages: item.images,
+    collectionId: item.collectionId,
+    displayName: item.displayName,
+    description: item.descriptionOverride ?? "",
+    bearing: item.bearingOverride ?? "",
+    serialNumber: (item.serialNumber ?? null) as string | null,
+    ownership: ownershipEditorValue(
+      ownershipPeriods.at(-1),
+    ) as OwnershipEditorValue,
+    installedPenPartIds: (item.installedPenPartCollectionItemIds ??
+      []) as number[],
+    installedRefillProductId: item.installedRefillProductId ?? null,
+    installedRefillOfferingId: item.installedRefillOfferingId ?? null,
+    material: collectionMaterialChoice(
+      product,
+      item.materials,
+    ) as CatalogLookup | null,
+    finish: (item.finishOption
+      ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
+      : null) as ComboboxOption | null,
+    customFinish: emptyFinishOption(),
+    magnetConfiguration: (item.magnetConfiguration ??
+      item.effectiveSliderSetup?.configuration ??
+      null) as SliderMagnetConfiguration | null,
+    button: (initialButton
+      ? {
+          id: initialButton.collectionItemId,
+          name: initialButton.displayName,
+        }
+      : {
+          id: "default",
+          name: t("web.catalog.defaultButton"),
+        }) as ComboboxOption | null,
+    buttonMaterial: collectionMaterialChoice(
+      buttonProducts.find(({ id }) => id === initialButton?.productId),
+      initialButton?.materials,
+    ) as CatalogLookup | null,
+    buttonFinish: (initialButton?.finishOption
+      ? {
+          id: "current",
+          name: localizedFinishLabel(initialButton.finishOption, t),
+        }
+      : null) as ComboboxOption | null,
+    buttonCustomFinish: emptyFinishOption(),
+    plate: (initialPlate
+      ? {
+          id: initialPlate.collectionItemId,
+          name: initialPlate.displayName,
+        }
+      : {
+          id: "default",
+          name: t("web.slider.component.noPlate"),
+        }) as ComboboxOption | null,
+    insert: (initialInsert
+      ? {
+          id: initialInsert.collectionItemId,
+          name: initialInsert.displayName,
+        }
+      : {
+          id: "default",
+          name: t("web.slider.component.noInsert"),
+        }) as ComboboxOption | null,
+  };
+  /**
+   * Selects the existing save/upload-only mode from a current form snapshot.
+   * @param value - Current editing fields.
+   * @returns Existing submission mode for valid details or selected images.
+   */
+  const draftMode = (value: typeof defaultValues) => {
+    const selectedButton = ownedButtons.find(
+      ({ collectionItemId }) => collectionItemId === value.button?.id,
+    );
+    const selectedButtonProduct = buttonProducts.find(
+      ({ id }) => id === selectedButton?.productId,
+    );
+    const selectedPlate = ownedSliderComponents.find(
+      ({ collectionItemId }) => collectionItemId === value.plate?.id,
+    );
+    const selectedInsert = ownedSliderComponents.find(
+      ({ collectionItemId }) => collectionItemId === value.insert?.id,
+    );
+    const buttonValid =
+      item.productTypeSlug !== "spinner" ||
+      value.button?.id === "default" ||
+      Boolean(selectedButton && selectedButtonProduct && value.buttonMaterial);
+    const sliderValid =
+      item.productTypeSlug !== "slider" ||
+      ((value.plate?.id === "default" || Boolean(selectedPlate)) &&
+        (!product.usesInserts ||
+          value.insert?.id === "default" ||
+          Boolean(selectedInsert)));
+    const finishValid =
+      value.finish?.id !== "custom" ||
+      finishOptionSchema.safeParse(value.customFinish).success;
+    const buttonFinishValid =
+      value.buttonFinish?.id !== "custom" ||
+      finishOptionSchema.safeParse(value.buttonCustomFinish).success;
+    const valid = Boolean(
+      value.displayName.trim() &&
+        value.description.length <= 5000 &&
+        (product.productTypeSlug.startsWith("pen") || value.material) &&
+        (value.serialNumber === null || value.serialNumber.trim()) &&
+        finishValid &&
+        buttonValid &&
+        sliderValid &&
+        (!selectedButton || buttonFinishValid),
+    );
+    return collectionEditSubmissionMode(valid, value.images.length);
+  };
+  const form = useForm({
+    defaultValues,
+    validators: {
+      /**
+       * Retains upload-only saves while validating images and details before mutation.
+       * @param input - Current edit fields.
+       * @returns Existing localized feedback when no save mode is eligible.
+       */
+      onSubmit: ({ value }): CollectionEditFeedback | undefined => {
+        if (draftMode(value) === "disabled")
+          return { message: "web.catalog.error.form" };
+        const error = validateImages(value.images, locale);
+        return error ? { message: error.key } : undefined;
+      },
+    },
+    /**
+     * Captures validated edits using the unchanged payload and moderation reason.
+     * @param input - Current edit fields.
+     */
+    onSubmit: ({ value }) => {
+      if (ui.save) return;
+      const mode = draftMode(value);
+      if (mode === "disabled") return;
+      const moderating = item.canAdminister && !item.isOwner;
+      const reason = moderating
+        ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+        : undefined;
+      if (moderating && !reason) return;
+      const {
+        collectionId,
+        displayName,
+        description,
+        bearing,
+        serialNumber,
+        ownership,
+        installedPenPartIds,
+        installedRefillProductId,
+        installedRefillOfferingId,
+        material,
+        finish,
+        customFinish,
+        magnetConfiguration,
+        button,
+        buttonMaterial,
+        buttonFinish,
+        buttonCustomFinish,
+        plate,
+        insert,
+      } = value;
+      const currentDescription = description;
+      const selectedButton = ownedButtons.find(
+        ({ collectionItemId }) => collectionItemId === button?.id,
+      );
+      const selectedPlate = ownedSliderComponents.find(
+        ({ collectionItemId }) => collectionItemId === plate?.id,
+      );
+      const selectedInsert = ownedSliderComponents.find(
+        ({ collectionItemId }) => collectionItemId === insert?.id,
+      );
+      const buttonFinishSelectionIsValid =
+        buttonFinish?.id !== "custom" ||
+        finishOptionSchema.safeParse(buttonCustomFinish).success;
+      const magnetConfigurationDirty = ui.magnetConfigurationDirty;
+      let data: unknown;
+      if (mode === "save") {
+        let installedButton:
+          | {
+              /** Installed collection item identifier. */
+              collectionItemId: number;
+              /** Custom finish applied to the installed button. */
+              customFinish: FinishOptionFormValue | null;
+              /** Catalog finish option applied to the installed button. */
+              finishOptionId: number | null;
+              /** Material applied to the installed button. */
+              materialAssignmentId?: number;
+            }
+          | null
+          | undefined;
+        if (item.productTypeSlug === "spinner") {
+          if (button?.id === "default") {
+            installedButton = null;
+          } else {
+            if (
+              !selectedButton ||
+              !buttonMaterial ||
+              !buttonFinish ||
+              !buttonFinishSelectionIsValid
+            ) {
+              return;
+            }
+            installedButton = {
+              collectionItemId: selectedButton.collectionItemId,
+              customFinish:
+                buttonFinish.id === "custom" ? buttonCustomFinish : null,
+              finishOptionId:
+                buttonFinish.id === "current" || buttonFinish.id === "custom"
+                  ? null
+                  : Number(buttonFinish.id),
+              materialAssignmentId:
+                buttonMaterial.id === -1 ? undefined : buttonMaterial.id,
+            };
+          }
+        }
+        const installedPlate =
+          item.productTypeSlug === "slider"
+            ? plate?.id === "default"
+              ? null
+              : selectedPlate
+                ? { collectionItemId: selectedPlate.collectionItemId }
+                : undefined
+            : undefined;
+        const installedInsert =
+          item.productTypeSlug === "slider" && product.usesInserts
+            ? insert?.id === "default"
+              ? null
+              : selectedInsert
+                ? { collectionItemId: selectedInsert.collectionItemId }
+                : undefined
+            : undefined;
+        data = {
+          bearing,
+          collectionId,
+          collectionItemId: item.collectionItemId,
+          installedPenPartCollectionItemIds: installedPenPartIds,
+          customFinish: finish?.id === "custom" ? customFinish : null,
+          displayName,
+          description: currentDescription,
+          finishOptionId:
+            finish?.id === "current" || finish?.id === "custom"
+              ? null
+              : finish
+                ? Number(finish.id)
+                : null,
+          ...(item.productTypeSlug === "pen"
+            ? {
+                installedRefillOfferingId,
+                installedRefillProductId,
+              }
+            : {}),
+          ...(item.productTypeSlug === "spinner" ? { installedButton } : {}),
+          ...(item.productTypeSlug === "slider"
+            ? {
+                installedInsert,
+                installedPlate,
+                ...(magnetConfigurationDirty ? { magnetConfiguration } : {}),
+              }
+            : {}),
+          materialAssignmentId: material?.id === -1 ? undefined : material?.id,
+          ownership: {
+            effectiveEndDate: ownership.currentlyOwned
+              ? null
+              : ownership.effectiveEndDate || null,
+            effectiveStartDate: ownership.startDateUnknown
+              ? null
+              : ownership.effectiveStartDate,
+            entryReason: ownership.entryReason,
+            exitReason: ownership.currentlyOwned
+              ? null
+              : ownership.exitReason || null,
+            periodId: ownership.periodId,
+          },
+          reason,
+          serialNumber,
+        };
+      }
+      dispatch({
+        type: "saveRequested",
+        request: {
+          data,
+          mode,
+          files: value.images,
+          itemId: item.collectionItemId,
+          itemName: item.displayName,
+          collectionId: value.collectionId,
+          reason,
+        },
+      });
+    },
+  });
+  const {
+    images,
+    existingImages,
+    collectionId,
+    displayName,
+    description,
+    bearing,
+    serialNumber,
+    ownership,
+    installedPenPartIds,
+    installedRefillProductId,
+    installedRefillOfferingId,
+    material,
+    finish,
+    customFinish,
+    magnetConfiguration,
+    button,
+    buttonMaterial,
+    buttonFinish,
+    buttonCustomFinish,
+    plate,
+    insert,
+  } = useStore(form.store, (state) => state.values);
+
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: CollectionEditEffect;
+    /** Completion retained across suspended observers. */
+    promise: Promise<CollectionEditResult>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    CollectionEditState,
+    CollectionEditEvent,
+    CollectionEditEffect
+  >(
+    (state, event, exec) => {
+      switch (event.type) {
+        case "lookupOptionsChanged":
+          return {
+            ...state,
+            options:
+              typeof event.update === "function"
+                ? event.update(state.options)
+                : event.update,
+          };
+        case "descriptionLoadingChanged":
+          return state.descriptionLoading === event.loading
+            ? state
+            : { ...state, descriptionLoading: event.loading };
+        case "magnetConfigurationEdited":
+          return { ...state, magnetConfigurationDirty: true };
+        case "magnetLayoutChanged":
+          return {
+            ...state,
+            magnetConfigurationDirty: true,
+            magnetConfigurationNotice: true,
+          };
+        case "saveRequested":
+          if (state.save) return state;
+          return { ...state, save: exec({ type: "save", ...event.request }) };
+        case "saveFinished":
+          exec.stop(state.save);
+          return { ...state, save: undefined };
+      }
+    },
+    {
+      options: initialOptions,
+      descriptionLoading: true,
+      magnetConfigurationDirty: false,
+      magnetConfigurationNotice: false,
+      save: undefined,
+    },
+    {
+      /**
+       * Observes image-first editing once across lifecycle resumption.
+       * @param _state - Current edit controls.
+       * @param effect - Captured immutable edit request.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      save: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = { effect, promise: performEdit(effect) };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished" });
+          form.setFieldValue("images", (current) =>
+            current.filter(
+              (file) =>
+                !effect.files.includes(file) || result.files.includes(file),
+            ),
+          );
+          if (result.error) form.setErrorMap({ onSubmit: result.error });
+          else
+            void navigate({
+              params: { collectionId: effect.collectionId },
+              to: "/user/collections/$collectionId",
+            });
+        });
+      },
+    },
   );
-  const [insert, setInsert] = React.useState<ComboboxOption | null>(() =>
-    initialInsert
-      ? { id: initialInsert.collectionItemId, name: initialInsert.displayName }
-      : { id: "default", name: t("web.slider.component.noInsert") },
+  const { options, descriptionLoading, magnetConfigurationNotice } = ui;
+  const feedback = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const submissionMode = useStore(form.store, (state) =>
+    draftMode(state.values),
   );
+  /**
+   * Accepts the existing shared lookup contract.
+   * @param update - Pure options replacement or updater.
+   */
+  const receiveOptions = (update: React.SetStateAction<CatalogOptions>) => {
+    dispatch({ type: "lookupOptionsChanged", update });
+  };
+  /**
+   * Reports committed Markdown readiness through a stable callback.
+   * @param loading - Whether initialization is pending.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => {
+      dispatch({ type: "descriptionLoadingChanged", loading });
+    },
+    [dispatch],
+  );
+  /**
+   * Uploads selected images before applying edits in the existing mutation order.
+   * @param request - Captured edit and upload inputs.
+   * @returns Retained files and existing localized failure feedback.
+   */
+  async function performEdit(
+    request: CollectionEditEffect,
+  ): Promise<CollectionEditResult> {
+    let files = request.files;
+    try {
+      if (files.length) {
+        const uploaded = await uploadImages({
+          locale,
+          files,
+          getToken,
+          reason: request.reason,
+          targetId: request.itemId,
+          targetType: "collection_item",
+          /**
+           * Offers the existing restore choice for an owner-deleted duplicate image.
+           * @param imageId - Duplicate image identifier.
+           * @returns Whether the duplicate was restored.
+           */
+          onOwnerDeletedDuplicate: async (imageId) => {
+            if (
+              !window.confirm(
+                t("web.resources.trash.restoreConfirmationDescription", {
+                  name: request.itemName,
+                }),
+              )
+            )
+              return false;
+            await restoreCatalogImage({
+              data: {
+                imageId,
+                reason: request.reason,
+                targetType: "collection_item",
+              },
+            });
+            return true;
+          },
+        });
+        files = uploaded.failed;
+        if (files.length)
+          return {
+            files,
+            error: { message: "web.resources.upload.sessionFailure" },
+          };
+      }
+      if (request.mode === "upload") return { files };
+      const result = await updateCollectionItem({ data: request.data });
+      if (result.ok) return { files };
+      return {
+        files,
+        error: {
+          message: result.formError,
+          detail:
+            "formErrorDetail" in result &&
+            typeof result.formErrorDetail === "string"
+              ? {
+                  key: result.formErrorDetail,
+                  values:
+                    "formErrorValues" in result &&
+                    typeof result.formErrorValues === "object" &&
+                    result.formErrorValues !== null
+                      ? (result.formErrorValues as Readonly<
+                          Record<string, unknown>
+                        >)
+                      : undefined,
+                }
+              : undefined,
+        },
+      };
+    } catch (error) {
+      return {
+        files,
+        error: { message: (error as ImageUploadError).key ?? "error.generic" },
+      };
+    }
+  }
+  const selectedButton = ownedButtons.find(
+    ({ collectionItemId }) => collectionItemId === button?.id,
+  );
+  const selectedButtonProduct = buttonProducts.find(
+    ({ id }) => id === selectedButton?.productId,
+  );
+
   const selectedPlate = ownedSliderComponents.find(
     ({ collectionItemId }) => collectionItemId === plate?.id,
   );
@@ -5126,38 +6865,6 @@ export function CollectionEditPage({
   );
   const effectiveMagnetLayout =
     selectedInsertProduct?.magnetLayout ?? product.magnetLayout;
-  const sliderComponentSelectionIsValid =
-    item.productTypeSlug !== "slider" ||
-    ((plate?.id === "default" || Boolean(selectedPlate)) &&
-      (!product.usesInserts ||
-        insert?.id === "default" ||
-        Boolean(selectedInsert)));
-  const buttonSelectionIsValid =
-    item.productTypeSlug !== "spinner" ||
-    button?.id === "default" ||
-    Boolean(selectedButton && selectedButtonProduct && buttonMaterial);
-  const finishSelectionIsValid =
-    finish?.id !== "custom" ||
-    finishOptionSchema.safeParse(customFinish).success;
-  const buttonFinishSelectionIsValid =
-    buttonFinish?.id !== "custom" ||
-    finishOptionSchema.safeParse(buttonCustomFinish).success;
-  const serialNumberIsValid =
-    serialNumber === null || serialNumber.trim().length > 0;
-  const detailsAreValid = Boolean(
-    displayName.trim() &&
-      description.length <= 5000 &&
-      (product.productTypeSlug.startsWith("pen") || material) &&
-      serialNumberIsValid &&
-      finishSelectionIsValid &&
-      buttonSelectionIsValid &&
-      sliderComponentSelectionIsValid &&
-      (!selectedButton || buttonFinishSelectionIsValid),
-  );
-  const submissionMode = collectionEditSubmissionMode(
-    detailsAreValid,
-    images.length,
-  );
 
   return (
     <AppShell
@@ -5171,7 +6878,9 @@ export function CollectionEditPage({
           <Field label={displayNameLabel}>
             <Input
               aria-label={displayNameLabel}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) =>
+                form.setFieldValue("displayName", event.target.value)
+              }
               required
               value={displayName}
             />
@@ -5181,8 +6890,8 @@ export function CollectionEditPage({
             help={t("web.catalog.help.collectionDescriptionOverride")}
             id="collection-item-override"
             label={t("web.catalog.field.description")}
-            onChange={setDescription}
-            onLoadingChange={setDescriptionLoading}
+            onChange={(value) => form.setFieldValue("description", value)}
+            onLoadingChange={receiveDescriptionLoading}
             ref={descriptionRef}
           />
           {item.productTypeSlug === "spinner" ? (
@@ -5190,23 +6899,26 @@ export function CollectionEditPage({
               <Input
                 aria-label={t("web.catalog.field.bearing")}
                 maxLength={200}
-                onChange={(event) => setBearing(event.target.value)}
+                onChange={(event) =>
+                  form.setFieldValue("bearing", event.target.value)
+                }
                 value={bearing}
               />
             </Field>
           ) : null}
           {collectionProductTypeSupportsSerial(item.productTypeSlug) ? (
             <SerialNumberFields
-              onChange={setSerialNumber}
+              onChange={(value) => form.setFieldValue("serialNumber", value)}
               t={t}
               value={serialNumber}
             />
           ) : null}
           <OwnershipLifecycleFields
             allowDeparture
-            onChange={setOwnership}
+            onChange={(value) => form.setFieldValue("ownership", value)}
             onPeriodChange={(periodId) =>
-              setOwnership(
+              form.setFieldValue(
+                "ownership",
                 ownershipEditorValue(
                   ownershipPeriods.find(({ id }) => id === periodId),
                 ),
@@ -5220,7 +6932,8 @@ export function CollectionEditPage({
             collections={collections}
             label={t("web.collections.field.collection")}
             onChange={(nextCollectionId) => {
-              if (nextCollectionId) setCollectionId(nextCollectionId);
+              if (nextCollectionId)
+                form.setFieldValue("collectionId", nextCollectionId);
             }}
             placeholder={t("web.collections.select.placeholder")}
             selectedId={collectionId}
@@ -5230,10 +6943,12 @@ export function CollectionEditPage({
             customFinish={customFinish}
             finish={finish}
             material={material}
-            onCustomFinishChange={setCustomFinish}
-            onFinishChange={setFinish}
-            onMaterialChange={setMaterial}
-            onOptionsChange={setOptions}
+            onCustomFinishChange={(value) =>
+              form.setFieldValue("customFinish", value)
+            }
+            onFinishChange={(value) => form.setFieldValue("finish", value)}
+            onMaterialChange={(value) => form.setFieldValue("material", value)}
+            onOptionsChange={receiveOptions}
             options={options}
             product={product}
             t={t}
@@ -5242,9 +6957,15 @@ export function CollectionEditPage({
             <PenCollectionFields
               allProducts={catalogProducts}
               currentCollectionItemId={item.collectionItemId}
-              onRefillOfferingChange={setInstalledRefillOfferingId}
-              onRefillProductChange={setInstalledRefillProductId}
-              onInstalledPartIdsChange={setInstalledPenPartIds}
+              onRefillOfferingChange={(value) =>
+                form.setFieldValue("installedRefillOfferingId", value)
+              }
+              onRefillProductChange={(value) =>
+                form.setFieldValue("installedRefillProductId", value)
+              }
+              onInstalledPartIdsChange={(value) =>
+                form.setFieldValue("installedPenPartIds", value)
+              }
               ownedItems={ownedItems}
               product={product}
               refillOfferingId={installedRefillOfferingId}
@@ -5271,11 +6992,12 @@ export function CollectionEditPage({
                     })),
                 ]}
                 onValueChange={(value) => {
-                  setButton(value);
+                  form.setFieldValue("button", value);
                   const selected = ownedButtons.find(
                     ({ collectionItemId }) => collectionItemId === value?.id,
                   );
-                  setButtonMaterial(
+                  form.setFieldValue(
+                    "buttonMaterial",
                     collectionMaterialChoice(
                       buttonProducts.find(
                         ({ id }) => id === selected?.productId,
@@ -5283,7 +7005,8 @@ export function CollectionEditPage({
                       selected?.materials,
                     ),
                   );
-                  setButtonFinish(
+                  form.setFieldValue(
+                    "buttonFinish",
                     selected?.finishOption
                       ? {
                           id: "current",
@@ -5291,7 +7014,7 @@ export function CollectionEditPage({
                         }
                       : null,
                   );
-                  setButtonCustomFinish(emptyFinishOption());
+                  form.setFieldValue("buttonCustomFinish", emptyFinishOption());
                 }}
                 placeholder={t("web.catalog.defaultButton")}
                 removeLabel={t("web.action.close")}
@@ -5323,7 +7046,7 @@ export function CollectionEditPage({
                         name: displayName,
                       })),
                   ]}
-                  onValueChange={setPlate}
+                  onValueChange={(value) => form.setFieldValue("plate", value)}
                   placeholder={t("web.slider.component.noPlate")}
                   removeLabel={t("web.action.close")}
                   showSelectedPill
@@ -5365,11 +7088,10 @@ export function CollectionEditPage({
                         effectiveMagnetLayout !== nextLayout &&
                         magnetConfiguration !== null
                       ) {
-                        setMagnetConfiguration(null);
-                        setMagnetConfigurationDirty(true);
-                        setMagnetConfigurationNotice(true);
+                        form.setFieldValue("magnetConfiguration", null);
+                        dispatch({ type: "magnetLayoutChanged" });
                       }
-                      setInsert(value);
+                      form.setFieldValue("insert", value);
                     }}
                     placeholder={t("web.slider.component.noInsert")}
                     removeLabel={t("web.action.close")}
@@ -5382,8 +7104,8 @@ export function CollectionEditPage({
                 <SliderMagnetConfigurationEditor
                   layout={effectiveMagnetLayout}
                   onChange={(value) => {
-                    setMagnetConfiguration(value);
-                    setMagnetConfigurationDirty(true);
+                    form.setFieldValue("magnetConfiguration", value);
+                    dispatch({ type: "magnetConfigurationEdited" });
                   }}
                   presets={options.magnetPresets}
                   t={t}
@@ -5437,25 +7159,32 @@ export function CollectionEditPage({
               customFinish={buttonCustomFinish}
               finish={buttonFinish}
               material={buttonMaterial}
-              onCustomFinishChange={setButtonCustomFinish}
-              onFinishChange={setButtonFinish}
-              onMaterialChange={setButtonMaterial}
-              onOptionsChange={setOptions}
+              onCustomFinishChange={(value) =>
+                form.setFieldValue("buttonCustomFinish", value)
+              }
+              onFinishChange={(value) =>
+                form.setFieldValue("buttonFinish", value)
+              }
+              onMaterialChange={(value) =>
+                form.setFieldValue("buttonMaterial", value)
+              }
+              onOptionsChange={receiveOptions}
               options={options}
               product={selectedButtonProduct}
               t={t}
             />
           ) : null}
-          {formError ? (
+          {feedback ? (
             <Notice>
-              {t(formError)}
-              {formErrorDetail
-                ? ` ${t(formErrorDetail.key, formErrorDetail.values)}`
+              {t(feedback.message)}
+              {feedback.detail
+                ? ` ${t(feedback.detail.key, feedback.detail.values)}`
                 : null}
             </Notice>
           ) : null}
           {item.canEdit ? (
             <PermanentDeletionControls
+              key={item.collectionItemId}
               name={item.displayName}
               targetType="collection_item"
               reasonRequired={Boolean(item.canAdminister && !item.isOwner)}
@@ -5468,17 +7197,20 @@ export function CollectionEditPage({
                   },
                 });
                 if (!result.ok) throw new Error(result.formError);
-                await navigate({
+              }}
+              onDeleted={() =>
+                navigate({
                   params: { collectionId: item.collectionId },
                   to: "/user/collections/$collectionId",
-                });
-              }}
+                })
+              }
             />
           ) : null}
         </div>
         <div className="grid min-w-0 content-start gap-5">
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
+            disabled={Boolean(ui.save)}
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -5495,10 +7227,13 @@ export function CollectionEditPage({
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImages((current) => [...current, ...additions])
+              form.setFieldValue("images", (current) => [
+                ...current,
+                ...additions,
+              ])
             }
             onRemove={(index) =>
-              setImages((current) =>
+              form.setFieldValue("images", (current) =>
                 current.filter((_, candidate) => candidate !== index),
               )
             }
@@ -5514,7 +7249,7 @@ export function CollectionEditPage({
                 : undefined
             }
             images={existingImages}
-            onChange={setExistingImages}
+            onChange={(value) => form.setFieldValue("existingImages", value)}
             t={t}
             targetType="collection_item"
           />
@@ -5533,221 +7268,20 @@ export function CollectionEditPage({
             {t("action.cancel")}
           </Button>
           <Button
-            disabled={descriptionLoading || submissionMode === "disabled"}
-            onClick={async () => {
-              const currentDescription =
-                descriptionRef.current?.getValue() ?? description;
-              if (
-                descriptionRef.current?.isLoading() ||
-                currentDescription.length > 5000 ||
-                submissionMode === "disabled"
-              ) {
-                return;
-              }
-              const moderating = item.canAdminister && !item.isOwner;
-              const reason = moderating
-                ? window
-                    .prompt(t("web.resources.moderation.reasonLabel"))
-                    ?.trim()
-                : undefined;
-              if (moderating && !reason) return;
-              setFormError(null);
-              setFormErrorDetail(null);
-              const imageError = validateImages(images, locale);
-              if (imageError) {
-                setFormError(imageError.key);
-                return;
-              }
-              if (images.length) {
-                try {
-                  const uploads = await uploadImages({
-                    locale,
-                    files: images,
-                    getToken,
-                    reason,
-                    /**
-                     * Offers to restore an owner-deleted duplicate image.
-                     *
-                     * @param imageId - Duplicate image identifier.
-                     * @returns Whether the duplicate was restored.
-                     */
-                    onOwnerDeletedDuplicate: async (imageId) => {
-                      if (
-                        !window.confirm(
-                          t(
-                            "web.resources.trash.restoreConfirmationDescription",
-                            { name: item.displayName },
-                          ),
-                        )
-                      )
-                        return false;
-                      await restoreCatalogImage({
-                        data: {
-                          imageId,
-                          reason,
-                          targetType: "collection_item",
-                        },
-                      });
-                      return true;
-                    },
-                    targetId: item.collectionItemId,
-                    targetType: "collection_item",
-                  });
-                  setImages(uploads.failed);
-                  if (uploads.failed.length) {
-                    setFormError("web.resources.upload.sessionFailure");
-                    return;
-                  }
-                } catch (error) {
-                  setFormError(
-                    (error as ImageUploadError).key ?? "error.generic",
-                  );
-                  return;
-                }
-              }
-              if (submissionMode === "upload") {
-                await navigate({
-                  params: { collectionId },
-                  to: "/user/collections/$collectionId",
-                });
-                return;
-              }
-              if (
-                (!product.productTypeSlug.startsWith("pen") && !material) ||
-                (finish?.id === "custom" && !finishSelectionIsValid)
-              )
-                return;
-              let installedButton:
-                | {
-                    /** Installed collection item identifier. */
-                    collectionItemId: number;
-                    /** Custom finish applied to the installed button. */
-                    customFinish: FinishOptionFormValue | null;
-                    /** Catalog finish option applied to the installed button. */
-                    finishOptionId: number | null;
-                    /** Material applied to the installed button. */
-                    materialAssignmentId?: number;
-                  }
-                | null
-                | undefined;
-              if (item.productTypeSlug === "spinner") {
-                if (button?.id === "default") {
-                  installedButton = null;
-                } else {
-                  if (
-                    !selectedButton ||
-                    !buttonMaterial ||
-                    !buttonFinish ||
-                    !buttonFinishSelectionIsValid
-                  ) {
-                    return;
-                  }
-                  installedButton = {
-                    collectionItemId: selectedButton.collectionItemId,
-                    customFinish:
-                      buttonFinish.id === "custom" ? buttonCustomFinish : null,
-                    finishOptionId:
-                      buttonFinish.id === "current" ||
-                      buttonFinish.id === "custom"
-                        ? null
-                        : Number(buttonFinish.id),
-                    materialAssignmentId:
-                      buttonMaterial.id === -1 ? undefined : buttonMaterial.id,
-                  };
-                }
-              }
-              const installedPlate =
-                item.productTypeSlug === "slider"
-                  ? plate?.id === "default"
-                    ? null
-                    : selectedPlate
-                      ? { collectionItemId: selectedPlate.collectionItemId }
-                      : undefined
-                  : undefined;
-              const installedInsert =
-                item.productTypeSlug === "slider" && product.usesInserts
-                  ? insert?.id === "default"
-                    ? null
-                    : selectedInsert
-                      ? { collectionItemId: selectedInsert.collectionItemId }
-                      : undefined
-                  : undefined;
-              const result = await updateCollectionItem({
-                data: {
-                  bearing,
-                  collectionId,
-                  collectionItemId: item.collectionItemId,
-                  installedPenPartCollectionItemIds: installedPenPartIds,
-                  customFinish: finish?.id === "custom" ? customFinish : null,
-                  displayName,
-                  description: currentDescription,
-                  finishOptionId:
-                    finish?.id === "current" || finish?.id === "custom"
-                      ? null
-                      : finish
-                        ? Number(finish.id)
-                        : null,
-                  ...(item.productTypeSlug === "pen"
-                    ? {
-                        installedRefillOfferingId,
-                        installedRefillProductId,
-                      }
-                    : {}),
-                  ...(item.productTypeSlug === "spinner"
-                    ? { installedButton }
-                    : {}),
-                  ...(item.productTypeSlug === "slider"
-                    ? {
-                        installedInsert,
-                        installedPlate,
-                        ...(magnetConfigurationDirty
-                          ? { magnetConfiguration }
-                          : {}),
-                      }
-                    : {}),
-                  materialAssignmentId:
-                    material?.id === -1 ? undefined : material?.id,
-                  ownership: {
-                    effectiveEndDate: ownership.currentlyOwned
-                      ? null
-                      : ownership.effectiveEndDate || null,
-                    effectiveStartDate: ownership.startDateUnknown
-                      ? null
-                      : ownership.effectiveStartDate,
-                    entryReason: ownership.entryReason,
-                    exitReason: ownership.currentlyOwned
-                      ? null
-                      : ownership.exitReason || null,
-                    periodId: ownership.periodId,
-                  },
-                  reason,
-                  serialNumber,
-                },
-              });
-              if (result.ok) {
-                await navigate({
-                  params: { collectionId },
-                  to: "/user/collections/$collectionId",
-                });
-              } else {
-                setFormError(result.formError);
-                setFormErrorDetail(
-                  "formErrorDetail" in result &&
-                    typeof result.formErrorDetail === "string"
-                    ? {
-                        key: result.formErrorDetail,
-                        values:
-                          "formErrorValues" in result &&
-                          typeof result.formErrorValues === "object" &&
-                          result.formErrorValues !== null
-                            ? (result.formErrorValues as Readonly<
-                                Record<string, unknown>
-                              >)
-                            : undefined,
-                      }
-                    : null,
-                );
-              }
+            disabled={
+              descriptionLoading ||
+              Boolean(ui.save) ||
+              submissionMode === "disabled"
+            }
+            onClick={() => {
+              if (descriptionRef.current?.isLoading() || ui.save) return;
+              form.setFieldValue(
+                "description",
+                descriptionRef.current?.getValue() ??
+                  form.state.values.description,
+              );
+              form.setErrorMap({ onSubmit: undefined });
+              void form.handleSubmit();
             }}
             type="button"
           >

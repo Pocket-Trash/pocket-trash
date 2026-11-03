@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
-import { expect, within } from "storybook/test";
+import { useReducer } from "react";
+import { expect, waitFor, within } from "storybook/test";
 import {
   type CatalogFacets,
   type CatalogFilters,
@@ -222,6 +222,21 @@ export const FilterInteraction: Story = {
     await expect(
       page.getByRole("button", { name: "Remove: KAP EDC" }),
     ).toBeVisible();
+    const popup = page.getByRole("dialog", { name: "Filters" });
+    await expect(popup).toBeVisible();
+    within(popup).getByRole("button", { name: "Apply" }).focus();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(popup).not.toBeVisible());
+    const trigger = canvas.getByRole("button", { name: "More filters" });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await userEvent.click(trigger);
+    await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Clear" }));
+    await waitFor(() =>
+      expect(
+        page.queryByRole("dialog", { name: "Filters" }),
+      ).not.toBeInTheDocument(),
+    );
   },
 };
 
@@ -241,8 +256,23 @@ function FilterExample({
    */
   initialFilters?: CatalogFilters;
 }) {
-  const [filters, setFilters] = useState(
+  const [filters, dispatch] = useReducer(
+    (
+      _state: CatalogFilters,
+      event: {
+        /** Controlled facet edit or pruning correction. */
+        type: "filtersChanged";
+        /** Complete next filter selections. */
+        filters: CatalogFilters;
+      },
+    ) => event.filters,
     initialFilters ?? emptyCatalogFilters(),
   );
-  return <CatalogFilterBar {...args} filters={filters} onChange={setFilters} />;
+  return (
+    <CatalogFilterBar
+      {...args}
+      filters={filters}
+      onChange={(filters) => dispatch({ type: "filtersChanged", filters })}
+    />
+  );
 }

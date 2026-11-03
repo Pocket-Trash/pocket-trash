@@ -38,9 +38,15 @@ runtime ownership, and links to the authoritative source schemas.
 
 ### Install the repository
 
+Configure the Font Awesome token helper once per machine after logging in to
+Infisical. It retrieves the package token automatically so `pnpm install` and
+`pnpm i` work across worktrees.
+
 ```sh
 corepack enable
-infisical run --env=dev --path=/tools/package-manager -- sh -c 'env "pnpm_config_//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" pnpm install'
+pnpm config set --global //npm.fontawesome.com/:tokenHelper \
+  "$(command -v infisical) secrets get FONTAWESOME_PACKAGE_TOKEN --env=dev --path=/tools/package-manager --projectId=1d68bea3-0525-453f-b380-3cdc82cad1f8 --plain --silent"
+pnpm install
 pnpm agent-skills:update
 pnpm infisical:check
 ```

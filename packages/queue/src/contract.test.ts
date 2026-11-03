@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   createInMemoryQueueAdapter,
@@ -80,6 +80,62 @@ it("models retry delay and exhaustion deterministically", async () => {
   now += 60_001;
   await expect(queue.counts()).resolves.toMatchObject({ failed: 0 });
   await adapter.close();
+});
+
+it("reschedules a continuous retry when its timer fires early", async () => {
+  vi.useFakeTimers();
+  let now = 1_000;
+  const adapter = createInMemoryQueueAdapter({
+    /**
+     * Supplies wall-clock time independently of timer progression.
+     *
+     * @returns Current test time in milliseconds.
+     */
+    now: () => now,
+  });
+
+  try {
+    const queue = adapter.define({
+      deduplication: { replaceCompleted: false },
+      mode: "continuous",
+      name: "early-retry",
+      retention: {
+        completed: { ageSeconds: 60, count: 10 },
+        failed: { ageSeconds: 60 },
+      },
+      retry: { attempts: 2, backoff: { delayMs: 5, type: "fixed" } },
+      schema: z.object({ value: z.string() }),
+    });
+    const attempts: number[] = [];
+    await queue.processContinuously({
+      concurrency: 1,
+      /**
+       * Fails the initial attempt and completes its retry.
+       *
+       * @param job - Queue job with its prior attempt count.
+       * @returns A completed outcome on the retry.
+       * @rejects On the initial attempt.
+       */
+      handler: async (job) => {
+        attempts.push(job.attemptsMade);
+        if (job.attemptsMade === 0) throw new Error("expected failure");
+      },
+    });
+    await queue.enqueue({ id: "job", name: "test", payload: { value: "x" } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toEqual([0]);
+
+    now += 4;
+    await vi.advanceTimersByTimeAsync(5);
+    expect(attempts).toEqual([0]);
+
+    now += 1;
+    await vi.advanceTimersByTimeAsync(1);
+    expect(attempts).toEqual([0, 1]);
+  } finally {
+    await adapter.close();
+    vi.useRealTimers();
+  }
 });
 
 it("retries an immediate continuous failure and closes it with the queue", async () => {

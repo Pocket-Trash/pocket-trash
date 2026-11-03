@@ -74,5 +74,6 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
  * @returns The rendered route UI.
  */
 function CollectionEditRoute() {
-  return <CollectionEditPage {...Route.useLoaderData()} />;
+  const data = Route.useLoaderData();
+  return <CollectionEditPage key={data.item.collectionItemId} {...data} />;
 }

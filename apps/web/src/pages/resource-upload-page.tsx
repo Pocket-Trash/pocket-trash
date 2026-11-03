@@ -12,8 +12,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useForm, useStore } from "@tanstack/react-form";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { ResourceCategoryInput } from "@/components/resource-category-input";
@@ -24,11 +23,11 @@ import {
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useResourceUpload } from "@/hooks/use-resource-upload";
 import {
   appendResourceUploadFiles,
   formatMiB,
-  getUploadErrorTranslation,
-  uploadResourceSession,
+  type ResourceUploadValidationError,
   validateResourceUpload,
 } from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
@@ -39,9 +38,17 @@ import { useLocale } from "@/providers/locale-provider";
  * @returns The resource upload page.
  */
 export function ResourceUploadPage() {
-  const { getToken } = useAuth();
+  const { userId } = useAuth();
+  return <ResourceUploadForm key={userId} />;
+}
+
+/**
+ * Owns one account's resource authoring draft and upload intent.
+ * @returns Account-scoped resource upload form.
+ */
+function ResourceUploadForm() {
   const { locale } = useLocale();
-  const navigate = useNavigate();
+  const { submitting, status: uploadStatus, startUpload } = useResourceUpload();
   /**
    * Formats localized resource upload copy.
    *
@@ -53,12 +60,58 @@ export function ResourceUploadPage() {
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [isPublic, setIsPublic] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState("");
+  const form = useForm({
+    defaultValues: {
+      selectedCategories: [] as string[],
+      files: [] as File[],
+      imageFiles: [] as File[],
+      isPublic: true,
+    },
+    onSubmitMeta: { name: "", description: "" },
+    validators: {
+      /**
+       * Preserves category and file validation before starting an upload session.
+       * @param input - Current resource authoring fields.
+       * @returns Existing localized validation feedback.
+       */
+      onSubmit: ({ value }): ResourceUploadValidationError | undefined =>
+        value.selectedCategories.length === 0
+          ? { key: "web.resources.validation.requiredCategory" }
+          : (validateResourceUpload(
+              value.files,
+              value.imageFiles,
+              true,
+              locale,
+            ) ?? undefined),
+    },
+    /**
+     * Reports existing validation feedback without discarding the selected files.
+     * @param input - Invalid form and its current feedback.
+     */
+    onSubmitInvalid: ({ formApi }) => {
+      const error = formApi.state.errorMap.onSubmit;
+      if (error) toast.error(t(error.key, error.params));
+    },
+    /**
+     * Captures native metadata and form-owned selections for one resource upload.
+     * @param input - Validated selections and native metadata snapshot.
+     */
+    onSubmit: ({ value, meta }) => {
+      startUpload({
+        categories: value.selectedCategories,
+        description: meta.description,
+        files: value.files,
+        images: value.imageFiles,
+        isPrivate: !value.isPublic,
+        name: meta.name,
+        operation: "create",
+      });
+    },
+  });
+  const { selectedCategories, files, imageFiles, isPublic } = useStore(
+    form.store,
+    (state) => state.values,
+  );
 
   return (
     <AppShell title={t("web.resources.add.title")}>
@@ -67,71 +120,15 @@ export function ResourceUploadPage() {
           aria-busy={submitting}
           className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
           encType="multipart/form-data"
-          onSubmit={async (event) => {
+          onSubmit={(event) => {
             event.preventDefault();
-            if (selectedCategories.length === 0) {
-              toast.error(t("web.resources.validation.requiredCategory"));
-              return;
-            }
-
-            const formData = new FormData(event.currentTarget);
-            const validation = validateResourceUpload(
-              files,
-              imageFiles,
-              true,
-              locale,
-            );
-            if (validation) {
-              toast.error(t(validation.key, validation.params));
-              return;
-            }
-
-            setSubmitting(true);
-            setUploadStatus("");
-            try {
-              const result = await uploadResourceSession({
-                categories: selectedCategories,
-                description: String(formData.get("description") ?? ""),
-                files,
-                getToken,
-                images: imageFiles,
-                isPrivate: !isPublic,
-                name: String(formData.get("name") ?? ""),
-                /**
-                 * Reports file upload progress.
-                 *
-                 * @param filename - File currently uploading.
-                 * @param percent - Completed percentage.
-                 * @returns Nothing.
-                 */
-                onProgress: (filename, percent) =>
-                  setUploadStatus(
-                    t("web.resources.upload.progress", { filename, percent }),
-                  ),
-                /**
-                 * Reports upload workflow stage changes.
-                 *
-                 * @param stage - Current upload stage.
-                 */
-                onStage: (stage) => {
-                  if (stage === "complete") {
-                    setUploadStatus(t("web.resources.upload.finalizing"));
-                  }
-                },
-                operation: "create",
-              });
-              toast.success(t("web.resources.upload.success"));
-              await navigate({
-                params: { resourceId: String(result.resourceId) },
-                to: "/resources/$resourceId",
-              });
-            } catch (error) {
-              const message = getUploadErrorTranslation(error);
-              toast.error(t(message.key, message.params));
-            } finally {
-              setSubmitting(false);
-              setUploadStatus("");
-            }
+            if (submitting) return;
+            const data = new FormData(event.currentTarget);
+            form.setErrorMap({ onSubmit: undefined });
+            void form.handleSubmit({
+              name: String(data.get("name") ?? ""),
+              description: String(data.get("description") ?? ""),
+            });
           }}
         >
           <p className="m-0 text-sm leading-6 text-muted-foreground">
@@ -166,11 +163,13 @@ export function ResourceUploadPage() {
             label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
-              setImageFiles(appendResourceUploadFiles(imageFiles, additions))
+              form.setFieldValue("imageFiles", (current) =>
+                appendResourceUploadFiles(current, additions),
+              )
             }
             onRemove={(index) =>
-              setImageFiles(
-                imageFiles.filter((_, itemIndex) => itemIndex !== index),
+              form.setFieldValue("imageFiles", (current) =>
+                current.filter((_, itemIndex) => itemIndex !== index),
               )
             }
             removeFileLabel={t("web.resources.action.removeFile")}
@@ -202,7 +201,7 @@ export function ResourceUploadPage() {
             fileTypes={t("web.resources.upload.fileTypes")}
             id="resource-file"
             label={t("web.resources.upload.filesLabel")}
-            onFilesChange={setFiles}
+            onFilesChange={(files) => form.setFieldValue("files", files)}
             removeFileLabel={t("web.resources.action.removeFile")}
           />
 
@@ -210,7 +209,9 @@ export function ResourceUploadPage() {
             disabled={submitting}
             label={t("web.resources.category.label")}
             noResultsLabel={t("web.resources.category.noResults")}
-            onChange={setSelectedCategories}
+            onChange={(categories) =>
+              form.setFieldValue("selectedCategories", categories)
+            }
             placeholder={t("web.resources.category.search")}
             removeLabel={(category) =>
               t("web.resources.category.remove", { category })
@@ -221,7 +222,9 @@ export function ResourceUploadPage() {
           <PublicResourceSwitch
             checked={isPublic}
             disabled={submitting}
-            onCheckedChange={setIsPublic}
+            onCheckedChange={(checked) =>
+              form.setFieldValue("isPublic", checked)
+            }
           />
 
           <Button disabled={submitting} type="submit">

@@ -1,19 +1,12 @@
-import { useAuth } from "@clerk/tanstack-react-start";
 import { faChevronRight, faHouse } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  DEFAULT_LOCALE,
-  formatTranslation,
-  type TranslationKey,
-} from "@pocket-trash/localizations";
+import { DEFAULT_LOCALE, formatTranslation } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import type * as React from "react";
-import { toast } from "sonner";
+import type React from "react";
 import { GlobalSearch } from "@/components/global-search";
 import { LanguageSelect } from "@/components/language-select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-import { updateLocaleSetting } from "@/lib/locale-api";
 import { cn } from "@/lib/utils";
 import { useLocale, useOptionalLocale } from "@/providers/locale-provider";
 
@@ -212,37 +205,13 @@ export function AppShell({
  * @throws {Error} When a required provider is unavailable.
  */
 function AppShellControls() {
-  const { isLoaded, isSignedIn } = useAuth();
   const { locale, setLocale } = useLocale();
-  /**
-   * Formats an application-shell translation for the active locale.
-   *
-   * @param key - Application-shell localization key.
-   * @returns The localized application-shell text.
-   */
-  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
-  /**
-   * Applies a locale immediately and requests persistence for loaded signed-in users.
-   * Failed requests show a settings error without reverting the applied locale.
-   *
-   * @param nextLocale - Locale selected by the user.
-   */
-  const onLocaleChange = (nextLocale: typeof locale) => {
-    setLocale(nextLocale);
-
-    if (isLoaded && isSignedIn) {
-      void updateLocaleSetting(nextLocale).catch(() => {
-        toast.error(t("web.error.settingsSaveFailed"));
-      });
-    }
-  };
-
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
       <LanguageSelect
         className="w-[9.5rem] max-sm:w-[8.5rem]"
         locale={locale}
-        onLocaleChange={onLocaleChange}
+        onLocaleChange={setLocale}
       />
       <ThemeToggle />
       <UserMenu />

@@ -10,7 +10,12 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import * as React from "react";
+import React from "react";
+import {
+  type EffectEntity,
+  type EffectReducer,
+  useEffectReducer,
+} from "use-effect-reducer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { searchPublic } from "@/lib/search";
 import {
@@ -30,6 +35,184 @@ import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { Input } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
 
+/** Search visibility, result selection, and committed work lifetimes. */
+type SearchState = {
+  /** Whether the search surface is open. */
+  isOpen: boolean;
+  /** Current compact presentation. */
+  mobile: boolean;
+  /** Untrimmed search input. */
+  query: string;
+  /** Last accepted modal results. */
+  results: SearchResult[];
+  /** Active result index. */
+  selected: number;
+  /** Current request feedback. */
+  status: "idle" | "loading" | "ready" | "error";
+  /** Generation guarding late search responses. */
+  generation: number;
+  /** Current debounce or search request. */
+  lookup: EffectEntity<SearchState, SearchEvent> | undefined;
+  /** Generation guarding completed presentation work. */
+  presentationId: number;
+  /** Committed dialog and focus synchronization. */
+  presentation: EffectEntity<SearchState, SearchEvent> | undefined;
+};
+/** User actions, viewport transitions, and terminal workflow events. */
+type SearchEvent =
+  | {
+      /** Surface visibility transition. */
+      type: "opened" | "closed";
+    }
+  | {
+      /** Responsive presentation changed. */
+      type: "viewportChanged";
+      /** Current compact presentation. */
+      mobile: boolean;
+    }
+  | {
+      /** User edited the search input. */
+      type: "queryChanged";
+      /** New untrimmed query. */
+      query: string;
+    }
+  | {
+      /** User moved through search results. */
+      type: "selectionMoved";
+      /** Adjacent direction. */
+      offset: number;
+    }
+  | {
+      /** Search request completed. */
+      type: "searchSettled";
+      /** Request generation. */
+      generation: number;
+      /** Accepted result items, or null on failure. */
+      results: SearchResult[] | null;
+    }
+  | {
+      /** Dialog/focus synchronization finished. */
+      type: "presentationFinished";
+      /** Presentation generation. */
+      presentationId: number;
+    };
+/** Disposable committed search and presentation operations. */
+type SearchEffect =
+  | {
+      /** Debounced request implementation. */
+      type: "search";
+      /** Trimmed query sent to the public API. */
+      query: string;
+      /** Request generation. */
+      generation: number;
+    }
+  | {
+      /** Dialog/focus synchronization implementation. */
+      type: "present";
+      /** Whether to open or close the surface. */
+      open: boolean;
+      /** Presentation being opened or closed. */
+      mobile: boolean;
+      /** Presentation generation. */
+      presentationId: number;
+    };
+
+/**
+ * Owns search transitions and replaces or stops their committed work.
+ * @param state - Current search and presentation lifetimes.
+ * @param event - User, viewport, or terminal event.
+ * @param exec - Committed effect queue.
+ * @returns Search state after the semantic transition.
+ */
+const searchReducer: EffectReducer<SearchState, SearchEvent, SearchEffect> = (
+  state,
+  event,
+  exec,
+) => {
+  if (event.type === "searchSettled") {
+    if (!state.isOpen || event.generation !== state.generation) return state;
+    exec.stop(state.lookup);
+    return {
+      ...state,
+      lookup: undefined,
+      results: event.results ?? [],
+      selected: 0,
+      status: event.results === null ? "error" : "ready",
+    };
+  }
+  if (event.type === "presentationFinished") {
+    if (event.presentationId !== state.presentationId) return state;
+    exec.stop(state.presentation);
+    return { ...state, presentation: undefined };
+  }
+  if (event.type === "selectionMoved") {
+    if (state.status !== "ready" || !state.results.length) return state;
+    return {
+      ...state,
+      selected: Math.max(
+        0,
+        Math.min(state.selected + event.offset, state.results.length - 1),
+      ),
+    };
+  }
+  if (event.type === "queryChanged") {
+    if (!state.isOpen || event.query === state.query) return state;
+    const query = event.query.trim();
+    const generation = state.generation + 1;
+    exec.stop(state.lookup);
+    const searching = query.length >= SEARCH_QUERY_MIN_LENGTH;
+    return {
+      ...state,
+      query: event.query,
+      generation,
+      results: [],
+      selected: 0,
+      status: searching ? "loading" : "idle",
+      lookup: searching
+        ? exec({ type: "search", query, generation })
+        : undefined,
+    };
+  }
+  if (event.type === "opened") {
+    if (state.isOpen) return state;
+    const presentationId = state.presentationId + 1;
+    return {
+      ...state,
+      isOpen: true,
+      presentationId,
+      presentation: exec.replace(state.presentation, {
+        type: "present",
+        open: true,
+        mobile: state.mobile,
+        presentationId,
+      }),
+    };
+  }
+  if (event.type === "viewportChanged" && !state.isOpen)
+    return { ...state, mobile: event.mobile };
+  if (event.type === "closed" && !state.isOpen) return state;
+  exec.stop(state.lookup);
+  const presentationId = state.presentationId + 1;
+  return {
+    ...state,
+    isOpen: false,
+    mobile: event.type === "viewportChanged" ? event.mobile : state.mobile,
+    query: "",
+    results: [],
+    selected: 0,
+    status: "idle",
+    generation: state.generation + 1,
+    lookup: undefined,
+    presentationId,
+    presentation: exec.replace(state.presentation, {
+      type: "present",
+      open: false,
+      mobile: state.mobile,
+      presentationId,
+    }),
+  };
+};
+
 /**
  * Renders the persistent site-wide search trigger and compact search surface.
  *
@@ -42,103 +225,115 @@ export function GlobalSearch() {
   const input = React.useRef<HTMLInputElement>(null);
   const seeAll = React.useRef<HTMLAnchorElement>(null);
   const trigger = React.useRef<HTMLButtonElement>(null);
-  const request = React.useRef(0);
-  const presentation = React.useRef(isMobile);
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<SearchResult[]>([]);
-  const [selected, setSelected] = React.useState(0);
-  const [state, setState] = React.useState<
-    "idle" | "loading" | "ready" | "error"
-  >("idle");
+  const [search, dispatch] = useEffectReducer(
+    searchReducer,
+    (): SearchState => ({
+      isOpen: false,
+      mobile: isMobile,
+      query: "",
+      results: [],
+      selected: 0,
+      status: "idle",
+      generation: 0,
+      lookup: undefined,
+      presentationId: 0,
+      presentation: undefined,
+    }),
+    {
+      /**
+       * Debounces the public request and rejects responses from canceled lifetimes.
+       * @param _state - State that queued the search.
+       * @param effect - Query and request generation.
+       * @param dispatch - Terminal workflow dispatcher.
+       * @param context - Request cancellation lifetime.
+       * @returns Debounce cleanup.
+       */
+      search: (_state, effect, dispatch, { signal }) => {
+        /**
+         * Delivers one accepted search result or failure.
+         * @param results - Results, or null on failure.
+         */
+        const settle = (results: SearchResult[] | null) => {
+          if (!signal.aborted)
+            dispatch({
+              type: "searchSettled",
+              generation: effect.generation,
+              results,
+            });
+        };
+        const timer = window.setTimeout(() => {
+          void searchPublic({
+            data: { query: effect.query, surface: "modal" },
+            signal,
+          }).then(
+            (response) => settle(response.items),
+            () => settle(null),
+          );
+        }, SEARCH_QUERY_DELAY_MS);
+        return () => window.clearTimeout(timer);
+      },
+      /**
+       * Synchronizes the native dialog and focus only after a committed transition.
+       * @param _state - State that queued the presentation.
+       * @param effect - Requested presentation transition.
+       * @param dispatch - Terminal workflow dispatcher.
+       * @param context - Presentation cancellation lifetime.
+       * @returns Animation-frame and focus-timer cleanup.
+       */
+      present: (_state, effect, dispatch, { signal }) => {
+        let frame = 0;
+        let timer = 0;
+        /** Completes this presentation without replaying it on Activity resumption. */
+        const finish = () => {
+          if (!signal.aborted)
+            dispatch({
+              type: "presentationFinished",
+              presentationId: effect.presentationId,
+            });
+        };
+        if (effect.open) {
+          if (!effect.mobile) {
+            if (dialog.current && !dialog.current.open)
+              dialog.current.showModal();
+            frame = window.requestAnimationFrame(() => {
+              if (!signal.aborted) input.current?.focus();
+              finish();
+            });
+          } else finish();
+        } else {
+          if (dialog.current?.open) dialog.current.close();
+          trigger.current?.focus();
+          if (effect.mobile)
+            timer = window.setTimeout(() => {
+              if (!signal.aborted) trigger.current?.focus();
+              finish();
+            });
+          else finish();
+        }
+        return () => {
+          window.cancelAnimationFrame(frame);
+          window.clearTimeout(timer);
+        };
+      },
+    },
+  );
+  if (search.mobile !== isMobile)
+    dispatch({ type: "viewportChanged", mobile: isMobile });
+  const { isOpen, query, results, selected, status: state } = search;
 
   /** Formats search copy for the active locale. */
   const t = React.useCallback(
     (key: TranslationKey) => formatTranslation(key, {}, locale),
     [locale],
   );
-
   /** Opens the responsive search surface. */
-  const open = React.useCallback(() => {
-    setIsOpen(true);
-    if (isMobile) return;
-    dialog.current?.showModal();
-    requestAnimationFrame(() => input.current?.focus());
-  }, [isMobile]);
-
-  React.useEffect(() => {
-    const currentDialog = dialog.current;
-    if (!currentDialog) return;
-    /**
-     * Closes the modal when its native backdrop is clicked.
-     *
-     * @param event - Native dialog click event.
-     */
-    const onBackdropClick = (event: MouseEvent) => {
-      if (event.target === currentDialog) currentDialog.close();
-    };
-    currentDialog.addEventListener("click", onBackdropClick);
-    return () => currentDialog.removeEventListener("click", onBackdropClick);
-  }, [isMobile]);
-
-  /** Clears modal state and restores focus to the header trigger. */
-  const finishClose = React.useCallback(() => {
-    request.current += 1;
-    setIsOpen(false);
-    setQuery("");
-    setResults([]);
-    setSelected(0);
-    setState("idle");
-    trigger.current?.focus();
-    if (isMobile) window.setTimeout(() => trigger.current?.focus());
-  }, [isMobile]);
-
-  /** Closes the active search presentation. */
-  const close = React.useCallback(() => {
-    if (isMobile) finishClose();
-    else dialog.current?.close();
-  }, [finishClose, isMobile]);
-
-  React.useEffect(() => {
-    if (presentation.current === isMobile) return;
-    presentation.current = isMobile;
-    if (!isOpen) return;
-    if (dialog.current?.open) dialog.current.close();
-    else finishClose();
-  }, [finishClose, isMobile, isOpen]);
-
-  React.useEffect(() => {
-    const trimmed = query.trim();
-    const currentRequest = ++request.current;
-    if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
-      setResults([]);
-      setSelected(0);
-      setState("idle");
-      return;
-    }
-
-    setResults([]);
-    setSelected(0);
-    setState("loading");
-    const timer = window.setTimeout(() => {
-      void searchPublic({
-        data: { query: trimmed, surface: "modal" },
-      })
-        .then((response) => {
-          if (currentRequest !== request.current) return;
-          setResults(response.items);
-          setSelected(0);
-          setState("ready");
-        })
-        .catch(() => {
-          if (currentRequest !== request.current) return;
-          setResults([]);
-          setSelected(0);
-          setState("error");
-        });
-    }, SEARCH_QUERY_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [query]);
+  const open = () => {
+    dispatch({ type: "opened" });
+  };
+  /** Closes the current surface, clears requests, and restores trigger focus. */
+  const close = () => {
+    dispatch({ type: "closed" });
+  };
 
   const searchHref = query.trim()
     ? `/search?q=${encodeURIComponent(query.trim())}`
@@ -160,10 +355,10 @@ export function GlobalSearch() {
       results.length
     ) {
       event.preventDefault();
-      setSelected((value) => Math.min(value + 1, results.length - 1));
+      dispatch({ type: "selectionMoved", offset: 1 });
     } else if (state === "ready" && event.key === "ArrowUp" && results.length) {
       event.preventDefault();
-      setSelected((value) => Math.max(value - 1, 0));
+      dispatch({ type: "selectionMoved", offset: -1 });
     } else if (
       event.key === "Enter" &&
       (/Mac|iPhone|iPad|iPod/u.test(navigator.platform)
@@ -212,7 +407,9 @@ export function GlobalSearch() {
           aria-label={t("web.search.label")}
           className="border-0 shadow-none focus-visible:ring-[3px]"
           maxLength={SEARCH_QUERY_MAX_LENGTH}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) =>
+            dispatch({ type: "queryChanged", query: event.target.value })
+          }
           onKeyDown={onInputKeyDown}
           placeholder={t("web.search.placeholder")}
           ref={input}
@@ -220,7 +417,7 @@ export function GlobalSearch() {
           value={query}
         />
         <Button
-          aria-label={formatTranslation("web.action.close", {}, locale)}
+          aria-label={t("web.action.close")}
           onClick={close}
           size="icon"
           type="button"
@@ -335,8 +532,7 @@ export function GlobalSearch() {
       {isMobile ? (
         <Drawer
           onOpenChange={(nextOpen) => {
-            setIsOpen(nextOpen);
-            if (!nextOpen) finishClose();
+            dispatch({ type: nextOpen ? "opened" : "closed" });
           }}
           open={isOpen}
         >
@@ -365,9 +561,18 @@ export function GlobalSearch() {
           data-presentation="dialog"
           onCancel={(event) => {
             event.preventDefault();
-            dialog.current?.close();
+            close();
           }}
-          onClose={finishClose}
+          onPointerUp={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+          onKeyDownCapture={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              close();
+            }
+          }}
+          onClose={close}
           ref={dialog}
         >
           {panel}
