@@ -440,3 +440,35 @@ export const ConfigurablePen: Story = {
     await userEvent.keyboard("{Escape}");
   },
 };
+
+/** Removing a new Sold selection discards inactive invalid sold-price validation. */
+export const SoldPriceDeselection: Story = {
+  args: { defaultCollectionName: "Daily carry" },
+  /**
+   * Keeps an unsold draft saveable after entering and hiding a sold price.
+   * @param context - Rendered form and real browser interactions.
+   */
+  play: async (context) => {
+    await context.userEvent.click(
+      context.canvas.getByText("Add price, status, or notes"),
+    );
+    const publicStatuses = within(
+      context.canvas.getByRole("group", { name: "Public status" }),
+    );
+    const sold = publicStatuses.getByRole("checkbox", { name: "Sold" });
+    await context.userEvent.click(sold);
+    await context.userEvent.type(
+      context.canvas.getByRole("textbox", { name: "Price sold" }),
+      "-1",
+    );
+    await expect(context.canvas.getByRole("alert")).toBeVisible();
+    await context.userEvent.click(sold);
+    await expect(
+      context.canvas.queryByRole("textbox", { name: "Price sold" }),
+    ).not.toBeInTheDocument();
+    await expect(context.canvas.queryByRole("alert")).not.toBeInTheDocument();
+    await expect(
+      context.canvas.getByRole("button", { name: /^Add to collection$/ }),
+    ).toBeEnabled();
+  },
+};

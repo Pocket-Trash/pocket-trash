@@ -45,6 +45,14 @@ const session = vi.hoisted(() => ({
   navigate: vi.fn(),
   createExternalAccount: vi.fn(),
 }));
+vi.mock("@/hooks/use-pen-settings", () => ({
+  /**
+   * Returns the preferred currency for form fixtures.
+   * @returns Stable preference fixture.
+   */
+  usePenSettings: () => ({ currency: "USD" }),
+}));
+
 vi.mock("@clerk/tanstack-react-start", () => ({
   /** Supplies the current authoring account.
    * @returns Token and account context. */

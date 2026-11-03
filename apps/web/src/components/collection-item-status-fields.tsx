@@ -8,7 +8,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Tooltip,
@@ -34,6 +34,8 @@ export const collectionStatusLabels = {
 export function CollectionItemStatusFields(props: {
   /** Current form-owned metadata. */
   value: CollectionItemMetadataWrite;
+  /** Additional owner metadata fields inside the same disclosure. */
+  children?: ReactNode;
   /**
    * Updates form values while preserving the independent saved scopes.
    * @param value - Replacement form metadata.
@@ -47,6 +49,8 @@ export function CollectionItemStatusFields(props: {
   saleDateRecorded?: boolean;
   /** Localized explanation of the blocking public visibility condition. */
   warning?: TranslationKey;
+  /** Whether another metadata field, such as a paid price, is designated public. */
+  hasPublicMetadata?: boolean;
 }) {
   const { locale } = useLocale();
   const id = useId();
@@ -62,8 +66,10 @@ export function CollectionItemStatusFields(props: {
   return (
     <details
       className="border-y py-4"
-      key={props.invalid ? "invalid" : "valid"}
-      open={props.editing || props.invalid || undefined}
+      ref={(node) => {
+        if (node && props.invalid) node.open = true;
+      }}
+      open={props.editing || undefined}
     >
       <summary className="cursor-pointer focus-visible:outline focus-visible:outline-ring">
         {t(
@@ -84,7 +90,7 @@ export function CollectionItemStatusFields(props: {
             </legend>
             {scope === "public" &&
             props.warning &&
-            props.value.statuses.public.length ? (
+            (props.value.statuses.public.length || props.hasPublicMetadata) ? (
               <Tooltip>
                 <TooltipTrigger
                   aria-label={t("web.collectionItemMetadata.publicHidden")}
@@ -149,6 +155,7 @@ export function CollectionItemStatusFields(props: {
           />
         </div>
       ) : null}
+      {props.children}
     </details>
   );
 }

@@ -1,4 +1,4 @@
-import type { CollectionItemStatusState } from "@package/services";
+import type { CollectionItemStatusState, MoneyValue } from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -9,6 +9,7 @@ import { collectionStatusLabels } from "@/components/collection-item-status-fiel
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getPublicCollectionItem } from "@/lib/catalog-api";
+import { formatCollectionMoney } from "@/lib/catalog-money";
 import { useLocale } from "@/providers/locale-provider";
 
 /** Anonymous detail shape returned by the same public-viewer query as the item route. */
@@ -46,6 +47,10 @@ type PreviewEvent =
 export function CollectionItemMetadataSection(props: {
   /** Independent saved status scopes, already redacted by the service. */
   statuses: CollectionItemStatusState;
+  /** Already-redacted paid price for the current ownership period. */
+  pricePaid?: MoneyValue & { /** Paid price visibility. */ isPublic: boolean };
+  /** Sale price supplied only to the owner. */
+  priceSold?: MoneyValue;
   /** Whether the current viewer owns this item. */
   isOwner: boolean;
   /** Database item identity used for the public projection request. */
@@ -118,7 +123,19 @@ export function CollectionItemMetadataSection(props: {
           (status) => !props.statuses.public.includes(status),
         )
       : props.statuses.public;
-  if (!props.isOwner && !props.statuses.public.length) return null;
+  if (
+    !props.isOwner &&
+    !props.statuses.public.length &&
+    !props.pricePaid?.isPublic
+  )
+    return null;
+  const showPaid =
+    props.pricePaid &&
+    (props.isOwner
+      ? scope === "public"
+        ? props.pricePaid.isPublic
+        : !props.pricePaid.isPublic
+      : props.pricePaid.isPublic);
   return (
     <section className="grid gap-4 border border-border bg-card p-4">
       <h2>{t("web.collectionItemMetadata.title")}</h2>
@@ -156,6 +173,24 @@ export function CollectionItemMetadataSection(props: {
           <Badge key={status}>{t(collectionStatusLabels[status])}</Badge>
         ))}
       </div>
+      <dl className="grid gap-2">
+        {showPaid && props.pricePaid ? (
+          <div>
+            <dt className="text-muted-foreground">
+              {t("web.collectionItemMetadata.pricePaid")}
+            </dt>
+            <dd>{formatCollectionMoney(props.pricePaid, locale)}</dd>
+          </div>
+        ) : null}
+        {props.isOwner && scope === "private" && props.priceSold ? (
+          <div>
+            <dt className="text-muted-foreground">
+              {t("web.collectionItemMetadata.priceSold")}
+            </dt>
+            <dd>{formatCollectionMoney(props.priceSold, locale)}</dd>
+          </div>
+        ) : null}
+      </dl>
       {props.isOwner ? (
         <dialog
           onKeyDown={(event) => {

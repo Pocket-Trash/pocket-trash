@@ -15,6 +15,14 @@ import {
 } from "./catalog-form-pages";
 import { collectionFixture, productFixture } from "./catalog-test-fixtures";
 
+vi.mock("@/hooks/use-pen-settings", () => ({
+  /**
+   * Returns the preferred currency for form fixtures.
+   * @returns Stable preference fixture.
+   */
+  usePenSettings: () => ({ currency: "USD" }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   /**
    * Returns a navigation spy.

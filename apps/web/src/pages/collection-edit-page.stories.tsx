@@ -302,3 +302,85 @@ export const InstalledSliderAssembly: Story = {
     await expect(plateSelector).toHaveValue("Spare plate");
   },
 };
+
+/** Saved prices keep historical currencies while the selected ownership period changes. */
+export const OwnershipPrices: Story = {
+  args: {
+    item: {
+      ...sliderItem,
+      ownershipPeriods: sliderItem.ownershipPeriods.map((period, index) => ({
+        ...period,
+        pricePaid:
+          index === 0
+            ? { amountMinor: 1200, currencyCode: "JPY", isPublic: true }
+            : { amountMinor: 2900, currencyCode: "CAD", isPublic: false },
+        ...(index === 0
+          ? { priceSold: { amountMinor: 18500, currencyCode: "USD" } }
+          : {}),
+      })),
+    },
+  },
+  /**
+   * Restores historical amount text, currency, and sold prices through the period selector.
+   * @param context - Rendered page and browser interactions.
+   */
+  play: async (context) => {
+    await expect(
+      context.canvas.getByRole("textbox", { name: "Price paid" }),
+    ).toHaveValue("29.00");
+    const paid = within(
+      context.canvas.getByRole("group", { name: "Price paid" }),
+    );
+    await expect(
+      paid.getByRole("combobox", { name: "Currency" }),
+    ).toHaveTextContent("CAD");
+    await context.userEvent.click(
+      context.canvas.getByRole("combobox", { name: "Ownership history" }),
+    );
+    await context.userEvent.click(
+      await within(context.canvasElement.ownerDocument.body).findByRole(
+        "option",
+        { name: "2025-01-15 – 2025-06-01" },
+      ),
+    );
+    await expect(
+      context.canvas.getByRole("textbox", { name: "Price paid" }),
+    ).toHaveValue("1200");
+    await expect(
+      paid.getByRole("combobox", { name: "Currency" }),
+    ).toHaveTextContent("JPY");
+    await expect(
+      context.canvas.getByRole("textbox", { name: "Price sold" }),
+    ).toHaveValue("185.00");
+  },
+};
+
+/** A lifecycle sale price survives unrelated status choices before private Sold is synchronized. */
+export const LifecycleSalePrice: Story = {
+  /**
+   * Preserves the entered sold amount when selecting Favorite on a new lifecycle sale.
+   * @param context - Edit page and browser interactions.
+   */
+  play: async (context) => {
+    await context.userEvent.click(
+      context.canvas.getByRole("checkbox", { name: "Currently owned" }),
+    );
+    await context.userEvent.click(
+      context.canvas.getByRole("combobox", { name: "Departure reason" }),
+    );
+    await context.userEvent.click(
+      await within(context.canvasElement.ownerDocument.body).findByRole(
+        "option",
+        { name: /^Sale$/ },
+      ),
+    );
+    const sold = context.canvas.getByRole("textbox", { name: "Price sold" });
+    await context.userEvent.type(sold, "185.00");
+    await context.userEvent.click(
+      within(
+        context.canvas.getByRole("group", { name: "Public status" }),
+      ).getByRole("checkbox", { name: "Favorite" }),
+    );
+    await expect(sold).toHaveValue("185.00");
+  },
+};
