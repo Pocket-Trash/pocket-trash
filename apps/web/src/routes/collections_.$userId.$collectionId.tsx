@@ -1,9 +1,17 @@
-import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  notFound,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
 import {
   getPublicCollection,
   listCatalogTerminologyAliases,
 } from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
+import { loadDirectorySearch } from "@/lib/directory-search";
+import { canCommitSearch } from "@/lib/search-navigation";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { CollectionPage } from "@/pages/catalog-pages";
 
@@ -38,15 +46,25 @@ export const Route = createFileRoute("/collections_/$userId/$collectionId")({
     }),
   },
   validateSearch: parseCatalogFilterSearch,
+  pendingMs: Infinity,
+  /**
+   * Keys ranked public collection-item matches by the query.
+   * @param context - Validated route context.
+   * @param context.search - Normalized collection filters.
+   * @returns Public search query.
+   */
+  loaderDeps: ({ search }) => ({ q: parseCatalogFilterSearch(search).q ?? "" }),
   /**
    * Loads a public collection and its visible items.
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
+   * @param context.deps - Normalized public query.
+   * @param context.abortController - Router cancellation lifetime.
    * @returns The public collection, owner name, and visible items.
    * @rejects When the identifiers are invalid or the public collection cannot be loaded.
    */
-  loader: async ({ params }) => {
+  loader: async ({ params, deps, abortController }) => {
     if (
       !Number.isSafeInteger(params.userId) ||
       !Number.isSafeInteger(params.collectionId) ||
@@ -55,12 +73,13 @@ export const Route = createFileRoute("/collections_/$userId/$collectionId")({
     ) {
       throw notFound();
     }
-    const [result, aliases] = await Promise.all([
+    const [result, aliases, directorySearch] = await Promise.all([
       getPublicCollection({ data: params }),
       listCatalogTerminologyAliases(),
+      loadDirectorySearch(deps.q, "collections", abortController.signal),
     ]);
     if (!result) throw notFound();
-    return { ...result, aliases };
+    return { ...result, aliases, directorySearch };
   },
   component: PublicCollectionRoute,
 });
@@ -73,22 +92,32 @@ export const Route = createFileRoute("/collections_/$userId/$collectionId")({
 function PublicCollectionRoute() {
   const navigate = useNavigate();
   const data = Route.useLoaderData();
-  const search = Route.useSearch();
-  const [filters, setFilters] = useCatalogFilters(
-    search,
-    (search) =>
-      void navigate({
-        params: {
-          collectionId: data.collection.id,
-          userId: data.collection.ownerUserId,
-        },
-        replace: true,
-        search,
-        to: "/collections/$userId/$collectionId",
-      }),
-  );
+  const router = useRouter();
+  const { location, isLoading: loading } = useRouterState();
+  const search = parseCatalogFilterSearch(location.search);
+  const [filters, setFilters] = useCatalogFilters(search, (search) => {
+    if (
+      !canCommitSearch(router, Route.id, {
+        collectionId: data.collection.id,
+        userId: data.collection.ownerUserId,
+      })
+    )
+      return;
+    void navigate({
+      params: {
+        collectionId: data.collection.id,
+        userId: data.collection.ownerUserId,
+      },
+      replace: true,
+      search,
+      to: "/collections/$userId/$collectionId",
+    });
+  });
   return (
     <CollectionPage
+      directorySearch={
+        loading ? { items: [], status: "loading" } : data.directorySearch
+      }
       aliases={data.aliases}
       collection={data.collection}
       filters={filters}

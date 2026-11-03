@@ -2,6 +2,11 @@ import { faSliders } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogColor } from "@package/services";
 import * as React from "react";
+import {
+  type EffectEntity,
+  type EffectReducer,
+  useEffectReducer,
+} from "use-effect-reducer";
 import { Button } from "@/components/ui/button";
 import {
   CatalogCombobox,
@@ -16,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -38,6 +44,55 @@ import {
   pruneCatalogFilters,
 } from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
+
+/** Controlled facet reconciliation and its committed notification. */
+type PruningState = {
+  /** Current controlled/pruned input identity. */
+  key: string;
+  /** Disposable parent notification. */
+  change: EffectEntity<PruningState, PruningEvent> | undefined;
+};
+/** Facet input changes and completed parent notifications. */
+type PruningEvent = {
+  /** Facets changed or their reconciliation was delivered. */
+  type: "inputsChanged" | "applied";
+  /** Controlled/pruned input identity. */
+  key: string;
+  /** Pruned selections, absent when no change is needed. */
+  filters?: CatalogFilters;
+};
+/** One committed correction to controlled selections. */
+type PruningEffect = {
+  /** Parent notification implementation. */
+  type: "prune";
+  /** Controlled/pruned input identity. */
+  key: string;
+  /** Validated selections for the supplied facets. */
+  filters: CatalogFilters;
+};
+
+/**
+ * Replaces obsolete facet corrections and stops delivered notifications.
+ * @param state - Last reconciliation and notification lifetime.
+ * @param event - New facets or terminal notification.
+ * @param exec - Committed effect queue.
+ * @returns Current reconciliation lifetime.
+ */
+const pruningReducer: EffectReducer<
+  PruningState,
+  PruningEvent,
+  PruningEffect
+> = (state, event, exec) => {
+  if (event.type === "applied" && event.key !== state.key) return state;
+  exec.stop(state.change);
+  return {
+    key: event.key,
+    change:
+      event.type === "inputsChanged" && event.filters
+        ? exec({ type: "prune", key: event.key, filters: event.filters })
+        : undefined,
+  };
+};
 
 /**
  * Localized labels and label builders used by catalog filter controls.
@@ -196,55 +251,42 @@ export function CatalogFilterBar({
   /** Current matching result count announced after filter changes. */
   resultCount: number;
 }) {
-  const [desktopAdvancedOpen, setDesktopAdvancedOpen] = React.useState(false);
-  const [mobileAdvancedOpen, setMobileAdvancedOpen] = React.useState(false);
   const desktopRootRef = React.useRef<HTMLDivElement>(null);
   const advancedId = React.useId();
-  const facetKey = JSON.stringify({
-    colors: facets.colors.map(({ id }) => id),
-    fades: facets.fades.map(({ key }) => key),
-    finishes: facets.finishes.map(({ id }) => id),
-    makers: facets.makers.map(({ id }) => id),
-    materials: facets.materials.map(({ id }) => id),
-    patterns: facets.patterns.map(({ id }) => id),
-    plates: facets.plates.map(({ id }) => id),
-    spinnerButtons: facets.spinnerButtons.map(({ id }) => id),
-  });
-  React.useEffect(() => {
-    const next = pruneCatalogFilters(filters, facets);
-    if (JSON.stringify(next) !== JSON.stringify(filters)) onChange(next);
-  }, [facetKey, facets, filters, onChange]);
-  React.useEffect(() => {
-    if (!desktopAdvancedOpen) return;
-    /**
-     * Closes the desktop advanced panel for pointer events outside its controls and popups.
-     *
-     * @param event - Document pointer event used to locate the interaction target.
-     */
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      const target = event.target as Element;
-      const inFilterPopup = target.closest(
-        '[role="listbox"], [data-slot="dropdown-menu-content"]',
-      );
-      if (!desktopRootRef.current?.contains(target) && !inFilterPopup) {
-        setDesktopAdvancedOpen(false);
-      }
-    };
-    /**
-     * Closes the desktop advanced panel when Escape is pressed.
-     *
-     * @param event - Document keyboard event.
-     */
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDesktopAdvancedOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [desktopAdvancedOpen]);
+  const nextFilters = pruneCatalogFilters(filters, facets);
+  const changed = JSON.stringify(nextFilters) !== JSON.stringify(filters);
+  const key = JSON.stringify([filters, nextFilters]);
+  const [pruning, dispatchPruning] = useEffectReducer(
+    pruningReducer,
+    (exec) => ({
+      key,
+      change: changed
+        ? exec({ type: "prune", key, filters: nextFilters })
+        : undefined,
+    }),
+    {
+      /**
+       * Delivers accepted facet corrections after commit without replaying completed work.
+       * @param _state - State that queued reconciliation.
+       * @param effect - Validated selections and input identity.
+       * @param dispatch - Terminal reconciliation dispatcher.
+       * @param context - Notification cancellation lifetime.
+       */
+      prune: (_state, effect, dispatch, { signal }) => {
+        queueMicrotask(() => {
+          if (signal.aborted) return;
+          dispatch({ type: "applied", key: effect.key });
+          onChange(effect.filters);
+        });
+      },
+    },
+  );
+  if (pruning.key !== key)
+    dispatchPruning({
+      type: "inputsChanged",
+      key,
+      ...(changed ? { filters: nextFilters } : {}),
+    });
   const productType = filters.productType
     ? (() => {
         const selected = facets.productTypes.find(
@@ -330,19 +372,49 @@ export function CatalogFilterBar({
           filters={filters}
           onChange={onChange}
         />
-        <Button
-          aria-controls={advancedId}
-          aria-expanded={desktopAdvancedOpen}
-          className="max-[880px]:hidden"
-          onClick={() => setDesktopAdvancedOpen((open) => !open)}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <FontAwesomeIcon aria-hidden="true" icon={faSliders} />
-          {copy.moreFilters}
-        </Button>
-        <Sheet open={mobileAdvancedOpen} onOpenChange={setMobileAdvancedOpen}>
+        <PopoverPrimitive.Root>
+          <PopoverPrimitive.Trigger
+            render={
+              <Button
+                className="max-[880px]:hidden"
+                size="sm"
+                type="button"
+                variant="outline"
+              />
+            }
+          >
+            <FontAwesomeIcon aria-hidden="true" icon={faSliders} />
+            {copy.moreFilters}
+          </PopoverPrimitive.Trigger>
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Positioner
+              anchor={desktopRootRef}
+              align="start"
+              side="bottom"
+              sideOffset={0}
+              className="z-40 hidden w-[var(--anchor-width)] min-[881px]:block"
+            >
+              <PopoverPrimitive.Popup
+                aria-label={copy.filters}
+                className="grid min-h-96 grid-cols-[minmax(0,1fr)_minmax(16rem,0.5fr)] content-start gap-5 rounded-b-xl border-x border-b border-border bg-popover p-5 text-popover-foreground shadow-lg"
+                render={<section />}
+              >
+                {advanced}
+                <PopoverPrimitive.Close
+                  render={
+                    <Button
+                      className="col-span-full mt-auto ml-auto self-end"
+                      type="button"
+                    />
+                  }
+                >
+                  {copy.apply}
+                </PopoverPrimitive.Close>
+              </PopoverPrimitive.Popup>
+            </PopoverPrimitive.Positioner>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
+        <Sheet>
           <SheetTrigger
             className="min-[881px]:hidden"
             render={
@@ -359,12 +431,9 @@ export function CatalogFilterBar({
             </SheetHeader>
             <div className="grid gap-5 overflow-y-auto px-6 pb-6">
               {advanced}
-              <Button
-                onClick={() => setMobileAdvancedOpen(false)}
-                type="button"
-              >
+              <SheetClose render={<Button type="button" />}>
                 {copy.apply}
-              </Button>
+              </SheetClose>
             </div>
           </SheetContent>
         </Sheet>
@@ -379,22 +448,6 @@ export function CatalogFilterBar({
         ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
-      {desktopAdvancedOpen ? (
-        <section
-          aria-label={copy.filters}
-          className="absolute inset-x-0 top-full z-40 hidden min-h-96 grid-cols-[minmax(0,1fr)_minmax(16rem,0.5fr)] content-start gap-5 rounded-b-xl border-x border-b border-border bg-popover p-5 text-popover-foreground shadow-lg min-[881px]:grid"
-          id={advancedId}
-        >
-          {advanced}
-          <Button
-            className="col-span-full mt-auto ml-auto self-end"
-            onClick={() => setDesktopAdvancedOpen(false)}
-            type="button"
-          >
-            {copy.apply}
-          </Button>
-        </section>
-      ) : null}
     </div>
   );
 }
@@ -798,3 +851,5 @@ function toggle(values: number[], value: number): number[] {
     ? values.filter((candidate) => candidate !== value)
     : [...values, value];
 }
+
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";

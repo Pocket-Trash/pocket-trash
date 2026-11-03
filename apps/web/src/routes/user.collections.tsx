@@ -1,10 +1,16 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
 import {
   getUserCollection,
   getUserCollections,
   listCatalogTerminologyAliases,
 } from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
+import { canCommitSearch } from "@/lib/search-navigation";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { UserCollectionsPage } from "@/pages/catalog-pages";
 
@@ -37,11 +43,13 @@ export const Route = createFileRoute("/user/collections")({
  */
 function UserCollectionsRoute() {
   const navigate = useNavigate();
-  const [filters, setFilters] = useCatalogFilters(
-    Route.useSearch(),
-    (search) =>
-      void navigate({ replace: true, search, to: "/user/collections" }),
-  );
+  const router = useRouter();
+  const { location } = useRouterState();
+  const search = parseCatalogFilterSearch(location.search);
+  const [filters, setFilters] = useCatalogFilters(search, (search) => {
+    if (!canCommitSearch(router, Route.id)) return;
+    void navigate({ replace: true, search, to: "/user/collections" });
+  });
   return (
     <UserCollectionsPage
       aliases={Route.useLoaderData().aliases}
