@@ -29,3 +29,17 @@ export function normalizeCollectionName(name: string) {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
+
+/** Stable status selections shared by services and URL state. */
+export const collectionItemStatusSearches = [
+  "grail",
+  "favorite",
+  "want-to-sell",
+  "want-to-trade",
+  "sold",
+  "unstatused",
+] as const;
+
+/** One selectable collection-item status bucket. */
+export type CollectionItemStatusSearch =
+  (typeof collectionItemStatusSearches)[number];

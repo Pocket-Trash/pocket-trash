@@ -69,6 +69,7 @@ export type {
   CollectionItemOwnershipWrite,
   CollectionItemStatus,
   CollectionItemStatusState,
+  CollectionItemStatusTrendItem,
   CollectionsService,
   CreateAuditExportInput,
   DeleteAuditExportInput,

@@ -28,6 +28,7 @@ type CatalogPiePoint = {
 export function CatalogTrendsChart({
   catalogProductsLabel,
   chartLabel,
+  description = chartLabel,
   onProductTypeSelect,
   otherLabel,
   trends,
@@ -36,6 +37,8 @@ export function CatalogTrendsChart({
   catalogProductsLabel: string;
   /** Localized chart title and accessible description. */
   chartLabel: string;
+  /** Optional chart explanation, including overlapping assignment semantics. */
+  description?: string;
   /**
    * Opens the material, maker, and product breakdowns for a product type.
    *
@@ -75,7 +78,7 @@ export function CatalogTrendsChart({
 
       const chart = Highcharts.chart(node, {
         accessibility: {
-          description: chartLabel,
+          description,
           point: { valueSuffix: ` ${catalogProductsLabel}` },
           screenReaderSection: {
             beforeChartFormat:
@@ -106,6 +109,7 @@ export function CatalogTrendsChart({
           : undefined,
         plotOptions: {
           pie: {
+            animation: false,
             dataLabels: {
               enabled: true,
               format: "{point.name}: {point.percentage:.1f}%",
@@ -122,7 +126,14 @@ export function CatalogTrendsChart({
 
       return () => chart.destroy();
     },
-    [catalogProductsLabel, chartLabel, onProductTypeSelect, otherLabel, trends],
+    [
+      catalogProductsLabel,
+      chartLabel,
+      description,
+      onProductTypeSelect,
+      otherLabel,
+      trends,
+    ],
   );
 
   return (

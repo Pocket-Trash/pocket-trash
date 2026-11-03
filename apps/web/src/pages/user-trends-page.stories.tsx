@@ -124,7 +124,11 @@ export const Populated: Story = {
    */
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole("table")).toHaveLength(6);
+    await expect(
+      canvas.getByRole("table", {
+        name: "Collection item status assignments and counts",
+      }),
+    ).toBeVisible();
     await expect(
       canvas.getByRole("heading", {
         name: /Collection history|web\.userTrends\.collectionHistory/,

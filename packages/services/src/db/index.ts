@@ -144,6 +144,7 @@ export type {
   CollectionItemOwnershipWrite,
   CollectionItemStatus,
   CollectionItemStatusState,
+  CollectionItemStatusTrendItem,
   CollectionsService,
   EffectiveSliderSetup,
   MaterialCombination,
