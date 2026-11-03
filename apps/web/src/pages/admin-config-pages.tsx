@@ -11,6 +11,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link } from "@tanstack/react-router";
 import {
   columnFilteringFeature,
@@ -23,15 +24,11 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useMemo } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  setProductTypePartOrAccessory,
-  setProductTypeTrendsInclusion,
-} from "@/lib/catalog-api";
+import { useProductTypeConfiguration } from "@/hooks/use-product-type-configuration";
 import { useLocale } from "@/providers/locale-provider";
 
 /** TanStack Table features required by product-type configuration. */
@@ -58,9 +55,6 @@ const productTypeColumns = productTypeColumnHelper.columns([
     header: "isPartOrAccessory",
   }),
 ]);
-
-/** Delay that collapses rapid classification changes into one request. */
-const productTypeSaveDebounceMs = 300;
 
 /** Configuration keys supplied by the stacked localization change. */
 type AdminConfigTranslationKey =
@@ -144,59 +138,10 @@ export function AdminTrendsConfigPage({
     key: AdminConfigTranslationKey,
     values: Readonly<Record<string, unknown>> = {},
   ) => formatTranslation(key as TranslationKey, values, locale);
-  const [rows, setRows] = useState(productTypes);
-  const [savingIds, setSavingIds] = useState<Set<number>>(() => new Set());
-
-  /**
-   * Persists one secondary product type's public Trends inclusion state.
-   *
-   * @param productType - Secondary product type being changed.
-   * @param includeInTrends - Desired public inclusion state.
-   */
-  function updateInclusion(
-    productType: TrendsProductTypeConfiguration,
-    includeInTrends: boolean,
-  ) {
-    setRows((current) =>
-      current.map((candidate) =>
-        candidate.id === productType.id
-          ? { ...candidate, includeInTrends }
-          : candidate,
-      ),
-    );
-    setSavingIds((current) => new Set(current).add(productType.id));
-    void setProductTypeTrendsInclusion({
-      data: { includeInTrends, productTypeId: productType.id },
-    })
-      .then((saved) => {
-        setRows((current) =>
-          current.map((candidate) =>
-            candidate.id === saved.id ? saved : candidate,
-          ),
-        );
-        toast.success(
-          t("web.admin.config.trends.updated", { name: saved.name }),
-        );
-      })
-      .catch(() => {
-        setRows((current) =>
-          current.map((candidate) =>
-            candidate.id === productType.id ? productType : candidate,
-          ),
-        );
-        toast.error(
-          t("web.admin.config.trends.updateFailed", { name: productType.name }),
-        );
-      })
-      .finally(() => {
-        setSavingIds((current) => {
-          const next = new Set(current);
-          next.delete(productType.id);
-          return next;
-        });
-      });
-  }
-
+  const { rows, savingIds, changeRow } = useProductTypeConfiguration(
+    productTypes,
+    "trends",
+  );
   const title = t("web.admin.config.trends.title");
   return (
     <AdminPageShell
@@ -249,7 +194,7 @@ export function AdminTrendsConfigPage({
                         savingIds.has(productType.id)
                       }
                       onChange={(event) =>
-                        updateInclusion(productType, event.target.checked)
+                        changeRow(productType.id, event.target.checked)
                       }
                       type="checkbox"
                     />
@@ -294,13 +239,12 @@ export function AdminProductConfigPage({
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
   ) => formatTranslation(key, values, locale);
-  const [rows, setRows] = useState(productTypes);
-  const [query, setQuery] = useState("");
-  const [savingIds, setSavingIds] = useState<Set<number>>(() => new Set());
-  const persisted = useRef(
-    new Map(productTypes.map((type) => [type.id, type.isPartOrAccessory])),
+  const { rows, savingIds, changeRow } = useProductTypeConfiguration(
+    productTypes,
+    "classification",
   );
-  const timers = useRef(new Map<number, number>());
+  const form = useForm({ defaultValues: { query: "" } });
+  const query = useStore(form.store, (state) => state.values.query);
   const initialState = useMemo(
     () => ({ pagination: { pageIndex: 0, pageSize: 30 } }),
     [],
@@ -320,7 +264,12 @@ export function AdminProductConfigPage({
         column.id === "name" || column.id === "slug",
       globalFilterFn: "includesString",
       initialState,
-      onGlobalFilterChange: setQuery,
+      /**
+       * Reconciles the table's search command into its form-owned field.
+       * @param update - Current query or field updater.
+       * @returns Nothing.
+       */
+      onGlobalFilterChange: (update) => form.setFieldValue("query", update),
       state: { globalFilter: query },
     },
     (state) => ({
@@ -328,84 +277,6 @@ export function AdminProductConfigPage({
       pagination: state.pagination,
     }),
   );
-
-  useEffect(
-    /**
-     * Registers cleanup for pending debounced updates.
-     *
-     * @returns Cleanup that clears every pending timer.
-     */
-    () => () => {
-      for (const timer of timers.current.values()) window.clearTimeout(timer);
-    },
-    [],
-  );
-
-  /**
-   * Optimistically changes one row and schedules its persisted update.
-   *
-   * @param productType - Product type being changed.
-   * @param isPartOrAccessory - Desired classification.
-   */
-  function scheduleUpdate(
-    productType: CatalogProductTypeSummary,
-    isPartOrAccessory: boolean,
-  ) {
-    setRows((current) =>
-      current.map((candidate) =>
-        candidate.id === productType.id
-          ? { ...candidate, isPartOrAccessory }
-          : candidate,
-      ),
-    );
-    const pending = timers.current.get(productType.id);
-    if (pending !== undefined) window.clearTimeout(pending);
-    timers.current.set(
-      productType.id,
-      window.setTimeout(() => {
-        timers.current.delete(productType.id);
-        setSavingIds((current) => new Set(current).add(productType.id));
-        void setProductTypePartOrAccessory({
-          data: { isPartOrAccessory, productTypeId: productType.id },
-        })
-          .then((saved) => {
-            persisted.current.set(saved.id, saved.isPartOrAccessory);
-            setRows((current) =>
-              current.map((candidate) =>
-                candidate.id === saved.id ? saved : candidate,
-              ),
-            );
-            toast.success(
-              t("web.admin.config.products.updated", {
-                name: saved.name,
-              }),
-            );
-          })
-          .catch(() => {
-            const previous = persisted.current.get(productType.id) ?? false;
-            setRows((current) =>
-              current.map((candidate) =>
-                candidate.id === productType.id
-                  ? { ...candidate, isPartOrAccessory: previous }
-                  : candidate,
-              ),
-            );
-            toast.error(
-              t("web.admin.config.products.updateFailed", {
-                name: productType.name,
-              }),
-            );
-          })
-          .finally(() => {
-            setSavingIds((current) => {
-              const next = new Set(current);
-              next.delete(productType.id);
-              return next;
-            });
-          });
-      }, productTypeSaveDebounceMs),
-    );
-  }
 
   const pageCount = table.getPageCount();
   const visibleRows = table.getRowModel().rows;
@@ -479,7 +350,7 @@ export function AdminProductConfigPage({
                         className="size-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         disabled={savingIds.has(original.id)}
                         onChange={(event) =>
-                          scheduleUpdate(original, event.target.checked)
+                          changeRow(original.id, event.target.checked)
                         }
                         type="checkbox"
                       />

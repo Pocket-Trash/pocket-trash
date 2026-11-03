@@ -17,8 +17,10 @@ import {
   maxImageSessionBytes,
   maxImageSessionFiles,
 } from "@package/services/constants";
+import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
 import * as React from "react";
+import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
 import type { MarkdownEditorHandle } from "@/components/markdown-editor";
@@ -106,6 +108,136 @@ export function AdminMaterialsPage({
   );
 }
 
+/** Explicit material image administration intent. */
+type MaterialImageAction =
+  | {
+      /** Moves one image to another specific/general scope. */
+      kind: "move";
+      /** Selected image. */
+      imageId: number;
+      /** Destination scope. */
+      materialSpecificId: number | null;
+    }
+  | {
+      /** Reorders the current active scope. */
+      kind: "reorder";
+      /** Current scope. */
+      materialSpecificId: number | null;
+      /** Complete active image order. */
+      imageIds: number[];
+    }
+  | {
+      /** Toggles one image's archived state. */
+      kind: "archive";
+      /** Selected persisted image and previous archive state. */
+      image: CatalogImage;
+    };
+/** Confirmed image action captured by its material authoring owner. */
+type MaterialImageEffect = {
+  /** Image administration implementation. */
+  type: "imageActionRequested";
+  /** Confirmed image operation. */
+  action: MaterialImageAction;
+};
+
+/** Existing material form feedback normalized by TanStack Form. */
+type MaterialValidation = {
+  /** Existing localized form failure key. */
+  form?: string;
+  /** Existing schema/server field failures. */
+  fields?: Record<string, string | undefined>;
+};
+/** Captured material profile and upload values. */
+type MaterialDraft = {
+  /** Current Markdown description. */
+  description: string;
+  /** Current material name. */
+  name: string;
+  /** Whether a stable slug change was confirmed. */
+  updateSlug: boolean;
+  /** Files captured for upload after metadata is saved. */
+  files: File[];
+  /** Selected parent-specific image scope. */
+  uploadScope: number | null;
+};
+/** Material editor lifecycle and explicit selection state. */
+type MaterialEditorState = {
+  /** Current material-wide image operation, serialized with metadata saves. */
+  imageRequest:
+    | EffectEntity<MaterialEditorState, MaterialEditorEvent>
+    | undefined;
+  /** Editor initialization state. */
+  loading: boolean;
+  /** Canonical material specifics. */
+  specifics: MaterialSpecific[];
+  /** Current specific editor identity. */
+  editing: MaterialSpecific | "new" | null;
+  /** Pending material save. */
+  save: EffectEntity<MaterialEditorState, MaterialEditorEvent> | undefined;
+  /** Whether the existing saved message is visible. */
+  saved: boolean;
+};
+/** Material draft readiness, specific selection, and save intent. */
+type MaterialEditorEvent =
+  | MaterialImageEffect
+  | {
+      /** Stops a completed image operation. */
+      type: "imageActionFinished";
+    }
+  | {
+      /** Receives Markdown readiness. */
+      type: "editorLoadingChanged";
+      /** Current loading state. */
+      loading: boolean;
+    }
+  | {
+      /** Selects or dismisses a specific editor. */
+      type: "specificSelected";
+      /** Current specific identity or create mode. */
+      specific: MaterialSpecific | "new" | null;
+    }
+  | {
+      /** Receives a durably saved specific. */
+      type: "specificSaved";
+      /** Canonical saved specific. */
+      specific: MaterialSpecific;
+    }
+  | {
+      /** Starts one validated material save. */
+      type: "saveRequested";
+      /** Captured profile and upload fields. */
+      value: MaterialDraft;
+    }
+  | {
+      /** Stops a terminal save. */
+      type: "saveFinished";
+      /** Whether every save stage completed. */
+      success: boolean;
+    };
+/** Confirmed material save descriptor. */
+type MaterialEditorEffect =
+  | Extract<
+      MaterialEditorEvent,
+      {
+        /** Captured intent discriminant. */
+        type: "saveRequested";
+      }
+    >
+  | MaterialImageEffect;
+/** Retained material write/upload outcome without observer side effects. */
+type MaterialSaveOutcome = {
+  /** Validation or upload failure when a stage failed. */
+  error?: MaterialValidation;
+  /** Canonical material identity created or updated before upload. */
+  materialId?: number;
+  /** Canonical stable slug after metadata save. */
+  slug?: string;
+  /** Failed captured files retained for retry. */
+  failedFiles?: File[];
+  /** Canonical images reloaded after uploads. */
+  images?: CatalogImage[];
+};
+
 /**
  * Renders the material create or edit form.
  *
@@ -119,130 +251,395 @@ export function AdminMaterialFormPage({
   /** Existing material, or nothing for creation. */
   initialMaterial?: AdminMaterial;
 }) {
+  const { userId } = useAuth();
+  return (
+    <AdminMaterialForm
+      key={`${userId}:${initialMaterial?.id ?? "new"}`}
+      initialMaterial={initialMaterial}
+    />
+  );
+}
+
+/**
+ * Owns one administrator/material draft and its committed save stages.
+ * @param props - Existing material profile.
+ * @returns Scoped material authoring controls.
+ */
+function AdminMaterialForm({
+  initialMaterial,
+}: {
+  /** Existing material, or nothing for creation. */
+  initialMaterial?: AdminMaterial;
+}) {
   const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
   const t = useCatalogCopy();
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
-  const [description, setDescription] = React.useState(
-    initialMaterial?.description ?? "",
+  const savedMaterialId = React.useRef(initialMaterial?.id ?? null);
+  const form = useForm({
+    defaultValues: {
+      description: initialMaterial?.description ?? "",
+      name: initialMaterial?.name ?? "",
+      slug: initialMaterial?.slug ?? "",
+      updateSlug: false,
+      files: [] as File[],
+      existingImages: initialMaterial?.images ?? [],
+      uploadScope: null as number | null,
+    },
+    validators: {
+      /**
+       * Keeps profile eligibility and image validation in the authoring form.
+       * @param input - Current material and upload fields.
+       * @returns Existing localized feedback when invalid.
+       */
+      onSubmit: ({ value }): MaterialValidation | undefined => {
+        if (!value.name.trim() || value.description.length > 5000)
+          return { form: "web.catalog.error.form" };
+        const error = validateImages(value.files, locale);
+        return error ? { form: error.key } : undefined;
+      },
+    },
+    /**
+     * Confirms a stable slug change and captures the validated authoring intent.
+     * @param input - Current material and upload fields.
+     */
+    onSubmit: ({ value }) => {
+      if (ui.loading || ui.save) return;
+      if (
+        initialMaterial &&
+        value.updateSlug &&
+        slugify(value.name) !== value.slug &&
+        !window.confirm(
+          `${t("web.materials.slug.confirmation", { oldUrl: `/materials/${value.slug}`, newUrl: `/materials/${slugify(value.name)}` })} ${t("web.materials.slug.affected", { count: ui.specifics.length })}`,
+        )
+      )
+        return;
+      dispatch({ type: "saveRequested", value });
+    },
+  });
+  const {
+    description,
+    name,
+    slug,
+    updateSlug,
+    files,
+    existingImages,
+    uploadScope,
+  } = useStore(form.store, (state) => state.values);
+  const fieldErrors = useStore(form.store, (state) => state.fieldMeta);
+  const formFeedback = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const formError =
+    typeof formFeedback === "string" ? formFeedback : formFeedback?.form;
+  const canSave = useStore(
+    form.store,
+    (state) =>
+      !state.isSubmitting &&
+      Boolean(state.values.name.trim()) &&
+      state.values.description.length <= 5000,
   );
-  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
-  const [existingImages, setExistingImages] = React.useState(
-    initialMaterial?.images ?? [],
+  const task = React.useRef<{
+    /** Descriptor whose save must not replay. */
+    effect: Extract<
+      MaterialEditorEffect,
+      {
+        /** Captured intent discriminant. */
+        type: "saveRequested";
+      }
+    >;
+    /** Metadata and upload completion retained across suspension. */
+    promise: Promise<MaterialSaveOutcome>;
+  } | null>(null);
+  const observer = React.useRef<{
+    /** Current save descriptor. */
+    effect: Extract<
+      MaterialEditorEffect,
+      {
+        /** Captured intent discriminant. */
+        type: "saveRequested";
+      }
+    >;
+    /** Current visible observer lifetime. */
+    signal: AbortSignal;
+  } | null>(null);
+  const imageTask = React.useRef<{
+    /** Captured operation whose mutation must not replay. */
+    effect: MaterialImageEffect;
+    /** Serialized operation identity retained after a refresh failure. */
+    key: string;
+    /** Durable mutation acknowledgement. */
+    mutation: Promise<string | undefined>;
+    /** Whether the server write committed. */
+    committed?: boolean;
+    /** Current canonical image reload. */
+    refresh?: Promise<CatalogImage[] | undefined>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    MaterialEditorState,
+    MaterialEditorEvent,
+    MaterialEditorEffect
+  >(
+    (state, event, exec) => {
+      switch (event.type) {
+        case "imageActionRequested":
+          return state.save || state.imageRequest
+            ? state
+            : { ...state, imageRequest: exec(event) };
+        case "imageActionFinished":
+          exec.stop(state.imageRequest);
+          return { ...state, imageRequest: undefined };
+        case "editorLoadingChanged":
+          return state.loading === event.loading
+            ? state
+            : { ...state, loading: event.loading };
+        case "specificSelected":
+          return { ...state, editing: event.specific };
+        case "specificSaved":
+          return {
+            ...state,
+            editing: null,
+            specifics: [
+              ...state.specifics.filter(({ id }) => id !== event.specific.id),
+              event.specific,
+            ].sort((a, b) => a.name.localeCompare(b.name)),
+          };
+        case "saveRequested":
+          return state.loading || state.save || state.imageRequest
+            ? state
+            : { ...state, saved: false, save: exec(event) };
+        case "saveFinished":
+          exec.stop(state.save);
+          return { ...state, save: undefined, saved: event.success };
+      }
+    },
+    {
+      imageRequest: undefined,
+      loading: true,
+      specifics: initialMaterial?.specifics ?? [],
+      editing: null,
+      save: undefined,
+      saved: false,
+    },
+    {
+      /**
+       * Serializes image administration and reloads canonical images without replaying writes.
+       * @param _state - Current material controls.
+       * @param effect - Confirmed scope/order/archive operation.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current account observer lifetime.
+       */
+      imageActionRequested: (_state, effect, dispatch, { signal }) => {
+        if (!initialMaterial) return;
+        const previous = imageTask.current;
+        const key = JSON.stringify(effect.action);
+        if (previous?.effect !== effect)
+          imageTask.current = {
+            effect,
+            key,
+            committed: previous?.key === key && previous.committed,
+            mutation:
+              previous?.key === key && previous.committed
+                ? previous.mutation
+                : (async (): Promise<string | undefined> => {
+                    try {
+                      const action = effect.action;
+                      if (action.kind === "move") {
+                        const result = await moveAdminMaterialImage({
+                          data: {
+                            materialId: initialMaterial.id,
+                            imageId: action.imageId,
+                            materialSpecificId: action.materialSpecificId,
+                          },
+                        });
+                        if (!result.ok) return result.formError;
+                      } else if (action.kind === "reorder")
+                        await reorderAdminMaterialImages({
+                          data: {
+                            materialId: initialMaterial.id,
+                            materialSpecificId: action.materialSpecificId,
+                            imageIds: action.imageIds,
+                          },
+                        });
+                      else
+                        await (action.image.deletedAt
+                          ? restoreCatalogImage
+                          : softDeleteCatalogImage)({
+                          data: {
+                            imageId: action.image.id,
+                            targetType: "material",
+                          },
+                        });
+                      return undefined;
+                    } catch {
+                      return "error.generic";
+                    }
+                  })(),
+          };
+        const task = imageTask.current;
+        if (!task) return;
+        void task.mutation.then(async (error) => {
+          task.committed = !error;
+          if (signal.aborted) return;
+          if (!error) {
+            task.refresh ??= getAdminMaterial({
+              data: { materialId: initialMaterial.id },
+            }).then(
+              (material) => material?.images,
+              () => undefined,
+            );
+            const images = await task.refresh;
+            if (signal.aborted) return;
+            if (images) form.setFieldValue("existingImages", images);
+            else error = "error.generic";
+          }
+          dispatch({ type: "imageActionFinished" });
+          if (error) form.setErrorMap({ onSubmit: { form: error } });
+        });
+      },
+      /**
+       * Saves metadata before scoped images and retains service results across Activity.
+       * @param _state - Current editor and specific selection state.
+       * @param effect - Captured material fields and pending files.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current account observer lifetime.
+       * @returns Cleanup detaching interactive duplicate confirmation.
+       */
+      saveRequested: (_state, effect, dispatch, { signal }) => {
+        const currentObserver = { effect, signal };
+        observer.current = currentObserver;
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: (async (): Promise<MaterialSaveOutcome> => {
+              let metadata: MaterialSaveOutcome = {};
+              try {
+                const result = await saveAdminMaterial({
+                  data: {
+                    description: effect.value.description,
+                    materialId: savedMaterialId.current,
+                    name: effect.value.name,
+                    updateSlug: effect.value.updateSlug,
+                  },
+                });
+                if (!result.ok)
+                  return {
+                    error: {
+                      form: result.formError,
+                      fields: Object.fromEntries(
+                        Object.entries(result.fieldErrors).map(
+                          ([name, errors]) => [
+                            name,
+                            Array.isArray(errors) ? errors[0] : undefined,
+                          ],
+                        ),
+                      ),
+                    },
+                  };
+                savedMaterialId.current = result.material.id;
+                metadata = {
+                  materialId: result.material.id,
+                  slug: result.material.slug,
+                };
+                if (effect.value.files.length) {
+                  const uploads = await uploadImages({
+                    files: effect.value.files,
+                    getToken,
+                    locale,
+                    targetId: result.material.id,
+                    targetType: "material",
+                    materialSpecificId: effect.value.uploadScope,
+                    /**
+                     * Confirms a duplicate only while its current account observer is active.
+                     * @param imageId - Archived material image identifier.
+                     * @returns Whether the archived image was restored.
+                     * @rejects When restoration fails.
+                     */
+                    onOwnerDeletedDuplicate: async (imageId) => {
+                      if (
+                        observer.current?.effect !== effect ||
+                        observer.current.signal.aborted ||
+                        !window.confirm(
+                          t("web.materials.image.restoreConfirmation"),
+                        )
+                      )
+                        return false;
+                      await restoreCatalogImage({
+                        data: { imageId, targetType: "material" },
+                      });
+                      return true;
+                    },
+                  });
+                  metadata.failedFiles = uploads.failed;
+                  if (uploads.failed.length)
+                    return {
+                      ...metadata,
+                      error: { form: "web.materials.image.uploadFailed" },
+                    };
+                  if (initialMaterial) {
+                    const refreshed = await getAdminMaterial({
+                      data: { materialId: result.material.id },
+                    });
+                    metadata.images = refreshed?.images;
+                  }
+                }
+                return metadata;
+              } catch (error) {
+                return {
+                  ...metadata,
+                  error: {
+                    form:
+                      (error as ImageUploadError).key ??
+                      "web.materials.image.uploadFailed",
+                  },
+                };
+              }
+            })(),
+          };
+        void task.current.promise.then((outcome) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished", success: !outcome.error });
+          if (outcome.slug !== undefined) {
+            form.setFieldValue("slug", outcome.slug);
+            form.setFieldValue("updateSlug", false);
+          }
+          const failedFiles = outcome.failedFiles;
+          if (failedFiles)
+            form.setFieldValue("files", (current) => [
+              ...current.filter((file) => !effect.value.files.includes(file)),
+              ...failedFiles,
+            ]);
+          if (outcome.images)
+            form.setFieldValue("existingImages", outcome.images);
+          if (outcome.error) form.setErrorMap({ onSubmit: outcome.error });
+          else if (!initialMaterial && outcome.materialId)
+            void navigate({
+              params: { materialId: String(outcome.materialId) },
+              to: "/admin/materials/$materialId/edit",
+            });
+        });
+        return () => {
+          if (observer.current === currentObserver) observer.current = null;
+        };
+      },
+    },
   );
-  const [fieldErrors, setFieldErrors] = React.useState<
-    Record<string, string[] | undefined>
-  >({});
-  const [files, setFiles] = React.useState<File[]>([]);
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [name, setName] = React.useState(initialMaterial?.name ?? "");
-  const [specifics, setSpecifics] = React.useState(
-    initialMaterial?.specifics ?? [],
+  /**
+   * Receives readiness through the stable legacy Markdown callback contract.
+   * @param loading - Whether editor initialization is pending.
+   */
+  const receiveDescriptionLoading = React.useCallback(
+    (loading: boolean) => dispatch({ type: "editorLoadingChanged", loading }),
+    [dispatch],
   );
-  const [editingSpecific, setEditingSpecific] = React.useState<
-    MaterialSpecific | "new" | null
-  >(null);
-  const [uploadScope, setUploadScope] = React.useState<number | null>(null);
-  const [slug, setSlug] = React.useState(initialMaterial?.slug ?? "");
-  const [updateSlug, setUpdateSlug] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
-  const [status, setStatus] = React.useState<string | null>(null);
+  const descriptionLoading = ui.loading;
+  const saving = Boolean(ui.save || ui.imageRequest);
+  const specifics = ui.specifics;
+  const editingSpecific = ui.editing;
+  const status = ui.saved ? t("web.materials.admin.saved") : null;
   const imageGuidance = getImageUploadGuidance(locale);
   const title = initialMaterial
     ? t("web.materials.admin.editTitle")
     : t("web.materials.admin.addTitle");
-
-  /** Validates and saves the material, then uploads selected images. */
-  const save = async () => {
-    setFormError(null);
-    setStatus(null);
-    const imageError = validateImages(files, locale);
-    if (imageError) {
-      setFormError(imageError.key);
-      return;
-    }
-    if (
-      initialMaterial &&
-      updateSlug &&
-      slugify(name) !== slug &&
-      !window.confirm(
-        `${t("web.materials.slug.confirmation", { oldUrl: `/materials/${slug}`, newUrl: `/materials/${slugify(name)}` })} ${t("web.materials.slug.affected", { count: specifics.length })}`,
-      )
-    )
-      return;
-    setSaving(true);
-    try {
-      const result = await saveAdminMaterial({
-        data: {
-          description,
-          materialId: initialMaterial?.id ?? null,
-          name,
-          updateSlug,
-        },
-      });
-      if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
-        setFormError(result.formError);
-        return;
-      }
-      setFieldErrors({});
-      setSlug(result.material.slug);
-      setUpdateSlug(false);
-      if (files.length) {
-        try {
-          const uploads = await uploadImages({
-            files,
-            getToken,
-            locale,
-            /**
-             * Restores an archived duplicate after administrator confirmation.
-             *
-             * @param imageId - Existing material-image identifier.
-             * @returns Whether the archived image was restored.
-             * @rejects When restoration fails.
-             */
-            onOwnerDeletedDuplicate: async (imageId) => {
-              if (!window.confirm(t("web.materials.image.restoreConfirmation")))
-                return false;
-              await restoreCatalogImage({
-                data: { imageId, targetType: "material" },
-              });
-              return true;
-            },
-            targetId: result.material.id,
-            targetType: "material",
-            materialSpecificId: uploadScope,
-          });
-          setFiles(uploads.failed);
-          if (uploads.failed.length) {
-            setFormError("web.materials.image.uploadFailed");
-            return;
-          }
-          if (initialMaterial) {
-            const refreshed = await getAdminMaterial({
-              data: { materialId: initialMaterial.id },
-            });
-            if (refreshed) setExistingImages(refreshed.images);
-          }
-        } catch (error) {
-          const uploadError = error as ImageUploadError;
-          setFormError(uploadError.key ?? "web.materials.image.uploadFailed");
-          return;
-        }
-      }
-      if (!initialMaterial) {
-        await navigate({
-          params: { materialId: String(result.material.id) },
-          to: "/admin/materials/$materialId/edit",
-        });
-        return;
-      }
-      setStatus(t("web.materials.admin.saved"));
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <AdminPageShell
@@ -262,11 +659,13 @@ export function AdminMaterialFormPage({
               {t("web.catalog.field.name")}
               <Input
                 maxLength={255}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) =>
+                  form.setFieldValue("name", event.target.value)
+                }
                 required
                 value={name}
               />
-              <FieldError error={fieldErrors.name?.[0]} />
+              <FieldError error={fieldErrors.name?.errors[0]} />
             </label>
             {initialMaterial ? (
               <div className="grid gap-2 text-sm font-medium">
@@ -277,14 +676,16 @@ export function AdminMaterialFormPage({
                   id="material-slug"
                   readOnly
                   value={slug}
-                  aria-invalid={Boolean(fieldErrors.slug?.length)}
+                  aria-invalid={Boolean(fieldErrors.slug?.errors.length)}
                 />
-                <FieldError error={fieldErrors.slug?.[0]} />
+                <FieldError error={fieldErrors.slug?.errors[0]} />
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={updateSlug}
-                    onChange={(event) => setUpdateSlug(event.target.checked)}
+                    onChange={(event) =>
+                      form.setFieldValue("updateSlug", event.target.checked)
+                    }
                   />
                   {t("web.materials.slug.update")}
                 </label>
@@ -303,15 +704,15 @@ export function AdminMaterialFormPage({
             <CatalogMarkdownEditor
               defaultValue={description}
               error={
-                fieldErrors.description?.[0]
-                  ? t(fieldErrors.description[0])
+                fieldErrors.description?.errors[0]
+                  ? t(fieldErrors.description.errors[0])
                   : undefined
               }
               help={t("web.catalog.help.markdownDescription")}
               id="material-description"
               label={t("web.catalog.field.description")}
-              onChange={setDescription}
-              onLoadingChange={setDescriptionLoading}
+              onChange={(value) => form.setFieldValue("description", value)}
+              onLoadingChange={receiveDescriptionLoading}
               ref={descriptionRef}
             />
           </div>
@@ -327,7 +728,10 @@ export function AdminMaterialFormPage({
                   removeLabel={t("web.action.close")}
                   showSelectedPill
                   onValueChange={(value) =>
-                    setUploadScope(value ? Number(value.id) : null)
+                    form.setFieldValue(
+                      "uploadScope",
+                      value ? Number(value.id) : null,
+                    )
                   }
                 />
               </label>
@@ -350,10 +754,13 @@ export function AdminMaterialFormPage({
               label={t("web.resources.upload.imagesLabel")}
               multiple
               onFilesChange={(additions) =>
-                setFiles((current) => [...current, ...additions])
+                form.setFieldValue("files", (current) => [
+                  ...current,
+                  ...additions,
+                ])
               }
               onRemove={(index) =>
-                setFiles((current) =>
+                form.setFieldValue("files", (current) =>
                   current.filter((_, candidate) => candidate !== index),
                 )
               }
@@ -372,26 +779,16 @@ export function AdminMaterialFormPage({
                         (image) =>
                           (image.materialSpecificId ?? null) === scope.id,
                       )}
-                      materialId={initialMaterial.id}
                       materialSpecificId={scope.id}
                       specifics={specifics}
                       materialName={name || initialMaterial.name}
-                      onChange={(images) =>
-                        setExistingImages((current) => [
-                          ...current.filter(
-                            (image) =>
-                              (image.materialSpecificId ?? null) !== scope.id,
-                          ),
-                          ...images,
-                        ])
-                      }
-                      onRefresh={async () => {
-                        const refreshed = await getAdminMaterial({
-                          data: { materialId: initialMaterial.id },
+                      disabled={saving}
+                      onAction={(action) => {
+                        form.setErrorMap({
+                          onSubmit: { form: "", fields: {} },
                         });
-                        if (refreshed) setExistingImages(refreshed.images);
+                        dispatch({ type: "imageActionRequested", action });
                       }}
-                      onError={setFormError}
                     />
                   </section>
                 ))}
@@ -415,7 +812,9 @@ export function AdminMaterialFormPage({
                     <span>{specific.name}</span>
                     <Button
                       variant="outline"
-                      onClick={() => setEditingSpecific(specific)}
+                      onClick={() =>
+                        dispatch({ type: "specificSelected", specific })
+                      }
                     >
                       {t("web.action.edit")}
                     </Button>
@@ -428,7 +827,9 @@ export function AdminMaterialFormPage({
               )}
               <Button
                 variant="outline"
-                onClick={() => setEditingSpecific("new")}
+                onClick={() =>
+                  dispatch({ type: "specificSelected", specific: "new" })
+                }
               >
                 {t("web.materials.specific.add")}
               </Button>
@@ -439,16 +840,12 @@ export function AdminMaterialFormPage({
                   specific={
                     editingSpecific === "new" ? undefined : editingSpecific
                   }
-                  onCancel={() => setEditingSpecific(null)}
-                  onSaved={(saved) => {
-                    setSpecifics((current) =>
-                      [
-                        ...current.filter(({ id }) => id !== saved.id),
-                        saved,
-                      ].sort((a, b) => a.name.localeCompare(b.name)),
-                    );
-                    setEditingSpecific(null);
-                  }}
+                  onCancel={() =>
+                    dispatch({ type: "specificSelected", specific: null })
+                  }
+                  onSaved={(specific) =>
+                    dispatch({ type: "specificSaved", specific })
+                  }
                 />
               ) : null}
             </section>
@@ -477,13 +874,11 @@ export function AdminMaterialFormPage({
               {t("action.cancel")}
             </Link>
             <Button
-              disabled={
-                saving ||
-                descriptionLoading ||
-                !name.trim() ||
-                description.length > 5000
-              }
-              onClick={() => void save()}
+              disabled={saving || descriptionLoading || !canSave}
+              onClick={() => {
+                form.setErrorMap({ onSubmit: { form: "", fields: {} } });
+                void form.handleSubmit();
+              }}
             >
               {t("action.save")}
             </Button>
@@ -505,44 +900,28 @@ export function AdminMaterialFormPage({
  * @returns Material image controls.
  */
 function MaterialImageEditor({
-  materialId,
   materialSpecificId,
   specifics,
-  onRefresh,
+  disabled,
+  onAction,
   images,
   materialName,
-  onChange,
-  onError,
 }: {
-  /** General material context retained by every image. */
-  materialId: number;
   /** Exact scope being reordered. */
   materialSpecificId: number | null;
   /** Allowed destination scopes under this parent. */
   specifics: MaterialSpecific[];
+  /** Whether a material-wide save/image action is pending. */
+  disabled: boolean;
   /**
-   * Reloads canonical images after a scope move.
-   * @returns Completion after canonical state reloads.
+   * Requests one confirmed image administration action.
+   * @param action - Captured scope/order/archive intent.
    */
-  onRefresh(): Promise<void>;
+  onAction(action: MaterialImageAction): void;
   /** Active and archived images. */
   images: CatalogImage[];
   /** Material name used in alternative text. */
   materialName: string;
-  /**
-   * Receives updated image state.
-   *
-   * @param images - Updated active and archived images.
-   * @returns Nothing.
-   */
-  onChange(images: CatalogImage[]): void;
-  /**
-   * Receives a localized failure key.
-   *
-   * @param error - Localized failure key.
-   * @returns Nothing.
-   */
-  onError(error: string): void;
 }) {
   const t = useCatalogCopy();
   if (!images.length)
@@ -585,36 +964,26 @@ function MaterialImageEditor({
                 }
               }
               placeholder={t("web.materials.image.move")}
-              onValueChange={async (value) => {
+              disabled={disabled}
+              onValueChange={(value) => {
                 if (
+                  disabled ||
                   !value ||
                   Number(value.id) === (image.materialSpecificId ?? 0)
                 )
                   return;
                 if (
-                  !window.confirm(
+                  window.confirm(
                     t("web.materials.image.moveConfirmation", {
                       scope: value.name,
                     }),
                   )
                 )
-                  return;
-                try {
-                  const result = await moveAdminMaterialImage({
-                    data: {
-                      materialId,
-                      imageId: image.id,
-                      materialSpecificId: Number(value.id) || null,
-                    },
+                  onAction({
+                    kind: "move",
+                    imageId: image.id,
+                    materialSpecificId: Number(value.id) || null,
                   });
-                  if (!result.ok) {
-                    onError(result.formError);
-                    return;
-                  }
-                  await onRefresh();
-                } catch {
-                  onError("error.generic");
-                }
               }}
             />
             {!archived
@@ -628,27 +997,22 @@ function MaterialImageEditor({
                       size="sm"
                       aria-label={`${t("web.materials.image.move")} ${direction < 0 ? "↑" : "↓"} ${image.fileName}`}
                       disabled={
+                        disabled ||
                         index + direction < 0 ||
                         index + direction >= active.length
                       }
-                      onClick={async () => {
+                      onClick={() => {
                         const next = [...active];
-                        [next[index], next[index + direction]] = [
-                          next[index + direction]!,
-                          next[index]!,
-                        ];
-                        try {
-                          await reorderAdminMaterialImages({
-                            data: {
-                              materialId,
-                              materialSpecificId,
-                              imageIds: next.map(({ id }) => id),
-                            },
-                          });
-                          await onRefresh();
-                        } catch {
-                          onError("error.generic");
-                        }
+                        const destination = next[index + direction];
+                        const selected = next[index];
+                        if (disabled || !destination || !selected) return;
+                        next[index] = destination;
+                        next[index + direction] = selected;
+                        onAction({
+                          kind: "reorder",
+                          materialSpecificId,
+                          imageIds: next.map(({ id }) => id),
+                        });
                       }}
                     >
                       <FontAwesomeIcon
@@ -665,40 +1029,19 @@ function MaterialImageEditor({
                   ? t("web.materials.image.restore")
                   : t("web.action.deleteImage")
               }
-              onClick={async () => {
-                const confirmed = window.confirm(
-                  t(
-                    archived
-                      ? "web.materials.image.restoreConfirmation"
-                      : "web.materials.image.archiveConfirmation",
-                  ),
-                );
-                if (!confirmed) return;
-                try {
-                  if (archived) {
-                    await restoreCatalogImage({
-                      data: { imageId: image.id, targetType: "material" },
-                    });
-                  } else {
-                    await softDeleteCatalogImage({
-                      data: { imageId: image.id, targetType: "material" },
-                    });
-                  }
-                  onChange(
-                    images.map((candidate) =>
-                      candidate.id === image.id
-                        ? {
-                            ...candidate,
-                            deletedAt: archived ? null : new Date(),
-                            deletedByClerkId: null,
-                            deletedByRole: archived ? null : "admin",
-                          }
-                        : candidate,
+              disabled={disabled}
+              onClick={() => {
+                if (
+                  !disabled &&
+                  window.confirm(
+                    t(
+                      archived
+                        ? "web.materials.image.restoreConfirmation"
+                        : "web.materials.image.archiveConfirmation",
                     ),
-                  );
-                } catch {
-                  onError("error.generic");
-                }
+                  )
+                )
+                  onAction({ kind: "archive", image });
               }}
               size="sm"
               type="button"
@@ -718,6 +1061,44 @@ function MaterialImageEditor({
     </section>
   );
 }
+
+/** Material-specific editor readiness and confirmed save. */
+type SpecificEditorState = {
+  /** Current Markdown readiness. */
+  loading: boolean;
+  /** Pending canonical-specific save. */
+  save: EffectEntity<SpecificEditorState, SpecificEditorEvent> | undefined;
+};
+/** Specific editor readiness and explicit save intent. */
+type SpecificEditorEvent =
+  | {
+      /** Receives current Markdown readiness. */
+      type: "editorLoadingChanged";
+      /** Whether editor initialization is pending. */
+      loading: boolean;
+    }
+  | {
+      /** Requests one confirmed specific save. */
+      type: "saveRequested";
+      /** Captured specific name. */
+      name: string;
+      /** Captured Markdown description. */
+      description: string;
+      /** Whether stable-slug replacement was confirmed. */
+      updateSlug: boolean;
+    }
+  | {
+      /** Stops a completed specific mutation. */
+      type: "saveFinished";
+    };
+/** Captured specific save descriptor. */
+type SpecificEditorEffect = Extract<
+  SpecificEditorEvent,
+  {
+    /** Captured intent discriminant. */
+    type: "saveRequested";
+  }
+>;
 
 /**
  * Edits one alloy or grade in read-only general material context.
@@ -744,17 +1125,157 @@ function MaterialSpecificEditor({
   onCancel(): void;
 }) {
   const t = useCatalogCopy();
-  const [name, setName] = React.useState(specific?.name ?? "");
-  const [description, setDescription] = React.useState(
-    specific?.description ?? "",
+  const form = useForm({
+    defaultValues: {
+      name: specific?.name ?? "",
+      description: specific?.description ?? "",
+      updateSlug: false,
+      slug: specific?.slug ?? "",
+    },
+    validators: {
+      /**
+       * Keeps existing required-name and Markdown-size eligibility in the form.
+       * @param input - Current specific fields.
+       * @returns Existing global feedback when invalid.
+       */
+      onSubmit: ({ value }): MaterialValidation | undefined =>
+        !value.name.trim() || value.description.length > 5000
+          ? { form: "web.catalog.error.form" }
+          : undefined,
+    },
+    /**
+     * Confirms stable URL replacement before queueing one specific mutation.
+     * @param input - Validated specific fields.
+     */
+    onSubmit: ({ value }) => {
+      if (ui.loading || ui.save) return;
+      if (
+        specific &&
+        value.updateSlug &&
+        slugify(value.name) !== specific.slug &&
+        !window.confirm(
+          t("web.materials.slug.confirmation", {
+            oldUrl: `/materials/${material.slug}/${specific.slug}`,
+            newUrl: `/materials/${material.slug}/${slugify(value.name)}`,
+          }),
+        )
+      )
+        return;
+      dispatch({
+        type: "saveRequested",
+        name: value.name,
+        description: value.description,
+        updateSlug: value.updateSlug,
+      });
+    },
+  });
+  const { name, description, updateSlug } = useStore(
+    form.store,
+    (state) => state.values,
   );
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [updateSlug, setUpdateSlug] = React.useState(false);
-  const [fieldErrors, setFieldErrors] = React.useState<
-    Record<string, string[]>
-  >({});
-  const [error, setError] = React.useState<string | null>(null);
+  const fieldErrors = useStore(form.store, (state) => state.fieldMeta);
+  const feedback = useStore(form.store, (state) => state.errorMap.onSubmit);
+  const error = typeof feedback === "string" ? feedback : feedback?.form;
+  const canSave = useStore(
+    form.store,
+    (state) =>
+      !state.isSubmitting &&
+      Boolean(state.values.name.trim()) &&
+      state.values.description.length <= 5000,
+  );
+  const task = React.useRef<{
+    /** Descriptor whose mutation must not replay. */
+    effect: SpecificEditorEffect;
+    /** Retained canonical result or existing validation feedback. */
+    promise: Promise<{
+      /** Canonical specific on success. */
+      specific?: MaterialSpecific;
+      /** Existing form/field feedback on failure. */
+      error?: MaterialValidation;
+    }>;
+  } | null>(null);
+  const [ui, dispatch] = useEffectReducer<
+    SpecificEditorState,
+    SpecificEditorEvent,
+    SpecificEditorEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "editorLoadingChanged")
+        return state.loading === event.loading
+          ? state
+          : { ...state, loading: event.loading };
+      if (event.type === "saveRequested")
+        return state.loading || state.save
+          ? state
+          : { ...state, save: exec(event) };
+      exec.stop(state.save);
+      return { ...state, save: undefined };
+    },
+    { loading: true, save: undefined },
+    {
+      /**
+       * Observes one canonical-specific write through this selected editor lifetime.
+       * @param _state - Current readiness/save controls.
+       * @param effect - Captured validated fields.
+       * @param dispatch - Terminal dispatcher.
+       * @param context - Current observer lifetime.
+       */
+      saveRequested: (_state, effect, dispatch, { signal }) => {
+        if (task.current?.effect !== effect)
+          task.current = {
+            effect,
+            promise: Promise.resolve()
+              .then(() =>
+                saveAdminMaterialSpecific({
+                  data: {
+                    materialId: material.id,
+                    specificId: specific?.id,
+                    name: effect.name,
+                    description: effect.description,
+                    updateSlug: effect.updateSlug,
+                  },
+                }),
+              )
+              .then(
+                (result) =>
+                  result.ok
+                    ? { specific: result.specific }
+                    : {
+                        error: {
+                          form: result.formError ?? "error.generic",
+                          fields: Object.fromEntries(
+                            Object.entries(result.fieldErrors).map(
+                              ([name, errors]) => [
+                                name,
+                                Array.isArray(errors) ? errors[0] : undefined,
+                              ],
+                            ),
+                          ),
+                        },
+                      },
+                () => ({ error: { form: "error.generic" } }),
+              ),
+          };
+        void task.current.promise.then((result) => {
+          if (signal.aborted) return;
+          dispatch({ type: "saveFinished" });
+          if (result.error) form.setErrorMap({ onSubmit: result.error });
+          else if (result.specific) onSaved(result.specific);
+        });
+      },
+    },
+  );
+  /**
+   * Receives editor readiness without changing the legacy callback identity.
+   * @param loading - Whether Markdown initialization is pending.
+   */
+  const receiveLoading = React.useCallback(
+    (loading: boolean) => dispatch({ type: "editorLoadingChanged", loading }),
+    [dispatch],
+  );
+  const loading = ui.loading;
+  const saving = Boolean(ui.save);
+
   return (
     <section className="grid gap-4 border border-border bg-card p-4">
       <h3 className="font-semibold">
@@ -771,28 +1292,30 @@ function MaterialSpecificEditor({
       <label className="grid gap-2 text-sm">
         {t("web.materials.specific.name")}
         <Input
-          aria-invalid={Boolean(fieldErrors.name?.length)}
+          aria-invalid={Boolean(fieldErrors.name?.errors.length)}
           value={name}
           maxLength={255}
           required
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => form.setFieldValue("name", event.target.value)}
         />
-        <FieldError error={fieldErrors.name?.[0]} />
+        <FieldError error={fieldErrors.name?.errors[0]} />
       </label>
       {specific ? (
         <div className="grid gap-2 text-sm">
           <Input
             aria-label={t("web.catalog.field.slug")}
             readOnly
-            aria-invalid={Boolean(fieldErrors.slug?.length)}
+            aria-invalid={Boolean(fieldErrors.slug?.errors.length)}
             value={specific.slug}
           />
-          <FieldError error={fieldErrors.slug?.[0]} />
+          <FieldError error={fieldErrors.slug?.errors[0]} />
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={updateSlug}
-              onChange={(event) => setUpdateSlug(event.target.checked)}
+              onChange={(event) =>
+                form.setFieldValue("updateSlug", event.target.checked)
+              }
             />
             {t("web.materials.slug.update")}
           </label>
@@ -813,8 +1336,8 @@ function MaterialSpecificEditor({
         defaultValue={description}
         label={t("web.catalog.field.description")}
         help={t("web.catalog.help.markdownDescription")}
-        onChange={setDescription}
-        onLoadingChange={setLoading}
+        onChange={(value) => form.setFieldValue("description", value)}
+        onLoadingChange={receiveLoading}
       />
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -826,45 +1349,10 @@ function MaterialSpecificEditor({
           {t("action.cancel")}
         </Button>
         <Button
-          disabled={
-            saving || loading || !name.trim() || description.length > 5000
-          }
-          onClick={async () => {
-            if (
-              specific &&
-              updateSlug &&
-              slugify(name) !== specific.slug &&
-              !window.confirm(
-                t("web.materials.slug.confirmation", {
-                  oldUrl: `/materials/${material.slug}/${specific.slug}`,
-                  newUrl: `/materials/${material.slug}/${slugify(name)}`,
-                }),
-              )
-            )
-              return;
-            setSaving(true);
-            setError(null);
-            setFieldErrors({});
-            try {
-              const result = await saveAdminMaterialSpecific({
-                data: {
-                  materialId: material.id,
-                  specificId: specific?.id,
-                  name,
-                  description,
-                  updateSlug,
-                },
-              });
-              if (result.ok) onSaved(result.specific);
-              else {
-                setFieldErrors(result.fieldErrors);
-                setError(result.formError ?? "error.generic");
-              }
-            } catch {
-              setError("error.generic");
-            } finally {
-              setSaving(false);
-            }
+          disabled={saving || loading || !canSave}
+          onClick={() => {
+            form.setErrorMap({ onSubmit: { form: "", fields: {} } });
+            void form.handleSubmit();
           }}
         >
           {t("action.save")}
