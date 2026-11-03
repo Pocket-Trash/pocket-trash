@@ -32,6 +32,12 @@ checks migration-history consistency with:
 pnpm --filter @package/database db:check
 ```
 
+Generate custom SQL for functions or triggers after their dependent tables:
+
+```sh
+pnpm --filter @package/database db:generate --custom --name=database_protections
+```
+
 Follow [database coding standards](coding-standards-references/database.md) for immutable artifacts, custom SQL ordering, verified TLS, and chain/personal-history validation.
 
 ## Local Database Selection
