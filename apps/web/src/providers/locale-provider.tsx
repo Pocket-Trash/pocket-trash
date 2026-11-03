@@ -1,51 +1,47 @@
-import { useAuth } from "@clerk/tanstack-react-start";
-import {
-  formatTranslation,
-  type SupportedLocale,
-} from "@pocket-trash/localizations";
+import type { SupportedLocale } from "@pocket-trash/localizations";
 import * as React from "react";
-import { toast } from "sonner";
-import {
-  readStoredLocale,
-  resolveAuthenticatedLocale,
-  resolveBrowserLocale,
-  writeStoredLocale,
-} from "@/lib/locale";
-import {
-  fetchLocaleSettingsState,
-  updateLocaleSetting,
-} from "@/lib/locale-api";
 import type { MeasurementSystem } from "@/lib/pen-formatters";
 import type { UserSettingsState } from "@/lib/user-settings";
+import {
+  createUserSettingsStore,
+  subscribeSettingsDocument,
+  UserSettingsContext,
+  type UserSettingsStore,
+} from "@/lib/user-settings-store";
 
-/** Active locale and local preference update operation. */
+import { UserSettingsProvider } from "./user-settings-provider";
+
+/** Compatibility name for the former locale-only bootstrap component. */
+export const AuthenticatedLocaleSync: React.ComponentType<{
+  /** Initial preferences owned by the surrounding LocaleProvider. */
+  initialSettingsState: UserSettingsState | null;
+}> = UserSettingsProvider;
+
+/** Active locale and local preference update operations. */
 type LocaleProviderValue = {
   /** Active supported locale. */
   locale: SupportedLocale;
-  /** Active app-wide measurement display preference. */
+  /** Active measurement display preference. */
   measurementSystem: MeasurementSystem;
   /**
-   * Updates and locally persists the active locale.
-   *
-   * @param locale - Supported locale selected by the user.
+   * Applies the locale and persists the active account preference.
+   * @param locale - Selected supported locale.
    */
   setLocale: (locale: SupportedLocale) => void;
   /**
-   * Updates the active measurement display preference.
-   *
-   * @param system - Metric or imperial display preference.
+   * Updates and locally persists the measurement display preference.
+   * @param system - Selected measurement system.
    */
   setMeasurementSystem: (system: MeasurementSystem) => void;
 };
-
-/** Locale context, or `null` outside the provider. */
+/** Locale context, or null outside the provider. */
 const LocaleContext = React.createContext<LocaleProviderValue | null>(null);
 
 /**
- * Initializes locale state and keeps the document language synchronized.
+ * Owns one request-isolated settings store and binds document preferences.
  *
- * @param props - Application content and server-loaded settings.
- * @returns Locale context provider around the application content.
+ * @param props - Content and server-loaded initial settings.
+ * @returns Existing locale context around the isolated settings owner.
  */
 export function LocaleProvider({
   children,
@@ -53,131 +49,68 @@ export function LocaleProvider({
 }: {
   /** Application content. */
   children: React.ReactNode;
-  /** Server-loaded settings, or `null` when unavailable. */
+  /** Server-loaded preferences for this request. */
   initialSettingsState: UserSettingsState | null;
 }) {
-  const [locale, setLocaleState] = React.useState<SupportedLocale>(
-    () => initialSettingsState?.settings.locale ?? resolveBrowserLocale(),
+  const owner = React.useRef<UserSettingsStore | null>(null);
+  if (!owner.current)
+    owner.current = createUserSettingsStore(initialSettingsState);
+  const store = owner.current;
+  const snapshot = React.useSyncExternalStore(
+    React.useCallback(
+      (notify) => subscribeSettingsDocument(store, notify),
+      [store],
+    ),
+    React.useCallback(() => store.state.get(), [store]),
+    React.useCallback(() => store.initial, [store]),
   );
-  const [measurementSystem, setMeasurementSystem] =
-    React.useState<MeasurementSystem>(
-      () => initialSettingsState?.settings.measurementSystem ?? "metric",
-    );
-
-  React.useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
-
-  const setLocale = React.useCallback((nextLocale: SupportedLocale) => {
-    setLocaleState(nextLocale);
-    writeStoredLocale(nextLocale);
-  }, []);
-
+  const setLocale = React.useCallback(
+    (locale: SupportedLocale) => {
+      void store.save({ locale });
+    },
+    [store],
+  );
+  const setMeasurementSystem = React.useCallback(
+    (measurementSystem: MeasurementSystem) =>
+      store.select({ measurementSystem }),
+    [store],
+  );
   const value = React.useMemo(
     () => ({
-      locale,
-      measurementSystem,
+      locale: snapshot.locale,
+      measurementSystem: snapshot.settings.measurementSystem,
       setLocale,
       setMeasurementSystem,
     }),
-    [locale, measurementSystem, setLocale],
+    [
+      snapshot.locale,
+      snapshot.settings.measurementSystem,
+      setLocale,
+      setMeasurementSystem,
+    ],
   );
-
   return (
-    <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+    <UserSettingsContext.Provider value={store}>
+      <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+    </UserSettingsContext.Provider>
   );
 }
 
 /**
- * Reconciles an authenticated user's local locale with persisted settings.
- *
- * @param props - Optional server-loaded settings used before a client fetch.
- * @returns No UI.
- * @throws When rendered outside {@link LocaleProvider}.
- */
-export function AuthenticatedLocaleSync({
-  initialSettingsState,
-}: {
-  /** Server-loaded settings, or `null` when a client fetch is required. */
-  initialSettingsState: UserSettingsState | null;
-}) {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { locale, setLocale } = useLocale();
-  const initialStateRef = React.useRef(initialSettingsState);
-  const localeRef = React.useRef(locale);
-  localeRef.current = locale;
-
-  React.useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    let canceled = false;
-
-    void (async () => {
-      const settingsState =
-        initialStateRef.current ?? (await fetchLocaleSettingsState());
-      initialStateRef.current = null;
-      const next = resolveAuthenticatedLocale(
-        settingsState,
-        readStoredLocale(),
-      );
-
-      if (canceled || !next.locale) return;
-
-      setLocale(next.locale);
-
-      if (next.shouldPersist) {
-        await updateLocaleSetting(next.locale).catch(() => {
-          if (!canceled) {
-            toast.error(
-              formatTranslation(
-                "web.error.settingsSaveFailed",
-                {},
-                next.locale,
-              ),
-            );
-          }
-        });
-      }
-    })().catch(() => {
-      if (!canceled) {
-        toast.error(
-          formatTranslation(
-            "web.error.settingsSaveFailed",
-            {},
-            localeRef.current,
-          ),
-        );
-      }
-    });
-
-    return () => {
-      canceled = true;
-    };
-  }, [isLoaded, isSignedIn, setLocale]);
-
-  return null;
-}
-
-/**
- * Reads the required locale provider value.
- *
- * @returns Active locale and update operation.
- * @throws When called outside {@link LocaleProvider}.
+ * Reads the required locale context.
+ * @returns Active locale and preference operations.
+ * @throws When used outside LocaleProvider.
  */
 export function useLocale() {
   const context = React.useContext(LocaleContext);
-
-  if (!context) {
+  if (!context)
     throw new Error("useLocale must be used within LocaleProvider.");
-  }
-
   return context;
 }
 
 /**
- * Reads the active locale without requiring a provider.
- *
- * @returns Active locale, or `null` outside {@link LocaleProvider}.
+ * Reads the locale without requiring a provider.
+ * @returns Active locale, or null outside LocaleProvider.
  */
 export function useOptionalLocale() {
   return React.useContext(LocaleContext)?.locale ?? null;

@@ -16,7 +16,7 @@ const meta = {
   component: UserSettingsPage,
   decorators: [
     (Story) => (
-      <StoryProviders>
+      <StoryProviders initialSettingsState={null}>
         <div className="w-[min(52rem,100vw)]">
           <Story />
         </div>
@@ -63,6 +63,7 @@ export const Private: Story = {
     await waitFor(() => expect(publish).not.toBeDisabled());
     await expect(patchCurrentUserSettings).toHaveBeenCalledWith({
       data: { isProfilePublic: true },
+      signal: expect.any(AbortSignal),
     });
   },
 };
