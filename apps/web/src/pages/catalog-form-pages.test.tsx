@@ -470,11 +470,13 @@ describe("collection item deletion", () => {
     );
 
     expect(ownerHtml.match(/>Permanently delete item<\/button>/g)).toHaveLength(
-      2,
+      1,
     );
     expect(ownerHtml).not.toContain('maxLength="1000"');
     expect(adminHtml).toContain("Permanently delete item");
-    expect(adminHtml).toContain('maxLength="1000"');
+    expect(adminHtml.match(/>Permanently delete item<\/button>/g)).toHaveLength(
+      1,
+    );
     expect(strangerHtml).not.toContain("Permanently delete item");
   });
 });

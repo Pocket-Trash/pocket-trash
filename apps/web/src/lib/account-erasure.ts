@@ -64,14 +64,32 @@ export const requestSelfErasure = createServerFn({ method: "POST" })
  * @rejects When authentication, hashing, or receipt lookup fails.
  */
 export const getSelfErasureStatus = createServerFn().handler(async () => {
-  const clerkId = selfErasureClerkId(await clerkAuth());
-  if (!clerkId) return "signed_out" as const;
+  return (await resolveSelfErasureSnapshot()).status;
+});
+
+/** Loads a self-erasure receipt with the identity that authorized this exact request.
+ *
+ * @returns Current receipt and its authenticated account identity.
+ * @rejects When authentication, hashing, or receipt lookup fails.
+ */
+export const getSelfErasureStatusSnapshot = createServerFn().handler(
+  resolveSelfErasureSnapshot,
+);
+
+/** Resolves the existing receipt/signed-out protocol within one guarded Clerk request.
+ *
+ * @returns Current account identity and its erasure receipt protocol result.
+ * @rejects When authentication, hashing, or receipt lookup fails.
+ */
+async function resolveSelfErasureSnapshot() {
+  const actorId = selfErasureClerkId(await clerkAuth());
+  if (!actorId) return { actorId: null, status: "signed_out" as const };
   const { s } = await import("@/lib/services");
   const request = await s.db.erasure.getReceiptBySubject(
-    await subjectHmac(clerkId),
+    await subjectHmac(actorId),
   );
-  return request ? statusView(request) : null;
-});
+  return { actorId, status: request ? statusView(request) : null };
+}
 
 /** Selects the Clerk ID only from an authenticated auth state.
  *

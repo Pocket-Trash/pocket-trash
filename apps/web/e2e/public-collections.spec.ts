@@ -342,6 +342,86 @@ test("@mutation admins can open private collection resources directly", async ({
   });
 });
 
+for (const isProfilePublic of [undefined, false, true]) {
+  test(`@mutation public privacy fixtures restore ${isProfilePublic ?? "unsaved"} settings`, async () => {
+    test.skip(
+      process.env.E2E_RUN_MUTATIONS !== "true",
+      "Collection mutations require explicit isolation opt-in.",
+    );
+    test.setTimeout(120_000);
+
+    const mutation = await createMutationFixture();
+    try {
+      const database = createDb({
+        databaseUrl: requiredEnvironment("DATABASE_URL"),
+      });
+      const [owner] = await database
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(
+          eq(
+            schema.user.clerkId,
+            requiredEnvironment("E2E_CLERK_REGULAR_USER_ID"),
+          ),
+        )
+        .limit(1);
+      if (!owner) throw new Error("The regular E2E user is missing.");
+      const [originalSettings] = await database
+        .select()
+        .from(schema.userSettings)
+        .where(eq(schema.userSettings.userId, owner.id));
+
+      try {
+        await database
+          .delete(schema.userSettings)
+          .where(eq(schema.userSettings.userId, owner.id));
+        if (isProfilePublic !== undefined) {
+          await database.insert(schema.userSettings).values({
+            currencyCode: "CAD",
+            isProfilePublic,
+            locale: "fr-CA",
+            theme: "dark",
+            userId: owner.id,
+          });
+        }
+        const before = await database
+          .select()
+          .from(schema.userSettings)
+          .where(eq(schema.userSettings.userId, owner.id));
+        const privacy = await createPublicPrivacyFixture(mutation);
+        try {
+          const [during] = await database
+            .select()
+            .from(schema.userSettings)
+            .where(eq(schema.userSettings.userId, owner.id));
+          expect(during).toMatchObject({
+            ...before[0],
+            isProfilePublic: true,
+            userId: owner.id,
+          });
+        } finally {
+          await privacy.cleanup();
+        }
+        expect(
+          await database
+            .select()
+            .from(schema.userSettings)
+            .where(eq(schema.userSettings.userId, owner.id)),
+        ).toEqual(before);
+      } finally {
+        await database
+          .delete(schema.userSettings)
+          .where(eq(schema.userSettings.userId, owner.id));
+        if (originalSettings) {
+          await database.insert(schema.userSettings).values(originalSettings);
+        }
+      }
+    } finally {
+      await mutation.cleanup();
+    }
+  });
+}
+
 /** Collection identifier and browser-visible name. */
 type CollectionReference = {
   /** Database identifier. */
@@ -417,16 +497,15 @@ async function createPublicPrivacyFixture(
     .from(schema.userSettings)
     .where(eq(schema.userSettings.userId, owner.id))
     .limit(1);
-  if (!ownerSettings) {
-    throw new Error("The public privacy fixture owner settings are missing.");
-  }
-
   const runId = `e2e-${crypto.randomUUID()}`;
   const seeded = await database.transaction(async (transaction) => {
     await transaction
-      .update(schema.userSettings)
-      .set({ isProfilePublic: true })
-      .where(eq(schema.userSettings.userId, owner.id));
+      .insert(schema.userSettings)
+      .values({ isProfilePublic: true, userId: owner.id })
+      .onConflictDoUpdate({
+        set: { isProfilePublic: true },
+        target: schema.userSettings.userId,
+      });
     const collections = await transaction
       .insert(schema.userCollection)
       .values([
@@ -558,7 +637,7 @@ async function createPublicPrivacyFixture(
       await cleanupPublicPrivacyFixture(
         database,
         owner.id,
-        ownerSettings.isProfilePublic,
+        ownerSettings?.isProfilePublic,
         [seeded.publicCollection.id, seeded.emptyCollection.id],
       );
     },
@@ -574,21 +653,27 @@ async function createPublicPrivacyFixture(
  *
  * @param database - Isolated preview database.
  * @param ownerId - Expected collection owner identifier.
- * @param originalProfileVisibility - Profile visibility restored after the test.
+ * @param originalProfileVisibility - Saved visibility, or `undefined` when no settings existed.
  * @param collectionIds - Exact public collection identifiers.
  * @returns Completion after removal.
  */
 async function cleanupPublicPrivacyFixture(
   database: Database,
   ownerId: number,
-  originalProfileVisibility: boolean,
+  originalProfileVisibility: boolean | undefined,
   collectionIds: number[],
 ) {
   await database.transaction(async (transaction) => {
-    await transaction
-      .update(schema.userSettings)
-      .set({ isProfilePublic: originalProfileVisibility })
-      .where(eq(schema.userSettings.userId, ownerId));
+    if (originalProfileVisibility === undefined) {
+      await transaction
+        .delete(schema.userSettings)
+        .where(eq(schema.userSettings.userId, ownerId));
+    } else {
+      await transaction
+        .update(schema.userSettings)
+        .set({ isProfilePublic: originalProfileVisibility })
+        .where(eq(schema.userSettings.userId, ownerId));
+    }
     await transaction
       .delete(schema.userCollection)
       .where(

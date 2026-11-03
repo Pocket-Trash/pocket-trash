@@ -1,26 +1,141 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { useEffect, useState } from "react";
+import { useForm, useStore } from "@tanstack/react-form";
+import { useRef } from "react";
+import {
+  type EffectEntity,
+  type EffectFunction,
+  useEffectReducer,
+} from "use-effect-reducer";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useErasurePolling } from "@/hooks/use-erasure-polling";
 import {
   type AdminErasureStatusView,
   type ErasureTarget,
   findErasureTarget,
-  getAdminErasureStatus,
   requestAdminErasure,
   retryAdminErasure,
 } from "@/lib/account-erasure";
 import { useLocale } from "@/providers/locale-provider";
+
+/** Current verified target, receipt, and independent operation lifetimes. */
+type AdminErasureState = {
+  /** Current verified target identity. */
+  target: ErasureTarget | null;
+  /** Receipt supplied to the polling owner after create/retry. */
+  receipt: AdminErasureStatusView | null;
+  /** Explicit create/retry generation, including same-ID retries. */
+  receiptRevision: number;
+  /** Monotonic lookup/target operation lifetime. */
+  revision: number;
+  /** Current cancellable target lookup. */
+  finding: EffectEntity<AdminErasureState, AdminErasureEvent> | undefined;
+  /** Current confirmed request/retry mutation. */
+  action: EffectEntity<AdminErasureState, AdminErasureEvent> | undefined;
+  /** Existing target-not-found feedback. */
+  notFound: boolean;
+  /** Existing operation failure feedback. */
+  failed: boolean;
+};
+/** Form-owned bounded verification evidence. */
+type ErasureVerification = {
+  /** Existing verified request method. */
+  method: "authenticated_request" | "verified_email";
+  /** Existing opaque verification reference. */
+  reference: string;
+};
+/** Explicit target reconciliation and confirmed request/retry intent. */
+type AdminErasureEvent =
+  | {
+      /** Disposes private target/request data when its lookup field changes. */
+      type: "emailChanged";
+    }
+  | {
+      /** Searches for a submitted verified email. */
+      type: "lookupRequested";
+      /** Submitted target email. */
+      email: string;
+    }
+  | {
+      /** Stops one current target lookup. */
+      type: "lookupFinished";
+      /** Lookup lifetime that completed. */
+      revision: number;
+      /** Verified target, or null when absent. */
+      target: ErasureTarget | null;
+      /** Whether lookup failed. */
+      failed: boolean;
+    }
+  | {
+      /** Requests confirmed erasure with bounded verification evidence. */
+      type: "erasureRequested";
+      /** Verified target email. */
+      email: string;
+      /** Captured verification evidence. */
+      verification: ErasureVerification;
+    }
+  | {
+      /** Retries the selected receipt after needs-support status. */
+      type: "retryRequested";
+      /** Current receipt identity. */
+      requestId: string;
+    }
+  | {
+      /** Stops one completed request/retry mutation. */
+      type: "actionFinished";
+      /** Target lifetime that completed. */
+      revision: number;
+      /** Current created/retried receipt, absent on failure. */
+      receipt?: AdminErasureStatusView;
+    };
+/** Captured target lookup or confirmed privacy operation. */
+type AdminErasureEffect = {
+  /** Current target lifetime. */
+  revision: number;
+} & (
+  | {
+      /** Verified target lookup implementation. */
+      type: "lookup";
+      /** Submitted target email. */
+      email: string;
+    }
+  | {
+      /** Confirmed request creation implementation. */
+      type: "create";
+      /** Captured verified target identity. */
+      target: ErasureTarget;
+      /** Verified target email. */
+      email: string;
+      /** Bounded verification evidence. */
+      verification: ErasureVerification;
+    }
+  | {
+      /** Existing request retry implementation. */
+      type: "retry";
+      /** Current receipt identity. */
+      requestId: string;
+    }
+);
 
 /** Renders account-erasure lookup, request, and retry controls.
  *
  * @returns The account-erasure administration page.
  */
 export function AdminAccountErasurePage() {
+  const { userId } = useAuth();
+  return <AdminErasureContent key={userId} />;
+}
+
+/**
+ * Owns one administrator's verified target, confirmed request, and retry lifetimes.
+ * @returns Scoped account-erasure administration.
+ */
+function AdminErasureContent() {
   const { locale } = useLocale();
   /** Formats account-erasure copy for the active locale.
    *
@@ -32,26 +147,211 @@ export function AdminAccountErasurePage() {
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
-  const [email, setEmail] = useState("");
-  const [target, setTarget] = useState<ErasureTarget | null>(null);
-  const [request, setRequest] = useState<AdminErasureStatusView | null>(null);
-  const [finding, setFinding] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [notFound, setNotFound] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (request?.status !== "processing") return;
-    const interval = window.setInterval(() => {
-      void getAdminErasureStatus({ data: { requestId: request.requestId } })
-        .then((next) => {
-          if (next) setRequest(next);
-        })
-        .catch(() => setFailed(true));
-    }, 3000);
-    return () => window.clearInterval(interval);
-  }, [request]);
-
+  const form = useForm({
+    defaultValues: { email: "" },
+    /**
+     * Captures an explicit target lookup from the current email field.
+     * @param input - Current lookup field.
+     */
+    onSubmit: ({ value }) => {
+      dispatch({ type: "lookupRequested", email: value.email });
+    },
+  });
+  const email = useStore(form.store, (state) => state.values.email);
+  const task = useRef<{
+    /** Confirmed mutation descriptor whose write must not replay. */
+    effect: AdminErasureEffect;
+    /** Retained privacy operation result. */
+    promise: Promise<AdminErasureStatusView | undefined>;
+  } | null>(null);
+  /**
+   * Observes one confirmed request/retry without replaying it across Activity.
+   * @param _state - Current target/request controls.
+   * @param effect - Captured verified privacy operation.
+   * @param dispatch - Terminal dispatcher.
+   * @param context - Current account/target observer lifetime.
+   */
+  const executeAction: EffectFunction<
+    AdminErasureState,
+    AdminErasureEvent,
+    Extract<
+      AdminErasureEffect,
+      {
+        /** Confirmed privacy operation discriminant. */
+        type: "create" | "retry";
+      }
+    >
+  > = (_state, effect, dispatch, { signal }) => {
+    if (task.current?.effect !== effect)
+      task.current = {
+        effect,
+        promise: (async (): Promise<AdminErasureStatusView | undefined> => {
+          try {
+            return await (effect.type === "create"
+              ? requestAdminErasure({
+                  data: {
+                    email: effect.email,
+                    targetClerkId: effect.target.clerkId,
+                    verificationMethod: effect.verification.method,
+                    verificationReference: effect.verification.reference,
+                  },
+                })
+              : retryAdminErasure({ data: { requestId: effect.requestId } }));
+          } catch {
+            return undefined;
+          }
+        })(),
+      };
+    void task.current.promise.then((receipt) => {
+      if (!signal.aborted)
+        dispatch({
+          type: "actionFinished",
+          revision: effect.revision,
+          receipt,
+        });
+    });
+  };
+  const [state, dispatch] = useEffectReducer<
+    AdminErasureState,
+    AdminErasureEvent,
+    AdminErasureEffect
+  >(
+    (state, event, exec) => {
+      if (event.type === "emailChanged") {
+        exec.stop(state.finding);
+        exec.stop(state.action);
+        return {
+          target: null,
+          receipt: null,
+          receiptRevision: state.receiptRevision + 1,
+          revision: state.revision + 1,
+          finding: undefined,
+          action: undefined,
+          notFound: false,
+          failed: false,
+        };
+      }
+      if (event.type === "lookupRequested") {
+        exec.stop(state.action);
+        const revision = state.revision + 1;
+        return {
+          ...state,
+          target: null,
+          receipt: null,
+          receiptRevision: state.receiptRevision + 1,
+          revision,
+          action: undefined,
+          notFound: false,
+          failed: false,
+          finding: exec.replace(state.finding, {
+            type: "lookup",
+            email: event.email,
+            revision,
+          }),
+        };
+      }
+      if (event.type === "lookupFinished") {
+        if (event.revision !== state.revision || !state.finding) return state;
+        exec.stop(state.finding);
+        return {
+          ...state,
+          finding: undefined,
+          target: event.target,
+          notFound: !event.failed && !event.target,
+          failed: event.failed,
+        };
+      }
+      if (event.type === "erasureRequested")
+        return !state.target || state.action || state.finding
+          ? state
+          : {
+              ...state,
+              failed: false,
+              action: exec({
+                type: "create",
+                target: state.target,
+                email: event.email,
+                verification: event.verification,
+                revision: state.revision,
+              }),
+            };
+      if (event.type === "retryRequested")
+        return state.action || state.receipt?.requestId !== event.requestId
+          ? state
+          : {
+              ...state,
+              failed: false,
+              action: exec({
+                type: "retry",
+                requestId: event.requestId,
+                revision: state.revision,
+              }),
+            };
+      if (event.revision !== state.revision || !state.action) return state;
+      exec.stop(state.action);
+      return {
+        ...state,
+        action: undefined,
+        receipt: event.receipt ?? state.receipt,
+        receiptRevision: state.receiptRevision + (event.receipt ? 1 : 0),
+        failed: !event.receipt,
+      };
+    },
+    {
+      target: null,
+      receipt: null,
+      receiptRevision: 0,
+      revision: 0,
+      finding: undefined,
+      action: undefined,
+      notFound: false,
+      failed: false,
+    },
+    {
+      /**
+       * Reads a verified target only through the current email/account observer.
+       * @param _state - Current target lookup controls.
+       * @param effect - Captured email and lookup lifetime.
+       * @param dispatch - Terminal lookup dispatcher.
+       * @param context - Current cancellation lifetime.
+       */
+      lookup: (_state, effect, dispatch, { signal }) => {
+        void findErasureTarget({ data: { email: effect.email }, signal }).then(
+          (target) => {
+            if (!signal.aborted)
+              dispatch({
+                type: "lookupFinished",
+                revision: effect.revision,
+                target,
+                failed: false,
+              });
+          },
+          () => {
+            if (!signal.aborted)
+              dispatch({
+                type: "lookupFinished",
+                revision: effect.revision,
+                target: null,
+                failed: true,
+              });
+          },
+        );
+      },
+      create: executeAction,
+      retry: executeAction,
+    },
+  );
+  const { status: request, failed: pollFailed } = useErasurePolling(
+    state.receipt,
+    "admin",
+    state.receiptRevision,
+  );
+  const { target, notFound } = state;
+  const finding = Boolean(state.finding);
+  const saving = Boolean(state.action);
+  const failed = state.failed || pollFailed;
+  const errorCode =
+    request && "errorCode" in request ? request.errorCode : null;
   const statusCopy = request
     ? t(
         request.status === "completed"
@@ -70,20 +370,9 @@ export function AdminAccountErasurePage() {
         </p>
         <form
           className="grid gap-4 rounded-lg border border-border bg-card p-5"
-          onSubmit={async (event) => {
+          onSubmit={(event) => {
             event.preventDefault();
-            setFinding(true);
-            setFailed(false);
-            setNotFound(false);
-            try {
-              const result = await findErasureTarget({ data: { email } });
-              setTarget(result);
-              setNotFound(!result);
-            } catch {
-              setFailed(true);
-            } finally {
-              setFinding(false);
-            }
+            void form.handleSubmit();
           }}
         >
           <label
@@ -95,9 +384,8 @@ export function AdminAccountErasurePage() {
               autoComplete="off"
               id="erasure-email"
               onChange={(event) => {
-                setEmail(event.target.value);
-                setTarget(null);
-                setRequest(null);
+                form.setFieldValue("email", event.target.value);
+                dispatch({ type: "emailChanged" });
               }}
               placeholder={t("web.erasure.admin.emailPlaceholder")}
               required
@@ -125,11 +413,11 @@ export function AdminAccountErasurePage() {
 
         {target && !request ? (
           <AdminTargetForm
-            email={email}
-            onCreated={setRequest}
-            onFailed={() => setFailed(true)}
+            key={target.clerkId}
+            onRequest={(verification) =>
+              dispatch({ type: "erasureRequested", email, verification })
+            }
             saving={saving}
-            setSaving={setSaving}
             t={t}
             target={target}
           />
@@ -159,10 +447,10 @@ export function AdminAccountErasurePage() {
                 requestId: request.requestId,
               })}
             </code>
-            {request.errorCode ? (
+            {errorCode ? (
               <p className="m-0 text-sm text-destructive">
                 {t("web.erasure.admin.errorLabel", {
-                  errorCode: request.errorCode,
+                  errorCode,
                 })}
               </p>
             ) : null}
@@ -170,21 +458,12 @@ export function AdminAccountErasurePage() {
               <Button
                 className="justify-self-start"
                 disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  setFailed(false);
-                  try {
-                    setRequest(
-                      await retryAdminErasure({
-                        data: { requestId: request.requestId },
-                      }),
-                    );
-                  } catch {
-                    setFailed(true);
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
+                onClick={() =>
+                  dispatch({
+                    type: "retryRequested",
+                    requestId: request.requestId,
+                  })
+                }
                 type="button"
               >
                 {t(
@@ -210,40 +489,25 @@ export function AdminAccountErasurePage() {
 /** Renders the verified erasure-request form for a selected account.
  *
  * @param props - Target form properties.
- * @param props.email - Verified target email address.
- * @param props.onCreated - Receives the newly created erasure request.
- * @param props.onFailed - Reports request creation failure.
+ * @param props.onRequest - Queues one validated, verified erasure intent.
  * @param props.saving - Whether an erasure request is being created.
- * @param props.setSaving - Updates the shared saving state.
  * @param props.t - Localizes form copy.
  * @param props.target - Clerk account selected for erasure.
  * @returns The administrator erasure-request form.
  */
 function AdminTargetForm({
-  email,
-  onCreated,
-  onFailed,
+  onRequest,
   saving,
-  setSaving,
   t,
   target,
 }: {
-  /** Verified target email address. */
-  email: string;
-  /** Reports a newly created erasure request.
-   *
-   * @param request - Created request status.
+  /**
+   * Queues one confirmed request with the existing bounded verification evidence.
+   * @param verification - Validated request method and opaque reference.
    */
-  onCreated: (request: AdminErasureStatusView) => void;
-  /** Reports that erasure request creation failed. */
-  onFailed: () => void;
-  /** Whether an erasure request is being created. */
+  onRequest(verification: ErasureVerification): void;
+  /** Whether a confirmed erasure request is being created. */
   saving: boolean;
-  /** Updates the shared saving state.
-   *
-   * @param saving - Next saving state.
-   */
-  setSaving: (saving: boolean) => void;
   /** Formats account-erasure copy.
    *
    * @param key - Translation key to format.
@@ -254,33 +518,49 @@ function AdminTargetForm({
   /** Clerk account selected for erasure. */
   target: ErasureTarget;
 }) {
-  const [method, setMethod] = useState<
-    "authenticated_request" | "verified_email"
-  >("authenticated_request");
-  const [reference, setReference] = useState("");
+  const form = useForm({
+    defaultValues: {
+      method: "authenticated_request",
+      reference: "",
+    } as ErasureVerification,
+    validators: {
+      /**
+       * Preserves the existing bounded opaque-reference constraint before confirmation.
+       * @param input - Current verification evidence.
+       * @returns Existing failure feedback for invalid references.
+       */
+      onSubmit: ({ value }): string | undefined =>
+        value.reference.length <= 120 &&
+        /^[A-Za-z0-9:_-]+$/.test(value.reference)
+          ? undefined
+          : t("web.erasure.admin.failure"),
+    },
+    /**
+     * Captures one validated verification intent for its current selected target.
+     * @param input - Current bounded verification evidence.
+     */
+    onSubmit: ({ value }) => {
+      if (!saving) onRequest(value);
+    },
+  });
+  const { method, reference } = useStore(form.store, (state) => state.values);
+  const eligible = useStore(
+    form.store,
+    (state) =>
+      !state.isSubmitting &&
+      state.values.reference.length <= 120 &&
+      /^[A-Za-z0-9:_-]+$/.test(state.values.reference),
+  );
+  const error = useStore(form.store, (state) => state.errorMap.onSubmit);
 
   return (
     <form
       className="grid gap-4 rounded-lg border border-destructive/40 bg-card p-5"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        setSaving(true);
-        try {
-          onCreated(
-            await requestAdminErasure({
-              data: {
-                email,
-                targetClerkId: target.clerkId,
-                verificationMethod: method,
-                verificationReference: reference,
-              },
-            }),
-          );
-        } catch {
-          onFailed();
-        } finally {
-          setSaving(false);
-        }
+        if (saving) return;
+        form.setErrorMap({ onSubmit: undefined });
+        void form.handleSubmit();
       }}
     >
       <div className="grid gap-1 text-sm">
@@ -299,8 +579,10 @@ function AdminTargetForm({
         <select
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           id="verification-method"
+          disabled={saving}
           onChange={(event) =>
-            setMethod(
+            form.setFieldValue(
+              "method",
               event.target.value === "verified_email"
                 ? "verified_email"
                 : "authenticated_request",
@@ -324,8 +606,11 @@ function AdminTargetForm({
         <Input
           aria-describedby="verification-reference-help"
           id="verification-reference"
+          disabled={saving}
           maxLength={120}
-          onChange={(event) => setReference(event.target.value)}
+          onChange={(event) =>
+            form.setFieldValue("reference", event.target.value)
+          }
           pattern="[A-Za-z0-9:_-]+"
           required
           value={reference}
@@ -337,9 +622,14 @@ function AdminTargetForm({
       >
         {t("web.erasure.admin.referenceDescription")}
       </p>
+      {error ? (
+        <p aria-live="polite" className="m-0 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
       <Button
         className="justify-self-start"
-        disabled={saving}
+        disabled={saving || !eligible}
         type="submit"
         variant="destructive"
       >

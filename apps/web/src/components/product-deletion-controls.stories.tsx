@@ -1,7 +1,7 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, fn, mocked, userEvent, waitFor, within } from "storybook/test";
-import { StoryProviders } from "../../.storybook/story-fixtures";
+import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { PermanentDeletionControls as ProductDeletionControls } from "./permanent-deletion-controls";
 
 /** Product-deletion story configuration and isolated mutation spy. */
@@ -18,6 +18,7 @@ const meta = {
    * @param context - Story arguments.
    */
   beforeEach: ({ args }) => {
+    mockStoryAuth();
     mocked(args.onDelete).mockReset().mockResolvedValue(undefined);
   },
   decorators: [
@@ -66,7 +67,7 @@ export const Owner: Story = {
     );
     const page = within(canvasElement.ownerDocument.body);
     await userEvent.click(page.getByRole("button", { name: action }));
-    const dialog = within(page.getByRole("dialog"));
+    let dialog = within(page.getByRole("dialog"));
     await expect(dialog.getByText(/Katla/)).toBeVisible();
     await expect(dialog.getByRole("button", { name: action })).toBeDisabled();
     const checkbox = dialog.getByRole("checkbox", { name: confirmation });
@@ -77,8 +78,11 @@ export const Owner: Story = {
         name: formatTranslation("action.cancel", {}, "en-US"),
       }),
     );
-    await waitFor(() => expect(checkbox).not.toBeChecked());
+    await waitFor(() =>
+      expect(page.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     await userEvent.click(page.getByRole("button", { name: action }));
+    dialog = within(page.getByRole("dialog"));
     await expect(dialog.getByRole("checkbox")).not.toBeChecked();
     await userEvent.click(dialog.getByRole("checkbox"));
     await userEvent.click(dialog.getByRole("button", { name: action }));
