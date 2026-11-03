@@ -14,6 +14,7 @@ import type {
   CatalogProduct,
   CatalogProductType,
   CatalogTerminologyAlias,
+  CollectionItemMetadataWrite,
   CollectionItemOwnershipPeriod,
   OwnershipEntryReason,
   OwnershipExitReason,
@@ -48,6 +49,7 @@ import {
   type CollectionFormValue,
   CollectionImageUploader,
 } from "@/components/collection-form";
+import { CollectionItemStatusFields } from "@/components/collection-item-status-fields";
 import { CollectionSelector } from "@/components/collection-selector";
 import type { MarkdownEditorHandle } from "@/components/markdown-editor";
 import {
@@ -4817,6 +4819,9 @@ export function CollectionAddPage({
     description: "",
     bearing: "",
     serialNumber: null as string | null,
+    metadata: {
+      statuses: { public: [], private: [] },
+    } as CollectionItemMetadataWrite,
     ownership: ownershipEditorValue() as OwnershipEditorValue,
     installedPenPartIds: [] as number[],
     installedRefillProductId: null as number | null,
@@ -4862,6 +4867,18 @@ export function CollectionAddPage({
             !finishOptionSchema.safeParse(value.buttonCustomFinish).success)))
     )
       return "web.catalog.error.form";
+    const saleDate = value.metadata.saleDate;
+    if (
+      (value.metadata.statuses.public.includes("sold") ||
+        value.metadata.statuses.private.includes("sold")) &&
+      (!saleDate ||
+        Number.isNaN(Date.parse(saleDate)) ||
+        new Date(saleDate).toISOString().slice(0, 10) !== saleDate ||
+        (!value.ownership.startDateUnknown &&
+          saleDate < value.ownership.effectiveStartDate))
+    ) {
+      return "web.collectionItemMetadata.saleDateError";
+    }
     return validateImages(value.images, locale)?.key;
   };
   const form = useForm({
@@ -4902,6 +4919,7 @@ export function CollectionAddPage({
           ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
           : null;
       const data = {
+        metadata: value.metadata,
         bearing,
         buttonCustomFinish:
           selectedButton && buttonFinish?.id === "custom"
@@ -4967,6 +4985,7 @@ export function CollectionAddPage({
     description,
     bearing,
     serialNumber,
+    metadata,
     ownership,
     installedPenPartIds,
     installedRefillProductId,
@@ -4981,6 +5000,12 @@ export function CollectionAddPage({
     productQuery,
   } = useStore(form.store, (state) => state.values);
 
+  const metadataError = useStore(
+    form.store,
+    (state) =>
+      Boolean(state.errorMap.onSubmit) ||
+      state.errorMap.onChange === "web.collectionItemMetadata.saleDateError",
+  );
   const collectionDialog = React.useRef<HTMLDialogElement>(null);
 
   const task = React.useRef<{
@@ -5380,6 +5405,12 @@ export function CollectionAddPage({
           allowDeparture={false}
           onChange={(value) => form.setFieldValue("ownership", value)}
           value={ownership}
+        />
+        <CollectionItemStatusFields
+          warning="web.collectionItemMetadata.unapprovedWarning"
+          value={metadata}
+          onChange={(value) => form.setFieldValue("metadata", value)}
+          invalid={Boolean(metadataError)}
         />
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
@@ -6360,6 +6391,10 @@ export function CollectionEditPage({
     description: item.descriptionOverride ?? "",
     bearing: item.bearingOverride ?? "",
     serialNumber: (item.serialNumber ?? null) as string | null,
+    metadata: {
+      statuses: item.metadata?.statuses ?? { public: [], private: [] },
+      saleDate: ownershipPeriods.at(-1)?.effectiveEndDate ?? undefined,
+    } as CollectionItemMetadataWrite,
     ownership: ownershipEditorValue(
       ownershipPeriods.at(-1),
     ) as OwnershipEditorValue,
@@ -6611,19 +6646,24 @@ export function CollectionEditPage({
               }
             : {}),
           materialAssignmentId: material?.id === -1 ? undefined : material?.id,
-          ownership: {
-            effectiveEndDate: ownership.currentlyOwned
-              ? null
-              : ownership.effectiveEndDate || null,
-            effectiveStartDate: ownership.startDateUnknown
-              ? null
-              : ownership.effectiveStartDate,
-            entryReason: ownership.entryReason,
-            exitReason: ownership.currentlyOwned
-              ? null
-              : ownership.exitReason || null,
-            periodId: ownership.periodId,
-          },
+          ...(item.isOwner ? { metadata: value.metadata } : {}),
+          ...(item.isOwner
+            ? {
+                ownership: {
+                  effectiveEndDate: ownership.currentlyOwned
+                    ? null
+                    : ownership.effectiveEndDate || null,
+                  effectiveStartDate: ownership.startDateUnknown
+                    ? null
+                    : ownership.effectiveStartDate,
+                  entryReason: ownership.entryReason,
+                  exitReason: ownership.currentlyOwned
+                    ? null
+                    : ownership.exitReason || null,
+                  periodId: ownership.periodId,
+                },
+              }
+            : {}),
           reason,
           serialNumber,
         };
@@ -6650,6 +6690,7 @@ export function CollectionEditPage({
     description,
     bearing,
     serialNumber,
+    metadata,
     ownership,
     installedPenPartIds,
     installedRefillProductId,
@@ -6927,6 +6968,27 @@ export function CollectionEditPage({
             periods={ownershipPeriods}
             value={ownership}
           />
+          {item.isOwner ? (
+            <CollectionItemStatusFields
+              saleDateRecorded={ownershipPeriods.at(-1)?.exitReason === "sale"}
+              warning={
+                item.collectionIsPrivate
+                  ? "web.collectionItemMetadata.collectionPrivateWarning"
+                  : item.isPrivate
+                    ? "web.collectionItemMetadata.itemPrivateWarning"
+                    : item.approvalStatus !== "approved"
+                      ? "web.collectionItemMetadata.unapprovedWarning"
+                      : product.isPrivate ||
+                          product.approvalStatus !== "approved"
+                        ? "web.collectionItemMetadata.unavailableWarning"
+                        : undefined
+              }
+              editing
+              value={metadata}
+              onChange={(value) => form.setFieldValue("metadata", value)}
+              invalid={Boolean(feedback)}
+            />
+          ) : null}
           <CollectionSelector
             addLabel={t("web.collections.select.addNew")}
             collections={collections}

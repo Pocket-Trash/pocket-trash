@@ -207,6 +207,42 @@ export const collectionItem = pgTable(
   ],
 );
 
+/** Supported independent public and private collection-item statuses. */
+export const collectionItemStatuses = [
+  "grail",
+  "favorite",
+  "want_to_sell",
+  "want_to_trade",
+  "sold",
+] as const;
+
+/** Current status assignments; public selection never overwrites private selection. */
+export const collectionItemStatus = pgTable(
+  "collection_item_status",
+  {
+    collectionItemId: bigint("collection_item_id", { mode: "number" })
+      .notNull()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    status: text("status", { enum: collectionItemStatuses }).notNull(),
+    isPublic: boolean("is_public").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.collectionItemId, table.status, table.isPublic],
+    }),
+    check(
+      "collection_item_status_valid",
+      sql`${table.status} in ('grail', 'favorite', 'want_to_sell', 'want_to_trade', 'sold')`,
+    ),
+  ],
+);
+
 /** Effective and recorded ownership history for one physical collection item. */
 export const collectionItemOwnershipPeriod = pgTable(
   "collection_item_ownership_period",

@@ -1951,8 +1951,31 @@ export type CollectionItemOwnershipStart = Pick<
   "effectiveStartDate" | "entryReason"
 >;
 
+/** Current structured status assigned independently to each visibility scope. */
+export type CollectionItemStatus =
+  (typeof schema.collectionItemStatuses)[number];
+/** Independently saved public and private status selections. */
+export type CollectionItemStatusState = {
+  /** Public assignments, subject to parent visibility. */
+  public: CollectionItemStatus[];
+  /** Private assignments visible only to the item owner. */
+  private: CollectionItemStatus[];
+};
+/** Owner-managed metadata; omission preserves all saved assignments. */
+export type CollectionItemMetadataWrite = {
+  /** Independent selections for both scopes. */
+  statuses: CollectionItemStatusState;
+  /** Explicit effective sale date when Sold becomes selected. */
+  saleDate?: string;
+};
+
 /** Owned collection item with its product snapshot and visibility state. */
 export type UserCollectionItem = {
+  /** Already-redacted metadata for the current viewer. */
+  metadata?: {
+    /** Visibility-scoped assignments for this viewer. */
+    statuses: CollectionItemStatusState;
+  };
   /** Durable administrative review state, independent of privacy. */
   approvalStatus: CatalogApprovalStatus;
   /**
@@ -2309,6 +2332,8 @@ export type CollectionsService = {
     newCollection?: CollectionWriteInput | null;
     /** Initial ownership period for this physical item. */
     ownership?: CollectionItemOwnershipStart;
+    /** Optional owner-managed status assignments. */
+    metadata?: CollectionItemMetadataWrite;
     /** Exact catalog product identifier. */
     productId: number;
     /** Exact Pen or Pen-part subtype. */
@@ -2388,6 +2413,8 @@ export type CollectionsService = {
     newCollection?: CollectionWriteInput | null;
     /** Initial ownership period shared by the spinner and included button. */
     ownership?: CollectionItemOwnershipStart;
+    /** Optional owner-managed status assignments. */
+    metadata?: CollectionItemMetadataWrite;
     /** Optional maker serial. */
     serialNumber?: string | null;
   }): Promise<{
@@ -2446,6 +2473,8 @@ export type CollectionsService = {
     newCollection?: CollectionWriteInput | null;
     /** Initial ownership period for this physical item. */
     ownership?: CollectionItemOwnershipStart;
+    /** Optional owner-managed status assignments. */
+    metadata?: CollectionItemMetadataWrite;
     /** Optional maker serial. */
     serialNumber?: string | null;
   }): Promise<number>;
@@ -2475,6 +2504,8 @@ export type CollectionsService = {
     newCollection?: CollectionWriteInput | null;
     /** Initial ownership period for this physical item. */
     ownership?: CollectionItemOwnershipStart;
+    /** Optional owner-managed status assignments. */
+    metadata?: CollectionItemMetadataWrite;
     /** Exact catalog product identifier. */
     productId: number;
     /** Exact standalone slider product subtype. */
@@ -2834,6 +2865,8 @@ export type CollectionsService = {
     materialAssignmentId?: number | null;
     /** Current period correction, departure, or a new reacquisition period. */
     ownership?: CollectionItemOwnershipWrite;
+    /** Optional owner-managed status assignments. */
+    metadata?: CollectionItemMetadataWrite;
     /**
      * Administrative reason for the operation.
      */
@@ -6138,6 +6171,7 @@ export function createCollectionsService(
               materialSelection,
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
+            await applyCollectionItemStatuses(tx, item.id, input.metadata);
             if (input.productTypeSlug === "pen") {
               await tx.insert(schema.collectionDetailPen).values({
                 id: item.id,
@@ -6345,6 +6379,11 @@ export function createCollectionsService(
               spinnerItem.id,
               input.ownership,
             );
+            await applyCollectionItemStatuses(
+              tx,
+              spinnerItem.id,
+              input.metadata,
+            );
             await tx.insert(schema.collectionDetailSpinner).values({
               ...(input.bearing !== undefined
                 ? { bearing: normalizeOptionalText(input.bearing) }
@@ -6448,6 +6487,7 @@ export function createCollectionsService(
               materialSelection,
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
+            await applyCollectionItemStatuses(tx, item.id, input.metadata);
             await tx.insert(schema.collectionDetailSpinnerButton).values({
               id: item.id,
               productSpinnerButtonId: input.productId,
@@ -6572,6 +6612,7 @@ export function createCollectionsService(
               materialSelection,
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
+            await applyCollectionItemStatuses(tx, item.id, input.metadata);
             if (input.productTypeSlug === "slider") {
               const magnetLayout =
                 product.includedInsertMagnetLayout ?? product.bodyMagnetLayout;
@@ -7863,6 +7904,12 @@ export function createCollectionsService(
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
             }
+            if (
+              (input.metadata !== undefined || input.ownership !== undefined) &&
+              item.ownerId !== owner.id
+            ) {
+              throw new Error("Only the item owner can change metadata.");
+            }
             const itemMaterials = await tx
               .select({
                 materialId: schema.collectionItemMaterial.materialId,
@@ -8404,6 +8451,12 @@ export function createCollectionsService(
                 input.ownership,
               );
             }
+            await applyCollectionItemStatuses(
+              tx,
+              input.collectionItemId,
+              input.metadata,
+              input.ownership,
+            );
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
@@ -9064,6 +9117,7 @@ async function createInitialOwnershipPeriod(
  * @param tx - Caller-owned database transaction.
  * @param collectionItemId - Physical collection-item identifier.
  * @param input - Lifecycle write to apply.
+ * @param allowReopen - Allows explicit final-Sold removal to reopen the latest period.
  * @returns Completion after the lifecycle and legacy fields are synchronized.
  * @rejects When authorization-independent lifecycle validation or persistence fails.
  */
@@ -9071,6 +9125,7 @@ async function applyOwnershipWrite(
   tx: CatalogTransaction,
   collectionItemId: number,
   input: CollectionItemOwnershipWrite,
+  allowReopen = false,
 ) {
   const recordedAt = new Date();
   if ((input.effectiveEndDate === null) !== (input.exitReason === null)) {
@@ -9122,7 +9177,11 @@ async function applyOwnershipWrite(
     )
     .limit(1);
   if (!period) throw new Error("Ownership period does not exist.");
-  if (period.effectiveEndDate !== null && input.effectiveEndDate === null) {
+  if (
+    !allowReopen &&
+    period.effectiveEndDate !== null &&
+    input.effectiveEndDate === null
+  ) {
     throw new Error("Reacquisition requires a new ownership period.");
   }
   const start = effectiveOwnershipDate(
@@ -9196,6 +9255,150 @@ async function applyOwnershipWrite(
       updatedAt: recordedAt,
     })
     .where(eq(schema.collectionItem.id, collectionItemId));
+}
+
+/**
+ * Saves status scopes and synchronizes the latest ownership period atomically.
+ * @param tx - Caller-owned item transaction after authorization and item locking.
+ * @param collectionItemId - Physical item whose assignments are being changed.
+ * @param metadata - Replacement selections, or undefined to preserve them.
+ * @param ownership - Lifecycle write already applied in this transaction.
+ * @returns Completion after assignments and current lifecycle agree.
+ * @rejects When status validation, sale dates, ranges, or persistence fails.
+ */
+async function applyCollectionItemStatuses(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+  metadata?: CollectionItemMetadataWrite,
+  ownership?: CollectionItemOwnershipWrite,
+) {
+  if (metadata === undefined && ownership === undefined) return;
+  const saved = await tx
+    .select()
+    .from(schema.collectionItemStatus)
+    .where(eq(schema.collectionItemStatus.collectionItemId, collectionItemId));
+  const statuses: CollectionItemStatusState = metadata
+    ? {
+        public: [...new Set(metadata.statuses.public)],
+        private: [...new Set(metadata.statuses.private)],
+      }
+    : {
+        public: saved.filter((row) => row.isPublic).map((row) => row.status),
+        private: saved.filter((row) => !row.isPublic).map((row) => row.status),
+      };
+  if (
+    [...statuses.public, ...statuses.private].some(
+      (status) => !schema.collectionItemStatuses.includes(status),
+    )
+  ) {
+    throw new Error("Invalid collection item status.");
+  }
+  const [latest] = await tx
+    .select()
+    .from(schema.collectionItemOwnershipPeriod)
+    .where(
+      eq(
+        schema.collectionItemOwnershipPeriod.collectionItemId,
+        collectionItemId,
+      ),
+    )
+    .orderBy(
+      desc(schema.collectionItemOwnershipPeriod.effectiveStartDate),
+      desc(schema.collectionItemOwnershipPeriod.startedRecordedAt),
+      desc(schema.collectionItemOwnershipPeriod.id),
+    )
+    .limit(1);
+  if (
+    ownership?.periodId != null &&
+    ownership.periodId !== latest?.id &&
+    metadata === undefined
+  )
+    return;
+  const currentOwnership =
+    ownership?.periodId === null || ownership?.periodId === latest?.id
+      ? ownership
+      : undefined;
+  if (
+    currentOwnership?.periodId === null ||
+    (currentOwnership?.exitReason != null &&
+      currentOwnership.exitReason !== "sale")
+  ) {
+    statuses.public = statuses.public.filter((status) => status !== "sold");
+    statuses.private = statuses.private.filter((status) => status !== "sold");
+  } else if (
+    !saved.some((row) => row.status === "sold") &&
+    currentOwnership?.exitReason === "sale" &&
+    !statuses.public.includes("sold") &&
+    !statuses.private.includes("sold")
+  ) {
+    statuses.private.push("sold");
+  }
+  const sold =
+    statuses.public.includes("sold") || statuses.private.includes("sold");
+  if (sold && latest?.exitReason !== "sale") {
+    if (!metadata?.saleDate || !latest || latest.effectiveEndDate !== null)
+      throw new Error(
+        "An explicit sale date and open ownership period are required.",
+      );
+    await applyOwnershipWrite(tx, collectionItemId, {
+      periodId: latest.id,
+      effectiveStartDate: latest.startDateImputed
+        ? null
+        : latest.effectiveStartDate,
+      effectiveEndDate: metadata.saleDate,
+      entryReason: latest.entryReason,
+      exitReason: "sale",
+    });
+  } else if (!sold && metadata !== undefined && latest?.exitReason === "sale") {
+    await applyOwnershipWrite(
+      tx,
+      collectionItemId,
+      {
+        periodId: latest.id,
+        effectiveStartDate: latest.startDateImputed
+          ? null
+          : latest.effectiveStartDate,
+        effectiveEndDate: null,
+        entryReason: latest.entryReason,
+        exitReason: null,
+      },
+      true,
+    );
+  }
+  const rows = [
+    ...statuses.public.map((status) => ({
+      collectionItemId,
+      status,
+      isPublic: true,
+    })),
+    ...statuses.private.map((status) => ({
+      collectionItemId,
+      status,
+      isPublic: false,
+    })),
+  ];
+  for (const row of saved) {
+    if (
+      !rows.some(
+        (next) => next.status === row.status && next.isPublic === row.isPublic,
+      )
+    ) {
+      await tx
+        .delete(schema.collectionItemStatus)
+        .where(
+          and(
+            eq(schema.collectionItemStatus.collectionItemId, collectionItemId),
+            eq(schema.collectionItemStatus.status, row.status),
+            eq(schema.collectionItemStatus.isPublic, row.isPublic),
+          ),
+        );
+    }
+  }
+  if (rows.length)
+    await tx
+      .insert(schema.collectionItemStatus)
+      .values(rows)
+      .onConflictDoNothing();
 }
 
 /**
@@ -10699,6 +10902,7 @@ async function queryOwnedItems(
       approvalStatus: schema.collectionItem.approvalStatus,
       bearingOverride: schema.collectionDetailSpinner.bearing,
       productBearing: schema.productDetailSpinner.bearing,
+      metadataPubliclyVisible: publicCollectionItemCondition(),
       collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
       serialNumber: schema.collectionItem.serialNumber,
@@ -11089,6 +11293,26 @@ async function queryOwnedItems(
   );
   if (items.length) {
     const itemIds = items.map(({ collectionItemId }) => collectionItemId);
+    const assignments = await db
+      .select()
+      .from(schema.collectionItemStatus)
+      .where(inArray(schema.collectionItemStatus.collectionItemId, itemIds))
+      .orderBy(asc(schema.collectionItemStatus.status));
+    for (const item of items) {
+      const publiclyVisible = visibleRows.find(
+        (row) => row.collectionItemId === item.collectionItemId,
+      )?.metadataPubliclyVisible;
+      item.metadata = { statuses: { public: [], private: [] } };
+      for (const assignment of assignments) {
+        if (assignment.collectionItemId !== item.collectionItemId) continue;
+        if (item.isOwner || (publiclyVisible && assignment.isPublic)) {
+          item.metadata.statuses[
+            assignment.isPublic ? "public" : "private"
+          ].push(assignment.status);
+        }
+      }
+    }
+
     const [installedParts, ownershipPeriods] = await Promise.all([
       db
         .select({
