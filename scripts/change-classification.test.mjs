@@ -882,14 +882,17 @@ test("uses the same explicit rules for pushes to main", () => {
 test("CI keeps required names and gates jobs with one classifier", () => {
   const jobs = ciWorkflow.jobs;
 
-  assert.deepEqual(ciWorkflow.on.pull_request.types, [
-    "opened",
-    "synchronize",
-    "reopened",
-    "edited",
-    "labeled",
-    "unlabeled",
-  ]);
+  assert.deepEqual(ciWorkflow.on.pull_request, {
+    types: [
+      "opened",
+      "synchronize",
+      "reopened",
+      "edited",
+      "labeled",
+      "unlabeled",
+    ],
+  });
+  assert.deepEqual(ciWorkflow.on.push, { branches: ["main"] });
   assert.ok(jobs["classify-changes"]);
   assert.match(jobs["classify-changes"].if, /action != 'edited'/u);
   assert.match(jobs["classify-changes"].if, /changes\.base != null/u);
