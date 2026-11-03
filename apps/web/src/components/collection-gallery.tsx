@@ -4,14 +4,7 @@ import {
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { UserCollectionSummary } from "@package/services";
-import {
-  createColumnHelper,
-  createPaginatedRowModel,
-  rowPaginationFeature,
-  tableFeatures,
-  useTable,
-} from "@tanstack/react-table";
-import { type ReactNode, useEffect, useMemo } from "react";
+import { type ReactNode, useMemo, useReducer } from "react";
 import {
   type GalleryImage,
   ImageButton,
@@ -19,27 +12,7 @@ import {
 } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
 import { Button } from "@/components/ui/button";
-
-/**
- * Responsive pagination behavior for non-cover collection images.
- */
-const paginationFeatures = tableFeatures({
-  rowPaginationFeature,
-  paginatedRowModel: createPaginatedRowModel(),
-});
-/**
- * Column builder for gallery images.
- */
-const columnHelper = createColumnHelper<
-  typeof paginationFeatures,
-  GalleryImage
->();
-/**
- * Minimal columns required to paginate gallery images.
- */
-const columns = columnHelper.columns([
-  columnHelper.accessor("id", { header: "id" }),
-]);
+import { useMediaQuery } from "@/hooks/use-browser-layout";
 
 /**
  * Localized labels displayed by a collection gallery.
@@ -139,33 +112,55 @@ export function CollectionGallery({
         : nonCoverImages,
     [collection.coverImage, nonCoverImages],
   );
-  const initialState = useMemo(
-    () => ({ pagination: { pageIndex: 0, pageSize: 6 } }),
-    [],
-  );
-  const table = useTable(
-    {
-      columns,
-      data: nonCoverImages,
-      features: paginationFeatures,
-      initialState,
+  const pageSize = useMediaQuery("(min-width: 64rem)") ? 9 : 6;
+  const [pagination, dispatch] = useReducer(
+    (
+      state: {
+        /** Ordered images used by the current pagination. */
+        images: GalleryImage[];
+        /** Current zero-based page. */
+        page: number;
+        /** Previous responsive page size. */
+        pageSize: number;
+      },
+      event:
+        | {
+            /** Collection images changed. */
+            type: "imagesChanged";
+            /** Replacement ordered images. */
+            images: GalleryImage[];
+          }
+        | {
+            /** Viewport tier changed. */
+            type: "viewportChanged";
+            /** New responsive page size. */
+            pageSize: number;
+          }
+        | {
+            /** Move to an adjacent page. */
+            type: "pageMoved";
+            /** Previous or next page. */
+            offset: number;
+          },
+    ) => {
+      if (event.type === "imagesChanged")
+        return { ...state, images: event.images, page: 0 };
+      if (event.type === "viewportChanged")
+        return {
+          ...state,
+          pageSize: event.pageSize,
+          page: Math.floor((state.page * state.pageSize) / event.pageSize),
+        };
+      return { ...state, page: state.page + event.offset };
     },
-    (state) => ({ pagination: state.pagination }),
+    { images: nonCoverImages, page: 0, pageSize },
   );
-  const setPageSize = table.setPageSize;
-  useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 64rem)");
-    /**
-     * Uses nine gallery images on desktop and six on smaller viewports.
-     */
-    const updatePageSize = () => {
-      setPageSize(desktop.matches ? 9 : 6);
-    };
-    updatePageSize();
-    desktop.addEventListener("change", updatePageSize);
-    return () => desktop.removeEventListener("change", updatePageSize);
-  }, [setPageSize]);
-  const pageCount = table.getPageCount();
+  if (pagination.images !== nonCoverImages)
+    dispatch({ type: "imagesChanged", images: nonCoverImages });
+  if (pagination.pageSize !== pageSize)
+    dispatch({ type: "viewportChanged", pageSize });
+  const pageCount = Math.max(1, Math.ceil(nonCoverImages.length / pageSize));
+  const page = Math.max(0, Math.min(pagination.page, pageCount - 1));
 
   return (
     <ImageLightbox
@@ -205,19 +200,19 @@ export function CollectionGallery({
               <>
                 <h2 className="text-lg font-semibold">{copy.gallery}</h2>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {table.getRowModel().rows.map((row) => (
-                    <ImageButton
-                      alt={copy.imageAlt}
-                      image={row.original}
-                      key={row.original.id}
-                      label={copy.gallery}
-                      onClick={() =>
-                        select(
-                          images.findIndex(({ id }) => id === row.original.id),
-                        )
-                      }
-                    />
-                  ))}
+                  {nonCoverImages
+                    .slice(page * pageSize, (page + 1) * pageSize)
+                    .map((image) => (
+                      <ImageButton
+                        alt={copy.imageAlt}
+                        image={image}
+                        key={image.id}
+                        label={copy.gallery}
+                        onClick={() =>
+                          select(images.findIndex(({ id }) => id === image.id))
+                        }
+                      />
+                    ))}
                 </div>
                 {pageCount > 1 ? (
                   <nav
@@ -226,8 +221,10 @@ export function CollectionGallery({
                   >
                     <Button
                       aria-label={copy.previousPage}
-                      disabled={!table.getCanPreviousPage()}
-                      onClick={() => table.previousPage()}
+                      disabled={page === 0}
+                      onClick={() =>
+                        dispatch({ type: "pageMoved", offset: -1 })
+                      }
                       size="icon"
                       type="button"
                       variant="outline"
@@ -238,15 +235,12 @@ export function CollectionGallery({
                       />
                     </Button>
                     <output aria-live="polite" className="text-sm">
-                      {copy.pageStatus(
-                        table.state.pagination.pageIndex + 1,
-                        pageCount,
-                      )}
+                      {copy.pageStatus(page + 1, pageCount)}
                     </output>
                     <Button
                       aria-label={copy.nextPage}
-                      disabled={!table.getCanNextPage()}
-                      onClick={() => table.nextPage()}
+                      disabled={page === pageCount - 1}
+                      onClick={() => dispatch({ type: "pageMoved", offset: 1 })}
                       size="icon"
                       type="button"
                       variant="outline"

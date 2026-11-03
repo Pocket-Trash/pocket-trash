@@ -1,6 +1,6 @@
 import type { PublicMaterial } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { useState } from "react";
+import { useReducer } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
@@ -205,8 +205,26 @@ export const EmptySpecific: Story = {
  * @returns Independent product and collection-item pagination in the browser.
  */
 function IndependentPaginationFixture() {
-  const [productsPage, setProductsPage] = useState(1);
-  const [collectionItemsPage, setCollectionItemsPage] = useState(2);
+  const [pages, dispatch] = useReducer(
+    (
+      state: {
+        /** Product result page. */
+        products: number;
+        /** Collection result page. */
+        collections: number;
+      },
+      event: {
+        /** Which independent pager changed. */
+        type: "productsRequested" | "collectionsRequested";
+        /** Requested one-based page. */
+        page: number;
+      },
+    ) =>
+      event.type === "productsRequested"
+        ? { ...state, products: event.page }
+        : { ...state, collections: event.page },
+    { products: 1, collections: 2 },
+  );
   const items = Array.from({ length: 41 }, (_, index) => index + 1);
   return (
     <main className="grid gap-6 p-4">
@@ -215,8 +233,8 @@ function IndependentPaginationFixture() {
         <MaterialResultPage
           ariaLabel="Product pages"
           items={items}
-          requestedPage={productsPage}
-          onPageChange={setProductsPage}
+          requestedPage={pages.products}
+          onPageChange={(page) => dispatch({ type: "productsRequested", page })}
         >
           {(page) => (
             <ul>
@@ -231,8 +249,10 @@ function IndependentPaginationFixture() {
         <MaterialResultPage
           ariaLabel="Collection pages"
           items={items}
-          requestedPage={collectionItemsPage}
-          onPageChange={setCollectionItemsPage}
+          requestedPage={pages.collections}
+          onPageChange={(page) =>
+            dispatch({ type: "collectionsRequested", page })
+          }
         >
           {(page) => (
             <ul>

@@ -4,7 +4,7 @@ import {
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useReducer, useRef } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -224,7 +224,30 @@ export function ImageLightbox({
   previousLabel: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, dispatch] = useReducer(
+    (
+      index: number,
+      event:
+        | {
+            /** Select an existing image. */
+            type: "selected";
+            /** Selected image index. */
+            index: number;
+          }
+        | {
+            /** Move through the ordered images. */
+            type: "cycled";
+            /** Adjacent direction. */
+            offset: number;
+            /** Current image count. */
+            count: number;
+          },
+    ) =>
+      event.type === "selected"
+        ? event.index
+        : (index + event.offset + event.count) % event.count,
+    0,
+  );
   /**
    * Opens the lightbox at an existing image index.
    *
@@ -232,7 +255,7 @@ export function ImageLightbox({
    */
   const select = (index: number) => {
     if (!images[index]) return;
-    setSelectedIndex(index);
+    dispatch({ type: "selected", index });
     dialogRef.current?.showModal();
   };
   /**
@@ -241,9 +264,7 @@ export function ImageLightbox({
    * @param offset - Adjacent movement: `-1` for previous or `1` for next.
    */
   const cycle = (offset: number) => {
-    setSelectedIndex(
-      (index) => (index + offset + images.length) % images.length,
-    );
+    dispatch({ type: "cycled", offset, count: images.length });
   };
 
   return (
