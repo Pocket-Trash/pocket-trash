@@ -10,7 +10,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import * as React from "react";
+import React from "react";
 import {
   type EffectEntity,
   type EffectReducer,

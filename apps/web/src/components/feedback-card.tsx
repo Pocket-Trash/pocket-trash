@@ -3,7 +3,7 @@ import {
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import type * as React from "react";
+import type React from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   type FeedbackCategory,

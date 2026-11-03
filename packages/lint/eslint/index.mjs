@@ -6,6 +6,7 @@ import { tailwind4 } from "tailwind-csstree";
 
 import appsConfig from "./apps.mjs";
 import reactConfig from "./react.mjs";
+import webStateConfig from "./web-state.mjs";
 
 export default defineConfig([
   ...reactConfig,
@@ -20,6 +21,7 @@ export default defineConfig([
     },
   },
   appsConfig,
+  ...webStateConfig,
   {
     files: ["packages/database/src/**/*.{js,jsx,ts,tsx}"],
     rules: {

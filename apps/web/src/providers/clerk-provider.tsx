@@ -1,7 +1,7 @@
 import { esMX } from "@clerk/localizations";
 import { ClerkProvider as TanStackClerkProvider } from "@clerk/tanstack-react-start";
 import type { SupportedLocale } from "@pocket-trash/localizations";
-import type * as React from "react";
+import type React from "react";
 import { clientEnv } from "@/env/client";
 import { useLocale } from "./locale-provider";
 

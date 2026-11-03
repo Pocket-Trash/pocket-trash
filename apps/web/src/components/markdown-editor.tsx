@@ -23,7 +23,9 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import * as React from "react";
+import { useForm } from "@tanstack/react-form";
+import React from "react";
+import { useEffectReducer } from "use-effect-reducer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +33,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { countWords } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { useOptionalLocale } from "@/providers/locale-provider";
+import {
+  type MarkdownEditorState,
+  markdownEditorReducer,
+} from "./markdown-editor-state";
 import type {
   MarkdownLinkSelection,
   MarkdownVisualEditorHandle,
@@ -110,21 +116,6 @@ export type MarkdownEditorProps = Readonly<{
   placeholder?: string;
   /** Whether content can be selected but not edited. */
   readOnly?: boolean;
-}>;
-
-/** Available editor surfaces. */
-type Mode = "source" | "visual";
-
-/** Link form opened from the current editor selection. */
-type LinkEditorState = Readonly<{
-  /** Whether link text must be collected in a modal. */
-  kind: "modal" | "popover";
-  /** Whether the selection is exactly one existing link. */
-  existing: boolean;
-  /** Link display text. */
-  text: string;
-  /** Link destination. */
-  url: string;
 }>;
 
 /** Shared toolbar action metadata. */
@@ -228,18 +219,51 @@ export const MarkdownEditor = React.forwardRef<
   const labelId = `${editorId}-label`;
   const statusId = `${editorId}-status`;
   const errorId = `${editorId}-error`;
-  const [mode, setMode] = React.useState<Mode>("visual");
-  const [value, setValue] = React.useState(() => safeMarkdown(defaultValue));
-  const [loading, setLoading] = React.useState(true);
-  const [fallback, setFallback] = React.useState(false);
-  const [activeFormats, setActiveFormats] = React.useState<
-    readonly MarkdownVisualFormat[]
-  >([]);
-  const [linkEditor, setLinkEditor] = React.useState<LinkEditorState | null>(
-    null,
+  const [editor, dispatch] = useEffectReducer(
+    markdownEditorReducer,
+    (exec): MarkdownEditorState => ({
+      mode: "visual",
+      value: safeMarkdown(defaultValue),
+      loading: true,
+      fallback: false,
+      activeFormats: [],
+      linkEditor: null,
+      announcementKey: "",
+      statusAnnouncement: "",
+      generation: 0,
+      notice: exec({ type: "notifyLoading", generation: 0, loading: true }),
+    }),
+    {
+      /**
+       * Delivers loading changes once from the committed editor lifetime.
+       * @param _state - Editor state that queued feedback.
+       * @param effect - Loading state and surface generation.
+       * @param dispatch - Terminal feedback dispatcher.
+       * @param context - Feedback cancellation lifetime.
+       */
+      notifyLoading: (_state, effect, dispatch, { signal }) => {
+        queueMicrotask(() => {
+          if (signal.aborted) return;
+          dispatch({
+            type: "loadingNotified",
+            generation: effect.generation,
+            loading: effect.loading,
+          });
+          onLoadingChange?.(effect.loading);
+        });
+      },
+    },
   );
-  const [linkError, setLinkError] = React.useState(false);
-  const [statusAnnouncement, setStatusAnnouncement] = React.useState("");
+  const {
+    mode,
+    value,
+    loading,
+    fallback,
+    activeFormats,
+    linkEditor,
+    statusAnnouncement,
+    generation,
+  } = editor;
   const valueRef = React.useRef(value);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const visualRef = React.useRef<MarkdownVisualEditorHandle | null>(null);
@@ -248,7 +272,7 @@ export const MarkdownEditor = React.forwardRef<
   const linkDialogRef = React.useRef<HTMLDialogElement>(null);
   const linkTextRef = React.useRef<HTMLInputElement>(null);
   const linkUrlRef = React.useRef<HTMLInputElement>(null);
-  const announcedStatusRef = React.useRef("");
+  const visualSessionRef = React.useRef<number | null>(null);
   /** Formats one localized editor string. */
   const t = React.useCallback(
     (key: TranslationKey, values: Readonly<Record<string, unknown>> = {}) =>
@@ -268,29 +292,69 @@ export const MarkdownEditor = React.forwardRef<
     .filter(Boolean)
     .join(" ");
 
-  React.useEffect(() => {
-    onLoadingChange?.(loading);
-  }, [loading, onLoadingChange]);
-
-  React.useEffect(() => {
-    if (!linkEditorKind) return;
-    if (linkEditorKind === "modal") linkDialogRef.current?.showModal?.();
-    (linkEditorKind === "modal" ? linkTextRef : linkUrlRef).current?.focus();
-  }, [linkEditorKind]);
-
-  React.useEffect(() => {
-    const key = `${fallback}:${countStatus ?? ""}`;
-    if (announcedStatusRef.current === key) return;
-    announcedStatusRef.current = key;
-    setStatusAnnouncement(
-      [
+  const announcementKey = `${fallback}:${countStatus ?? ""}`;
+  if (announcementKey !== editor.announcementKey)
+    dispatch({
+      type: "statusChanged",
+      key: announcementKey,
+      text: [
         fallback ? t("web.markdownEditor.status.fallback") : "",
         counter ? counterText(t, counter, count, locale) : "",
       ]
         .filter(Boolean)
         .join(" "),
-    );
-  }, [count, countStatus, counter, fallback, locale, t]);
+    });
+  const linkFields = useForm({
+    defaultValues: { text: linkEditor?.text ?? "", url: linkEditor?.url ?? "" },
+    /**
+     * Applies one validated contextual link edit.
+     * @param submission - Submitted link values.
+     * @param submission.value - Link text and destination.
+     */
+    onSubmit: ({ value }) => {
+      applyLink(value.text, value.url);
+    },
+  });
+  const bindVisualSurface = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return;
+      visualSessionRef.current = generation;
+      dispatch({ type: "visualStarting", generation });
+      return () => {
+        if (visualSessionRef.current === generation) {
+          visualSessionRef.current = null;
+          visualRef.current = null;
+        }
+      };
+    },
+    [dispatch, generation],
+  );
+  const bindLinkDialog = React.useCallback(
+    (node: HTMLDialogElement | null) => {
+      if (!node) return;
+      linkDialogRef.current = node;
+      if (linkEditorKind === "modal") {
+        node.showModal?.();
+        linkTextRef.current?.focus();
+      }
+      return () => {
+        if (node.open) node.close?.();
+        if (linkDialogRef.current === node) linkDialogRef.current = null;
+      };
+    },
+    [linkEditorKind],
+  );
+  const bindLinkUrl = React.useCallback(
+    (node: HTMLInputElement | null) => {
+      if (!node) return;
+      linkUrlRef.current = node;
+      if (linkEditorKind === "popover") node.focus();
+      return () => {
+        if (linkUrlRef.current === node) linkUrlRef.current = null;
+      };
+    },
+    [linkEditorKind],
+  );
 
   React.useLayoutEffect(() => {
     const selection = pendingSelectionRef.current;
@@ -332,10 +396,10 @@ export const MarkdownEditor = React.forwardRef<
   const updateValue = React.useCallback(
     (nextValue: string) => {
       valueRef.current = nextValue;
-      setValue(nextValue);
+      dispatch({ type: "valueEdited", value: nextValue });
       onChange?.(nextValue);
     },
-    [onChange],
+    [dispatch, onChange],
   );
 
   /**
@@ -345,25 +409,19 @@ export const MarkdownEditor = React.forwardRef<
    * @returns Nothing.
    */
   const changeMode = (nextMode: string) => {
-    if (nextMode !== "source" && nextMode !== "visual") return;
+    if ((nextMode !== "source" && nextMode !== "visual") || nextMode === mode)
+      return;
     const nextValue = safeMarkdown(valueRef.current);
     updateValue(nextValue);
-    setMode(nextMode);
-    setActiveFormats([]);
-    if (nextMode === "visual") {
-      setFallback(false);
-      setLoading(true);
-    } else {
-      setLoading(false);
-    }
+    visualSessionRef.current = null;
+    visualRef.current = null;
+    dispatch({ type: "modeSelected", mode: nextMode });
   };
 
   /** Switches to the value-preserving Source fallback. */
   const handleVisualError = React.useCallback(() => {
-    setFallback(true);
-    setMode("source");
-    setLoading(false);
-  }, []);
+    dispatch({ type: "visualFailed", generation });
+  }, [dispatch, generation]);
 
   /**
    * Applies a toolbar format to the current Source selection.
@@ -397,35 +455,36 @@ export const MarkdownEditor = React.forwardRef<
         textareaRef.current.selectionEnd,
       ];
     }
-    setLinkError(false);
-    setLinkEditor({
-      existing: Boolean(context.url),
-      kind: context.text ? "popover" : "modal",
-      text: context.text,
-      url: context.url ?? "",
+    linkFields.reset({ text: context.text, url: context.url ?? "" });
+    dispatch({
+      type: "linkOpened",
+      context: {
+        existing: Boolean(context.url),
+        kind: context.text ? "popover" : "modal",
+        text: context.text,
+        url: context.url ?? "",
+      },
     });
   };
 
   /** Closes the link form and restores the active editing surface. */
   const closeLinkEditor = () => {
     linkDialogRef.current?.close?.();
-    setLinkEditor(null);
-    setLinkError(false);
+    dispatch({ type: "linkClosed" });
+    linkFields.reset();
     if (mode === "visual") visualRef.current?.focus();
     else textareaRef.current?.focus();
   };
 
-  /** Applies the current validated link form. */
-  const applyLink = () => {
-    if (!linkEditor?.text || !isSafeMarkdownLink(linkEditor.url)) {
-      setLinkError(Boolean(linkEditor?.url));
-      return;
-    }
-    if (mode === "visual") {
-      visualRef.current?.setLink(linkEditor.text, linkEditor.url);
-    } else {
-      updateSourceLink(linkEditor.text, linkEditor.url, false);
-    }
+  /**
+   * Applies the current validated link form.
+   * @param text - Link display text.
+   * @param url - Permitted relative or HTTP(S) destination.
+   */
+  const applyLink = (text: string, url: string) => {
+    if (!text || !isSafeMarkdownLink(url)) return;
+    if (mode === "visual") visualRef.current?.setLink(text, url);
+    else updateSourceLink(text, url, false);
     closeLinkEditor();
   };
 
@@ -433,7 +492,7 @@ export const MarkdownEditor = React.forwardRef<
   const removeLink = () => {
     if (!linkEditor?.existing) return;
     if (mode === "visual") visualRef.current?.removeLink();
-    else updateSourceLink(linkEditor.text, "", true);
+    else updateSourceLink(linkFields.state.values.text, "", true);
     closeLinkEditor();
   };
 
@@ -489,7 +548,7 @@ export const MarkdownEditor = React.forwardRef<
       className="grid gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        applyLink();
+        void linkFields.handleSubmit();
       }}
     >
       <h2 className="text-sm font-semibold" id={`${editorId}-link-title`}>
@@ -500,41 +559,56 @@ export const MarkdownEditor = React.forwardRef<
         )}
       </h2>
       {linkEditor.kind === "modal" ? (
-        <label className="grid gap-1 text-sm">
-          {t("web.markdownEditor.link.text")}
-          <Input
-            onChange={(event) =>
-              setLinkEditor((current) =>
-                current ? { ...current, text: event.target.value } : current,
-              )
-            }
-            required
-            ref={linkTextRef}
-            value={linkEditor.text}
-          />
-        </label>
+        <linkFields.Field name="text">
+          {(field) => (
+            <label className="grid gap-1 text-sm">
+              {t("web.markdownEditor.link.text")}
+              <Input
+                onChange={(event) => field.handleChange(event.target.value)}
+                required
+                ref={linkTextRef}
+                value={field.state.value}
+              />
+            </label>
+          )}
+        </linkFields.Field>
       ) : null}
-      <label className="grid gap-1 text-sm">
-        {t("web.markdownEditor.link.url")}
-        <Input
-          aria-invalid={linkError || undefined}
-          inputMode="url"
-          onChange={(event) => {
-            setLinkError(false);
-            setLinkEditor((current) =>
-              current ? { ...current, url: event.target.value } : current,
-            );
-          }}
-          required
-          ref={linkUrlRef}
-          value={linkEditor.url}
-        />
-      </label>
-      {linkError ? (
-        <p className="m-0 text-xs text-destructive" role="alert">
-          {t("web.markdownEditor.link.invalidUrl")}
-        </p>
-      ) : null}
+      <linkFields.Field
+        name="url"
+        validators={{
+          /**
+           * Rejects unsafe link destinations when the form is submitted.
+           * @param input - Field validation context.
+           * @param input.value - Edited link destination.
+           * @returns Existing localized error key, or undefined for a permitted URL.
+           */
+          onSubmit: ({ value }) =>
+            value && !isSafeMarkdownLink(value)
+              ? ("web.markdownEditor.link.invalidUrl" as const)
+              : undefined,
+        }}
+      >
+        {(field) => (
+          <>
+            <label className="grid gap-1 text-sm">
+              {t("web.markdownEditor.link.url")}
+              <Input
+                aria-invalid={field.state.meta.errors.length > 0 || undefined}
+                inputMode="url"
+                onChange={(event) => field.handleChange(event.target.value)}
+                required
+                ref={bindLinkUrl}
+                value={field.state.value}
+              />
+            </label>
+            {field.state.meta.errors.length ? (
+              <p className="m-0 text-xs text-destructive" role="alert">
+                {t("web.markdownEditor.link.invalidUrl")}
+              </p>
+            ) : null}
+          </>
+        )}
+      </linkFields.Field>
       <div className="flex flex-wrap justify-end gap-2">
         {linkEditor.existing ? (
           <Button onClick={removeLink} type="button" variant="destructive">
@@ -641,7 +715,7 @@ export const MarkdownEditor = React.forwardRef<
           </Button>
         </div>
         {mode === "visual" ? (
-          <div className="relative h-64">
+          <div className="relative h-64" ref={bindVisualSurface}>
             {loading ? (
               <span className="sr-only" role="status">
                 {t("web.markdownEditor.status.loading")}
@@ -659,12 +733,19 @@ export const MarkdownEditor = React.forwardRef<
                 ariaInvalid={invalid}
                 disabled={disabled}
                 label={label}
-                onChange={updateValue}
+                onChange={(value) => {
+                  if (visualSessionRef.current === generation)
+                    updateValue(value);
+                }}
                 onError={handleVisualError}
-                onSelectionChange={setActiveFormats}
+                onSelectionChange={(formats) => {
+                  if (visualSessionRef.current === generation)
+                    dispatch({ type: "selectionChanged", formats });
+                }}
                 onReady={(handle) => {
+                  if (visualSessionRef.current !== generation) return;
                   visualRef.current = handle;
-                  setLoading(false);
+                  dispatch({ type: "visualReady", generation });
                 }}
                 placeholder={placeholder}
                 readOnly={readOnly}
@@ -689,7 +770,10 @@ export const MarkdownEditor = React.forwardRef<
             id={editorId}
             onChange={(event) => updateValue(event.target.value)}
             onSelect={(event) =>
-              setActiveFormats(sourceActiveFormats(event.currentTarget))
+              dispatch({
+                type: "selectionChanged",
+                formats: sourceActiveFormats(event.currentTarget),
+              })
             }
             placeholder={placeholder}
             readOnly={readOnly}
@@ -714,7 +798,7 @@ export const MarkdownEditor = React.forwardRef<
           event.preventDefault();
           closeLinkEditor();
         }}
-        ref={linkDialogRef}
+        ref={bindLinkDialog}
       >
         {linkEditor?.kind === "modal" ? linkForm : null}
       </dialog>
@@ -754,8 +838,17 @@ export const MarkdownEditor = React.forwardRef<
  * @returns An empty fallback element.
  */
 function VisualLoadFailure(props: MarkdownVisualEditorProps) {
-  React.useEffect(() => props.onError(), [props]);
-  return <></>;
+  const { onError } = props;
+  const reported = React.useRef(false);
+  const report = React.useCallback(
+    (node: HTMLSpanElement | null) => {
+      if (!node || reported.current) return;
+      reported.current = true;
+      onError();
+    },
+    [onError],
+  );
+  return <span hidden ref={report} />;
 }
 
 /**

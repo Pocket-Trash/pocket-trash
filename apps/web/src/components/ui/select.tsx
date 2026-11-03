@@ -5,7 +5,7 @@ import {
   faChevronUp,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type * as React from "react";
+import type React from "react";
 import { cn } from "@/lib/utils";
 
 /**

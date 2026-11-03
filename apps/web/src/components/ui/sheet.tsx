@@ -2,7 +2,7 @@ import { Drawer as SheetPrimitive } from "@base-ui/react/drawer";
 import { faXmark } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { formatTranslation } from "@pocket-trash/localizations";
-import type * as React from "react";
+import type React from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
