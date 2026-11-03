@@ -1002,6 +1002,29 @@ type CatalogLookupMutationResult<
 /**
  * Schema for adding a configured product and optional button to a collection.
  */
+/** Owner-only structured metadata accepted at the item write boundary. */
+const collectionItemMetadataSchema = z.object({
+  statuses: z.object({
+    public: z.array(
+      z.enum(
+        ["grail", "favorite", "want_to_sell", "want_to_trade", "sold"],
+        "web.collectionItemMetadata.statusError",
+      ),
+    ),
+    private: z.array(
+      z.enum(
+        ["grail", "favorite", "want_to_sell", "want_to_trade", "sold"],
+        "web.collectionItemMetadata.statusError",
+      ),
+    ),
+  }),
+  saleDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "web.collectionItemMetadata.saleDateError")
+    .optional(),
+});
+
+/** Validated create-item fields, including optional owner metadata. */
 const collectionAddSchema = z
   .object({
     bearing: optionalBearingSchema,
@@ -1017,6 +1040,7 @@ const collectionAddSchema = z
     finishOptionId: idSchema.nullable(),
     materialAssignmentId: idSchema.nullable(),
     newCollection: collectionWriteSchema.nullable().optional().default(null),
+    metadata: collectionItemMetadataSchema.optional(),
     ownership: ownershipStartSchema.default({
       effectiveStartDate: null,
       entryReason: "unknown",
@@ -1130,6 +1154,7 @@ const collectionEditSchema = z
     installedRefillProductId: idSchema.nullable().optional(),
     magnetConfiguration: sliderMagnetConfigurationSchema.nullable().optional(),
     materialAssignmentId: idSchema.nullable().optional(),
+    metadata: collectionItemMetadataSchema.optional(),
     ownership: ownershipWriteSchema.optional(),
     reason: z.string().trim().max(1000).optional(),
     serialNumber: z
@@ -2329,6 +2354,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           materialAssignmentId,
           newCollection: parsed.data.newCollection,
           ownership: parsed.data.ownership,
+          metadata: parsed.data.metadata,
           productId: parsed.data.productId,
           productTypeSlug: penProductType.data,
           serialNumber: parsed.data.serialNumber,
@@ -2360,6 +2386,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               description: parsed.data.description,
               newCollection: parsed.data.newCollection,
               ownership: parsed.data.ownership,
+              metadata: parsed.data.metadata,
               serialNumber: parsed.data.serialNumber,
             })
           ).spinnerItemId;
@@ -2376,6 +2403,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             description: parsed.data.description,
             newCollection: parsed.data.newCollection,
             ownership: parsed.data.ownership,
+            metadata: parsed.data.metadata,
             productId: parsed.data.productId,
             serialNumber: parsed.data.serialNumber,
           });
@@ -2395,6 +2423,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             materialAssignmentId,
             newCollection: parsed.data.newCollection,
             ownership: parsed.data.ownership,
+            metadata: parsed.data.metadata,
             productId: parsed.data.productId,
             productTypeSlug,
             serialNumber: parsed.data.serialNumber,
@@ -2478,12 +2507,13 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
         collectionId: idSchema,
         collectionItemId: idSchema,
         userId: idSchema,
+        publicVersion: z.boolean().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
-    const viewer = await getResourceViewer();
+    const viewer = data.publicVersion ? undefined : await getResourceViewer();
     const item = await s.db.collections.getPublicItem({
       collectionId: data.collectionId,
       collectionItemId: data.collectionItemId,

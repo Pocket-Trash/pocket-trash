@@ -34,6 +34,7 @@ import {
 } from "@/components/catalog-filter-bar";
 import { CollectionCard } from "@/components/collection-card";
 import { CollectionGallery } from "@/components/collection-gallery";
+import { CollectionItemMetadataSection } from "@/components/collection-item-metadata-section";
 import { DirectorySearchStatus } from "@/components/directory-search";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
@@ -2253,6 +2254,19 @@ export function CollectionItemDetailPage({
             src={[...ownImages, ...productImages][0]?.url}
           />
         ) : null}
+        <CollectionItemMetadataSection
+          key={`${item.ownerUserId}-${item.collectionId}-${item.collectionItemId}-${item.isOwner}`}
+          statuses={item.metadata?.statuses ?? { public: [], private: [] }}
+          isOwner={Boolean(item.isOwner)}
+          identity={{
+            collectionId: item.collectionId,
+            collectionItemId: item.collectionItemId,
+            userId: item.ownerUserId,
+          }}
+          renderPublicVersion={(detail) => (
+            <CollectionItemDetailPage {...detail} />
+          )}
+        />
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
           <Detail label={t("web.catalog.field.name")}>{item.name}</Detail>
           <Detail label={t("web.catalog.field.productType")}>

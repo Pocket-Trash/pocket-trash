@@ -219,6 +219,107 @@ describe("standalone slider collection items", () => {
         productTypeSlug: "slider",
       });
 
+      await collectionsService.updateItem({
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+        metadata: {
+          statuses: { public: ["favorite"], private: ["favorite", "grail"] },
+        },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: {
+          statuses: { public: ["favorite"], private: ["favorite", "grail"] },
+        },
+      });
+      await expect(
+        collectionsService.updateItem({
+          actor: { clerkId: otherOwner.clerkId, role: "admin" },
+          collectionItemId: sliderItemId,
+          customFinish: null,
+          displayName: "Must not change",
+          finishOptionId: null,
+          metadata: { statuses: { public: [], private: [] } },
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        collectionsService.getOwnedItem(
+          { clerkId: otherOwner.clerkId, role: "admin" },
+          sliderItemId,
+        ),
+      ).resolves.toMatchObject({
+        metadata: { statuses: { public: [], private: [] } },
+      });
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "approved" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      await expect(
+        collectionsService.getPublicItem({
+          collectionId: destination.id,
+          collectionItemId: sliderItemId,
+          ownerUserId: owner.id,
+        }),
+      ).resolves.toMatchObject({
+        metadata: { statuses: { public: ["favorite"], private: [] } },
+      });
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "pending" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      const statusEdit = {
+        actor,
+        collectionItemId: sliderItemId,
+        customFinish: null,
+        displayName: "Moved slider",
+        finishOptionId: null,
+      };
+      await expect(
+        collectionsService.updateItem({
+          ...statusEdit,
+          metadata: { statuses: { public: ["sold"], private: [] } },
+        }),
+      ).rejects.toThrow("explicit sale date");
+      await collectionsService.updateItem({
+        ...statusEdit,
+        metadata: {
+          saleDate: "2025-01-20",
+          statuses: { public: ["sold"], private: ["sold"] },
+        },
+      });
+      await collectionsService.updateItem({
+        ...statusEdit,
+        metadata: { statuses: { public: [], private: ["sold"] } },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: { statuses: { public: [], private: ["sold"] } },
+        ownershipPeriods: [
+          expect.objectContaining({
+            effectiveEndDate: "2025-01-20",
+            exitReason: "sale",
+          }),
+        ],
+      });
+      await collectionsService.updateItem({
+        ...statusEdit,
+        metadata: { statuses: { public: [], private: [] } },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: { statuses: { public: [], private: [] } },
+        ownershipPeriods: [
+          expect.objectContaining({ effectiveEndDate: null, exitReason: null }),
+        ],
+      });
+
       const [initialPeriod] = await db
         .select()
         .from(schema.collectionItemOwnershipPeriod)
@@ -278,6 +379,12 @@ describe("standalone slider collection items", () => {
           exitReason: "sale",
           periodId: initialPeriod.id,
         },
+        metadata: { statuses: { public: [], private: [] } },
+      });
+      await expect(
+        collectionsService.getOwnedItem(actor, sliderItemId),
+      ).resolves.toMatchObject({
+        metadata: { statuses: { public: [], private: ["sold"] } },
       });
       await expect(
         collectionsService.updateItem({
