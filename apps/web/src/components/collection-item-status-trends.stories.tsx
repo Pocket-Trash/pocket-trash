@@ -142,3 +142,27 @@ export const Mobile: Story = {
   args: { selected: "favorite" },
   globals: { viewport: { value: "mobile1", isRotated: false } },
 };
+
+/** Published-profile Sold entries remain text because departed items have no public route. */
+export const PublicSold: Story = {
+  args: { publicView: true, selected: "sold" },
+  /**
+   * Verifies the public departure label and absence of a detail or edit destination.
+   * @param context - Public status results.
+   * @rejects When a departed public item exposes a link.
+   */
+  play: async (context) => {
+    await expect(context.canvas.getByText("Sold slider")).toBeVisible();
+    await expect(
+      context.canvas.getByText("Sold item; no public item page is available."),
+    ).toBeVisible();
+    await expect(
+      context.canvas.queryByRole("link", { name: "Sold slider" }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+/** Current items retain their public detail destinations. */
+export const PublicCurrent: Story = {
+  args: { publicView: true, selected: "favorite" },
+};

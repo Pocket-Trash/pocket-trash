@@ -321,6 +321,13 @@ export function UserTrendsPage({
         />
       </div>
 
+      <CollectionItemStatusTrends
+        items={statusItems}
+        publicView
+        selected={search.status}
+        onSelect={(status) => onSearchChange({ ...search, status })}
+      />
+
       {visualizations.map((visualization) => (
         <section
           aria-labelledby={`user-trends-${visualization.id}-title`}

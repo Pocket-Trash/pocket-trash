@@ -51,13 +51,14 @@ function PublicUserTrendsRoute() {
       onSearchChange={(nextSearch) =>
         void navigate({
           params: { username: owner.username ?? "" },
-          replace: true,
+          replace: nextSearch.status === search.status,
           search: nextSearch,
           to: "/users/$username/trends",
         })
       }
       publicUsername={owner.username ?? undefined}
       search={search}
+      statusItems={owner.statusItems}
     />
   );
 }
