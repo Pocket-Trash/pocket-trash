@@ -85,7 +85,7 @@ export function CollectionItemStatusTrends({
               onSelect(collectionItemStatusSearches[value - 1])
             }
             otherLabel={t("web.collectionItemStatusTrends.unstatused")}
-            trends={values}
+            trends={values.filter((value) => value.count > 0)}
           />
         ) : (
           <p role="status">{t("web.collectionItemStatusTrends.empty")}</p>
@@ -93,7 +93,7 @@ export function CollectionItemStatusTrends({
         <div className="min-w-0 rounded-md border border-border">
           <table
             aria-describedby={`${id}-overlap`}
-            className="w-full border-collapse text-sm"
+            className="w-full table-fixed border-collapse break-words text-sm"
           >
             <caption className="p-3 text-left font-semibold">
               {t("web.collectionItemStatusTrends.tableLabel")}
@@ -123,6 +123,7 @@ export function CollectionItemStatusTrends({
                         status: value.productTypeName,
                       })}
                       aria-pressed={selected === value.status}
+                      className="h-auto min-h-9 max-w-full whitespace-normal text-left"
                       onClick={() => onSelect(value.status)}
                       variant={
                         selected === value.status ? "secondary" : "ghost"
