@@ -36,17 +36,39 @@ export function assertMutationIsolation(
   }
 
   const baseUrl = new URL(required(environment, "E2E_BASE_URL"));
-  if (
+  const local = environment.E2E_TARGET === "local";
+  if (local) {
+    const database = new URL(required(environment, "DATABASE_URL"));
+    if (
+      baseUrl.href !== "http://localhost:4005/" ||
+      environment.API_URL !== "http://127.0.0.1:4006" ||
+      database.protocol !== "postgresql:" ||
+      database.hostname !== "127.0.0.1" ||
+      database.port !== "54330" ||
+      database.pathname !== "/pocket_trash_e2e" ||
+      database.username !== "e2e" ||
+      database.search ||
+      database.hash
+    ) {
+      throw new Error(
+        "Local mutations require the disposable loopback app, API, and database.",
+      );
+    }
+  } else if (
     baseUrl.protocol !== "https:" ||
     !baseUrl.hostname.endsWith(".vercel.app")
   ) {
     throw new Error("Mutation tests require a Vercel preview URL.");
   }
 
+  const runId = local ? required(environment, "E2E_RUN_ID") : undefined;
+  if (runId && !/^[1-9]\d*-[1-9]\d*$/u.test(runId))
+    throw new Error("Invalid mutation run identifier.");
+  const suffix = runId ? `/run-${runId}` : "";
   const databaseBranch = `preview-pr-${prNumber}`;
-  const imagePrefix = `images/preview/pr-${prNumber}`;
-  const resourcePrefix = `resources/preview/pr-${prNumber}`;
-  if (environment.E2E_DATABASE_BRANCH !== databaseBranch) {
+  const imagePrefix = `images/preview/pr-${prNumber}${suffix}`;
+  const resourcePrefix = `resources/preview/pr-${prNumber}${suffix}`;
+  if (!local && environment.E2E_DATABASE_BRANCH !== databaseBranch) {
     throw new Error("Mutation tests require the current PR database branch.");
   }
   if (environment.BUNNY_IMAGE_FOLDER_PREFIX !== imagePrefix) {
@@ -80,6 +102,7 @@ export async function verifyMutationTargets(
   fetchTarget: typeof fetch = fetch,
 ) {
   const isolation = assertMutationIsolation(environment);
+  if (environment.E2E_TARGET === "local") return isolation;
   const neonProjectId = required(environment, "NEON_PROJECT_ID");
   const neonHeaders = {
     Authorization: `Bearer ${required(environment, "NEON_API_KEY")}`,

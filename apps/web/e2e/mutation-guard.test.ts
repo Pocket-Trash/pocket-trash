@@ -56,6 +56,36 @@ const targetFetch: typeof fetch = async (input) => {
 };
 
 describe("mutation isolation guard", () => {
+  it("accepts only the disposable CI-local database without provider credentials", async () => {
+    const environment = {
+      ...isolatedEnvironment,
+      E2E_TARGET: "local",
+      E2E_RUN_ID: "123-1",
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/preview/pr-42/run-123-1",
+      BUNNY_RESOURCE_FOLDER_PREFIX: "resources/preview/pr-42/run-123-1",
+      E2E_BASE_URL: "http://localhost:4005",
+      API_URL: "http://127.0.0.1:4006",
+      DATABASE_URL: "postgresql://e2e:e2e@127.0.0.1:54330/pocket_trash_e2e",
+    };
+    await expect(
+      verifyMutationTargets(environment, async () => {
+        throw new Error("Provider API must not be called");
+      }),
+    ).resolves.toMatchObject({ prNumber: 42 });
+    for (const override of [
+      { DATABASE_URL: isolatedEnvironment.DATABASE_URL },
+      { E2E_RUN_ID: "" },
+      { BUNNY_IMAGE_FOLDER_PREFIX: "images/preview/pr-42" },
+      { BUNNY_RESOURCE_FOLDER_PREFIX: "resources/preview/pr-42/run-122-1" },
+      { DATABASE_URL: "postgresql://e2e:e2e@127.0.0.1:54330/production" },
+      { E2E_BASE_URL: isolatedEnvironment.E2E_BASE_URL },
+      { API_URL: "https://api.pocket-trash.app" },
+      { CLERK_SECRET_KEY: "sk_live_nope" },
+    ])
+      expect(() =>
+        assertMutationIsolation({ ...environment, ...override }),
+      ).toThrow();
+  });
   it("requires a bypass secret for protected Vercel previews", () => {
     expect(() => assertVercelPreviewAccess(isolatedEnvironment)).toThrow(
       "VERCEL_AUTOMATION_BYPASS_SECRET",
@@ -67,7 +97,7 @@ describe("mutation isolation guard", () => {
       }),
     ).not.toThrow();
     expect(() =>
-      assertVercelPreviewAccess({ E2E_BASE_URL: "http://127.0.0.1:4005" }),
+      assertVercelPreviewAccess({ E2E_BASE_URL: "http://localhost:4005" }),
     ).not.toThrow();
   });
 

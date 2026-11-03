@@ -113,7 +113,9 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       ERASURE_HMAC_SECRET: z.string().min(32),
       BUNNY_IMAGE_FOLDER_PREFIX: z
         .string()
-        .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u)
+        .regex(
+          /^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*(?:\/run-[1-9]\d*-[1-9]\d*)?)?))?$/u,
+        )
         .optional(),
       LOGGER: z.enum(["compact", "verbose"]).optional(),
       LOG_DEPLOYMENT_ID: z.string().min(1).optional(),
@@ -129,7 +131,9 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       BUNNY_CDN_TOKEN_KEY: z.string().min(1).optional(),
       BUNNY_RESOURCE_FOLDER_PREFIX: z
         .string()
-        .regex(/^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u)
+        .regex(
+          /^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*(?:\/run-[1-9]\d*-[1-9]\d*)?)?)$/u,
+        )
         .optional(),
       BUNNY_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
       BUNNY_STORAGE_ENDPOINT: z.string().url().optional(),

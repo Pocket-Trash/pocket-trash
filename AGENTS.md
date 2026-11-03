@@ -32,7 +32,7 @@
     authentication, web/API contracts, Playwright configuration, or important
     user-visible workflows. Skip it for documentation-only changes and code
     that cannot affect a browser workflow. The command excludes mutation tests;
-    run those only through CI against an isolated `preview-pr-*` environment.
+    run those through the CI-local disposable app/API and Postgres environment.
     Add the `test:e2e` PR label when you need to force CI. If preview access or
     credentials are unavailable, report the skipped local check and verify the
     E2E CI result. See [`docs/e2e-testing.md`](docs/e2e-testing.md).

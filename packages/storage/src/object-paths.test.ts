@@ -11,6 +11,7 @@ describe("object paths", () => {
     ["images", "products", "1149", "43088626188475"],
     ["images", "products", "1141-285459", "43088626188475"],
     ["images/dev", "products", "1000", hash],
+    ["images/preview/pr-52/run-123-1", "collections", "42", hash],
     ["images/preview/pr-52", "collections", "42", hash],
     ["images", "collection-items", "77", hash],
     ["images", "resources", "1203", hash],

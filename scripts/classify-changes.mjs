@@ -120,7 +120,9 @@ const changeClassificationRules = [
   },
   {
     category: "web-mutation-makers-source",
-    patterns: [/^apps\/web\/src\/.*maker.*$/u],
+    patterns: [
+      /^apps\/web\/src\/(?:.*admin[./-]makers.*|pages\/maker-detail-page.*)$/u,
+    ],
     domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
     mutationDomains: ["makers"],
   },
@@ -138,7 +140,11 @@ const changeClassificationRules = [
       "apps/web/src/pages/catalog-pages.test.tsx",
       "apps/web/src/pages/catalog-pages.tsx",
     ],
-    patterns: [/^apps\/web\/src\/.*collection.*$/u],
+    patterns: [
+      /^apps\/web\/src\/components\/collection-(?:form|selector|gallery|cover-manager|image-uploader).*$/u,
+      /^apps\/web\/src\/pages\/(?:collection-(?:add|edit)-page|user-collections-page).*$/u,
+      /^apps\/web\/src\/routes\/(?:collections\.(?:add|edit)|user\.collections_\.(?:add|\$collectionId_\.edit)).*$/u,
+    ],
     domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
     mutationDomains: ["collections"],
   },
@@ -148,6 +154,7 @@ const changeClassificationRules = [
       "apps/web/e2e/auth.ts",
       "apps/web/e2e/global.setup.ts",
       "apps/web/e2e/mutation-fixture.ts",
+      "apps/web/e2e/prepare-local.ts",
       "apps/web/e2e/mutation-guard.test.ts",
       "apps/web/e2e/mutation-guard.ts",
       "apps/web/e2e/mutation.spec.ts",
@@ -499,7 +506,10 @@ export function classifyChanges(
   const labelEvent =
     eventName === "pull_request" &&
     ["labeled", "unlabeled"].includes(action) &&
-    !(action === "labeled" && eventLabel === "preview:webhooks");
+    !(
+      action === "labeled" &&
+      ["preview:webhooks", "preview:isolated"].includes(eventLabel)
+    );
   const domains = everyDomain(false);
   const mutationDomains = new Set();
   const noCodePaths = [];
@@ -580,6 +590,9 @@ export function classifyChanges(
     enable(domains, "preview", "safe_e2e", "mutation_e2e");
     for (const domain of allMutationDomains) mutationDomains.add(domain);
   }
+
+  if (action === "labeled" && eventLabel === "preview:isolated")
+    enable(domains, "preview", "validation");
 
   const mutationSpecs = selectMutationSpecs(mutationDomains);
   domains.mutation_e2e = mutationSpecs.length > 0;

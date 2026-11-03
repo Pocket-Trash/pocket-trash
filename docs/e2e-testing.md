@@ -1,8 +1,8 @@
 # End-to-End Testing
 
-Pocket Trash runs Chromium Playwright tests from `apps/web/e2e` against a
-deployed Vercel preview. The suite uses Clerk development users and keeps one
-worker in CI.
+Pocket Trash runs Chromium Playwright smoke tests against deployed Vercel previews
+and mutation tests against the local app/API and disposable Postgres in CI.
+Both suites use Clerk development users and one worker in CI.
 
 ## Test users
 
@@ -56,30 +56,52 @@ E2E_BASE_URL=https://example.vercel.app pnpm e2e
 
 The root command delegates to the web package's safe E2E suite. It reads Clerk
 and test-user values from the web Infisical path and always excludes mutation
-fixtures. Run mutation tests only through CI against isolated `preview-pr-*`
-resources.
+fixtures. CI runs mutation fixtures separately against disposable local infrastructure.
 
 ## CI
 
-The Deploy workflow runs only for preview-relevant changes. Safe E2E runs for
-web, API, and shared-service changes. Mutation-relevant changes create or reuse
-`preview-pr-<number>`, configure the matching Vercel database override, and
-assign both Bunny prefixes before Playwright starts. Database migrations are
-one reason for mutation isolation, not a requirement for it.
+The Deploy workflow keeps deployed smoke tests separate from mutation tests.
+The Mutation E2E job depends only on change classification, so unavailable preview
+capacity or a failed preview deployment cannot skip required write coverage.
+The `test:e2e` label forces both suites without requesting a Neon branch.
 
-The persistent `test:e2e` pull-request label forces both suites and isolated
-resources for the current head and later commits until the label is removed.
-Playwright runs in a separate E2E job after preview deployment, so rerunning a
-failed E2E job reuses the successful preview deployment.
+Mutation tests start the real Vite app, local Wrangler API, Postgres 17, and a
+restricted WebSocket proxy using `scripts/e2e-mutations.sh`. The proxy retains
+the application Neon driver's transaction behavior. CI applies the complete
+migration chain, seeds catalog lookups, and mirrors the configured Clerk test
+users into the disposable database. It does not change Clerk users or roles.
+The database and proxy are removed on success, failure, or termination. Fixture
+cleanup removes created storage objects; PR-close cleanup remains the fallback
+for canceled runs. Local tests use a per-run folder below the PR's guarded Bunny prefixes,
+so retries and deployed previews cannot share mutable objects.
 
-Before any mutation, the guard verifies these exact boundaries:
+The local mutation guard accepts only `http://localhost:4005`, the API at
+`http://127.0.0.1:4006`, and the `pocket_trash_e2e` database through the proxy at
+`127.0.0.1:54330`. Playwright starts fresh servers rather than reusing existing
+processes. Both local and deployed mutation guards require development Clerk
+keys and the current PR's image/resource prefixes. Existing deployed-target
+verification still checks Vercel and Neon ownership if that mode is used.
 
-- The Vercel deployment API reports that the exact target URL is a preview.
-- The Neon API reports that the `DATABASE_URL` host belongs to the exact PR
-  branch.
-- Clerk keys are development keys.
-- `preview-pr-<number>`, `images/preview/pr-<number>`, and
-  `resources/preview/pr-<number>` for the current pull request.
+For schema/seed changes, previews still use `preview-pr-<number>`. Add the
+`preview:isolated` label to request the same isolation for manual write testing.
+The `preview-db` label reports that preview requirement; it no longer reports
+CI mutation-test selection. Directory-only and editor changes avoid mutation
+fixtures; shared files containing write actions retain their coverage.
+
+To reproduce a mutation run with preview web credentials injected, build workspace
+dependencies, install Playwright Chromium, and run:
+
+```sh
+E2E_PR_NUMBER=<pr-number> bash scripts/e2e-mutations.sh
+```
+
+Pass specific `e2e/*.spec.ts` paths to run a subset. Docker Compose and free ports
+4005, 4006, 54329, and 54330 are required. Use the dedicated test accounts; the
+collection fixtures clear their collections in the disposable database.
+
+Local mutation tests cover database persistence and the local Workers runtime.
+They do not verify deployed Vercel/Cloudflare routing, protection, or environment
+bindings. Deployed read-only smoke tests retain that integration coverage.
 
 The fixtures create uniquely named catalog lookups, selectable finishes,
 products, optional private collections, collection items, and one text object.
