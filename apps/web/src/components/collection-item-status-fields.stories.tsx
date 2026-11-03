@@ -130,14 +130,15 @@ export const HiddenPublic: Story = {
       name: "Public metadata is currently hidden",
     });
     await expect(warnings).toHaveLength(1);
-    await userEvent.hover(
+    await context.userEvent.hover(
       canvas.getByRole("button", {
         name: "Public metadata is currently hidden",
       }),
     );
     await expect(
-      await within(context.canvasElement.ownerDocument.body).findByRole(
-        "tooltip",
+      await within(context.canvasElement.ownerDocument.body).findByText(
+        "This metadata is saved as public, but is hidden while the collection is private.",
+        { selector: "[data-slot='tooltip-content']" },
       ),
     ).toHaveTextContent("hidden while the collection is private");
   },
