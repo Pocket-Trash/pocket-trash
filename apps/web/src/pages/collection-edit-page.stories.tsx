@@ -4,7 +4,7 @@ import type {
   UserCollectionSummary,
 } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, within } from "storybook/test";
+import { expect, waitFor, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionEditPage } from "./catalog-form-pages";
 
@@ -352,6 +352,12 @@ export const OwnershipPrices: Story = {
     await expect(
       context.canvas.getByRole("textbox", { name: "Price sold" }),
     ).toHaveValue("185.00");
+    await context.userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(
+        within(context.canvasElement.ownerDocument.body).queryByRole("listbox"),
+      ).not.toBeInTheDocument(),
+    );
   },
 };
 
