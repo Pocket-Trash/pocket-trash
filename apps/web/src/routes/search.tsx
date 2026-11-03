@@ -7,7 +7,7 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import * as React from "react";
+import React from "react";
 import { searchPublic } from "@/lib/search";
 import {
   SEARCH_QUERY_MAX_LENGTH,

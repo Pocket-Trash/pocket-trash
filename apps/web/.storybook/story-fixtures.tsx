@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import * as React from "react";
+import React from "react";
 import { fn, mocked } from "storybook/test";
 import { applyTheme, type ThemeMode } from "../src/lib/theme";
 import type { UserSettingsState } from "../src/lib/user-settings";

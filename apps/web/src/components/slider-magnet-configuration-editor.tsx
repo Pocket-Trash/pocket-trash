@@ -9,7 +9,7 @@ import {
   sliderMagnetLayoutDetails,
 } from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
-import * as React from "react";
+import React from "react";
 
 /**
  * Formats localized editor copy.

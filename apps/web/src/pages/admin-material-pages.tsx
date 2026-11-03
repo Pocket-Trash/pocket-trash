@@ -19,7 +19,7 @@ import {
 } from "@package/services/constants";
 import { useForm, useStore } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import * as React from "react";
+import React from "react";
 import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";

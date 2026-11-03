@@ -32,7 +32,7 @@ import {
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
-import * as React from "react";
+import React from "react";
 import { createPortal } from "react-dom";
 import {
   type EffectEntity,

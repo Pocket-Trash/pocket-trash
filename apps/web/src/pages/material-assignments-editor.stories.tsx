@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useForm, useStore } from "@tanstack/react-form";
-import * as React from "react";
+import React from "react";
 import { expect, waitFor, within } from "storybook/test";
 import type { CatalogOptions } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
