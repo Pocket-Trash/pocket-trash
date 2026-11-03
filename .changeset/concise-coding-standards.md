@@ -2,4 +2,4 @@
 "@app/web": patch
 ---
 
-Consolidate concise coding standards and preserve operational runbooks.
+Consolidate agent coding standards under one index and remove superseded guides.
