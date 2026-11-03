@@ -53,3 +53,9 @@ describe("AdminUsersPage", () => {
     expect(html).toContain('role="status"');
   });
 });
+
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /** Supplies the user-access administrator identity.
+   * @returns Current account context. */
+  useAuth: () => ({ userId: "user_admin" }),
+}));
