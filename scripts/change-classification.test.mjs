@@ -724,7 +724,7 @@ test("assigns every mutation specification to an explicit domain", () => {
 
 test("returns intentional no-code paths explicitly", () => {
   const paths = [
-    "docs/storybook.md",
+    "docs/coding-standards-references/testing.md",
     "decisions/data/eng-404-pens-domain-baseline.md",
     ".changeset/calm-rules.md",
     "CONTEXT.md",
@@ -811,11 +811,13 @@ test("CLI fails open and exposes a stable error when the diff is unavailable", (
 
 test("applies persistent label overrides additively", () => {
   assert.deepEqual(
-    classifyChanges(["docs/storybook.md"], {
+    classifyChanges(["docs/coding-standards-references/testing.md"], {
       action: "labeled",
       labels: ["test:storybook"],
     }),
-    expected(["storybook"], { noCodePaths: ["docs/storybook.md"] }),
+    expected(["storybook"], {
+      noCodePaths: ["docs/coding-standards-references/testing.md"],
+    }),
   );
   assert.deepEqual(
     classifyChanges(["apps/api/src/index.ts"], {

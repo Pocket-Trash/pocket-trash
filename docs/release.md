@@ -61,19 +61,7 @@ deployment succeeds.
 
 ## Dependency Security
 
-Use Node 24.21.0 or newer within Node 24 and pnpm 11.27.1. Installs reject
-external package releases younger than seven days, missing publication times,
-and lockfiles that do not satisfy the current policy. Run the blocking audit
-before building or deploying:
-
-```sh
-pnpm security:audit
-```
-
-For an urgent security release, add only the reviewed exact package version to
-`minimumReleaseAgeExclude` in `pnpm-workspace.yaml`. Include a YAML comment with
-the Linear issue, reason, and UTC maturity/removal time, then remove the entry
-after it matures. Never lower `minimumReleaseAge` or add a scope wildcard.
+Use the Node and pnpm versions declared in [package.json](../package.json). Follow [dependency coding standards](coding-standards-references/dependencies-secrets.md) for release-age policy, approved exact-version exceptions and security audits.
 
 Roy must approve each vulnerability exception. Every exception requires a GHSA,
 an owner, a follow-up Linear issue, and a UTC expiry within seven days.

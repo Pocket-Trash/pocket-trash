@@ -6,11 +6,7 @@ implementations. This runbook covers repository and Neon operations.
 
 ## Product detail table names
 
-Catalog product-type detail tables use the reserved `product_detail_*` prefix,
-and collection-item product-type detail tables use `collection_detail_*`.
-`product` and `collection_item` remain the shared-ID base tables. Supporting
-entities, lookups, options, images, aliases, and relationships do not use either
-detail prefix.
+Follow [database naming standards](coding-standards-references/database.md).
 
 ## Migrations
 
@@ -36,26 +32,13 @@ checks migration-history consistency with:
 pnpm --filter @package/database db:check
 ```
 
-Neon connection strings commonly use `sslmode=require`. Local commands and
-deployment workflows promote that value to `sslmode=verify-full` so PostgreSQL
-clients continue to verify the server certificate and hostname. Keep
-`channel_binding=require`; do not add `uselibpqcompat=true` to suppress SSL
-warnings because it opts into weaker libpq `require` semantics.
-
-Drizzle records applied migration names, timestamps, and SQL hashes in
-`drizzle.__drizzle_migrations`. Validation compares named sets, not a highest
-timestamp or an ordered prefix. Never edit applied SQL, snapshots, or ledger rows.
-Functions and triggers unsupported by schema generation belong in a custom
-migration after their dependent tables:
+Generate custom SQL for functions or triggers after their dependent tables:
 
 ```sh
 pnpm --filter @package/database db:generate --custom --name=database_protections
 ```
 
-After adding custom SQL, unchanged schema generation must still emit no DDL.
-Use `pnpm db:validate:chain` to replay native migrations twice on disposable
-PGlite, and `pnpm db:validate:personal` to compare the selected personal Neon
-history read-only.
+Follow [database coding standards](coding-standards-references/database.md) for immutable artifacts, custom SQL ordering, verified TLS, and chain/personal-history validation.
 
 ## Local Database Selection
 

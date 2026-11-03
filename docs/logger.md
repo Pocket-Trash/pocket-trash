@@ -72,22 +72,9 @@ GitHub Actions authenticates to Infisical through OIDC. See
 
 ## Redaction And Observability
 
-- Use stable names from `loggerMessages`; place changing values in
-  `attributes`.
-- Never log raw Clerk IDs, user IDs, credentials, tokens, cookies, database
-  URLs, or request authorization data. Service code should use the existing
-  hashed-identifier helpers.
-- Sensitive key names are redacted recursively before transport delivery.
-  Client events are validated and redacted again by the server ingestion
-  endpoint.
-- Raw payloads require explicit call-site opt-in. Prefer the API and database
-  payload summarizers.
-- `LOGGER=verbose` exposes the complete redacted event in development
-  terminals. Leave it unset for compact output.
-- Keep `app`, deployment fields, and environment accurate so an event can be
-  traced to its runtime.
-- Generate `eventId` once at the original emitter and preserve it through the
-  browser proxy, Axiom, direct notification transport, and Discord queue.
+Follow [logging standards](coding-standards-references/logging.md).
+
+`LOGGER=verbose` exposes complete redacted events in development terminals; leave it unset for compact output.
 
 Production `error` and `fatal` events from `api`, `web`, and `scraper` also use
 the filtered server-only notification transport. It projects only the version,
