@@ -256,3 +256,104 @@ export const AnonymousOnly: Story = {
 
 /** Anonymous totals and empty live results remain readable in the dark theme. */
 export const Dark: Story = { ...AnonymousOnly, globals: { theme: "dark" } };
+
+/** Thresholded catalog rows contain no collector or collection-item identity. */
+const anonymousProducts = [
+  {
+    status: "favorite" as const,
+    productId: "44",
+    productName: "Anonymous titanium slider",
+    productSlug: "anonymous-slider",
+    productTypeSlug: "slider",
+    approximateItemCount: 10,
+    contributorCountBand: 5,
+  },
+  {
+    status: "sold" as const,
+    productId: "55",
+    productName: "Anonymous sold spinner",
+    productSlug: "anonymous-spinner",
+    productTypeSlug: "spinner",
+    approximateItemCount: 5,
+    contributorCountBand: 5,
+  },
+];
+
+/** Selected anonymous product groups coexist with live public item results. */
+export const AnonymousCatalog: Story = {
+  args: {
+    publicView: true,
+    selected: "favorite",
+    totals: [
+      { status: "favorite", approximateItemCount: 15, contributorCountBand: 5 },
+    ],
+    anonymousProducts,
+  },
+  /**
+   * Checks selection scope and catalog-only destinations while preserving current item links.
+   * @param context - Anonymous product rows and public item cards.
+   * @rejects When product rows expose a user or collection-item destination.
+   */
+  play: async (context) => {
+    const group = within(
+      context.canvas.getByRole("region", {
+        name: "Products from anonymous status totals",
+      }),
+    );
+    await expect(
+      group.getByRole("link", { name: "Anonymous titanium slider" }),
+    ).toHaveAttribute("href", "/products/slider/anonymous-slider");
+    await expect(
+      group.queryByRole("link", { name: "Anonymous sold spinner" }),
+    ).not.toBeInTheDocument();
+    for (const link of group.getAllByRole("link"))
+      await expect(link.getAttribute("href")).toMatch(/^\/products\//);
+    await expect(
+      context.canvas.getByRole("link", { name: "Titanium spinner" }),
+    ).toHaveAttribute("href", "/collections/3/2/1");
+  },
+};
+
+/** Public Sold entries stay text beside anonymous catalog product links. */
+export const SoldCatalog: Story = {
+  args: {
+    publicView: true,
+    selected: "sold",
+    totals: [
+      { status: "sold", approximateItemCount: 10, contributorCountBand: 5 },
+    ],
+    anonymousProducts,
+  },
+  /**
+   * Verifies the two departure presentations expose only the intended destination.
+   * @param context - Sold item and anonymous product presentations.
+   * @rejects When a departed item becomes linked.
+   */
+  play: async (context) => {
+    await expect(context.canvas.getByText("Sold slider")).toBeVisible();
+    await expect(
+      context.canvas.queryByRole("link", { name: "Sold slider" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      context.canvas.getByRole("link", { name: "Anonymous sold spinner" }),
+    ).toHaveAttribute("href", "/products/spinner/anonymous-spinner");
+  },
+};
+
+/** Suppressed product groups leave no anonymous row or empty disclosure. */
+export const SuppressedCatalog: Story = {
+  args: {
+    publicView: true,
+    selected: "favorite",
+    totals: [
+      { status: "favorite", approximateItemCount: 15, contributorCountBand: 5 },
+    ],
+    anonymousProducts: [],
+  },
+};
+
+/** Anonymous catalog destinations and contributor bands remain accessible in dark theme. */
+export const AnonymousCatalogDark: Story = {
+  ...AnonymousCatalog,
+  globals: { theme: "dark" },
+};

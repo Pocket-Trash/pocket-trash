@@ -502,6 +502,7 @@ export function TrendsPage({
             items={statusItems}
             publicView
             totals={statusTrends?.values ?? []}
+            anonymousProducts={statusTrends?.productValues ?? []}
             selected={search.status}
             onSelect={(status) => onSearchChange({ ...search, status })}
           />
