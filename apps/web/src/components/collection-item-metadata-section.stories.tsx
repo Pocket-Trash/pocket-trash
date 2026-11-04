@@ -93,3 +93,40 @@ export const PublicPaidPrice: Story = {
     await expect(context.canvas.getByText("¥0")).toBeVisible();
   },
 };
+
+/** Public notes render Markdown while private bodies remain outside the active public scope. */
+export const NoteScopes: Story = {
+  args: {
+    notes: [
+      {
+        id: "public-note",
+        name: "Setup",
+        content: "A **ceramic** bearing.",
+        isPublic: true,
+        position: 0,
+      },
+      {
+        id: "private-note",
+        name: "Condition",
+        content: "**Owner secret** condition.",
+        isPublic: false,
+        position: 0,
+      },
+    ],
+  },
+  /**
+   * Verifies rendered Markdown and one metadata scope at a time.
+   * @param context - Detail metadata canvas and browser interactions.
+   */
+  play: async (context) => {
+    await expect(context.canvas.getByText("ceramic")).toBeVisible();
+    await expect(
+      context.canvas.queryByText("Owner secret"),
+    ).not.toBeInTheDocument();
+    await context.userEvent.click(
+      context.canvas.getByRole("button", { name: /^Private$/ }),
+    );
+    await expect(context.canvas.getByText("Owner secret")).toBeVisible();
+    await expect(context.canvas.queryByText("ceramic")).not.toBeInTheDocument();
+  },
+};

@@ -72,11 +72,13 @@ export function CollectionItemStatusFields(props: {
       open={props.editing || undefined}
     >
       <summary className="cursor-pointer focus-visible:outline focus-visible:outline-ring">
-        {t(
-          props.editing
-            ? "web.collectionItemMetadata.editDisclosure"
-            : "web.collectionItemMetadata.addDisclosure",
-        )}
+        <h2 className="inline">
+          {t(
+            props.editing
+              ? "web.collectionItemMetadata.editDisclosure"
+              : "web.collectionItemMetadata.addDisclosure",
+          )}
+        </h2>
       </summary>
       <div className="grid gap-4 pt-4 sm:grid-cols-2">
         {(["public", "private"] as const).map((scope) => (

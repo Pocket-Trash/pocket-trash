@@ -18,7 +18,10 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import { type Actor, hasPermission } from "../../authorization.js";
 import { nextAvailableSlug, slugify } from "../../catalog-slug.js";
-import { normalizeCatalogSearch } from "../../catalog-terminology.js";
+import {
+  normalizeCatalogSearch,
+  normalizeCollectionName,
+} from "../../catalog-terminology.js";
 import {
   type SliderMagnetConfiguration,
   type SliderMagnetLayout,
@@ -1958,6 +1961,32 @@ export type CollectionItemOwnershipStart = Pick<
   "effectiveStartDate" | "entryReason"
 >;
 
+export { normalizeCollectionName };
+
+/** One saved, visibility-scoped Markdown note in its independently ordered group. */
+export type CollectionItemNote = {
+  /** Stable note identifier. */
+  id: string;
+  /** Trimmed user-visible name, unique after collection-name normalization. */
+  name: string;
+  /** Trimmed Markdown body, visible only in authorized projections. */
+  content: string;
+  /** Saved public designation, retained while parent visibility blocks publication. */
+  isPublic: boolean;
+  /** Contiguous zero-based position within the note's visibility group. */
+  position: number;
+};
+/** A note replacement submitted with the caller's item transaction. */
+export type CollectionItemNoteWrite = Omit<
+  CollectionItemNote,
+  "id" | "position"
+> & {
+  /** Final requested position after scope changes and any subsequent manual ordering. */
+  position: number;
+  /** Existing or client-generated identifier; omitted identifiers are generated on save. */
+  id?: string;
+};
+
 /** An exact non-negative amount in the persisted currency's minor units. */
 export type MoneyValue = {
   /** Integer amount in minor units, including zero. */
@@ -1967,6 +1996,8 @@ export type MoneyValue = {
 };
 /** Metadata visible to an owner or already redacted for another viewer. */
 export type CollectionItemMetadata = {
+  /** Notes already redacted and ordered for this viewer. */
+  notes?: CollectionItemNote[];
   /** Independently selected status scopes. */
   statuses: CollectionItemStatusState;
   /** Paid price, when visible to this viewer. */
@@ -1989,6 +2020,8 @@ export type CollectionItemStatusState = {
 };
 /** Owner-managed metadata; omission preserves all saved assignments. */
 export type CollectionItemMetadataWrite = {
+  /** Replacement notes; omission preserves them and an empty array deletes all. */
+  notes?: CollectionItemNoteWrite[];
   /** Replacement paid price for the selected ownership period; omit to clear. */
   pricePaid?: MoneyValue & {
     /** Saved paid-price visibility. */ isPublic: boolean;
@@ -8930,23 +8963,6 @@ function failProductLoad(): never {
 }
 
 /**
- * Builds a case-insensitive collection-name key.
- *
- * Trims whitespace, removes diacritics and punctuation, and lowercases letters.
- *
- * @param name - Display name to convert into a comparison key.
- * @returns Normalized collection name.
- */
-export function normalizeCollectionName(name: string) {
-  return name
-    .trim()
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-/**
  * Validates and normalizes one reusable slider magnet preset write.
  *
  * @param input - Candidate name, layout, and configuration.
@@ -9461,6 +9477,8 @@ async function applyCollectionItemMetadata(
         ? false
         : pricePeriodBefore?.exitReason === "sale",
     );
+  if (metadata?.notes !== undefined)
+    await applyCollectionItemNotes(tx, collectionItemId, metadata.notes);
 }
 
 /**
@@ -9536,6 +9554,130 @@ async function applyCollectionItemPrices(
       updatedAt: new Date(),
     })
     .where(eq(schema.collectionItemOwnershipPeriod.id, period.id));
+}
+
+/**
+ * Replaces owner notes with canonical per-scope order inside the item transaction.
+ * @param tx - Owner-authorized transaction holding the collection-item lock.
+ * @param collectionItemId - Physical item whose notes are being replaced.
+ * @param input - Complete replacement note list with independently requested scope positions.
+ * @returns Completion after normalized names, visibility moves, order, and deletions are persisted.
+ * @rejects With localized field errors for invalid notes; database failures omit private query parameters.
+ */
+async function applyCollectionItemNotes(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+  input: CollectionItemNoteWrite[],
+) {
+  const saved = await tx
+    .select()
+    .from(schema.collectionItemNote)
+    .where(eq(schema.collectionItemNote.collectionItemId, collectionItemId));
+  const savedById = new Map(saved.map((note) => [note.id, note]));
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  const notes = input.map((note) => {
+    if (typeof note.name !== "string")
+      throw new Error("web.collectionItemMetadata.noteNameError");
+    if (typeof note.content !== "string")
+      throw new Error("web.collectionItemMetadata.noteContentError");
+    const name = note.name.trim();
+    const content = note.content.trim();
+    if ([...name].length < 1 || [...name].length > 100)
+      throw new Error("web.collectionItemMetadata.noteNameError");
+    if ([...content].length < 5 || [...content].length > 2000)
+      throw new Error("web.collectionItemMetadata.noteContentError");
+    if (!Number.isSafeInteger(note.position) || note.position < 0)
+      throw new Error("web.collectionItemMetadata.notePositionError");
+    if (
+      typeof note.isPublic !== "boolean" ||
+      (note.id !== undefined && typeof note.id !== "string")
+    )
+      throw new Error("web.collectionItemMetadata.saveError");
+    const id = note.id === undefined ? crypto.randomUUID() : note.id.trim();
+    if (!id || id.length > 100 || ids.has(id))
+      throw new Error("web.collectionItemMetadata.saveError");
+    ids.add(id);
+    const normalizedName = normalizeCollectionName(name);
+    if (names.has(normalizedName))
+      throw new Error("web.collectionItemMetadata.duplicateNoteNameError");
+    names.add(normalizedName);
+    return {
+      id,
+      collectionItemId,
+      name,
+      normalizedName,
+      content,
+      isPublic: note.isPublic,
+      position: note.position,
+    };
+  });
+  for (const isPublic of [true, false]) {
+    const group = notes
+      .filter((note) => note.isPublic === isPublic)
+      .sort((a, b) => a.position - b.position);
+    group.forEach((note, position) => {
+      note.position = position;
+    });
+  }
+  try {
+    await tx.delete(schema.collectionItemNote).where(
+      and(
+        eq(schema.collectionItemNote.collectionItemId, collectionItemId),
+        notes.length
+          ? notInArray(
+              schema.collectionItemNote.id,
+              notes.map((note) => note.id),
+            )
+          : undefined,
+      ),
+    );
+    for (const note of notes) {
+      const previous = savedById.get(note.id);
+      if (previous && previous.normalizedName !== note.normalizedName) {
+        await tx
+          .update(schema.collectionItemNote)
+          .set({ normalizedName: `note:${note.id}:pending` })
+          .where(
+            and(
+              eq(schema.collectionItemNote.collectionItemId, collectionItemId),
+              eq(schema.collectionItemNote.id, note.id),
+            ),
+          );
+      }
+    }
+    for (const note of notes) {
+      const previous = savedById.get(note.id);
+      if (!previous) await tx.insert(schema.collectionItemNote).values(note);
+      else if (
+        previous.normalizedName !== note.normalizedName ||
+        previous.name !== note.name ||
+        previous.content !== note.content ||
+        previous.isPublic !== note.isPublic ||
+        previous.position !== note.position
+      ) {
+        await tx
+          .update(schema.collectionItemNote)
+          .set({
+            name: note.name,
+            normalizedName: note.normalizedName,
+            content: note.content,
+            isPublic: note.isPublic,
+            position: note.position,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.collectionItemNote.collectionItemId, collectionItemId),
+              eq(schema.collectionItemNote.id, note.id),
+            ),
+          );
+      }
+    }
+  } catch {
+    // Query errors may contain Markdown parameters; keep private bodies out of operation logs.
+    throw new Error("web.collectionItemMetadata.saveError");
+  }
 }
 
 /**
@@ -11536,6 +11678,37 @@ async function queryOwnedItems(
         startDateImputed: period.startDateImputed,
         startedRecordedAt: period.startedRecordedAt,
         updatedAt: period.updatedAt,
+      });
+    }
+    const notes = await db
+      .select()
+      .from(schema.collectionItemNote)
+      .where(inArray(schema.collectionItemNote.collectionItemId, itemIds))
+      .orderBy(
+        desc(schema.collectionItemNote.isPublic),
+        asc(schema.collectionItemNote.position),
+        asc(schema.collectionItemNote.id),
+      );
+    const publiclyVisibleItems = new Set(
+      visibleRows
+        .filter((row) => row.metadataPubliclyVisible)
+        .map((row) => row.collectionItemId),
+    );
+    for (const item of items) if (item.metadata) item.metadata.notes = [];
+    for (const note of notes) {
+      const item = itemsById.get(note.collectionItemId);
+      if (
+        !item?.metadata ||
+        (!item.isOwner &&
+          (!publiclyVisibleItems.has(item.collectionItemId) || !note.isPublic))
+      )
+        continue;
+      item.metadata.notes?.push({
+        id: note.id,
+        name: note.name,
+        content: note.content,
+        isPublic: note.isPublic,
+        position: note.position,
       });
     }
     const viewer = options.viewerClerkId

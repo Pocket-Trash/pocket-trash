@@ -49,6 +49,7 @@ import {
   type CollectionFormValue,
   CollectionImageUploader,
 } from "@/components/collection-form";
+import { CollectionItemNotesEditor } from "@/components/collection-item-notes-editor";
 import { CollectionItemPriceField } from "@/components/collection-item-price-fields";
 import { CollectionItemStatusFields } from "@/components/collection-item-status-fields";
 import { CollectionSelector } from "@/components/collection-selector";
@@ -4831,6 +4832,7 @@ export function CollectionAddPage({
     priceSoldInput: moneyInput(undefined, currency),
     pricePaidIsPublic: false,
     metadata: {
+      notes: [],
       statuses: { public: [], private: [] },
     } as CollectionItemMetadataWrite,
     ownership: ownershipEditorValue() as OwnershipEditorValue,
@@ -5443,7 +5445,8 @@ export function CollectionAddPage({
         />
         <CollectionItemStatusFields
           hasPublicMetadata={
-            pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())
+            (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
+            Boolean(metadata.notes?.some((note) => note.isPublic))
           }
           warning="web.collectionItemMetadata.unapprovedWarning"
           value={metadata}
@@ -5476,6 +5479,15 @@ export function CollectionAddPage({
               onChange={(value) => form.setFieldValue("priceSoldInput", value)}
             />
           ) : null}
+          <CollectionItemNotesEditor
+            value={metadata.notes ?? []}
+            onChange={(notes) =>
+              form.setFieldValue("metadata", (current) => ({
+                ...current,
+                notes,
+              }))
+            }
+          />
         </CollectionItemStatusFields>
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
@@ -6461,6 +6473,7 @@ export function CollectionEditPage({
     priceSoldInput: moneyInput(ownershipPeriods.at(-1)?.priceSold, currency),
     pricePaidIsPublic: ownershipPeriods.at(-1)?.pricePaid?.isPublic ?? false,
     metadata: {
+      notes: item.metadata?.notes ?? [],
       statuses: item.metadata?.statuses ?? { public: [], private: [] },
       saleDate: ownershipPeriods.at(-1)?.effectiveEndDate ?? undefined,
     } as CollectionItemMetadataWrite,
@@ -7096,7 +7109,8 @@ export function CollectionEditPage({
           {item.isOwner ? (
             <CollectionItemStatusFields
               hasPublicMetadata={
-                pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())
+                (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
+                Boolean(metadata.notes?.some((note) => note.isPublic))
               }
               saleDateRecorded={ownershipPeriods.at(-1)?.exitReason === "sale"}
               warning={
@@ -7149,6 +7163,15 @@ export function CollectionEditPage({
                   }
                 />
               ) : null}
+              <CollectionItemNotesEditor
+                value={metadata.notes ?? []}
+                onChange={(notes) =>
+                  form.setFieldValue("metadata", (current) => ({
+                    ...current,
+                    notes,
+                  }))
+                }
+              />
             </CollectionItemStatusFields>
           ) : null}
           <CollectionSelector

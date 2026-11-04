@@ -247,6 +247,43 @@ export const collectionItemStatus = pgTable(
   ],
 );
 
+/** Named Markdown notes ordered independently within their saved visibility scopes. */
+export const collectionItemNote = pgTable(
+  "collection_item_note",
+  {
+    id: text("id").primaryKey(),
+    collectionItemId: bigint("collection_item_id", { mode: "number" })
+      .notNull()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    content: text("content").notNull(),
+    isPublic: boolean("is_public").default(false).notNull(),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("collection_item_note_name_unique").on(
+      table.collectionItemId,
+      table.normalizedName,
+    ),
+    check(
+      "collection_item_note_name_length",
+      sql`char_length(trim(${table.name})) between 1 and 100`,
+    ),
+    check(
+      "collection_item_note_content_length",
+      sql`char_length(trim(${table.content})) between 5 and 2000`,
+    ),
+    check("collection_item_note_position_valid", sql`${table.position} >= 0`),
+  ],
+);
+
 /** Effective and recorded ownership history for one physical collection item. */
 export const collectionItemOwnershipPeriod = pgTable(
   "collection_item_ownership_period",

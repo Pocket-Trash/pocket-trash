@@ -2258,6 +2258,7 @@ export function CollectionItemDetailPage({
           key={`${item.ownerUserId}-${item.collectionId}-${item.collectionItemId}-${item.isOwner}`}
           statuses={item.metadata?.statuses ?? { public: [], private: [] }}
           isOwner={Boolean(item.isOwner)}
+          notes={item.metadata?.notes}
           pricePaid={item.metadata?.pricePaid}
           priceSold={item.metadata?.priceSold}
           identity={{
