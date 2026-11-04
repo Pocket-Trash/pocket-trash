@@ -236,6 +236,21 @@ describe("standalone slider collection items", () => {
           statuses: { public: ["favorite"], private: ["favorite", "grail"] },
         },
       });
+      const personalStatuses =
+        await collectionsService.listOwnedStatusItems(actor);
+      expect(
+        personalStatuses.find((item) => item.collectionItemId === sliderItemId),
+      ).toMatchObject({ current: true, statuses: ["favorite", "grail"] });
+      expect(
+        personalStatuses.filter((item) => item.statuses.includes("unstatused")),
+      ).toHaveLength(2);
+      expect(
+        await collectionsService.listOwnedStatusItems({
+          clerkId: otherOwner.clerkId,
+          role: "admin",
+        }),
+      ).toEqual([]);
+
       await expect(
         collectionsService.updateItem({
           actor: { clerkId: otherOwner.clerkId, role: "admin" },
@@ -651,6 +666,13 @@ describe("standalone slider collection items", () => {
           statuses: { public: ["sold"], private: ["sold"] },
         },
       });
+      const soldStatusItems =
+        await collectionsService.listOwnedStatusItems(actor);
+      expect(
+        soldStatusItems.find((item) => item.collectionItemId === sliderItemId),
+      ).toMatchObject({ current: false, statuses: ["sold"] });
+      expect(JSON.stringify(soldStatusItems)).not.toContain("condition");
+      expect(JSON.stringify(soldStatusItems)).not.toContain("amountMinor");
       await collectionsService.updateItem({
         ...statusEdit,
         metadata: {
@@ -875,6 +897,12 @@ describe("standalone slider collection items", () => {
         ],
       });
 
+      expect(
+        (await collectionsService.listOwnedStatusItems(actor)).find(
+          (item) => item.collectionItemId === sliderItemId,
+        )?.statuses,
+      ).toEqual(["unstatused"]);
+
       const duplicateItemId = await collectionsService.addSliderProduct({
         actor,
         collectionId: primary.id,
@@ -895,6 +923,30 @@ describe("standalone slider collection items", () => {
         productTypeSlug: "slider",
       });
       expect(duplicateItemId).not.toBe(sliderItemId);
+      const duplicatePeriod = (
+        await collectionsService.getOwnedItem(actor, duplicateItemId)
+      )?.ownershipPeriods?.at(-1);
+      if (!duplicatePeriod)
+        throw new Error("Duplicate ownership period missing.");
+      await collectionsService.updateItem({
+        actor,
+        collectionItemId: duplicateItemId,
+        customFinish: null,
+        displayName: "Departed gift",
+        finishOptionId: null,
+        ownership: {
+          periodId: duplicatePeriod.id,
+          effectiveStartDate: "2025-03-02",
+          effectiveEndDate: "2025-04-01",
+          entryReason: "purchase",
+          exitReason: "gift",
+        },
+      });
+      expect(
+        (await collectionsService.listOwnedStatusItems(actor)).some(
+          (item) => item.collectionItemId === duplicateItemId,
+        ),
+      ).toBe(false);
 
       await db.insert(schema.collectionItemNote).values({
         id: "cascade-fixture",

@@ -2639,6 +2639,19 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
   });
 
 /**
+ * Loads exact status Trends only for the authenticated owner.
+ * @returns Minimal current items and latest Sold departures without note or price fields.
+ * @rejects When authentication or the owner-scoped query fails.
+ */
+export const getUserCollectionStatusItems = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const actor = await requireActor();
+  const { s } = await import("@/lib/services");
+  return await s.db.collections.listOwnedStatusItems(actor);
+});
+
+/**
  * Lists the current user's collection items.
  *
  * @returns The actor's collection items, with signed images when configured.

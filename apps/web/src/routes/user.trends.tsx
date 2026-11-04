@@ -6,6 +6,7 @@ import {
   getUserActivityTrends,
   getUserCollection,
   getUserCollectionHistoryTrends,
+  getUserCollectionStatusItems,
   getUserCollections,
 } from "@/lib/catalog-api";
 import { parseCatalogTrendsSearch } from "@/lib/catalog-filters";
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/user/trends")({
       collectionItems,
       makerProducts,
       materials,
+      statusItems,
     ] = await Promise.all([
       getUserCollection(),
       getUserCollections(),
@@ -46,6 +48,7 @@ export const Route = createFileRoute("/user/trends")({
       getPublicCollectionItemTrends(),
       getPublicCollectionMakerProductTrends(),
       getPublicCollectionMaterialTrends(),
+      getUserCollectionStatusItems(),
     ]);
     return {
       activityTrends,
@@ -53,6 +56,7 @@ export const Route = createFileRoute("/user/trends")({
       collectionCount: collections.length,
       communityTrends: { collectionItems, makerProducts, materials },
       items,
+      statusItems,
     };
   },
   component: UserTrendsRoute,
@@ -71,6 +75,7 @@ function UserTrendsRoute() {
     collectionHistoryTrends,
     communityTrends,
     items,
+    statusItems,
   } = Route.useLoaderData();
   const search = Route.useSearch();
   return (
@@ -81,9 +86,14 @@ function UserTrendsRoute() {
       communityTrends={communityTrends}
       items={items}
       onSearchChange={(nextSearch) =>
-        void navigate({ replace: true, search: nextSearch, to: "/user/trends" })
+        void navigate({
+          replace: nextSearch.status === search.status,
+          search: nextSearch,
+          to: "/user/trends",
+        })
       }
       search={search}
+      statusItems={statusItems}
     />
   );
 }

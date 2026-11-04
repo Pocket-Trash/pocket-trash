@@ -19,6 +19,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { type Actor, hasPermission } from "../../authorization.js";
 import { nextAvailableSlug, slugify } from "../../catalog-slug.js";
 import {
+  type CollectionItemStatusSearch,
   normalizeCatalogSearch,
   normalizeCollectionName,
 } from "../../catalog-terminology.js";
@@ -2344,6 +2345,24 @@ export type CollectionWriteInput = {
   summary?: string | null;
 };
 
+/** Minimal item presentation authorized for one status Trends surface. */
+export type CollectionItemStatusTrendItem = {
+  /** Stable physical item identifier. */
+  collectionItemId: number;
+  /** Parent collection used by current-item destinations. */
+  collectionId: number;
+  /** Whether the item is currently owned. */
+  current: boolean;
+  /** User-visible item name. */
+  name: string;
+  /** Public owner identifier used by current-item destinations. */
+  ownerUserId: number;
+  /** Catalog product identity for aggregate grouping. */
+  productId: number;
+  /** Deduplicated applicable status buckets, including unstatused. */
+  statuses: CollectionItemStatusSearch[];
+};
+
 /** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
   /**
@@ -2765,6 +2784,14 @@ export type CollectionsService = {
    * @rejects When the required catalog data cannot be queried.
    */
   listOwned(actor: Actor, collectionId?: number): Promise<UserCollectionItem[]>;
+  /**
+   * Lists exact owner-authorized status assignments, including latest Sold departures.
+   * @param actor - Authenticated owner; staff permissions do not widen this scope.
+   * @returns Minimal items without notes, prices, or authentication identifiers.
+   * @rejects When the owner-scoped query fails.
+   */
+  listOwnedStatusItems(actor: Actor): Promise<CollectionItemStatusTrendItem[]>;
+
   /**
    * Lists owned collections.
    *
@@ -7372,6 +7399,51 @@ export function createCollectionsService(
       );
     },
     /**
+     * Loads deduplicated status assignments solely for the authenticated owner.
+     * @param actor - Authenticated owner.
+     * @returns Current items and latest effective Sold departures.
+     * @rejects When the owner-scoped query fails.
+     */
+    async listOwnedStatusItems(actor) {
+      const items = await queryOwnedItems(db, actor.clerkId, undefined, {
+        includeDeparted: true,
+        includePrivate: true,
+        viewerClerkId: actor.clerkId,
+      });
+      return items.flatMap((item): CollectionItemStatusTrendItem[] => {
+        const statuses = [
+          ...new Set([
+            ...(item.metadata?.statuses.public ?? []),
+            ...(item.metadata?.statuses.private ?? []),
+          ]),
+        ];
+        const applicable = item.currentlyOwned
+          ? statuses.length
+            ? statuses
+            : ["unstatused" as const]
+          : statuses.includes("sold") &&
+              item.ownershipPeriods?.at(-1)?.exitReason === "sale"
+            ? ["sold" as const]
+            : [];
+        return applicable.length
+          ? [
+              {
+                collectionItemId: item.collectionItemId,
+                collectionId: item.collectionId,
+                current: item.currentlyOwned,
+                name: item.displayName || item.name,
+                ownerUserId: item.ownerUserId,
+                productId: item.productId,
+                statuses: applicable.map(
+                  (status) =>
+                    status.replaceAll("_", "-") as CollectionItemStatusSearch,
+                ),
+              },
+            ]
+          : [];
+      });
+    },
+    /**
      * Lists collection items owned by the actor.
      *
      * @param actor - Authenticated actor.
@@ -11121,7 +11193,14 @@ async function queryOwnedItems(
      */
     viewerCanManage?: boolean;
   } = {},
-): Promise<UserCollectionItem[]> {
+): Promise<
+  Array<
+    UserCollectionItem & {
+      /** Current ownership state used by status Trends. */
+      currentlyOwned: boolean;
+    }
+  >
+> {
   const privacyInheritedFromItemId = sql<number | null>`coalesce(
     (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
     (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
@@ -11182,6 +11261,7 @@ async function queryOwnedItems(
       bearingOverride: schema.collectionDetailSpinner.bearing,
       productBearing: schema.productDetailSpinner.bearing,
       metadataPubliclyVisible: publicCollectionItemCondition(),
+      currentlyOwned: sql<boolean>`${schema.collectionItem.owned} and ${schema.collectionItem.soldAt} is null`,
       collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
       serialNumber: schema.collectionItem.serialNumber,
@@ -11465,7 +11545,12 @@ async function queryOwnedItems(
         : [],
     ),
   );
-  const items: UserCollectionItem[] = visibleRows.map((row) => {
+  const items: Array<
+    UserCollectionItem & {
+      /** Current ownership state used by status Trends. */
+      currentlyOwned: boolean;
+    }
+  > = visibleRows.map((row) => {
     const canSeeUnavailableComponents = Boolean(
       options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     );
@@ -11485,6 +11570,7 @@ async function queryOwnedItems(
         !canSeeUnavailableComponents,
     );
     return {
+      currentlyOwned: row.currentlyOwned,
       approvalStatus: row.approvalStatus,
       bearing: row.bearingOverride ?? row.productBearing,
       bearingOverride: row.bearingOverride,

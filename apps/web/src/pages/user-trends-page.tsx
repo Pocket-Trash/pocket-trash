@@ -1,4 +1,5 @@
 import type {
+  CollectionItemStatusTrendItem,
   PublicUserCollectionItem,
   UserActivityTrends,
   UserCollectionHistoryTrends,
@@ -9,6 +10,7 @@ import {
 } from "@pocket-trash/localizations";
 import { ActivityTrendsChart } from "@/components/activity-trends-chart";
 import { AppShell } from "@/components/app-shell";
+import { CollectionItemStatusTrends } from "@/components/collection-item-status-trends";
 import { CompositionComparison } from "@/components/composition-comparison";
 import { TrendVisualization } from "@/components/trend-visualization";
 import {
@@ -115,6 +117,7 @@ export function UserTrendsPage({
   onSearchChange,
   publicUsername,
   search,
+  statusItems = [],
 }: {
   /** Exact owner-scoped collection-item creation activity. */
   activityTrends?: UserActivityTrends;
@@ -137,6 +140,8 @@ export function UserTrendsPage({
   publicUsername?: string;
   /** Normalized URL filter state. */
   search: CatalogTrendsSearch;
+  /** Owner-authorized status data independent of the composition scope. */
+  statusItems?: CollectionItemStatusTrendItem[];
 }) {
   const { locale } = useLocale();
   /**
@@ -456,6 +461,12 @@ export function UserTrendsPage({
             value={search.productId}
           />
         </div>
+
+        <CollectionItemStatusTrends
+          items={statusItems}
+          selected={search.status}
+          onSelect={(status) => onSearchChange({ ...search, status })}
+        />
 
         {community ? (
           <div className="space-y-1 rounded-md border border-border bg-card p-4">

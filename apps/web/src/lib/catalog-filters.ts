@@ -7,6 +7,10 @@ import type {
   PublicProductTypeTrend,
   PublicUserCollectionItem,
 } from "@package/services";
+import {
+  type CollectionItemStatusSearch,
+  collectionItemStatusSearches,
+} from "@package/services/catalog-terminology";
 
 /** Stable recorded-activity ranges shared by Trends URL and request validation. */
 export const activityTrendRanges = [
@@ -19,6 +23,8 @@ export const activityTrendRanges = [
 
 /** URL-search representation of the Trends product-type filter. */
 export type CatalogTrendsSearch = {
+  /** Status selection independent of the composition filters. */
+  status?: CollectionItemStatusSearch;
   /** Stable recorded-activity range encoded in URL search. */
   range?: ActivityTrendRange;
   /** Stable maker identifier encoded in URL search. */
@@ -42,6 +48,9 @@ export type CatalogTrendsSearch = {
 export function parseCatalogTrendsSearch(
   search: Record<string, unknown>,
 ): CatalogTrendsSearch {
+  const status = collectionItemStatusSearches.find(
+    (value) => value === search.status,
+  );
   const materialId = Number(search.materialId);
   const materialSpecificId = Number(search.materialSpecificId);
   const makerId = Number(search.makerId);
@@ -62,6 +71,7 @@ export function parseCatalogTrendsSearch(
       : {}),
     ...(Number.isSafeInteger(productId) && productId > 0 ? { productId } : {}),
     ...(range ? { range } : {}),
+    ...(status ? { status } : {}),
   };
 }
 
