@@ -286,6 +286,12 @@ describe("standalone slider collection items", () => {
       expect(
         await collectionsService.listPublicStatusItems(owner.username ?? ""),
       ).toEqual([]);
+      expect(
+        (await collectionsService.listPublicStatusItems()).find(
+          (item) => item.collectionItemId === sliderItemId,
+        ),
+      ).toMatchObject({ current: true, statuses: ["favorite"] });
+
       await db.insert(schema.userSettings).values({
         userId: owner.id,
         isProfilePublic: true,

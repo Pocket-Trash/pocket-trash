@@ -1,7 +1,22 @@
+/** @vitest-environment jsdom */
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 
 /** Provides public product-type Trends to the route loader. */
 const listPublicProductTypeTrends = vi.hoisted(() => vi.fn());
+/** Provides anonymous status totals. */
+const getPublicCollectionStatusTrends = vi.hoisted(() => vi.fn());
+/** Provides exact live public status items. */
+const getPublicCollectionStatusItems = vi.hoisted(() => vi.fn());
 /** Provides app-wide recorded activity to the route loader. */
 const getPublicActivityTrends = vi.hoisted(() => vi.fn());
 /** Provides the active collection-item generation to the route loader. */
@@ -25,6 +40,8 @@ const getPublicSpinnerTrends = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/catalog-api", () => ({
   getPublicActivityTrends,
+  getPublicCollectionStatusTrends,
+  getPublicCollectionStatusItems,
   getPublicCatalogMaterialTrends,
   getPublicCollectionItemTrends,
   getPublicCollectionLifecycleTrends,
@@ -38,11 +55,31 @@ vi.mock("@/lib/catalog-api", () => ({
 }));
 vi.mock("@/pages/trends-page", () => ({
   /**
-   * Renders the stable Trends route test marker.
+   * Renders controlled route search for navigation checks.
+   * @param root0 - Validated URL state and navigation operation.
    *
    * @returns Trends route test marker.
    */
-  TrendsPage: () => <div>trends-page</div>,
+  TrendsPage: ({
+    search,
+    onSearchChange,
+  }: {
+    /** Current validated URL state. */ search: CatalogTrendsSearch;
+    /**
+     * Applies a selected status to URL history.
+     * @param next - Next search state.
+     */
+    onSearchChange: (next: CatalogTrendsSearch) => void;
+  }) => (
+    <div>
+      <output>
+        {search.status ?? "none"}:{search.productTypeId}
+      </output>
+      <button onClick={() => onSearchChange({ ...search, status: "sold" })}>
+        Sold
+      </button>
+    </div>
+  ),
   /**
    * Renders the stable Trends pending test marker.
    *
@@ -91,6 +128,13 @@ describe("Trends route", () => {
       stale: false,
       values: trends,
     };
+    const statusTrends = {
+      generatedAt: new Date("2026-10-14T00:00:00Z"),
+      stale: false,
+      values: [],
+    };
+    getPublicCollectionStatusTrends.mockResolvedValueOnce(statusTrends);
+    getPublicCollectionStatusItems.mockResolvedValueOnce([]);
     listPublicProductTypeTrends.mockResolvedValueOnce(trends);
     getPublicCollectionItemTrends.mockResolvedValueOnce(collectionTrends);
     const lifecycleTrends = {
@@ -136,6 +180,8 @@ describe("Trends route", () => {
       sliderTrends: null,
       penRefillTrends: null,
       spinnerTrends: null,
+      statusItems: [],
+      statusTrends,
     });
     expect(getPublicActivityTrends).toHaveBeenCalledWith({ data: "year" });
     expect(getPublicCollectionLifecycleTrends).toHaveBeenCalledWith({
@@ -146,5 +192,62 @@ describe("Trends route", () => {
         range: "year",
       },
     });
+  });
+  it("validates status selection and restores it through browser navigation independently of product type", async () => {
+    const validateSearch = Route.options.validateSearch;
+    if (typeof validateSearch !== "function")
+      throw new Error("Status search is missing.");
+    expect(
+      validateSearch({ status: "invalid", productTypeId: "1001" }),
+    ).toEqual({ productTypeId: 1001 });
+    getPublicCollectionStatusTrends.mockResolvedValue(null);
+    getPublicCollectionStatusItems.mockResolvedValue([]);
+    listPublicProductTypeTrends.mockResolvedValue([]);
+    const history = createMemoryHistory({
+      initialEntries: ["/trends?status=want-to-trade&productTypeId=1001"],
+    });
+    const rootRoute = createRootRoute({ component: Outlet });
+    Object.assign(Route.options, {
+      id: "/trends",
+      path: "/trends",
+      /**
+       * Resolves the app-wide test root.
+       * @returns In-memory root route.
+       */
+      getParentRoute: () => rootRoute,
+    });
+    const router = createRouter({
+      history,
+      routeTree: rootRoute.addChildren([Route]),
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        await router.load();
+        root.render(<RouterProvider router={router} />);
+      });
+      expect(container.querySelector("output")?.textContent).toBe(
+        "want-to-trade:1001",
+      );
+      await act(async () => {
+        container.querySelector("button")?.click();
+      });
+      expect(container.querySelector("output")?.textContent).toBe("sold:1001");
+      await act(async () => {
+        history.back();
+      });
+      expect(container.querySelector("output")?.textContent).toBe(
+        "want-to-trade:1001",
+      );
+      await act(async () => {
+        history.forward();
+      });
+      expect(container.querySelector("output")?.textContent).toBe("sold:1001");
+    } finally {
+      await act(() => root.unmount());
+      container.remove();
+    }
   });
 });

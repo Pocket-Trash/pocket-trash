@@ -1,4 +1,7 @@
-import type { CollectionItemStatusTrendItem } from "@package/services";
+import type {
+  CollectionItemStatusTrendItem,
+  PublicStatusTrendValue,
+} from "@package/services";
 import {
   type CollectionItemStatusSearch,
   collectionItemStatusSearches,
@@ -23,17 +26,18 @@ const labelKeys: Record<CollectionItemStatusSearch, TranslationKey> = {
 };
 
 /**
- * Renders exact status assignments with equivalent pie/table selection and inline items.
- * @param props - Authorized minimal items and URL-owned status selection.
- * @returns Responsive status chart, accessible table, and selected item cards.
+ * Renders authorized status assignments with equivalent pie/table selection and inline items.
+ * @param props - Scope-authorized items, optional anonymous totals, and URL-owned selection.
+ * @returns Responsive chart, accessible table, and privacy-filtered item results.
  */
 export function CollectionItemStatusTrends({
   items,
   onSelect,
   selected,
   publicView = false,
+  totals,
 }: {
-  /** Owner-authorized items, independent of the composition filters. */
+  /** Authorized items, independent of composition filters. */
   items: CollectionItemStatusTrendItem[];
   /**
    * Updates the parent's URL selection.
@@ -44,6 +48,8 @@ export function CollectionItemStatusTrends({
   selected?: CollectionItemStatusSearch;
   /** Public surfaces never link departed items to owner editing. */
   publicView?: boolean;
+  /** App-wide transformed totals; an empty list falls back to exact public counts. */
+  totals?: PublicStatusTrendValue[];
 }) {
   const { locale } = useLocale();
   const id = useId();
@@ -57,17 +63,30 @@ export function CollectionItemStatusTrends({
     key: TranslationKey,
     values: Record<string, string | number> = {},
   ) => formatTranslation(key, values, locale);
-  const values = collectionItemStatusSearches.map((status, index) => ({
-    status,
-    count: items.filter((item) => item.statuses.includes(status)).length,
-    productTypeId: index + 1,
-    productTypeName: t(labelKeys[status]),
-  }));
+  const numbers = new Intl.NumberFormat(locale);
+  const appWide = totals !== undefined;
+  const values = collectionItemStatusSearches.map((status, index) => {
+    const publicCount = items.filter((item) =>
+      item.statuses.includes(status),
+    ).length;
+    const anonymous = totals?.find((value) => value.status === status);
+    return {
+      status,
+      publicCount,
+      approximate: Boolean(anonymous),
+      count: anonymous
+        ? Math.max(anonymous.approximateItemCount, publicCount)
+        : publicCount,
+      productTypeId: index + 1,
+      productTypeName: t(labelKeys[status]),
+    };
+  });
   const assignments = values.reduce((sum, value) => sum + value.count, 0);
   const results = items.filter(
     (item) => selected && item.statuses.includes(selected),
   );
   const overlap = t("web.collectionItemStatusTrends.overlap");
+  const privacy = t("web.collectionItemStatusTrends.privacy");
   return (
     <section aria-labelledby={`${id}-title`} className="space-y-4">
       <h2 className="text-lg font-semibold" id={`${id}-title`}>
@@ -76,9 +95,9 @@ export function CollectionItemStatusTrends({
       <p className="text-sm text-muted-foreground" id={`${id}-overlap`}>
         {overlap}
       </p>
-      {publicView ? (
+      {appWide || publicView ? (
         <p className="text-sm text-muted-foreground">
-          {t("web.collectionItemStatusTrends.publicOnly")}
+          {appWide ? privacy : t("web.collectionItemStatusTrends.publicOnly")}
         </p>
       ) : null}
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
@@ -88,7 +107,7 @@ export function CollectionItemStatusTrends({
               "web.collectionItemStatusTrends.assignments",
             )}
             chartLabel={t("web.collectionItemStatusTrends.chartLabel")}
-            description={overlap}
+            description={appWide ? `${overlap} ${privacy}` : overlap}
             onProductTypeSelect={(value) =>
               onSelect(collectionItemStatusSearches[value - 1])
             }
@@ -101,19 +120,33 @@ export function CollectionItemStatusTrends({
         <div className="min-w-0 rounded-md border border-border">
           <table
             aria-describedby={`${id}-overlap`}
-            className="w-full table-fixed border-collapse break-words text-sm"
+            className={`w-full table-fixed border-collapse break-words ${appWide ? "text-xs sm:text-sm" : "text-sm"}`}
           >
             <caption className="p-3 text-left font-semibold">
               {t("web.collectionItemStatusTrends.tableLabel")}
             </caption>
             <thead className="border-y border-border bg-muted/50 text-left">
               <tr>
-                <th className="px-3 py-2" scope="col">
+                <th className="w-1/2 px-2 py-2" scope="col">
                   {t("web.collectionItemStatusTrends.status")}
                 </th>
-                <th className="px-3 py-2 text-right" scope="col">
-                  {t("web.collectionItemStatusTrends.assignments")}
+                <th className="px-2 py-2 text-right" scope="col">
+                  {appWide ? (
+                    <>
+                      <span aria-hidden="true">#</span>
+                      <span className="sr-only">
+                        {t("web.collectionItemStatusTrends.assignments")}
+                      </span>
+                    </>
+                  ) : (
+                    t("web.collectionItemStatusTrends.assignments")
+                  )}
                 </th>
+                {appWide ? (
+                  <th className="px-2 py-2 text-right" scope="col">
+                    {t("web.collectionItemMetadata.public")}
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -128,7 +161,7 @@ export function CollectionItemStatusTrends({
                         status: value.productTypeName,
                       })}
                       aria-pressed={selected === value.status}
-                      className="h-auto min-h-9 max-w-full whitespace-normal text-left"
+                      className="h-auto min-h-9 max-w-full whitespace-normal px-2 text-left text-xs sm:text-sm"
                       onClick={() => onSelect(value.status)}
                       variant={
                         selected === value.status ? "secondary" : "ghost"
@@ -137,9 +170,33 @@ export function CollectionItemStatusTrends({
                       {value.productTypeName}
                     </Button>
                   </th>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {value.count}
+                  <td
+                    aria-label={
+                      appWide
+                        ? t(
+                            value.approximate
+                              ? "web.collectionItemStatusTrends.approximateCount"
+                              : "web.collectionItemStatusTrends.exactPublicCount",
+                            { count: numbers.format(value.count) },
+                          )
+                        : undefined
+                    }
+                    className="px-2 py-2 text-right tabular-nums"
+                  >
+                    {value.approximate ? "≈ " : ""}
+                    {numbers.format(value.count)}
                   </td>
+                  {appWide ? (
+                    <td
+                      aria-label={t(
+                        "web.collectionItemStatusTrends.exactPublicCount",
+                        { count: numbers.format(value.publicCount) },
+                      )}
+                      className="px-2 py-2 text-right tabular-nums"
+                    >
+                      {numbers.format(value.publicCount)}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -161,6 +218,18 @@ export function CollectionItemStatusTrends({
               {t("web.collectionItemStatusTrends.clearSelection")}
             </Button>
           </div>
+          {appWide ? (
+            <>
+              <p>
+                {t("web.collectionItemStatusTrends.exactPublicCount", {
+                  count: numbers.format(results.length),
+                })}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t("web.collectionItemStatusTrends.publicOnly")}
+              </p>
+            </>
+          ) : null}
           {results.length ? (
             <ul className="grid gap-3 sm:grid-cols-2">
               {results.map((item) => (

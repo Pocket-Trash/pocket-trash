@@ -2792,13 +2792,13 @@ export type CollectionsService = {
    */
   listOwnedStatusItems(actor: Actor): Promise<CollectionItemStatusTrendItem[]>;
   /**
-   * Lists only public status assignments from an explicitly published profile.
-   * @param ownerUsername - Exact public profile username.
+   * Lists exact anonymous status assignments, optionally scoped to a published profile.
+   * @param ownerUsername - Exact published username, or omitted for app-wide public items.
    * @returns Visibility-filtered current items and non-linked Sold departures.
    * @rejects When the public profile or item query fails.
    */
   listPublicStatusItems(
-    ownerUsername: string,
+    ownerUsername?: string,
   ): Promise<CollectionItemStatusTrendItem[]>;
 
   /**
@@ -7422,31 +7422,35 @@ export function createCollectionsService(
       return statusTrendItems(items, false);
     },
     /**
-     * Enforces publication and anonymous item visibility before projecting status data.
-     * @param ownerUsername - Exact public profile username.
+     * Applies anonymous visibility and checks publication when a profile is requested.
+     * @param ownerUsername - Exact published username, or omitted for app-wide public items.
      * @returns Public assignments without notes, prices, or private status rows.
      * @rejects When the profile or item query fails.
      */
     async listPublicStatusItems(ownerUsername) {
-      const [owner] = await db
-        .select({ id: schema.user.id })
-        .from(schema.user)
-        .innerJoin(
-          schema.userSettings,
-          eq(schema.userSettings.userId, schema.user.id),
-        )
-        .where(
-          and(
-            eq(schema.user.username, ownerUsername),
-            eq(schema.userSettings.isProfilePublic, true),
-            eq(schema.userSettings.publishTrends, true),
-          ),
-        )
-        .limit(1);
-      if (!owner) return [];
+      let ownerUserId: number | undefined;
+      if (ownerUsername !== undefined) {
+        const [owner] = await db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .innerJoin(
+            schema.userSettings,
+            eq(schema.userSettings.userId, schema.user.id),
+          )
+          .where(
+            and(
+              eq(schema.user.username, ownerUsername),
+              eq(schema.userSettings.isProfilePublic, true),
+              eq(schema.userSettings.publishTrends, true),
+            ),
+          )
+          .limit(1);
+        if (!owner) return [];
+        ownerUserId = owner.id;
+      }
       return statusTrendItems(
         await queryOwnedItems(db, undefined, undefined, {
-          ownerUserId: owner.id,
+          ownerUserId,
           publicOnly: true,
           includeDeparted: true,
           includePublicDeparted: true,

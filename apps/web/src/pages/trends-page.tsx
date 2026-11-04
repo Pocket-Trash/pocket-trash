@@ -1,9 +1,11 @@
 import type {
+  CollectionItemStatusTrendItem,
   PublicActivityTrends,
   PublicCollectionItemTrends,
   PublicCollectionLifecycleTrends,
   PublicCollectionMakerProductTrends,
   PublicCollectionMaterialTrends,
+  PublicCollectionStatusTrends,
   PublicMakerProductTrend,
   PublicMaterialTrend,
   PublicPartAccessoryTrends,
@@ -21,6 +23,7 @@ import {
 import { ActivityTrendsChart } from "@/components/activity-trends-chart";
 import { AppShell } from "@/components/app-shell";
 import { CatalogTrendsChart } from "@/components/catalog-trends-chart";
+import { CollectionItemStatusTrends } from "@/components/collection-item-status-trends";
 import { PenRefillTrendVisualization } from "@/components/pen-refill-trend-visualization";
 import { SpinnerTrendVisualization } from "@/components/spinner-trend-visualization";
 import { TrendVisualization } from "@/components/trend-visualization";
@@ -47,6 +50,10 @@ type TrendsTranslationKey =
 
 /** Properties for the public catalog-product Trends page. */
 export type TrendsPageProps = {
+  /** Active anonymous status generation, separate from live public items. */
+  statusTrends?: PublicCollectionStatusTrends | null;
+  /** Exact live public status results. */
+  statusItems?: CollectionItemStatusTrendItem[];
   /** Exact catalog and privacy-safe app-wide record creation activity. */
   activityTrends?: PublicActivityTrends;
   /** Exact approved public catalog-product material counts. */
@@ -100,6 +107,8 @@ export function TrendsPage({
   sliderTrends = null,
   spinnerTrends = null,
   trends,
+  statusTrends = null,
+  statusItems = [],
 }: TrendsPageProps) {
   const { locale } = useLocale();
   /**
@@ -486,6 +495,30 @@ export function TrendsPage({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-3">
+          <CollectionItemStatusTrends
+            items={statusItems}
+            publicView
+            totals={statusTrends?.values ?? []}
+            selected={search.status}
+            onSelect={(status) => onSearchChange({ ...search, status })}
+          />
+          {statusTrends ? (
+            <p className="text-xs text-muted-foreground">
+              {t("web.trends.lastUpdated", {
+                date: new Intl.DateTimeFormat(locale, {
+                  dateStyle: "medium",
+                }).format(statusTrends.generatedAt),
+              })}
+            </p>
+          ) : null}
+          {statusTrends?.stale ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {t("web.trends.collectionItemsStale")}
+            </p>
+          ) : null}
         </div>
 
         <section aria-labelledby="activity-trends-title" className="space-y-4">
