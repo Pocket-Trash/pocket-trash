@@ -31,6 +31,7 @@ export function CollectionItemStatusTrends({
   items,
   onSelect,
   selected,
+  publicView = false,
 }: {
   /** Owner-authorized items, independent of the composition filters. */
   items: CollectionItemStatusTrendItem[];
@@ -41,6 +42,8 @@ export function CollectionItemStatusTrends({
   onSelect: (status: CollectionItemStatusSearch | undefined) => void;
   /** Selected URL bucket, including empty result buckets. */
   selected?: CollectionItemStatusSearch;
+  /** Public surfaces never link departed items to owner editing. */
+  publicView?: boolean;
 }) {
   const { locale } = useLocale();
   const id = useId();
@@ -73,6 +76,11 @@ export function CollectionItemStatusTrends({
       <p className="text-sm text-muted-foreground" id={`${id}-overlap`}>
         {overlap}
       </p>
+      {publicView ? (
+        <p className="text-sm text-muted-foreground">
+          {t("web.collectionItemStatusTrends.publicOnly")}
+        </p>
+      ) : null}
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         {assignments ? (
           <CatalogTrendsChart
@@ -106,9 +114,6 @@ export function CollectionItemStatusTrends({
                 <th className="px-3 py-2 text-right" scope="col">
                   {t("web.collectionItemStatusTrends.assignments")}
                 </th>
-                <th className="px-3 py-2 text-right" scope="col">
-                  {t("web.collectionItemStatusTrends.percentage")}
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -134,12 +139,6 @@ export function CollectionItemStatusTrends({
                   </th>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {value.count}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {new Intl.NumberFormat(locale, {
-                      style: "percent",
-                      maximumFractionDigits: 1,
-                    }).format(assignments ? value.count / assignments : 0)}
                   </td>
                 </tr>
               ))}
@@ -169,16 +168,25 @@ export function CollectionItemStatusTrends({
                   className="rounded-md border border-border bg-card p-4"
                   key={item.collectionItemId}
                 >
-                  <a
-                    className="font-medium underline underline-offset-4 focus-visible:outline focus-visible:outline-ring"
-                    href={
-                      item.current
-                        ? `/collections/${item.ownerUserId}/${item.collectionId}/${item.collectionItemId}`
-                        : `/collections/edit/${item.collectionItemId}`
-                    }
-                  >
-                    {item.name}
-                  </a>
+                  {publicView && !item.current ? (
+                    <>
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("web.collectionItemStatusTrends.soldNoPublicPage")}
+                      </p>
+                    </>
+                  ) : (
+                    <a
+                      className="font-medium underline underline-offset-4 focus-visible:outline focus-visible:outline-ring"
+                      href={
+                        item.current
+                          ? `/collections/${item.ownerUserId}/${item.collectionId}/${item.collectionItemId}`
+                          : `/collections/edit/${item.collectionItemId}`
+                      }
+                    >
+                      {item.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

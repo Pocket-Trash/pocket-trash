@@ -2791,6 +2791,15 @@ export type CollectionsService = {
    * @rejects When the owner-scoped query fails.
    */
   listOwnedStatusItems(actor: Actor): Promise<CollectionItemStatusTrendItem[]>;
+  /**
+   * Lists only public status assignments from an explicitly published profile.
+   * @param ownerUsername - Exact public profile username.
+   * @returns Visibility-filtered current items and non-linked Sold departures.
+   * @rejects When the public profile or item query fails.
+   */
+  listPublicStatusItems(
+    ownerUsername: string,
+  ): Promise<CollectionItemStatusTrendItem[]>;
 
   /**
    * Lists owned collections.
@@ -7410,38 +7419,40 @@ export function createCollectionsService(
         includePrivate: true,
         viewerClerkId: actor.clerkId,
       });
-      return items.flatMap((item): CollectionItemStatusTrendItem[] => {
-        const statuses = [
-          ...new Set([
-            ...(item.metadata?.statuses.public ?? []),
-            ...(item.metadata?.statuses.private ?? []),
-          ]),
-        ];
-        const applicable = item.currentlyOwned
-          ? statuses.length
-            ? statuses
-            : ["unstatused" as const]
-          : statuses.includes("sold") &&
-              item.ownershipPeriods?.at(-1)?.exitReason === "sale"
-            ? ["sold" as const]
-            : [];
-        return applicable.length
-          ? [
-              {
-                collectionItemId: item.collectionItemId,
-                collectionId: item.collectionId,
-                current: item.currentlyOwned,
-                name: item.displayName || item.name,
-                ownerUserId: item.ownerUserId,
-                productId: item.productId,
-                statuses: applicable.map(
-                  (status) =>
-                    status.replaceAll("_", "-") as CollectionItemStatusSearch,
-                ),
-              },
-            ]
-          : [];
-      });
+      return statusTrendItems(items, false);
+    },
+    /**
+     * Enforces publication and anonymous item visibility before projecting status data.
+     * @param ownerUsername - Exact public profile username.
+     * @returns Public assignments without notes, prices, or private status rows.
+     * @rejects When the profile or item query fails.
+     */
+    async listPublicStatusItems(ownerUsername) {
+      const [owner] = await db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .innerJoin(
+          schema.userSettings,
+          eq(schema.userSettings.userId, schema.user.id),
+        )
+        .where(
+          and(
+            eq(schema.user.username, ownerUsername),
+            eq(schema.userSettings.isProfilePublic, true),
+            eq(schema.userSettings.publishTrends, true),
+          ),
+        )
+        .limit(1);
+      if (!owner) return [];
+      return statusTrendItems(
+        await queryOwnedItems(db, undefined, undefined, {
+          ownerUserId: owner.id,
+          publicOnly: true,
+          includeDeparted: true,
+          includePublicDeparted: true,
+        }),
+        true,
+      );
     },
     /**
      * Lists collection items owned by the actor.
@@ -9882,14 +9893,22 @@ function effectiveCollectionItemIsPrivate() {
 }
 
 /**
- * Restricts joined collection items to public, approved, currently owned records.
+ * Restricts joined items to public approved records, with a narrow Sold exception for Trends.
+ * @param includeDepartedSold - Allows latest sale departures only for non-linked Trends entries.
  *
  * @returns Visibility predicate requiring owner, collection, subtype, and product joins.
  */
-function publicCollectionItemCondition() {
-  return sql<boolean>`${and(
+function publicCollectionItemCondition(includeDepartedSold = false) {
+  const current = and(
     eq(schema.collectionItem.owned, true),
     isNull(schema.collectionItem.soldAt),
+  );
+  const latestSale = sql<boolean>`(select period.exit_reason = 'sale'
+    from collection_item_ownership_period period
+    where period.collection_item_id = ${schema.collectionItem.id}
+    order by period.effective_start_date desc, period.id desc limit 1)`;
+  return sql<boolean>`${and(
+    includeDepartedSold ? or(current, latestSale) : current,
     eq(schema.collectionItem.approvalStatus, "approved"),
     eq(schema.userCollection.isPrivate, false),
     eq(effectiveCollectionItemIsPrivate(), false),
@@ -11166,6 +11185,8 @@ async function queryOwnedItems(
     makerId?: number;
     /** Include departed items for direct owner or staff editing. */
     includeDeparted?: boolean;
+    /** Allow anonymous latest Sold departures only in status Trends. */
+    includePublicDeparted?: boolean;
     /**
      * Directly assigned material identifier.
      */
@@ -11245,7 +11266,9 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = publicCollectionItemCondition();
+  const publicItem = publicCollectionItemCondition(
+    options.includePublicDeparted,
+  );
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -11260,7 +11283,9 @@ async function queryOwnedItems(
       approvalStatus: schema.collectionItem.approvalStatus,
       bearingOverride: schema.collectionDetailSpinner.bearing,
       productBearing: schema.productDetailSpinner.bearing,
-      metadataPubliclyVisible: publicCollectionItemCondition(),
+      metadataPubliclyVisible: publicCollectionItemCondition(
+        options.includePublicDeparted,
+      ),
       currentlyOwned: sql<boolean>`${schema.collectionItem.owned} and ${schema.collectionItem.soldAt} is null`,
       collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
@@ -11836,6 +11861,54 @@ async function queryOwnedItems(
     }
   }
   return items;
+}
+
+/**
+ * Projects only the fields consumed by status charts and their item results.
+ * @param items - Owner-scoped items or anonymous items filtered by the Sold-aware public predicate.
+ * @param onlyPublic - Whether the query already enforced anonymous visibility and latest Sold eligibility.
+ * @returns Applicable deduplicated status assignments without unrelated metadata.
+ */
+function statusTrendItems(
+  items: Array<
+    UserCollectionItem & {
+      /** Current ownership state. */ currentlyOwned: boolean;
+    }
+  >,
+  onlyPublic: boolean,
+): CollectionItemStatusTrendItem[] {
+  return items.flatMap((item): CollectionItemStatusTrendItem[] => {
+    const statuses = [
+      ...new Set([
+        ...(item.metadata?.statuses.public ?? []),
+        ...(onlyPublic ? [] : (item.metadata?.statuses.private ?? [])),
+      ]),
+    ];
+    const applicable = item.currentlyOwned
+      ? statuses.length
+        ? statuses
+        : ["unstatused" as const]
+      : statuses.includes("sold") &&
+          (onlyPublic || item.ownershipPeriods?.at(-1)?.exitReason === "sale")
+        ? ["sold" as const]
+        : [];
+    return applicable.length
+      ? [
+          {
+            collectionItemId: item.collectionItemId,
+            collectionId: item.collectionId,
+            current: item.currentlyOwned,
+            name: item.displayName || item.name,
+            ownerUserId: item.ownerUserId,
+            productId: item.productId,
+            statuses: applicable.map(
+              (status) =>
+                status.replaceAll("_", "-") as CollectionItemStatusSearch,
+            ),
+          },
+        ]
+      : [];
+  });
 }
 
 /**

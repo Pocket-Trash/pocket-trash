@@ -3,7 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
@@ -283,6 +283,108 @@ describe("standalone slider collection items", () => {
       ).resolves.toMatchObject({
         metadata: { statuses: { public: ["favorite"], private: [] } },
       });
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db.insert(schema.userSettings).values({
+        userId: owner.id,
+        isProfilePublic: true,
+        publishTrends: true,
+      });
+      const publicStatusItems = await collectionsService.listPublicStatusItems(
+        owner.username ?? "",
+      );
+      expect(
+        publicStatusItems.find(
+          (item) => item.collectionItemId === sliderItemId,
+        ),
+      ).toMatchObject({ current: true, statuses: ["favorite"] });
+      expect(JSON.stringify(publicStatusItems)).not.toContain("grail");
+      expect(JSON.stringify(publicStatusItems)).not.toContain("ownerClerkId");
+      await db
+        .delete(schema.collectionItemStatus)
+        .where(
+          and(
+            eq(schema.collectionItemStatus.collectionItemId, sliderItemId),
+            eq(schema.collectionItemStatus.isPublic, true),
+          ),
+        );
+      expect(
+        (
+          await collectionsService.listPublicStatusItems(owner.username ?? "")
+        ).find((item) => item.collectionItemId === sliderItemId)?.statuses,
+      ).toEqual(["unstatused"]);
+      await db.insert(schema.collectionItemStatus).values({
+        collectionItemId: sliderItemId,
+        status: "favorite",
+        isPublic: true,
+      });
+      await db
+        .update(schema.userSettings)
+        .set({ isProfilePublic: false })
+        .where(eq(schema.userSettings.userId, owner.id));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.userSettings)
+        .set({ isProfilePublic: true, publishTrends: false })
+        .where(eq(schema.userSettings.userId, owner.id));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.userSettings)
+        .set({ publishTrends: true })
+        .where(eq(schema.userSettings.userId, owner.id));
+      await db
+        .update(schema.userCollection)
+        .set({ isPrivate: true })
+        .where(eq(schema.userCollection.id, destination.id));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.userCollection)
+        .set({ isPrivate: false })
+        .where(eq(schema.userCollection.id, destination.id));
+      await db
+        .update(schema.collectionItem)
+        .set({ isPrivate: true })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.collectionItem)
+        .set({ isPrivate: false, approvalStatus: "pending" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "approved" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      await db
+        .update(schema.product)
+        .set({ approvalStatus: "pending" })
+        .where(eq(schema.product.id, sliderProductId));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.product)
+        .set({ approvalStatus: "approved", isPrivate: true })
+        .where(eq(schema.product.id, sliderProductId));
+      expect(
+        await collectionsService.listPublicStatusItems(owner.username ?? ""),
+      ).toEqual([]);
+      await db
+        .update(schema.product)
+        .set({ isPrivate: false })
+        .where(eq(schema.product.id, sliderProductId));
+
       await db
         .update(schema.collectionItem)
         .set({ approvalStatus: "pending" })
@@ -563,6 +665,18 @@ describe("standalone slider collection items", () => {
           ],
         },
       });
+      const publishedOwner = (await collectionsService.listOwners()).find(
+        (candidate) => candidate.userId === owner.id,
+      );
+      expect(publishedOwner?.publishTrends).toBe(true);
+      expect(JSON.stringify(publishedOwner)).not.toContain(
+        "Private **condition** notes.",
+      );
+      expect(
+        publishedOwner?.items.find(
+          (item) => item.collectionItemId === sliderItemId,
+        )?.metadata?.notes,
+      ).toEqual([expect.objectContaining({ name: "Setup", isPublic: true })]);
       await db
         .update(schema.userCollection)
         .set({ isPrivate: true })
@@ -673,6 +787,27 @@ describe("standalone slider collection items", () => {
       ).toMatchObject({ current: false, statuses: ["sold"] });
       expect(JSON.stringify(soldStatusItems)).not.toContain("condition");
       expect(JSON.stringify(soldStatusItems)).not.toContain("amountMinor");
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "approved" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+      expect(
+        (
+          await collectionsService.listPublicStatusItems(owner.username ?? "")
+        ).find((item) => item.collectionItemId === sliderItemId),
+      ).toMatchObject({ current: false, statuses: ["sold"] });
+      await expect(
+        collectionsService.getPublicItem({
+          collectionId: destination.id,
+          collectionItemId: sliderItemId,
+          ownerUserId: owner.id,
+        }),
+      ).resolves.toBeNull();
+      await db
+        .update(schema.collectionItem)
+        .set({ approvalStatus: "pending" })
+        .where(eq(schema.collectionItem.id, sliderItemId));
+
       await collectionsService.updateItem({
         ...statusEdit,
         metadata: {

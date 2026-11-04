@@ -2527,7 +2527,7 @@ export const getPublicCollectionOwner = createServerFn({ method: "GET" })
  * Loads a published personal Trends profile by exact username.
  *
  * @returns Privacy-filtered public owner data, or `null` for absent and private profiles.
- * @rejects If validation, service loading, viewer lookup, or the owner query fails.
+ * @rejects If validation, service loading, or anonymous owner and status queries fail.
  */
 export const getPublishedUserTrends = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
@@ -2536,10 +2536,15 @@ export const getPublishedUserTrends = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
     const owner =
-      (await s.db.collections.listOwners(await getResourceViewer())).find(
+      (await s.db.collections.listOwners()).find(
         (owner) => owner.publishTrends && owner.username === data.username,
       ) ?? null;
-    return owner ? ((await signCollectionOwners([owner]))[0] ?? null) : null;
+    if (!owner?.username) return null;
+    const statusItems = await s.db.collections.listPublicStatusItems(
+      owner.username,
+    );
+    const [signedOwner] = await signCollectionOwners([owner]);
+    return signedOwner ? { ...signedOwner, statusItems } : null;
   });
 
 /**
