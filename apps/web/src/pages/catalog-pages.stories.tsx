@@ -10,6 +10,7 @@ import type {
 import { formatTranslation } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, fn, userEvent, within } from "storybook/test";
+import { emptyCatalogFilters } from "@/lib/catalog-filters";
 import { getHelpDocument } from "@/lib/help-content";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
@@ -778,6 +779,38 @@ export const UserCollections: Story = {
       onFiltersChange={fn()}
     />
   ),
+};
+
+/** Owner search includes empty private collections that match their description. */
+export const PrivateCollectionSearch: Story = {
+  /**
+   * Renders a private metadata match using the existing owner directory.
+   * @returns Filtered owner collections.
+   */
+  render: () => (
+    <UserCollectionsPage
+      collections={[
+        {
+          ...collection,
+          description: "Travel archive",
+          isPrivate: true,
+          itemCount: 0,
+        },
+      ]}
+      filters={{ ...emptyCatalogFilters(), query: "archive" }}
+      items={[]}
+      onFiltersChange={fn()}
+    />
+  ),
+  /**
+   * Verifies the matching private card is visible.
+   * @param context - Story canvas.
+   * @returns The completed assertion.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(collection.name)).toBeVisible();
+  },
 };
 
 /** User index page story. */

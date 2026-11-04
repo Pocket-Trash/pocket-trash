@@ -37,6 +37,8 @@ export type SearchableCatalogItem = {
   activeTypeLabel: string;
   /** English canonical product-type fallback. */
   englishTypeLabel: string;
+  /** Owner-visible item prose, supplied only by authenticated collection pages. */
+  description?: string | null;
   /** Maker identifier. */
   makerId: number;
   /** Maker display name. */
@@ -76,7 +78,7 @@ export function normalizeCatalogSearch(value: string): string {
 }
 
 /**
- * Matches one catalog or collection item without indexing free-text descriptions.
+ * Matches one catalog or collection item using the fields supplied by its surface.
  * Alias matches expand to all items with the registered canonical product type.
  *
  * @param item - Searchable product or collection item.
@@ -108,6 +110,12 @@ export function matchCatalogSearch(
     };
   }
   if (normalizeCatalogSearch(item.name).includes(normalizedQuery)) {
+    return { matchedAlias: null, matchedOwner: null, matchedType: null };
+  }
+  if (
+    item.description &&
+    normalizeCatalogSearch(item.description).includes(normalizedQuery)
+  ) {
     return { matchedAlias: null, matchedOwner: null, matchedType: null };
   }
   const productAlias = item.aliases?.find((candidate) =>

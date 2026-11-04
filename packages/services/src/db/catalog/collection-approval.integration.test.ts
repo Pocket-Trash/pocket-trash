@@ -146,6 +146,33 @@ describe("collection-item approval", () => {
         canAdminister: true,
       });
       expect(await services.collections.listOwned(ownerActor)).toHaveLength(2);
+      // Owner search must not inherit the staff moderation bypass.
+      await db
+        .update(schema.userCollection)
+        .set({ isPrivate: true })
+        .where(eq(schema.userCollection.id, collection.id));
+      expect(await services.collections.listOwned(ownerActor)).toHaveLength(2);
+      expect(
+        await services.collections.listOwnedCollections(ownerActor),
+      ).toHaveLength(1);
+      for (const otherActor of [stranger, editorActor]) {
+        expect(await services.collections.listOwned(otherActor)).toEqual([]);
+        expect(
+          await services.collections.listOwnedCollections(otherActor),
+        ).toEqual([]);
+      }
+      const privateSearch = await services.search.search({
+        query: "Review",
+        group: "collections",
+        surface: "page",
+      });
+      expect(privateSearch.items).toEqual([]);
+      expect(privateSearch.counts.collections).toBe(0);
+      await db
+        .update(schema.userCollection)
+        .set({ isPrivate: false })
+        .where(eq(schema.userCollection.id, collection.id));
+
       expect(
         await services.collections.listCollectionItems(target),
       ).toHaveLength(1);
