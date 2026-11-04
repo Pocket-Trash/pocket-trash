@@ -1263,6 +1263,14 @@ test("committed workspace scripts select build checks without mutation isolation
 test("audited standalone scripts require validation without preview isolation", () => {
   for (const file of [
     "scripts/audit-bunny-services.mjs",
+    "scripts/ci-cost/README.txt",
+    "scripts/ci-cost/excluded.tsv",
+    "scripts/ci-cost/jobs.tsv",
+    "scripts/ci-cost/local.json",
+    "scripts/ci-cost/prs.tsv",
+    "scripts/ci-cost/reproduce.py",
+    "scripts/ci-cost/runs.tsv",
+    "scripts/ci-cost/summary.json",
     "scripts/change-classification.test.mjs",
     "scripts/check-changelog-reminder.mjs",
     "scripts/check-changelog-reminder.test.mjs",
