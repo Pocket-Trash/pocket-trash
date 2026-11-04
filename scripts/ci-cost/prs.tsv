@@ -1,0 +1,100 @@
+pr	url	branch	title
+430	https://github.com/Pocket-Trash/pocket-trash/pull/430	ra/eng-538-complete-pocket-trash-queue-cutover-across-all-apps-and	fix(config): complete shared queue routing and provisioning
+429	https://github.com/Pocket-Trash/pocket-trash/pull/429	ra/eng-513-allow-for-publicprivate-profiles	feat: enforce public profile privacy
+428	https://github.com/Pocket-Trash/pocket-trash/pull/428	ra/eng-506-add-discord-forum-ticket-controls-and-reconciliation	feat: add owner-only Discord forum ticket controls and recovery
+427	https://github.com/Pocket-Trash/pocket-trash/pull/427	ra/eng-505-implement-recoverable-discord-to-linear-ticket-persistence	feat: add recoverable Discord ticket persistence
+425	https://github.com/Pocket-Trash/pocket-trash/pull/425	ra/eng-504-select-the-discord-ticket-summarization-model	test: evaluate Discord ticket summaries and classification
+420	https://github.com/Pocket-Trash/pocket-trash/pull/420	ra/eng-517-add-the-global-search-trigger-and-modaldrawer	feat(web): add global search modal
+423	https://github.com/Pocket-Trash/pocket-trash/pull/423	ra/eng-503-add-the-staff-help-link-discord-command	feat: add the staff help-link Discord command
+422	https://github.com/Pocket-Trash/pocket-trash/pull/422	ra/eng-502-axiom-fallback	feat: recover Axiom fallback notifications
+417	https://github.com/Pocket-Trash/pocket-trash/pull/417	ra/eng-515-add-searchable-public-people-profiles	feat(web): add searchable public user profiles
+416	https://github.com/Pocket-Trash/pocket-trash/pull/416	ra/eng-514-build-the-public-search-index-and-query-service	feat(packages): add public search service
+419	https://github.com/Pocket-Trash/pocket-trash/pull/419	ra/fix-railpack-fontawesome-secret	fix: correct Discord bot deployment secrets
+418	https://github.com/Pocket-Trash/pocket-trash/pull/418	ra/fix-discord-bot-fontawesome-token	fix(config): provide Railway bot install token
+415	https://github.com/Pocket-Trash/pocket-trash/pull/415	ra/eng-502-add-direct-logger-notifications-with-axiom-discord-fallback	feat: add direct logger notification intake
+414	https://github.com/Pocket-Trash/pocket-trash/pull/414	ra/eng-501-migrate-github-notifications-to-the-discord-bot	feat: migrate GitHub notifications to Discord bot
+413	https://github.com/Pocket-Trash/pocket-trash/pull/413	ra/eng-496-spike-discord-components-v2-notification-format	feat: add Discord notification card renderer
+412	https://github.com/Pocket-Trash/pocket-trash/pull/412	ra/eng-500-configure-discord-applications-guild-resources-and-command	feat: validate Discord resource configuration
+411	https://github.com/Pocket-Trash/pocket-trash/pull/411	ra/eng-495-configure-and-review-linear-api-key-authentication-for-the	feat: validate Linear bot credentials
+405	https://github.com/Pocket-Trash/pocket-trash/pull/405	ra/eng-499-build-the-discord-bot-skeleton-and-railway-service	feat: add Discord bot runtime
+402	https://github.com/Pocket-Trash/pocket-trash/pull/402	ra/eng-497-create-packagequeue-and-migrate-the-scraper	feat(packages): add shared queue infrastructure
+410	https://github.com/Pocket-Trash/pocket-trash/pull/410	ra/eng-512-reconcile-undeclared-railway-service-variables	fix: reconcile secret ownership
+409	https://github.com/Pocket-Trash/pocket-trash/pull/409	ra/eng-511-remove-lucide-and-enforce-font-awesome	chore: remove Lucide and enforce Font Awesome
+408	https://github.com/Pocket-Trash/pocket-trash/pull/408	ra/eng-510-migrate-admin-and-operational-pages	feat(web): migrate admin icons to Font Awesome
+407	https://github.com/Pocket-Trash/pocket-trash/pull/407	ra/eng-509-migrate-user-facing-catalog-and-resource-pages	feat(web): migrate user-facing icons to Font Awesome
+406	https://github.com/Pocket-Trash/pocket-trash/pull/406	ra/eng-508-migrate-shared-ui-and-application-chrome	feat(web): migrate shared icons to Font Awesome
+404	https://github.com/Pocket-Trash/pocket-trash/pull/404	ra/eng-507-enable-authenticated-font-awesome-pro-usage	feat(web): enable authenticated Font Awesome Pro
+401	https://github.com/Pocket-Trash/pocket-trash/pull/401	ra/eng-110-require-product-type-image-fields	feat: require product type image metadata
+399	https://github.com/Pocket-Trash/pocket-trash/pull/399	ra/eng-453-allow-for-multiple-product-links	feat: allow multiple product links
+397	https://github.com/Pocket-Trash/pocket-trash/pull/397	ra/fetch-shared-github-workflow-secrets	ci(ci): fetch shared secrets from Infisical
+398	https://github.com/Pocket-Trash/pocket-trash/pull/398	ra/update-localizations-0-43-0	chore(web): update localization package
+396	https://github.com/Pocket-Trash/pocket-trash/pull/396	ra/eng-455-vite-config	fix(web): use native-compatible Vite config import
+395	https://github.com/Pocket-Trash/pocket-trash/pull/395	ra/eng-457-multiple-product-weights-tied-to-materials	feat: add material-specific product weights
+394	https://github.com/Pocket-Trash/pocket-trash/pull/394	ra/eng-473-publish-opt-in-user-trends	feat(web): publish opt-in user Trends
+393	https://github.com/Pocket-Trash/pocket-trash/pull/393	ra/eng-480-publish-privacy-safe-app-wide-lifecycle-trends	feat(web): publish privacy-safe lifecycle Trends
+385	https://github.com/Pocket-Trash/pocket-trash/pull/385	ra/eng-456-support-more-than-one-material	feat: support material combinations
+392	https://github.com/Pocket-Trash/pocket-trash/pull/392	ra/eng-479-show-personal-collection-history	feat: add personal collection history Trends
+391	https://github.com/Pocket-Trash/pocket-trash/pull/391	ra/eng-487-auto-select-unambiguous-collection-fields-and-collapse-the	feat(web): default collection product fields
+389	https://github.com/Pocket-Trash/pocket-trash/pull/389	ra/eng-478-add-pens-and-refills-trends	feat: add Pens and Refills Trends
+390	https://github.com/Pocket-Trash/pocket-trash/pull/390	ra/eng-450-close-out-the-pens-project-and-disposition-pr-87	chore(scraper): schedule Pen scrapers weekly
+388	https://github.com/Pocket-Trash/pocket-trash/pull/388	ra/eng-477-add-slider-specific-trends	feat: add Slider-specific Trends
+387	https://github.com/Pocket-Trash/pocket-trash/pull/387	ra/eng-485-add-compatible-pen-parts-to-the-top-level-product-form	feat(web): edit compatible Pen parts
+386	https://github.com/Pocket-Trash/pocket-trash/pull/386	ra/eng-476-add-spinner-specific-trends	feat: add Spinner-specific Trends
+384	https://github.com/Pocket-Trash/pocket-trash/pull/384	ra/eng-486-add-refill-compatibility-to-the-top-level-pen-product-form	feat(web): edit Pen refill compatibility on products
+381	https://github.com/Pocket-Trash/pocket-trash/pull/381	ra/eng-475-add-recorded-activity-trends	feat: add recorded activity Trends
+383	https://github.com/Pocket-Trash/pocket-trash/pull/383	ra/eng-494-exclude-the-autmog-pen-clips-accessory-from-canonical-pen	fix(scraper): exclude Autmog Pen Clips accessory
+382	https://github.com/Pocket-Trash/pocket-trash/pull/382	ra/eng-488-replace-duplicated-pen-configuration-with-direct-compatible	feat: replace pen configuration with direct parts
+380	https://github.com/Pocket-Trash/pocket-trash/pull/380	ra/eng-474-compare-personal-and-community-composition	feat(web): compare personal and community composition
+379	https://github.com/Pocket-Trash/pocket-trash/pull/379	ra/eng-472-ship-private-current-state-user-trends	feat: add private current-state Trends
+377	https://github.com/Pocket-Trash/pocket-trash/pull/377	ra/eng-471-add-maker-and-product-trends-drill-downs	feat: add maker and product Trends drill-downs
+376	https://github.com/Pocket-Trash/pocket-trash/pull/376	ra/eng-470-add-material-trends-drill-downs	feat: add material Trends drill-downs
+375	https://github.com/Pocket-Trash/pocket-trash/pull/375	ra/eng-468-add-the-public-collectors-chart	feat(web): add public collectors trends
+378	https://github.com/Pocket-Trash/pocket-trash/pull/378	ra/update-skills-0.5.5	chore(skills): update installed skills to v0.5.5
+374	https://github.com/Pocket-Trash/pocket-trash/pull/374	ra/eng-469-configure-and-publish-parts-and-accessories-trends	feat: publish configurable Parts and Accessories Trends
+373	https://github.com/Pocket-Trash/pocket-trash/pull/373	ra/eng-467-publish-privacy-safe-collection-item-trends	feat: publish privacy-safe collection item trends
+372	https://github.com/Pocket-Trash/pocket-trash/pull/372	ra/eng-466-track-collection-item-ownership-periods	feat: track collection item ownership periods
+371	https://github.com/Pocket-Trash/pocket-trash/pull/371	ra/eng-465-ship-the-public-catalog-product-trends-overview	feat: add public catalog Trends overview
+370	https://github.com/Pocket-Trash/pocket-trash/pull/370	ra/eng-484-prevent-refill-terminology-aliases-from-breaking-catalog	fix(services): filter product terminology aliases
+369	https://github.com/Pocket-Trash/pocket-trash/pull/369	ra/eng-483-exclude-autmog-accessories-from-canonical-pen-scraper-runs	fix(scraper): exclude Autmog accessories from pen jobs
+368	https://github.com/Pocket-Trash/pocket-trash/pull/368	ra/eng-482-sync-saga-appearances-and-capped-product-images	feat(scraper): sync capped Saga catalog data
+365	https://github.com/Pocket-Trash/pocket-trash/pull/365	ra/eng-447-remove-legacy-autmog-application-and-static-site-surfaces	refactor: remove retired Autmog archive
+367	https://github.com/Pocket-Trash/pocket-trash/pull/367	ra/eng-481-consume-released-pens-configuration-localizations	fix(web): consume Pens configuration translations
+366	https://github.com/Pocket-Trash/pocket-trash/pull/366	ra/eng-464-create-newly-discovered-autmog-finishes-during-scraper-sync	fix(scraper): create discovered Autmog finishes
+364	https://github.com/Pocket-Trash/pocket-trash/pull/364	ra/eng-444-enable-and-verify-the-canonical-autmog-and-saga-scrapers	feat(scraper): run Pens scrapers every 30 minutes
+363	https://github.com/Pocket-Trash/pocket-trash/pull/363	ra/eng-461-drop-dormant-refill-evidence-and-lifecycle-compatibility	refactor(database): remove dormant refill evidence schema
+362	https://github.com/Pocket-Trash/pocket-trash/pull/362	ra/eng-462-retarget-the-grimsmo-saga-scraper-to-canonical-pens-storage	feat(scraper): sync Saga materials to canonical catalog
+361	https://github.com/Pocket-Trash/pocket-trash/pull/361	ra/eng-442-retarget-the-autmog-scraper-to-canonical-pens-storage	feat(scraper): write Autmog pens to canonical catalog
+359	https://github.com/Pocket-Trash/pocket-trash/pull/359	ra/eng-337-remove-temporary-braces-audit-exception	chore(config): renew braces audit exception
+357	https://github.com/Pocket-Trash/pocket-trash/pull/357	ra/eng-438-add-owned-pen-configuration-serial-numbers-warnings-and	feat: add owned Pen configuration
+358	https://github.com/Pocket-Trash/pocket-trash/pull/358	ra/eng-439-add-deterministic-pens-fixtures-and-approved-import	feat(database): add deterministic Pens fixtures
+356	https://github.com/Pocket-Trash/pocket-trash/pull/356	ra/eng-437-add-admin-authoring-for-pens-parts-refills-and-compatibility	feat: add Pens catalog administration
+354	https://github.com/Pocket-Trash/pocket-trash/pull/354	ra/eng-435-implement-the-additive-pens-catalog-schema-and-migration	feat(database): add Pens catalog schema
+353	https://github.com/Pocket-Trash/pocket-trash/pull/353	ra/eng-433-sub-divide-product-types	feat: subdivide product types
+352	https://github.com/Pocket-Trash/pocket-trash/pull/352	ra/reduce-seed-and-refresh-production-seed	fix(database): reduce KAP development seed
+342	https://github.com/Pocket-Trash/pocket-trash/pull/342	ra/eng-384-add-public-material-specific-routes-and-discovery	feat: add public material-specific routes and discovery
+341	https://github.com/Pocket-Trash/pocket-trash/pull/341	ra/eng-432-investigate-flaky-markdown-editor-visual-table-storybook	test(web): stabilize visual table keyboard navigation
+337	https://github.com/Pocket-Trash/pocket-trash/pull/337	ra/eng-383-add-material-specifics-and-scoped-image-administration	feat: add material specifics and scoped image administration
+334	https://github.com/Pocket-Trash/pocket-trash/pull/334	ra/eng-155-enforce-complete-openapi-coverage-for-api-endpoints	fix: enforce complete OpenAPI endpoint coverage
+335	https://github.com/Pocket-Trash/pocket-trash/pull/335	ra/eng-404-ratify-the-existing-pens-domain-baseline	docs(docs): ratify Pens domain baseline
+336	https://github.com/Pocket-Trash/pocket-trash/pull/336	ra/eng-430-theme-persistence-e2e-test-intermittently-misses-saving	test(web): stabilize theme persistence e2e waits
+333	https://github.com/Pocket-Trash/pocket-trash/pull/333	ra/eng-426-postgress-ssl-warning	fix: preserve full SSL verification for Neon URLs
+332	https://github.com/Pocket-Trash/pocket-trash/pull/332	ra/eng-334-migrate-railway-config-as-code-to-infrastructure-as-code	chore(config): migrate Railway scraper settings to IaC
+330	https://github.com/Pocket-Trash/pocket-trash/pull/330	ra/eng-418-upgrade-node-and-ubuntu-runners	chore: upgrade Node and Ubuntu runners
+331	https://github.com/Pocket-Trash/pocket-trash/pull/331	ra/update-skills-to-0.5.4	chore: update skills to 0.5.4
+329	https://github.com/Pocket-Trash/pocket-trash/pull/329	ra/eng-422-cut-over-every-database-and-retire-the-temporary-drizzle	test(database): allow baseline migration hooks more setup time
+328	https://github.com/Pocket-Trash/pocket-trash/pull/328	ra/eng-419-qualify-the-drizzle-release-candidate-and-fresh-baseline	feat(database): adopt drizzle rc4 and a fresh migration baseline
+327	https://github.com/Pocket-Trash/pocket-trash/pull/327	ra/eng-417-remove-old-name-subtype-compatibility-views	refactor(database): remove subtype compatibility views
+326	https://github.com/Pocket-Trash/pocket-trash/pull/326	ra/eng-416-rename-catalog-and-collection-subtype-tables	refactor(database): rename subtype tables
+325	https://github.com/Pocket-Trash/pocket-trash/pull/325	ra/eng-415-fix-railway-scraper-upload-inputs-blocking-production	fix(ci): include required railway build inputs
+324	https://github.com/Pocket-Trash/pocket-trash/pull/324	ra/generate-pen-schema-diagram	chore(scripts): generate database diagram from Drizzle
+322	https://github.com/Pocket-Trash/pocket-trash/pull/322	ra/eng-368-align-preview-database-classification-and-db-change-labeling	fix(ci): classify and label preview database requirements
+323	https://github.com/Pocket-Trash/pocket-trash/pull/323	ra/eng-179-implement-scraper-cron-granularity	feat(scraper): dispatch due sources by UTC calendar slot
+321	https://github.com/Pocket-Trash/pocket-trash/pull/321	ra/eng-396-fix-the-hidden-product-image-input-causing-horizontal	fix(web): constrain hidden upload input dimensions
+320	https://github.com/Pocket-Trash/pocket-trash/pull/320	ra/eng-106-add-public-profile-pictures	feat(web): add public profile pictures
+319	https://github.com/Pocket-Trash/pocket-trash/pull/319	ra/eng-387-support-stored-metric-and-imperial-product-measurements	feat: support stored metric and imperial measurements
+318	https://github.com/Pocket-Trash/pocket-trash/pull/318	ra/eng-390-remove-slider-weight-basis-modeling	refactor(web): remove slider weight basis
+317	https://github.com/Pocket-Trash/pocket-trash/pull/317	ra/eng-392-model-inserts-as-fixed-layouts-and-redesign-magnet-setup	feat(web): redesign slider magnet configurations
+316	https://github.com/Pocket-Trash/pocket-trash/pull/316	ra/eng-391-simplify-body-hosted-magnet-layouts-and-correct-slider-click	feat: model slider clicks from magnet layouts
+314	https://github.com/Pocket-Trash/pocket-trash/pull/314	ra/eng-389-rework-slider-insert-selection-around-an-included-insert	feat: rework slider insert selection
+312	https://github.com/Pocket-Trash/pocket-trash/pull/312	ra/eng-395-promote-slider-plate-selection-to-a-top-level-product-field	feat: promote slider plate selection
+313	https://github.com/Pocket-Trash/pocket-trash/pull/313	ra/eng-394-make-generated-and-read-only-form-fields-visibly-non	fix(web): distinguish read-only inputs

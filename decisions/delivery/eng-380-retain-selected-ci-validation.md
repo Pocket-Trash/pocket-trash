@@ -13,7 +13,10 @@ Keep strict change classification, metadata-only validation for metadata edits,
 selected `validate:pr` checks before publication, and the lightweight pre-commit
 hook. This measurement does not justify widening default CI.
 
-The Linear report owns the evidence, exclusions, run manifest and offline replay.
+The Linear report owns the findings and exclusions. The
+[sanitized evidence and offline replay](../../scripts/ci-cost/README.txt) live
+beside the CI tooling. Run `python3 scripts/ci-cost/reproduce.py` from the
+repository root to verify the totals and snapshot-order invariance.
 Its local validation results are a partial recovered sample, not complete
 rollout telemetry or a count of proven avoided CI failures. Before the next
 measurement, capture structured local validation receipts and distinguish code

@@ -1,0 +1,16 @@
+{
+  "prs": 99,
+  "totals_seconds": {
+    "failed-retried-deployment": 24340.0,
+    "code-push-ci": 140234.0,
+    "successful-deployment": 69164.0,
+    "metadata-edit-ci": 2377.0
+  },
+  "cutoff": "2026-10-20T03:09:33Z",
+  "attempt_counts": {
+    "failed-retried-deployment": 60,
+    "code-push-ci": 190,
+    "successful-deployment": 154,
+    "metadata-edit-ci": 76
+  }
+}
