@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useForm } from "@tanstack/react-form";
 import { expect, fn } from "storybook/test";
+import { useCatalogCopy } from "@/lib/catalog-copy";
 import { Button } from "@/components/ui/button";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { ProductAliasesEditor } from "./product-aliases-editor";
@@ -24,6 +25,7 @@ function AliasStoryForm({
    */
   onSave: (aliases: string[]) => void;
 }) {
+  const t = useCatalogCopy();
   const form = useForm({
     defaultValues: { aliases: initialValue },
     /**
@@ -50,7 +52,7 @@ function AliasStoryForm({
           />
         )}
       </form.Field>
-      <Button type="submit">Save product</Button>
+      <Button type="submit">{t("action.save")}</Button>
     </form>
   );
 }
@@ -89,8 +91,8 @@ export const CollapsedNew: Story = {
     ).toBeVisible();
     await expect(canvas.getByText("Optional")).toBeVisible();
     await expect(
-      canvas.queryByRole("textbox", { name: "Alternative product name" }),
-    ).not.toBeInTheDocument();
+      canvas.getByLabelText("Alternative product name"),
+    ).not.toBeVisible();
     const details = canvasElement.querySelector("details");
     const summary = canvasElement.querySelector("summary");
     if (!details || !summary) throw new Error("Missing alias disclosure.");
@@ -113,8 +115,8 @@ export const CollapsedExisting: Story = {
       canvas.getByText("2", { selector: "[data-slot=badge]" }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole("textbox", { name: "Alternative product name" }),
-    ).not.toBeInTheDocument();
+      canvas.getByLabelText("Alternative product name"),
+    ).not.toBeVisible();
   },
 };
 
@@ -145,7 +147,7 @@ export const EntryAndSave: Story = {
       canvas.getByRole("button", { name: "Remove alias Pocket Writer" }),
     ).toBeVisible();
     await expect(args.onSave).not.toHaveBeenCalled();
-    await userEvent.click(canvas.getByRole("button", { name: "Save product" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
     await expect(args.onSave).toHaveBeenCalledTimes(1);
     await expect(args.onSave).toHaveBeenCalledWith([
       "Model 36, special edition",
@@ -195,7 +197,7 @@ export const ValidationAndRemoval: Story = {
     await expect(
       canvas.queryByRole("button", { name: "Remove alias Café" }),
     ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("button", { name: "Save product" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
     await expect(args.onSave).toHaveBeenCalledTimes(1);
     await expect(args.onSave).toHaveBeenCalledWith(["Pocket Writer"]);
   },

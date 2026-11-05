@@ -370,6 +370,7 @@ describe("catalog mutation lifetimes", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           aliases: ["Original", "Model 36, special edition"],
+          name: "Spinner",
         }),
       }),
     );
@@ -404,7 +405,11 @@ describe("catalog mutation lifetimes", () => {
       edit(input(container, "Alternative product name"), "Another name"),
     );
     await click(container, "Add");
-    await click(container, "Cancel");
+    const cancelButton = [...container.querySelectorAll("button")].find(
+      (node) => node.textContent === "Cancel" && !node.closest("dialog"),
+    );
+    if (!cancelButton) throw new Error("Missing main product cancel action");
+    await act(async () => cancelButton.click());
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(saveCatalogProduct).not.toHaveBeenCalled();
     expect(product.aliases).toEqual(["Original"]);
