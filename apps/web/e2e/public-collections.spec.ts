@@ -60,6 +60,10 @@ test("@mutation public collection browsing preserves effective privacy", async (
         "u",
       ),
     );
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
+      fixture.publicCollection.name,
+      { timeout: 30_000 },
+    );
     await expect(
       page.locator("main").getByText("Collection items: 3"),
     ).toBeVisible();
