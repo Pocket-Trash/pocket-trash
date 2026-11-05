@@ -193,6 +193,7 @@ export function CatalogMultiCombobox({
   placeholder,
   removeDisabled = false,
   removeLabel,
+  renderSelectionDetails,
   value,
 }: {
   /**
@@ -249,8 +250,12 @@ export function CatalogMultiCombobox({
    */
   removeLabel: string | RemoveLabelBuilder;
   /**
-   * Current controlled selection. An empty array means no options are selected.
+   * Adds contextual content beside one selected identity.
+   * @param selected - Current selected option.
+   * @returns Additional selected-option context.
    */
+  renderSelectionDetails?: (selected: ComboboxOption) => React.ReactNode;
+  /** Current controlled selection. An empty array means no options are selected. */
   value: ComboboxOption[];
 }) {
   const [open, dispatch] = React.useReducer(comboboxPopupReducer, false);
@@ -299,16 +304,21 @@ export function CatalogMultiCombobox({
       {value.length ? (
         <div className="flex flex-wrap gap-1.5">
           {value.map((selected) => (
-            <SelectionPill
-              className="bg-secondary text-secondary-foreground"
-              disabled={removeDisabled}
+            <div
+              className={renderSelectionDetails ? "grid gap-1" : "contents"}
               key={selected.id}
-              onRemove={() =>
-                onValueChange(value.filter(({ id }) => id !== selected.id))
-              }
-              removeLabel={removeLabel}
-              value={selected}
-            />
+            >
+              <SelectionPill
+                className="bg-secondary text-secondary-foreground"
+                disabled={removeDisabled}
+                onRemove={() =>
+                  onValueChange(value.filter(({ id }) => id !== selected.id))
+                }
+                removeLabel={removeLabel}
+                value={selected}
+              />
+              {renderSelectionDetails?.(selected)}
+            </div>
           ))}
         </div>
       ) : null}

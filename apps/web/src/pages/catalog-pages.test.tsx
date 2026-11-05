@@ -1210,6 +1210,35 @@ describe("ProductsPage", () => {
 });
 
 describe("ProductDetailPage", () => {
+  it("summarizes one physical clip in both functional compatibility groups", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          productTypeSlug: "pen",
+          compatibleParts: [
+            {
+              id: 101,
+              name: "Actuating Clip",
+              slug: "actuating-clip",
+              productTypeSlug: "pen-clip",
+              productTypeName: "Pen clip",
+              penPartRoles: ["clip", "actuator"],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(html).toContain("Pen clips");
+    expect(html).toContain("Pen actuators");
+    expect(
+      html.match(/href="\/products\/pen-clip\/actuating-clip"/gu),
+    ).toHaveLength(2);
+    expect(html).toContain(">Clip<");
+    expect(html).toContain(">Actuator<");
+  });
+
   it("groups and links compatible Pen parts without configuration copy", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage

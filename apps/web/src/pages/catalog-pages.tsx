@@ -15,6 +15,11 @@ import type {
   UserCollectionSummary,
 } from "@package/services";
 import {
+  getPenPartRoles,
+  type PenPartProductType,
+  penPartInterchangeabilityKeys,
+} from "@package/services/catalog-terminology";
+import {
   type SliderMagnetLayout,
   sliderMagnetLayoutDetails,
 } from "@package/services/constants";
@@ -41,6 +46,7 @@ import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCombinationLinks } from "@/components/material-link";
 import { PaginatedCards } from "@/components/paginated-cards";
+import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
 import { PublicProfileAvatar } from "@/components/public-profile-avatar";
@@ -654,13 +660,16 @@ export function ProductDetailPage({
       break;
   }
   const compatiblePartsByType = new Map<
-    CatalogProductType,
+    PenPartProductType,
     CatalogProduct["compatibleParts"]
   >();
   for (const part of product.compatibleParts) {
-    const parts = compatiblePartsByType.get(part.productTypeSlug) ?? [];
-    parts.push(part);
-    compatiblePartsByType.set(part.productTypeSlug, parts);
+    for (const role of getPenPartRoles(part)) {
+      const type: PenPartProductType = `pen-${role}`;
+      const parts = compatiblePartsByType.get(type) ?? [];
+      parts.push(part);
+      compatiblePartsByType.set(type, parts);
+    }
   }
 
   return (
@@ -776,6 +785,7 @@ export function ProductDetailPage({
               product.productTypeSlug,
               product.productTypeName,
             )}
+            <PenPartRoleBadges part={product} />
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={product.makerName} slug={product.makerSlug} />
@@ -929,19 +939,12 @@ export function ProductDetailPage({
               {t("web.pens.compatibleParts.heading" as TranslationKey)}
             </h2>
             <div className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
-              {[...compatiblePartsByType.values()].map((parts) => (
-                <div
-                  className="grid content-start gap-2"
-                  key={parts[0]?.productTypeSlug}
-                >
+              {[...compatiblePartsByType.entries()].map(([type, parts]) => (
+                <div className="grid content-start gap-2" key={type}>
                   <h3 className="font-semibold">
-                    {parts[0]
-                      ? catalogProductTypeLabel(
-                          t,
-                          parts[0].productTypeSlug,
-                          parts[0].productTypeName,
-                        )
-                      : null}
+                    {t(
+                      `web.pens.productType.${penPartInterchangeabilityKeys[type]}`,
+                    )}
                   </h3>
                   <ul className="grid gap-2 text-sm">
                     {parts.map((part) => (
@@ -956,6 +959,7 @@ export function ProductDetailPage({
                         >
                           {part.name}
                         </Link>
+                        <PenPartRoleBadges part={part} />
                         {part.requiresCustomization ? (
                           <span className="ml-2 text-xs text-muted-foreground">
                             {t("web.pens.interchangeableParts.customization")}
@@ -2328,6 +2332,7 @@ export function CollectionItemDetailPage({
               item.productTypeSlug,
               item.productTypeName,
             )}
+            <PenPartRoleBadges part={item} />
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={item.makerName} slug={item.makerSlug} />
