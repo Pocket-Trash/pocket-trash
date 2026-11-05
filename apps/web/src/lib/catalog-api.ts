@@ -455,6 +455,8 @@ export const productFormSchema = z
     compatibleButtonId: idSchema.nullable(),
     compatiblePartProductIds: z.array(idSchema).default([]),
     penPartRoles: z.array(z.enum(penPartRoles)).optional(),
+    actuatedMechanismProductIds: z.array(idSchema).optional(),
+    actuatingPartProductIds: z.array(idSchema).optional(),
     customizationConfirmedPartProductIds: z.array(idSchema).default([]),
     interchangeableParts: z
       .object({
@@ -532,6 +534,8 @@ export const productFormSchema = z
         mechanismId,
         productTypeSlug,
         penPartRoles: selectedPartRoles,
+        actuatedMechanismProductIds,
+        actuatingPartProductIds,
         refillCompatibility,
         refillModel,
         spinDiameter,
@@ -652,6 +656,21 @@ export const productFormSchema = z
           message: "web.catalog.error.form",
           path: ["refillCompatibility"],
         });
+      }
+      for (const key of [
+        "actuatedMechanismProductIds",
+        "actuatingPartProductIds",
+      ] as const) {
+        const ids =
+          key === "actuatedMechanismProductIds"
+            ? actuatedMechanismProductIds
+            : actuatingPartProductIds;
+        if (ids && new Set(ids).size !== ids.length)
+          context.addIssue({
+            code: "custom",
+            message: "web.pens.actuation.invalid",
+            path: [key],
+          });
       }
       if (productTypeSlug === "pen-mechanism" && mechanismId === null) {
         context.addIssue({
@@ -2331,6 +2350,8 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const input: ProductWriteInput = {
       actor,
       aliases: parsed.data.aliases,
+      actuatedMechanismProductIds: parsed.data.actuatedMechanismProductIds,
+      actuatingPartProductIds: parsed.data.actuatingPartProductIds,
       compatiblePartProductIds: parsed.data.compatiblePartProductIds,
       customizationConfirmedPartProductIds:
         parsed.data.customizationConfirmedPartProductIds,
@@ -3437,9 +3458,25 @@ function validationFailure(error: z.ZodError) {
  * @returns The standard mutation failure payload.
  */
 function mutationFailure(error: unknown) {
-  if (error instanceof Error && error.message === "web.pens.partRoles.inUse")
+  if (
+    error instanceof Error &&
+    ["web.pens.partRoles.inUse", "web.pens.actuation.roleInUse"].includes(
+      error.message,
+    )
+  )
     return {
       fieldErrors: { penPartRoles: [error.message] },
+      formError: error.message,
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
+
+  if (error instanceof Error && error.message === "web.pens.actuation.invalid")
+    return {
+      fieldErrors: {
+        actuatedMechanismProductIds: [error.message],
+        actuatingPartProductIds: [error.message],
+      },
       formError: error.message,
       ok: false as const,
       requiresConfirmation: false as const,

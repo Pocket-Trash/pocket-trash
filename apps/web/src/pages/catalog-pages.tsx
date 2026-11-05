@@ -46,6 +46,7 @@ import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCombinationLinks } from "@/components/material-link";
 import { PaginatedCards } from "@/components/paginated-cards";
+import { PenActuationLinks } from "@/components/pen-actuation-links";
 import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
@@ -786,6 +787,10 @@ export function ProductDetailPage({
               product.productTypeName,
             )}
             <PenPartRoleBadges part={product} />
+            <PenActuationLinks
+              actuatedMechanisms={product.actuatedMechanisms}
+              actuatingParts={product.actuatingParts}
+            />
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={product.makerName} slug={product.makerSlug} />
@@ -964,6 +969,9 @@ export function ProductDetailPage({
                           {part.name}
                         </Link>
                         <PenPartRoleBadges part={part} />
+                        <PenActuationLinks
+                          actuatedMechanisms={part.actuatedMechanisms}
+                        />
                         {part.requiresCustomization ? (
                           <span className="ml-2 text-xs text-muted-foreground">
                             {t("web.pens.interchangeableParts.customization")}

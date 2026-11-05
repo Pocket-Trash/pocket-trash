@@ -64,6 +64,7 @@ import {
   MeasurementInput,
   type MeasurementInputValue,
 } from "@/components/measurement-input";
+import { PenActuationLinks } from "@/components/pen-actuation-links";
 import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { FileDropInput } from "@/components/resource-file-input";
@@ -1557,6 +1558,10 @@ export function ProductEditor({
         : null,
     customizationConfirmedPartProductIds: [],
     penPartRoles: getPenPartRoles(initialProduct ?? { productTypeSlug }),
+    actuatedMechanismProductIds:
+      initialProduct?.actuatedMechanisms?.map(({ id }) => id) ?? [],
+    actuatingPartProductIds:
+      initialProduct?.actuatingParts?.map(({ id }) => id) ?? [],
     aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
     buttonDiameter: initialProduct?.buttonDiameter ?? { unit: "mm", value: "" },
@@ -1995,6 +2000,9 @@ export function ProductEditor({
                 {penPartRoles.map((role) => {
                   const type: PenPartProductType = `pen-${role}`;
                   const primary = type === productTypeSlug;
+                  const linkedActuator =
+                    role === "actuator" &&
+                    Boolean(initialProduct?.actuatedMechanisms?.length);
                   return (
                     <label
                       className="flex flex-wrap items-center gap-2 text-sm"
@@ -2003,7 +2011,7 @@ export function ProductEditor({
                       <input
                         type="checkbox"
                         checked={field.state.value?.includes(role) ?? primary}
-                        disabled={primary}
+                        disabled={primary || linkedActuator}
                         onChange={(event) =>
                           field.handleChange(
                             event.target.checked
@@ -2017,6 +2025,11 @@ export function ProductEditor({
                       {t(
                         `catalog.penPartRoles.${penPartInterchangeabilityKeys[type]}`,
                       )}
+                      {linkedActuator && !primary ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t("web.pens.actuation.roleInUse")}
+                        </span>
+                      ) : null}
                       {primary ? (
                         <span className="text-xs text-muted-foreground">
                           {t("web.pens.partRoles.primary")}
@@ -2033,6 +2046,67 @@ export function ProductEditor({
             )}
           </form.Field>
         ) : null}
+        <form.Subscribe selector={(state) => state.values.penPartRoles}>
+          {(roles) =>
+            [
+              {
+                name: "actuatedMechanismProductIds" as const,
+                label: t("web.pens.actuation.mechanisms"),
+                enabled: (roles ?? []).includes("actuator"),
+                items: ui.options.relationshipProducts.filter(
+                  (part) =>
+                    part.productTypeSlug === "pen-mechanism" &&
+                    part.id !== initialProduct?.id,
+                ),
+              },
+              {
+                name: "actuatingPartProductIds" as const,
+                label: t("web.pens.actuation.parts"),
+                enabled: productTypeSlug === "pen-mechanism",
+                items: ui.options.relationshipProducts.filter(
+                  (part) =>
+                    getPenPartRoles(part).includes("actuator") &&
+                    part.id !== initialProduct?.id,
+                ),
+              },
+            ]
+              .filter(({ enabled }) => enabled)
+              .map(({ name, label, items }) => (
+                <form.Field key={name} name={name} mode="array">
+                  {(field) => (
+                    <Field label={label}>
+                      <p className="text-xs text-muted-foreground">
+                        {t("web.pens.actuation.help")}
+                      </p>
+                      <CatalogMultiCombobox
+                        ariaLabel={label}
+                        items={items}
+                        value={items.filter(({ id }) =>
+                          field.state.value?.includes(id),
+                        )}
+                        onValueChange={(parts) =>
+                          field.handleChange(parts.map(({ id }) => Number(id)))
+                        }
+                        placeholder={label}
+                        removeLabel={(name) =>
+                          t("web.action.removeSelection", { name })
+                        }
+                        renderSelectionDetails={(part) => {
+                          const selected = items.find(
+                            ({ id }) => id === part.id,
+                          );
+                          return selected ? (
+                            <PenPartRoleBadges part={selected} />
+                          ) : null;
+                        }}
+                      />
+                      <FieldError error={serverErrors[name]?.errors[0]} t={t} />
+                    </Field>
+                  )}
+                </form.Field>
+              ))
+          }
+        </form.Subscribe>
         {productTypeSlug === "pen" ? (
           <form.Field name="interchangeableParts">
             {(field) => (
@@ -2479,7 +2553,14 @@ export function ProductEditor({
                                   ({ id }) => id === selected.id,
                                 );
                                 return part ? (
-                                  <PenPartRoleBadges part={part} />
+                                  <>
+                                    <PenPartRoleBadges part={part} />
+                                    <PenActuationLinks
+                                      actuatedMechanisms={
+                                        part.actuatedMechanisms
+                                      }
+                                    />
+                                  </>
                                 ) : null;
                               }}
                             />

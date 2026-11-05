@@ -871,3 +871,24 @@ describe("collection writes", () => {
     ).toBe(false);
   });
 });
+
+describe("physical actuation product writes", () => {
+  it("rejects duplicate links and retains omission for older writers", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "pen-clip",
+        penPartRoles: ["clip", "actuator"],
+        actuatedMechanismProductIds: [1010, 1010],
+      }).success,
+    ).toBe(false);
+    const result = productFormSchema.parse({
+      ...base,
+      productTypeSlug: "pen-mechanism",
+      mechanismId: 1000,
+      actuatingPartProductIds: [1011],
+    });
+    expect(result.actuatingPartProductIds).toEqual([1011]);
+    expect(result.actuatedMechanismProductIds).toBeUndefined();
+  });
+});
