@@ -34,6 +34,94 @@
 
 
 
+
+## 0.13.0
+
+### Minor Changes
+
+* Add anonymous product drilldowns to app-wide collection status Trends. (@app/web, @package/services)
+* Recover Axiom fallback notifications with durable reconciliation and shared event deduplication. (@app/discord-bot, @app/api, @package/queue, @package/logger)
+* Add the shareable search page and reusable pagination. (@app/web)
+* Route authenticated GitHub webhooks through the Discord bot's durable notification queue and retire the GitHub Actions notifier. (@app/discord-bot, @package/infisical-runner, @package/queue)
+* Add owner-only Discord ticket controls, recovery and advisory classification. (@app/discord-bot, @package/logger)
+* Add independently ordered public and private Markdown notes to collection items. (@app/web, @package/services, @package/database)
+* Add searchable public user profile destinations. (@app/web, @package/services)
+* Add public and private collection item statuses with synchronized sale history and an owner public-preview dialog. (@app/web, @package/services, @package/database)
+* Add the production Discord bot runtime, queue worker, role guards, and Railway service. (@app/discord-bot)
+* Add the global compact search experience. (@app/web)
+* Require image metadata for product types (@app/web, @package/database, @package/services)
+* Add the selected Discord notification card renderer. (@app/discord-bot)
+* Add personal collection status Trends with URL-backed item drilldowns. (@app/web, @package/services)
+* Store, edit, and display optional product weights for each material combination. (@app/web, @package/database, @package/services)
+* Use ranked public search results across product, collection, maker, material, and resource directories. (@app/web, @package/services)
+* Add staff-only help links with English topic choices and optional member mentions. (@app/discord-bot)
+* Add private-by-default profile visibility controls and mask private profile attribution across public routes and search. (@app/web, @package/database, @package/services)
+* Add anonymous app-wide collection status totals and live public drilldowns. (@app/web, @package/services, @package/database)
+* Record ownership-period paid and sold prices with saved currencies and owner-controlled paid-price visibility. (@app/web, @package/services, @package/database)
+* Add public status Trends and item drilldowns to published profiles. (@app/web, @package/services)
+* Add the synchronized public search index and ranked query service. (@package/database, @package/services)
+* Add shared typed queues and migrate scraper delivery. (@package/queue, @app/scraper)
+* Add stable logger event identities and an app-authenticated direct Discord notification path for selected production errors. (@app/api, @app/discord-bot, @app/scraper, @app/web, @package/logger)
+* Add recoverable Discord-to-Linear ticket persistence and bounded attachment processing. (@app/discord-bot)
+
+### Patch Changes
+
+* Share account preferences across routes while isolating accounts and preserving browser preferences. (@app/web)
+* Preserve responsive galleries, pagination, and sidebar interactions across viewport and lifecycle changes. (@app/web)
+* Replace icons on user-facing catalog and resource pages with Font Awesome Pro Light. (@app/web)
+* Replace icons on admin and operational pages with Font Awesome Pro Light. (@app/web)
+* Enforce the Axiom event and map-field contract. (@package/logger)
+* Preserve catalog administration drafts, image retries, and pending configuration changes. (@app/web)
+* Preserve erasure confirmations and stop stale privacy workflows across account changes. (@app/web)
+* Fetch shared workflow secrets directly from Infisical. (@package/logger, @package/storage)
+* Keep resource category searches in sync with the latest input.
+  Remove unused database viewer development dependencies. (@app/web)
+* Complete the Markdown editor state migration. (@app/web)
+* Consolidate agent coding standards under one index and remove superseded guides. (@app/web)
+* Consolidate JSDoc coding guidance. (@app/web)
+* Validate and preserve configured Discord routing, forum, tag, and Axiom intake IDs. (@app/discord-bot)
+* Keep in-memory queue retries scheduled when their timer fires early. (@package/queue)
+* Keep product editing and catalog moderation drafts safe through explicit save lifetimes. (@app/web)
+* Preserve collection drafts and ordered saves through explicit editing and upload lifetimes. (@app/web)
+* Run required CI checks for pull requests targeting feature branches. (@app/api, @app/scraper, @app/web, @app/discord-bot)
+* Provide package authentication to Railway Discord bot builds. (@app/discord-bot)
+* Replace icons in shared application chrome and reusable UI components with Font Awesome Pro Light. (@app/web)
+* Validate the dedicated Linear bot credential and required ticket targets at startup. (@app/discord-bot)
+* Start and verify isolated local Redis for bot and scraper development. (@app/discord-bot, @app/scraper, @package/infisical-runner)
+* Document one-time Font Awesome authentication for local pnpm installs. (@app/web)
+* Support ordered product links across catalog storage, editing, display, and scraper synchronization. (@app/scraper, @app/web, @package/database, @package/logger, @package/services)
+* Run mutation tests with disposable Postgres instead of Neon branches. (@package/database, @package/storage, @app/web)
+* Update vulnerable dependencies and remove the withdrawn braces exception.
+  Limit CI test concurrency to prevent database-test resource contention. (@app/api, @app/discord-bot, @app/scraper, @app/web)
+* Remove unused dependencies and obsolete workspace overrides. (@app/api, @app/web, @package/database)
+* Add authenticated Font Awesome Pro support and migrate the footer brand icons. (@app/web)
+* Patch Undici against malformed response denial of service. (@app/api, @app/discord-bot, @app/scraper, @app/web)
+* Update Zod 4 to 4.6.6 and restrict the temporary legacy tooling exception. (@app/api, @app/discord-bot, @app/scraper, @app/web, @package/database, @package/logger, @package/queue, @package/services)
+* Allow slow Redis volume mounting during preview deployment verification. (@app/scraper)
+* Provide Railpack's private package token and validate the Axiom intake webhook URL. (@app/discord-bot)
+* Finish the Font Awesome migration and reject new Lucide imports. (@app/web, @package/lint)
+* Authenticate Railway package installation and preserve service variables. (@app/scraper)
+* Cancel superseded global searches and preserve keyboard and focus behavior across modal changes. (@app/web)
+* Wire opt-in PR visuals and manual credential checks, and renew the approved temporary development-tooling audit exception. (@app/api, @app/discord-bot, @app/scraper, @app/web)
+* Remove obsolete Redis infrastructure declarations after the shared queue cutover. (@app/scraper, @app/discord-bot)
+* Follow the promoted PR reviewer release channel. (@app/web)
+* Keep public search results and filters aligned with URL history without losing in-progress edits. (@app/web)
+* Make public privacy test fixtures support unsaved preferences. (@app/web)
+* Route scraper deployments to persistent shared Redis and support workspace-scoped Railway credentials in CI. (@app/scraper, @app/discord-bot)
+* Preserve access and feature flag drafts across retries and account changes. (@app/web)
+* Preserve feedback drafts, votes, and planning requests across workflow lifetimes. (@app/web)
+* Preserve Markdown editor lifecycles with explicit editing and loading transitions. (@app/web)
+* Preserve chart, clipboard, recovery, and readiness behavior across UI lifetimes. (@app/web)
+* Enforce web state ownership across application code, stories, tests, and browser harnesses. (@app/web, @package/lint)
+* Stage the shared Railway queue with RDB and AOF persistence while retaining the legacy scraper queue for migration. (@app/scraper)
+* Preserve resource drafts and pending actions across account and visibility changes. (@app/web)
+* Rename the web asset-folder secret and reconcile workflow and Railway secret ownership. (@app/web)
+* Select ticket-summary and advisory classification models with reproducible synthetic evaluations. (@app/discord-bot)
+* Use localization release 0.43.0. (@app/web)
+* Fix native Vite config loading for web tests. (@app/web)
+* Update Storybook and redirect tooling to patched security releases.
+  Renew the temporary braces security exception for seven days. (@app/web)
+
 ## 0.12.0
 
 ### Minor Changes
