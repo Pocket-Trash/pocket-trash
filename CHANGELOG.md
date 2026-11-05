@@ -35,6 +35,17 @@
 
 
 
+
+## 0.14.0
+
+### Minor Changes
+
+* Search private collections by their names and descriptions and owned items by product name and description. (@app/web)
+
+### Patch Changes
+
+* Include private package registry configuration in Railway builds. (@app/scraper, @app/discord-bot)
+
 ## 0.13.0
 
 ### Minor Changes
