@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useReducer } from "react";
-import { expect, waitFor, within } from "storybook/test";
+import { expect, fn, waitFor, within } from "storybook/test";
 import { useCatalogCopy } from "@/lib/catalog-copy";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionAddPage, PenCollectionFields } from "./catalog-form-pages";
@@ -197,9 +197,20 @@ export const OrdinaryInstallation: Story = {
   },
 };
 
-/** Changing the selected Pen preserves owned parts and re-evaluates their confirmation. */
+/** Reselecting a Pen preserves parts; choosing a different Pen clears them after confirmation. */
 export const ProductChangePreservesParts: Story = {
-  beforeEach: mockStoryAuth,
+  /**
+   * Restores native product-change confirmation after this story.
+   * @returns Cleanup restoring the browser confirmation.
+   */
+  beforeEach: () => {
+    mockStoryAuth();
+    const confirm = window.confirm;
+    window.confirm = fn(() => true);
+    return () => {
+      window.confirm = confirm;
+    };
+  },
   /**
    * Renders the real creation form with two catalog Pens and an owned clip.
    * @returns Collection creation form.
@@ -238,7 +249,7 @@ export const ProductChangePreservesParts: Story = {
     />
   ),
   /**
-   * Retains a selection for the same Pen and asks again for a different Pen.
+   * Retains same-Pen selections and requires fresh acknowledgments after replacement.
    * @param root0 - Story interaction context.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -249,22 +260,26 @@ export const ProductChangePreservesParts: Story = {
     await userEvent.keyboard("{ArrowDown}{Enter}");
     await userEvent.click(page.getByRole("button", { name: "Yes, continue" }));
     await userEvent.click(
-      canvas.getByText("Product selector", { selector: "summary" }),
+      canvas.getByText(/Selected product:/, { selector: "summary" }),
     );
     await userEvent.click(canvas.getByRole("button", { name: "Test Pen" }));
     await expect(
       canvas.queryByRole("button", { name: "Confirm customization" }),
     ).not.toBeInTheDocument();
     await userEvent.click(
-      canvas.getByText("Product selector", { selector: "summary" }),
+      canvas.getByText(/Selected product:/, { selector: "summary" }),
     );
     await userEvent.click(canvas.getByRole("button", { name: "Another Pen" }));
+    await expect(window.confirm).toHaveBeenCalledOnce();
     await expect(
-      canvas.getByText("Custom Clip", { exact: true }),
-    ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole("button", { name: "Confirm customization" }),
-    );
+      canvas.queryByRole("button", { name: "Close: Custom Clip" }),
+    ).not.toBeInTheDocument();
+    const replacementInput = canvas.getByRole("combobox", {
+      name: "Installed parts",
+    });
+    await userEvent.click(replacementInput);
+    await userEvent.type(replacementInput, "Custom");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
     await expect(
       page.getByRole("dialog", { name: "Confirm customization" }),
     ).toBeVisible();
