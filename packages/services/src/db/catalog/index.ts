@@ -20,9 +20,13 @@ import { type Actor, hasPermission } from "../../authorization.js";
 import { nextAvailableSlug, slugify } from "../../catalog-slug.js";
 import {
   type CollectionItemStatusSearch,
+  getPenPartRoles,
   normalizeCatalogSearch,
   normalizeCollectionName,
+  type PenPartRole,
   penPartInterchangeabilityKeys,
+  penPartNeedsCustomization,
+  penPartRoles,
 } from "../../catalog-terminology.js";
 import {
   type SliderMagnetConfiguration,
@@ -719,6 +723,8 @@ export function resolveEffectiveSliderSetup(input: {
  * Fully hydrated catalog product returned to callers.
  */
 export type CatalogProduct = {
+  /** Complete functional roles of a physical Pen part. */
+  penPartRoles?: PenPartRole[];
   /** Standard Pen interchangeability; omitted for other product types. */
   interchangeableParts?: {
     /** Tip can be exchanged for another version without customization. */
@@ -928,6 +934,8 @@ export type CatalogRefillCompatibilityTarget = {
 
 /** One Pen-part product that can be installed on a Pen. */
 export type CatalogCompatiblePenPart = {
+  /** Complete roles performed by this one physical part. */
+  penPartRoles?: PenPartRole[];
   /** Standard Pen must be customized to fit this part. */
   requiresCustomization?: boolean;
   /** Database identifier. */
@@ -987,6 +995,8 @@ export type CatalogPensAdminOptions = {
  * Validated fields accepted when creating or updating a catalog product.
  */
 export type ProductWriteInput = {
+  /** Complete reviewed role set; omission preserves existing assignments. */
+  penPartRoles?: PenPartRole[];
   /** Selected parts explicitly acknowledged as customization exceptions. */
   customizationConfirmedPartProductIds?: number[];
   /** Replacement Pen facts; omission preserves existing reviewed answers. */
@@ -2058,6 +2068,8 @@ export type CollectionItemMetadataWrite = {
 
 /** Owned collection item with its product snapshot and visibility state. */
 export type UserCollectionItem = {
+  /** Functional roles of the source physical Pen-part product. */
+  penPartRoles?: PenPartRole[];
   /** Already-redacted metadata for the current viewer. */
   metadata?: CollectionItemMetadata;
   /** Durable administrative review state, independent of privacy. */
@@ -9024,6 +9036,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     compatiblePens: product.compatiblePens,
     compatibleParts: product.compatibleParts,
     interchangeableParts: product.interchangeableParts ?? null,
+    penPartRoles: product.penPartRoles ?? [],
     description: product.description,
     diameter: product.diameter,
     finishOptions: product.finishOptions.map((option) => ({
@@ -10782,6 +10795,17 @@ async function loadPensCatalogDetails(
           )
       : Promise.resolve([]),
   ]);
+  const rolesByProduct = await loadPenPartRoles(db, [
+    ...productIds,
+    ...compatibleParts.map(({ partProductId }) => partProductId),
+  ]);
+  for (const product of products) {
+    if (Object.hasOwn(penPartInterchangeabilityKeys, product.productTypeSlug))
+      product.penPartRoles = getPenPartRoles({
+        ...product,
+        penPartRoles: rolesByProduct.get(product.id),
+      });
+  }
   const productsById = new Map(
     products.map((product) => [product.id, product]),
   );
@@ -10797,6 +10821,10 @@ async function loadPensCatalogDetails(
     productsById.get(part.penProductId)?.compatibleParts.push({
       id: part.partProductId,
       requiresCustomization: part.requiresCustomization,
+      penPartRoles: getPenPartRoles({
+        productTypeSlug: part.productTypeSlug,
+        penPartRoles: rolesByProduct.get(part.partProductId),
+      }),
       name: part.name,
       productTypeName: part.productTypeName,
       productTypeSlug: catalogProductType(part.productTypeSlug),
@@ -11797,6 +11825,17 @@ async function queryOwnedItems(
           asc(schema.collectionItemOwnershipPeriod.id),
         ),
     ]);
+    const rolesByProduct = await loadPenPartRoles(
+      db,
+      items.map(({ productId }) => productId),
+    );
+    for (const item of items) {
+      if (Object.hasOwn(penPartInterchangeabilityKeys, item.productTypeSlug))
+        item.penPartRoles = getPenPartRoles({
+          ...item,
+          penPartRoles: rolesByProduct.get(item.productId),
+        });
+    }
     const itemsById = new Map(
       items.map((item) => [item.collectionItemId, item]),
     );
@@ -13206,6 +13245,8 @@ async function replaceInstalledPenParts(
             eq(schema.collectionItem.owned, true),
           ),
         )
+        .orderBy(asc(schema.product.id))
+        .for("update", { of: schema.product })
     : [];
   if (
     parts.length !== partIds.length ||
@@ -13237,13 +13278,20 @@ async function replaceInstalledPenParts(
   const compatibleIds = new Set(
     compatibleParts.map(({ partProductId }) => partProductId),
   );
+  const rolesByProduct = await loadPenPartRoles(
+    tx,
+    parts.map(({ productId }) => productId),
+  );
   const replacements = parts.map((part) => {
-    const key =
-      penPartInterchangeabilityKeys[
-        part.type as keyof typeof penPartInterchangeabilityKeys
-      ];
     const needsCustomization =
-      !compatibleIds.has(part.productId) || !pen?.[`${key}Interchangeable`];
+      !compatibleIds.has(part.productId) ||
+      penPartNeedsCustomization(
+        {
+          productTypeSlug: part.type,
+          penPartRoles: rolesByProduct.get(part.productId),
+        },
+        penInterchangeabilityAnswers(pen),
+      );
     const existing = previous.find(
       ({ partCollectionItemId }) => partCollectionItemId === part.id,
     );
@@ -13625,6 +13673,22 @@ function requireBoundedText(value: string, maximum: number, label: string) {
  * @throws When a subtype field is missing, misplaced, or malformed.
  */
 function assertPensProductFields(input: ProductWriteInput) {
+  if (input.penPartRoles !== undefined) {
+    if (!Object.hasOwn(penPartInterchangeabilityKeys, input.productTypeSlug))
+      throw new Error("Only Pen parts may declare functional roles.");
+    if (
+      new Set(input.penPartRoles).size !== input.penPartRoles.length ||
+      input.penPartRoles.some((role) => !penPartRoles.includes(role))
+    )
+      throw new Error("Pen part roles must be valid and unique.");
+    if (
+      !input.penPartRoles.some(
+        (role) => `pen-${role}` === input.productTypeSlug,
+      )
+    )
+      throw new Error("The primary product-type role must be retained.");
+  }
+
   if (input.interchangeableParts && input.productTypeSlug !== "pen")
     throw new Error("Only Pens may declare interchangeable parts.");
   const mechanismId = input.mechanismId ?? null;
@@ -13760,6 +13824,122 @@ async function replaceProductAliases(
 }
 
 /**
+ * Loads explicitly assigned canonical roles for a bounded set of products.
+ * @param db - Read-capable database or transaction.
+ * @param productIds - Physical part identities to load.
+ * @returns Explicit assignments keyed by stable product identity.
+ */
+async function loadPenPartRoles(
+  db: Pick<Database, "select">,
+  productIds: number[],
+): Promise<Map<number, PenPartRole[]>> {
+  const result = new Map<number, PenPartRole[]>();
+  if (!productIds.length) return result;
+  const rows = await db
+    .select({
+      productId: schema.penPartRoleAssignment.partProductId,
+      role: schema.catalogTerminologyConcept.key,
+    })
+    .from(schema.penPartRoleAssignment)
+    .innerJoin(
+      schema.catalogTerminologyConcept,
+      eq(
+        schema.catalogTerminologyConcept.id,
+        schema.penPartRoleAssignment.conceptId,
+      ),
+    )
+    .where(
+      inArray(schema.penPartRoleAssignment.partProductId, [
+        ...new Set(productIds),
+      ]),
+    );
+  for (const row of rows) {
+    const role = penPartRoles.find((role) => role === row.role);
+    if (!role) continue;
+    const roles = result.get(row.productId) ?? [];
+    roles.push(role);
+    result.set(row.productId, roles);
+  }
+  return result;
+}
+/**
+ * Replaces reviewed roles while protecting relationships that depend on them.
+ * @param tx - Caller-owned catalog transaction.
+ * @param productId - Stable physical part identity.
+ * @param input - Validated role replacement and actor context.
+ * @rejects When removing an in-use role or persistence fails.
+ */
+async function replacePenPartRoles(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+) {
+  if (input.penPartRoles === undefined) return;
+  const previous =
+    (await loadPenPartRoles(tx, [productId])).get(productId) ?? [];
+  if (previous.some((role) => !input.penPartRoles?.includes(role))) {
+    const [compatible] = await tx
+      .select({ id: schema.penCompatiblePart.penProductId })
+      .from(schema.penCompatiblePart)
+      .where(eq(schema.penCompatiblePart.partProductId, productId))
+      .limit(1);
+    const [installed] = await tx
+      .select({
+        id: schema.collectionItemInstalledPenPart.partCollectionItemId,
+      })
+      .from(schema.collectionItemInstalledPenPart)
+      .where(
+        sql`collection_catalog_product(${schema.collectionItemInstalledPenPart.partCollectionItemId}) = ${productId}`,
+      )
+      .limit(1);
+    if (compatible || installed) throw new Error("web.pens.partRoles.inUse");
+  }
+  const concepts = await tx
+    .select({ id: schema.catalogTerminologyConcept.id })
+    .from(schema.catalogTerminologyConcept)
+    .where(
+      and(
+        eq(schema.catalogTerminologyConcept.namespace, "pen-part-role"),
+        inArray(schema.catalogTerminologyConcept.key, input.penPartRoles),
+      ),
+    );
+  if (concepts.length !== input.penPartRoles.length)
+    throw new Error("Pen part roles do not exist.");
+  await tx
+    .delete(schema.penPartRoleAssignment)
+    .where(eq(schema.penPartRoleAssignment.partProductId, productId));
+  await tx
+    .insert(schema.penPartRoleAssignment)
+    .values(
+      concepts.map(({ id }) => ({ conceptId: id, partProductId: productId })),
+    );
+  const compatiblePens = await tx
+    .select({ pen: schema.productDetailPen })
+    .from(schema.penCompatiblePart)
+    .innerJoin(
+      schema.productDetailPen,
+      eq(schema.productDetailPen.id, schema.penCompatiblePart.penProductId),
+    )
+    .where(eq(schema.penCompatiblePart.partProductId, productId));
+  for (const { pen } of compatiblePens)
+    await tx
+      .update(schema.penCompatiblePart)
+      .set({
+        requiresCustomization: penPartNeedsCustomization(
+          input,
+          penInterchangeabilityAnswers(pen),
+        ),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.penCompatiblePart.penProductId, pen.id),
+          eq(schema.penCompatiblePart.partProductId, productId),
+        ),
+      );
+}
+
+/**
  * Replaces one Pen's compatible-part set inside its caller transaction.
  *
  * @param tx - Active catalog transaction.
@@ -13774,27 +13954,39 @@ async function replaceCompatiblePenParts(
 ) {
   if (input.compatiblePartProductIds === undefined) {
     if (input.productTypeSlug === "pen" && input.interchangeableParts) {
-      for (const [type, key] of Object.entries(penPartInterchangeabilityKeys)) {
+      const existing = await tx
+        .select({
+          id: schema.product.id,
+          productTypeSlug: schema.productType.slug,
+        })
+        .from(schema.penCompatiblePart)
+        .innerJoin(
+          schema.product,
+          eq(schema.product.id, schema.penCompatiblePart.partProductId),
+        )
+        .innerJoin(
+          schema.productType,
+          eq(schema.productType.id, schema.product.productTypeId),
+        )
+        .where(eq(schema.penCompatiblePart.penProductId, productId));
+      const roles = await loadPenPartRoles(
+        tx,
+        existing.map(({ id }) => id),
+      );
+      for (const part of existing) {
         await tx
           .update(schema.penCompatiblePart)
           .set({
-            requiresCustomization: !input.interchangeableParts[key],
+            requiresCustomization: penPartNeedsCustomization(
+              { ...part, penPartRoles: roles.get(part.id) },
+              input.interchangeableParts,
+            ),
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(schema.penCompatiblePart.penProductId, productId),
-              inArray(
-                schema.penCompatiblePart.partProductId,
-                tx
-                  .select({ id: sql`${schema.product.id}` })
-                  .from(schema.product)
-                  .innerJoin(
-                    schema.productType,
-                    eq(schema.product.productTypeId, schema.productType.id),
-                  )
-                  .where(eq(schema.productType.slug, type)),
-              ),
+              eq(schema.penCompatiblePart.partProductId, part.id),
             ),
           );
       }
@@ -13831,6 +14023,8 @@ async function replaceCompatiblePenParts(
           eq(schema.product.id, schema.productDetailPenPart.id),
         )
         .where(inArray(schema.product.id, partProductIds))
+        .orderBy(asc(schema.product.id))
+        .for("update", { of: schema.product })
     : [];
   const acceptedTypes = new Set([
     "pen-actuator",
@@ -13866,12 +14060,15 @@ async function replaceCompatiblePenParts(
   const confirmed = new Set(input.customizationConfirmedPartProductIds ?? []);
   if ([...confirmed].some((id) => !partProductIds.includes(id)))
     throw new Error("Customization confirmation must name a selected part.");
+  const rolesByProduct = await loadPenPartRoles(
+    tx,
+    parts.map(({ id }) => id),
+  );
   const replacements = parts.map((part) => {
-    const key =
-      penPartInterchangeabilityKeys[
-        part.type as keyof typeof penPartInterchangeabilityKeys
-      ];
-    const requiresCustomization = !pen[`${key}Interchangeable`];
+    const requiresCustomization = penPartNeedsCustomization(
+      { productTypeSlug: part.type, penPartRoles: rolesByProduct.get(part.id) },
+      penInterchangeabilityAnswers(pen),
+    );
     if (
       requiresCustomization &&
       !previousIds.has(part.id) &&
@@ -13892,6 +14089,23 @@ async function replaceCompatiblePenParts(
     .where(eq(schema.penCompatiblePart.penProductId, productId));
   if (replacements.length)
     await tx.insert(schema.penCompatiblePart).values(replacements);
+}
+
+/**
+ * Reads the standard interchangeability answers from stored Pen detail columns.
+ * @param pen - Stored Pen facts, if present.
+ * @returns Complete logical answers, defaulting missing facts to No.
+ */
+function penInterchangeabilityAnswers(
+  pen: typeof schema.productDetailPen.$inferSelect | undefined,
+) {
+  return {
+    tip: pen?.tipInterchangeable ?? false,
+    clip: pen?.clipInterchangeable ?? false,
+    topCap: pen?.topCapInterchangeable ?? false,
+    actuator: pen?.actuatorInterchangeable ?? false,
+    mechanism: pen?.mechanismInterchangeable ?? false,
+  };
 }
 
 /**
@@ -13975,6 +14189,7 @@ async function insertProductSubtype(
         conceptId: role.id,
         partProductId: productId,
       });
+      await replacePenPartRoles(tx, productId, input);
       return;
     case "refill": {
       const model = input.refillModel?.trim() ?? "";
@@ -14049,8 +14264,10 @@ async function updateProductSubtype(
     case "pen-clip":
     case "pen-tip":
     case "pen-top-cap":
+      await replacePenPartRoles(tx, productId, input);
       return;
     case "pen-mechanism":
+      await replacePenPartRoles(tx, productId, input);
       await tx
         .update(schema.productDetailPenMechanism)
         .set({ mechanismId: input.mechanismId ?? 0, updatedAt })

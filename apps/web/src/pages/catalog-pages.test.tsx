@@ -1210,6 +1210,35 @@ describe("ProductsPage", () => {
 });
 
 describe("ProductDetailPage", () => {
+  it("summarizes one physical clip in both functional compatibility groups", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          productTypeSlug: "pen",
+          compatibleParts: [
+            {
+              id: 101,
+              name: "Actuating Clip",
+              slug: "actuating-clip",
+              productTypeSlug: "pen-clip",
+              productTypeName: "Pen clip",
+              penPartRoles: ["clip", "actuator"],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(html).toContain("Pen clips");
+    expect(html).toContain("Pen actuator (e.g. bolt pin, button)");
+    expect(
+      html.match(/href="\/products\/pen-clip\/actuating-clip"/gu),
+    ).toHaveLength(2);
+    expect(html).toContain(">Clip<");
+    expect(html).toContain(">Actuator<");
+  });
+
   it("groups and links compatible Pen parts without configuration copy", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage
@@ -1452,6 +1481,29 @@ describe("ProductDetailPage", () => {
 });
 
 describe("CollectionItemDetailPage", () => {
+  it("summarizes the roles of an installed physical pen clip", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{ ...item, productTypeSlug: "pen", productTypeName: "Pen" }}
+        installedPenParts={[
+          {
+            ...item,
+            collectionItemId: 2001,
+            displayName: "Installed clip",
+            productTypeSlug: "pen-clip",
+            productTypeName: "Pen clip",
+            penPartRoles: ["clip", "actuator"],
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain("Installed clip");
+    expect(html).toContain(">Clip<");
+    expect(html).toContain(">Actuator<");
+  });
+
   it("shows live body-hosted slider facts as read-only details", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");

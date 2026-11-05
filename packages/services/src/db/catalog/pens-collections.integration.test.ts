@@ -133,6 +133,18 @@ describe("owned Pens and Pen parts", () => {
         conceptId: tipRole.id,
         partProductId: tipId,
       });
+      const clipRoles = await db
+        .select({ id: schema.catalogTerminologyConcept.id })
+        .from(schema.catalogTerminologyConcept)
+        .where(
+          inArray(schema.catalogTerminologyConcept.key, ["clip", "actuator"]),
+        );
+      await db.insert(schema.penPartRoleAssignment).values(
+        clipRoles.map(({ id }) => ({
+          conceptId: id,
+          partProductId: productId.get("pen-clip")!,
+        })),
+      );
       const materialAssignments = await db
         .insert(schema.productMaterial)
         .values(
@@ -200,10 +212,11 @@ describe("owned Pens and Pen parts", () => {
       if (!pensCollection || !partsCollection)
         throw new Error("Collections missing.");
       const actor = { clerkId: owner.clerkId, role: "user" as const };
-      const service = createDbServices(
+      const services = createDbServices(
         db,
         createNoopLogger({ app: "test", environment: "test" }),
-      ).collections;
+      );
+      const service = services.collections;
       const partItemIds = new Map<string, number>();
       for (const slug of penProductTypes.filter((slug) => slug !== "pen")) {
         const id = await service.addPenProduct({
@@ -281,6 +294,30 @@ describe("owned Pens and Pen parts", () => {
             penItemId,
           ),
         );
+      expect(customized).toHaveLength(2);
+      await expect(
+        services.catalog.updateProduct({
+          actor: { ...actor, role: "admin" },
+          productId: productId.get("pen-clip")!,
+          productTypeSlug: "pen-clip",
+          makerId: maker.id,
+          name: "pen-clip",
+          slug: "owned-pen-clip",
+          specs: {},
+          materialAssignments: [
+            {
+              weight: null,
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
+          ],
+          finishOptions: [],
+          penPartRoles: ["clip"],
+          reason: "Attempt to remove an installed role",
+        }),
+      ).rejects.toThrow("web.pens.partRoles.inUse");
+
       expect(customized).toContainEqual(
         expect.objectContaining({
           partCollectionItemId: partItemIds.get("pen-clip"),
@@ -427,10 +464,10 @@ describe("owned Pens and Pen parts", () => {
       expect(
         items.find(({ collectionItemId }) => collectionItemId === penItemId),
       ).toMatchObject({
-        installedPenPartCollectionItemIds: [
+        installedPenPartCollectionItemIds: expect.arrayContaining([
           partItemIds.get("pen-tip"),
           partItemIds.get("pen-clip"),
-        ],
+        ]),
         customizedPenPartCollectionItemIds: [partItemIds.get("pen-clip")],
         installedRefillOfferingId: offering.id,
         installedRefillProductId: refillId,

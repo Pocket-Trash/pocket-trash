@@ -276,3 +276,167 @@ export const DraftBecomesCustomized: Story = {
     await expect(parts.getByText("Fine Tip")).toBeVisible();
   },
 };
+
+/** One physical clip also performs the actuator role. */
+const dualClip: CatalogProduct = {
+  ...clip,
+  penPartRoles: ["clip", "actuator"],
+};
+/** Multi-role compatibility fixture with both roles ordinarily interchangeable. */
+const dualRolePen: CatalogProduct = {
+  ...pen,
+  compatibleParts: [],
+  interchangeableParts: {
+    tip: true,
+    clip: true,
+    topCap: false,
+    actuator: true,
+    mechanism: false,
+  },
+};
+
+/** Authors an additional role while retaining the primary product type. */
+export const MultipleFunctionalRoles: Story = {
+  args: { initialProduct: clip, productTypeSlug: "pen-clip" },
+  /**
+   * Keeps the primary Clip role selected and adds Actuator with the keyboard.
+   * @param root0 - Story interaction context.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const roles = within(
+      canvas.getByRole("group", { name: "What does this part do?" }),
+    );
+    await expect(roles.getByRole("checkbox", { name: /Clip/ })).toBeChecked();
+    await expect(roles.getByRole("checkbox", { name: /Clip/ })).toBeDisabled();
+    const actuator = roles.getByRole("checkbox", { name: "Actuator" });
+    actuator.focus();
+    await userEvent.keyboard(" ");
+    await expect(actuator).toBeChecked();
+  },
+};
+/** Selecting one multi-role clip creates two synchronized appearances. */
+export const RoleAwareCompatibility: Story = {
+  args: {
+    initialProduct: dualRolePen,
+    options: { ...options, relationshipProducts: [tip, dualClip] },
+  },
+  /**
+   * Selects a clip once, shows it in both roles, and removes its one selection.
+   * @param root0 - Story interaction context.
+   * @rejects When the selected clip removal control is absent.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const parts = within(
+      canvas.getByRole("group", { name: "Compatible parts" }),
+    );
+    await userEvent.click(parts.getByRole("checkbox", { name: "Pen clips" }));
+    const input = parts.getByRole("combobox", { name: "Pen clips" });
+    await userEvent.click(input);
+    await userEvent.type(input, "Machined");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      parts.getByRole("combobox", {
+        name: "Pen actuator (e.g. bolt pin, button)",
+      }),
+    ).toBeVisible();
+    await expect(
+      parts.getAllByRole("button", { name: "Remove Machined Clip" }),
+    ).toHaveLength(2);
+    const remove = parts.getAllByRole("button", {
+      name: "Remove Machined Clip",
+    })[0];
+    if (!remove) throw new Error("Missing selected clip.");
+    await userEvent.click(remove);
+    await expect(parts.queryByText("Machined Clip")).not.toBeInTheDocument();
+  },
+};
+/** A secondary non-interchangeable role still requires confirmation. */
+export const SecondaryRoleCustomization: Story = {
+  args: {
+    initialProduct: {
+      ...dualRolePen,
+      interchangeableParts: {
+        tip: true,
+        clip: true,
+        topCap: false,
+        actuator: false,
+        mechanism: false,
+      },
+    },
+    options: { ...options, relationshipProducts: [dualClip] },
+  },
+  /**
+   * Requires confirmation for Actuator even when selecting through Clips.
+   * @param root0 - Story interaction context.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const parts = within(
+      canvas.getByRole("group", { name: "Compatible parts" }),
+    );
+    await userEvent.click(parts.getByRole("checkbox", { name: "Pen clips" }));
+    const input = parts.getByRole("combobox", { name: "Pen clips" });
+    await userEvent.click(input);
+    await userEvent.type(input, "Machined");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    const dialog = await within(canvasElement.ownerDocument.body).findByRole(
+      "dialog",
+      { name: "Confirm customization" },
+    );
+    await expect(
+      within(dialog).getByText("Actuator", { exact: true }),
+    ).toBeVisible();
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Yes, continue" }),
+    );
+    await expect(
+      parts.getAllByRole("button", { name: "Remove Machined Clip" }),
+    ).toHaveLength(2);
+  },
+};
+
+/** Mobile authoring retains the primary role and wraps additional role controls. */
+export const MobileFunctionalRoles: Story = {
+  ...MultipleFunctionalRoles,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Exercises keyboard role assignment and checks horizontal fit on a small phone.
+   * @param context - Story interaction context.
+   */
+  play: async (context) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    await MultipleFunctionalRoles.play?.(context);
+    const roles = context.canvas.getByRole("group", {
+      name: "What does this part do?",
+    });
+    await expect(roles.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+    await expect(roles.scrollWidth).toBeLessThanOrEqual(roles.clientWidth);
+  },
+};
+/** Mobile compatibility shows one clip in both role groups. */
+export const MobileRoleCompatibility: Story = {
+  ...RoleAwareCompatibility,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Exercises synchronized selection and checks wrapping on a small phone.
+   * @param context - Story interaction context.
+   */
+  play: async ({ canvas, userEvent }) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    const parts = canvas.getByRole("group", { name: "Compatible parts" });
+    const queries = within(parts);
+    await userEvent.click(queries.getByRole("checkbox", { name: "Pen clips" }));
+    const input = queries.getByRole("combobox", { name: "Pen clips" });
+    await userEvent.click(input);
+    await userEvent.type(input, "Machined");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      queries.getAllByRole("button", { name: "Remove Machined Clip" }),
+    ).toHaveLength(2);
+    await expect(parts.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+    await expect(parts.scrollWidth).toBeLessThanOrEqual(parts.clientWidth);
+  },
+};

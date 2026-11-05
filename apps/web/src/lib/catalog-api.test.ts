@@ -451,6 +451,35 @@ describe("Pens admin validation", () => {
 });
 
 describe("product source details", () => {
+  it("accepts complete unique Pen-part roles and keeps the primary role", () => {
+    const clip = {
+      ...base,
+      productTypeSlug: "pen-clip",
+      penPartRoles: ["clip", "actuator"],
+    };
+    expect(productFormSchema.safeParse(clip).success).toBe(true);
+    expect(
+      productFormSchema.safeParse({ ...clip, penPartRoles: ["clip", "clip"] })
+        .success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({ ...clip, penPartRoles: ["actuator"] })
+        .success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...clip,
+        penPartRoles: ["clip", "unknown"],
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({ ...base, penPartRoles: ["clip"] }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({ ...clip, penPartRoles: undefined }).success,
+    ).toBe(true);
+  });
+
   it("accepts unique compatible parts only for Pens", () => {
     const pen = {
       ...base,

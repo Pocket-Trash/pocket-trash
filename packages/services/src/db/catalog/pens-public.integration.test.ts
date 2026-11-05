@@ -8,6 +8,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
+import type { ProductWriteInput } from "./index.js";
 
 describe("public Pens catalog reads", () => {
   it("loads direct compatible parts, offerings, and refill compatibility", async () => {
@@ -465,6 +466,58 @@ describe("public Pens catalog reads", () => {
         slug: "compatible-tip",
         specs: {},
       });
+      const clipInput: ProductWriteInput = {
+        actor,
+        finishOptions: [],
+        makerId: maker.id,
+        materialAssignments: [
+          {
+            weight: null,
+            materials: [{ materialId: material.id, materialSpecificId: null }],
+          },
+        ],
+        name: "Actuating Clip",
+        slug: "actuating-clip",
+        productTypeSlug: "pen-clip",
+        specs: {},
+        penPartRoles: ["clip", "actuator"],
+      };
+      const clip = await service.createProduct(clipInput);
+      expect(clip).toMatchObject({
+        productTypeSlug: "pen-clip",
+        penPartRoles: ["clip", "actuator"],
+      });
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Remove unused additional role",
+          penPartRoles: ["clip"],
+        }),
+      ).resolves.toMatchObject({ penPartRoles: ["clip"] });
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Restore actuator role",
+        }),
+      ).resolves.toMatchObject({ penPartRoles: ["clip", "actuator"] });
+      await expect(
+        service.createProduct({
+          ...clipInput,
+          name: "Duplicate roles",
+          slug: "duplicate-roles",
+          penPartRoles: ["clip", "clip"],
+        }),
+      ).rejects.toThrow("roles");
+      await expect(
+        service.createProduct({
+          ...clipInput,
+          name: "Missing primary",
+          slug: "missing-primary",
+          penPartRoles: ["actuator"],
+        }),
+      ).rejects.toThrow("primary");
       /** Complete Pen draft with one non-interchangeable compatible tip. */
       const penInput = {
         actor,
@@ -492,6 +545,44 @@ describe("public Pens catalog reads", () => {
       expect(pen.compatibleParts).toEqual([
         expect.objectContaining({ id: tip.id, requiresCustomization: true }),
       ]);
+      const multiRolePen = await service.createProduct({
+        ...penInput,
+        name: "Multi-role Pen",
+        slug: "multi-role-pen",
+        compatiblePartProductIds: [clip.id],
+        customizationConfirmedPartProductIds: [clip.id],
+      });
+      expect(multiRolePen.compatibleParts).toEqual([
+        expect.objectContaining({
+          id: clip.id,
+          productTypeSlug: "pen-clip",
+          penPartRoles: ["clip", "actuator"],
+        }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(schema.penCompatiblePart)
+          .where(eq(schema.penCompatiblePart.penProductId, multiRolePen.id)),
+      ).toHaveLength(1);
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Remove a used role",
+          penPartRoles: ["clip"],
+        }),
+      ).rejects.toThrow("web.pens.partRoles.inUse");
+      const oldWriterClipInput = { ...clipInput };
+      delete oldWriterClipInput.penPartRoles;
+      await expect(
+        service.updateProduct({
+          ...oldWriterClipInput,
+          productId: clip.id,
+          reason: "Older writer update",
+        }),
+      ).resolves.toMatchObject({ penPartRoles: ["clip", "actuator"] });
+
       expect(pen.compatibleParts).toEqual([
         expect.objectContaining({ id: tip.id, productTypeSlug: "pen-tip" }),
       ]);

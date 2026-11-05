@@ -37,7 +37,11 @@ import {
   CollectionItemPrivacyInheritedError,
 } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
-import { normalizeCatalogSearch } from "@package/services/catalog-terminology";
+import {
+  normalizeCatalogSearch,
+  penPartInterchangeabilityKeys,
+  penPartRoles,
+} from "@package/services/catalog-terminology";
 import {
   type SliderMagnetConfiguration,
   type SliderMagnetLayout,
@@ -450,6 +454,7 @@ export const productFormSchema = z
     buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
     compatiblePartProductIds: z.array(idSchema).default([]),
+    penPartRoles: z.array(z.enum(penPartRoles)).optional(),
     customizationConfirmedPartProductIds: z.array(idSchema).default([]),
     interchangeableParts: z
       .object({
@@ -526,6 +531,7 @@ export const productFormSchema = z
         magnetLayout,
         mechanismId,
         productTypeSlug,
+        penPartRoles: selectedPartRoles,
         refillCompatibility,
         refillModel,
         spinDiameter,
@@ -537,6 +543,20 @@ export const productFormSchema = z
       },
       context,
     ) => {
+      if (
+        selectedPartRoles !== undefined &&
+        (new Set(selectedPartRoles).size !== selectedPartRoles.length ||
+          (Object.hasOwn(penPartInterchangeabilityKeys, productTypeSlug)
+            ? !selectedPartRoles.some(
+                (role) => `pen-${role}` === productTypeSlug,
+              )
+            : selectedPartRoles.length > 0))
+      )
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["penPartRoles"],
+        });
       const normalizedAliases = aliases.map(normalizeCatalogSearch);
       if (new Set(normalizedAliases).size !== normalizedAliases.length) {
         context.addIssue({
@@ -2315,6 +2335,12 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       customizationConfirmedPartProductIds:
         parsed.data.customizationConfirmedPartProductIds,
       interchangeableParts: parsed.data.interchangeableParts ?? undefined,
+      penPartRoles: Object.hasOwn(
+        penPartInterchangeabilityKeys,
+        parsed.data.productTypeSlug,
+      )
+        ? parsed.data.penPartRoles
+        : undefined,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({
@@ -3411,6 +3437,14 @@ function validationFailure(error: z.ZodError) {
  * @returns The standard mutation failure payload.
  */
 function mutationFailure(error: unknown) {
+  if (error instanceof Error && error.message === "web.pens.partRoles.inUse")
+    return {
+      fieldErrors: { penPartRoles: [error.message] },
+      formError: error.message,
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
+
   if (
     error instanceof Error &&
     error.message.startsWith("web.materials.validation.")

@@ -23,7 +23,12 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
-import { penPartInterchangeabilityKeys } from "@package/services/catalog-terminology";
+import {
+  getPenPartRoles,
+  penPartInterchangeabilityKeys,
+  penPartNeedsCustomization,
+  penPartRoles,
+} from "@package/services/catalog-terminology";
 import {
   maxImageBytes,
   maxImageSessionBytes,
@@ -59,6 +64,7 @@ import {
   MeasurementInput,
   type MeasurementInputValue,
 } from "@/components/measurement-input";
+import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { FileDropInput } from "@/components/resource-file-input";
 import { SliderMagnetConfigurationEditor } from "@/components/slider-magnet-configuration-editor";
@@ -732,6 +738,8 @@ type ProductValidation = {
 type PartCustomizationRequest = {
   /** Functional part type requiring customization. */
   role: PenPartProductType;
+  /** Secondary functional role responsible for the customization warning. */
+  reasonRole?: PenPartProductType;
   /** Complete replacement selection for this role, when selecting parts. */
   partIds?: number[];
   /** Whether confirmation should open inline part creation. */
@@ -1349,8 +1357,10 @@ export function ProductEditor({
       magnetConfigurationNotice: false,
       activePartType: null,
       openPartRoles: new Set(
-        initialProduct?.compatibleParts.map(
-          ({ productTypeSlug }) => productTypeSlug as PenPartProductType,
+        initialProduct?.compatibleParts.flatMap((part) =>
+          getPenPartRoles(part).map(
+            (role): PenPartProductType => `pen-${role}`,
+          ),
         ) ?? [],
       ),
       descriptionLoading: true,
@@ -1546,6 +1556,7 @@ export function ProductEditor({
           })
         : null,
     customizationConfirmedPartProductIds: [],
+    penPartRoles: getPenPartRoles(initialProduct ?? { productTypeSlug }),
     aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
     buttonDiameter: initialProduct?.buttonDiameter ?? { unit: "mm", value: "" },
@@ -1686,19 +1697,32 @@ export function ProductEditor({
    * @param role - Part role being edited.
    * @param partIds - Complete next selection for that role.
    * @param acknowledged - Whether this action has just been explicitly confirmed.
+   * @param availableParts - Current choices, including a just-created inline part.
    */
   const selectCompatibleParts = (
     role: PenPartProductType,
     partIds: number[],
     acknowledged = false,
+    availableParts = options.relationshipProducts,
   ) => {
     const current = form.state.values.compatiblePartProductIds;
-    const requiresCustomization =
-      !interchangeableParts?.[penPartInterchangeabilityKeys[role]];
+    const selectedParts = availableParts.filter(({ id }) =>
+      partIds.includes(id),
+    );
+    const requiresCustomization = selectedParts.some((part) =>
+      penPartNeedsCustomization(part, interchangeableParts ?? undefined),
+    );
+    const reasonRole = selectedParts
+      .flatMap((part) =>
+        getPenPartRoles(part).map((role): PenPartProductType => `pen-${role}`),
+      )
+      .find(
+        (type) => !interchangeableParts?.[penPartInterchangeabilityKeys[type]],
+      );
     if (
       requiresCustomization &&
       !acknowledged &&
-      !ui.confirmedPartRoles.has(role) &&
+      !ui.confirmedPartRoles.has(reasonRole ?? role) &&
       partIds.some((id) => !current.includes(id))
     ) {
       customizationTrigger.current =
@@ -1707,16 +1731,20 @@ export function ProductEditor({
           : null;
       dispatch({
         type: "partCustomizationChanged",
-        request: { role, partIds },
+        request: { role, reasonRole, partIds },
       });
       return;
     }
     const roleIds = new Set(
-      options.relationshipProducts
-        .filter((part) => part.productTypeSlug === role)
+      availableParts
+        .filter((part) =>
+          getPenPartRoles(part).some((assigned) => `pen-${assigned}` === role),
+        )
         .map(({ id }) => id),
     );
-    const next = [...current.filter((id) => !roleIds.has(id)), ...partIds];
+    const next = [
+      ...new Set([...current.filter((id) => !roleIds.has(id)), ...partIds]),
+    ];
     form.setFieldValue("compatiblePartProductIds", next);
     form.setFieldValue("customizationConfirmedPartProductIds", (confirmed) => [
       ...confirmed.filter((id) => next.includes(id)),
@@ -1724,11 +1752,19 @@ export function ProductEditor({
         ? partIds.filter((id) => !confirmed.includes(id))
         : []),
     ]);
+    const selectedRoles = new Set(
+      selectedParts.flatMap((part) =>
+        getPenPartRoles(part).map((role): PenPartProductType => `pen-${role}`),
+      ),
+    );
+    for (const type of selectedRoles)
+      if (!openPartRoles.has(type))
+        dispatch({ type: "partRoleToggled", role: type });
   };
 
   return (
     <form
-      className="grid min-w-0 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
+      className="grid min-w-0 grid-cols-1 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -1741,7 +1777,7 @@ export function ProductEditor({
         void form.handleSubmit();
       }}
     >
-      <div className="grid min-w-0 content-start gap-5">
+      <div className="grid min-w-0 grid-cols-1 content-start gap-5">
         <form.Field name="name">
           {(field) => (
             <Field label={t("web.catalog.field.name")}>
@@ -1946,6 +1982,57 @@ export function ProductEditor({
             )}
           </form.Field>
         ) : null}
+        {Object.hasOwn(penPartInterchangeabilityKeys, productTypeSlug) ? (
+          <form.Field mode="array" name="penPartRoles">
+            {(field) => (
+              <fieldset className="grid gap-3 border border-border p-4">
+                <legend className="px-1 font-semibold">
+                  {t("web.pens.partRoles.heading")}
+                </legend>
+                <p className="text-sm text-muted-foreground">
+                  {t("web.pens.partRoles.help")}
+                </p>
+                {penPartRoles.map((role) => {
+                  const type: PenPartProductType = `pen-${role}`;
+                  const primary = type === productTypeSlug;
+                  return (
+                    <label
+                      className="flex flex-wrap items-center gap-2 text-sm"
+                      key={role}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={field.state.value?.includes(role) ?? primary}
+                        disabled={primary}
+                        onChange={(event) =>
+                          field.handleChange(
+                            event.target.checked
+                              ? [...(field.state.value ?? []), role]
+                              : (field.state.value?.filter(
+                                  (value) => value !== role,
+                                ) ?? []),
+                          )
+                        }
+                      />
+                      {t(
+                        `catalog.penPartRoles.${penPartInterchangeabilityKeys[type]}`,
+                      )}
+                      {primary ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t("web.pens.partRoles.primary")}
+                        </span>
+                      ) : null}
+                    </label>
+                  );
+                })}
+                <FieldError
+                  error={serverErrors.penPartRoles?.errors[0]}
+                  t={t}
+                />
+              </fieldset>
+            )}
+          </form.Field>
+        ) : null}
         {productTypeSlug === "pen" ? (
           <form.Field name="interchangeableParts">
             {(field) => (
@@ -1987,7 +2074,10 @@ export function ProductEditor({
                                     options.relationshipProducts.some(
                                       (part) =>
                                         part.id === id &&
-                                        part.productTypeSlug === role?.type,
+                                        getPenPartRoles(part).some(
+                                          (assigned) =>
+                                            `pen-${assigned}` === role?.type,
+                                        ),
                                     ),
                                 );
                               const hasNewSelection = selectedIds.some(
@@ -2320,7 +2410,9 @@ export function ProductEditor({
                     const items = options.relationshipProducts.filter(
                       (candidate) =>
                         candidate.id !== initialProduct?.id &&
-                        candidate.productTypeSlug === role.type,
+                        getPenPartRoles(candidate).some(
+                          (assigned) => `pen-${assigned}` === role.type,
+                        ),
                     );
                     const selected = items.filter((candidate) =>
                       field.state.value.includes(candidate.id),
@@ -2382,6 +2474,14 @@ export function ProductEditor({
                                 t("web.action.removeSelection", { name })
                               }
                               value={selected}
+                              renderSelectionDetails={(selected) => {
+                                const part = items.find(
+                                  ({ id }) => id === selected.id,
+                                );
+                                return part ? (
+                                  <PenPartRoleBadges part={part} />
+                                ) : null;
+                              }}
                             />
                             <Button
                               aria-haspopup="dialog"
@@ -2798,7 +2898,7 @@ export function ProductEditor({
         ) : null}
       </div>
 
-      <div className="grid min-w-0 content-start gap-5">
+      <div className="grid min-w-0 grid-cols-1 content-start gap-5">
         <form.Field name="description">
           {(field) => (
             <CatalogMarkdownEditor
@@ -2976,7 +3076,7 @@ export function ProductEditor({
               </h2>
               <p className="mt-2 font-medium">
                 {t(
-                  `catalog.penPartRoles.${penPartInterchangeabilityKeys[ui.customization.role]}`,
+                  `catalog.penPartRoles.${penPartInterchangeabilityKeys[ui.customization.reasonRole ?? ui.customization.role]}`,
                 )}
               </p>
               <p className="mt-2 text-sm">
@@ -3003,7 +3103,7 @@ export function ProductEditor({
                     customizationDialog.current?.close();
                     dispatch({
                       type: "partCustomizationConfirmed",
-                      role: request.role,
+                      role: request.reasonRole ?? request.role,
                     });
                     if (request.makeNonInterchangeable) {
                       form.setFieldValue("interchangeableParts", (value) =>
@@ -3070,19 +3170,27 @@ export function ProductEditor({
                         part,
                       ].sort((a, b) => a.name.localeCompare(b.name)),
                     }));
-                    form.setFieldValue("compatiblePartProductIds", [
-                      ...form.state.values.compatiblePartProductIds,
-                      part.id,
-                    ]);
-                    if (
-                      !interchangeableParts?.[
-                        penPartInterchangeabilityKeys[activePartType]
-                      ]
-                    )
-                      form.setFieldValue(
-                        "customizationConfirmedPartProductIds",
-                        (ids) => [...ids, part.id],
+                    const availableParts = [
+                      ...options.relationshipProducts,
+                      part,
+                    ];
+                    const selectedRoleIds =
+                      form.state.values.compatiblePartProductIds.filter((id) =>
+                        availableParts.some(
+                          (candidate) =>
+                            candidate.id === id &&
+                            getPenPartRoles(candidate).some(
+                              (role) => `pen-${role}` === activePartType,
+                            ),
+                        ),
                       );
+                    selectCompatibleParts(
+                      activePartType,
+                      [...selectedRoleIds, part.id],
+                      false,
+                      availableParts,
+                    );
+                    customizationTrigger.current = partTrigger.current;
                     partDialog.current?.close();
                     dispatch({ type: "partCreationChanged", partType: null });
                     partTrigger.current?.focus();
@@ -6432,9 +6540,7 @@ export function PenCollectionFields({
    * @returns Whether its functional role normally requires customization.
    */
   const nonInterchangeable = (item: UserCollectionItem) => {
-    const key =
-      penPartInterchangeabilityKeys[item.productTypeSlug as PenPartProductType];
-    return !product.interchangeableParts?.[key];
+    return penPartNeedsCustomization(item, product.interchangeableParts);
   };
   /**
    * Identifies a new exception still awaiting explicit acknowledgment.
@@ -6509,6 +6615,12 @@ export function PenCollectionFields({
               "web.pens.collection.installedParts" as TranslationKey,
             )}
             items={partOptions}
+            renderSelectionDetails={(selected) => {
+              const part = availableParts.find(
+                ({ collectionItemId }) => collectionItemId === selected.id,
+              );
+              return part ? <PenPartRoleBadges part={part} /> : null;
+            }}
             onValueChange={(next) =>
               selectParts(next.map(({ id }) => Number(id)))
             }
