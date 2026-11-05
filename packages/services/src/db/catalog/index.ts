@@ -22,6 +22,7 @@ import {
   type CollectionItemStatusSearch,
   normalizeCatalogSearch,
   normalizeCollectionName,
+  penPartInterchangeabilityKeys,
 } from "../../catalog-terminology.js";
 import {
   type SliderMagnetConfiguration,
@@ -718,6 +719,19 @@ export function resolveEffectiveSliderSetup(input: {
  * Fully hydrated catalog product returned to callers.
  */
 export type CatalogProduct = {
+  /** Standard Pen interchangeability; omitted for other product types. */
+  interchangeableParts?: {
+    /** Tip can be exchanged for another version without customization. */
+    tip: boolean;
+    /** Clip can be exchanged for another version without customization. */
+    clip: boolean;
+    /** Top cap can be exchanged for another version without customization. */
+    topCap: boolean;
+    /** Actuator can be exchanged for another version without customization. */
+    actuator: boolean;
+    /** Mechanism can be exchanged for another version without customization. */
+    mechanism: boolean;
+  };
   /** Searchable alternate product names. */
   aliases: string[];
   /**
@@ -914,6 +928,8 @@ export type CatalogRefillCompatibilityTarget = {
 
 /** One Pen-part product that can be installed on a Pen. */
 export type CatalogCompatiblePenPart = {
+  /** Standard Pen must be customized to fit this part. */
+  requiresCustomization?: boolean;
   /** Database identifier. */
   id: number;
   /** Display name. */
@@ -971,6 +987,10 @@ export type CatalogPensAdminOptions = {
  * Validated fields accepted when creating or updating a catalog product.
  */
 export type ProductWriteInput = {
+  /** Selected parts explicitly acknowledged as customization exceptions. */
+  customizationConfirmedPartProductIds?: number[];
+  /** Replacement Pen facts; omission preserves existing reviewed answers. */
+  interchangeableParts?: NonNullable<CatalogProduct["interchangeableParts"]>;
   /** Replacement searchable product aliases. */
   aliases?: string[];
   /** Complete replacement set of Pen-part products compatible with this Pen. */
@@ -8989,6 +9009,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     compatibleButtonId: product.compatibleButtonId,
     compatiblePens: product.compatiblePens,
     compatibleParts: product.compatibleParts,
+    interchangeableParts: product.interchangeableParts ?? null,
     description: product.description,
     diameter: product.diameter,
     finishOptions: product.finishOptions.map((option) => ({
@@ -10329,6 +10350,12 @@ async function queryProducts(
       makerUrl: schema.maker.rootUrl,
       magnetConfiguration: schema.productDetailSlider.magnetConfiguration,
       magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productDetailSlider.magnetLayout}, ${schema.productDetailSliderInsert.magnetLayout})`,
+      tipInterchangeable: schema.productDetailPen.tipInterchangeable,
+      clipInterchangeable: schema.productDetailPen.clipInterchangeable,
+      topCapInterchangeable: schema.productDetailPen.topCapInterchangeable,
+      actuatorInterchangeable: schema.productDetailPen.actuatorInterchangeable,
+      mechanismInterchangeable:
+        schema.productDetailPen.mechanismInterchangeable,
       mechanismId: schema.productDetailPenMechanism.mechanismId,
       materialAssignmentId: schema.productMaterial.id,
       materialAssignmentWeight: schema.productMaterial.weight,
@@ -10419,6 +10446,10 @@ async function queryProducts(
       eq(schema.product.id, schema.productDetailRefill.id),
     )
     .leftJoin(
+      schema.productDetailPen,
+      eq(schema.product.id, schema.productDetailPen.id),
+    )
+    .leftJoin(
       schema.productDetailPenMechanism,
       eq(schema.product.id, schema.productDetailPenMechanism.id),
     )
@@ -10480,6 +10511,17 @@ async function queryProducts(
       continue;
     }
     products.set(row.id, {
+      ...(row.productTypeSlug === "pen"
+        ? {
+            interchangeableParts: {
+              tip: row.tipInterchangeable ?? false,
+              clip: row.clipInterchangeable ?? false,
+              topCap: row.topCapInterchangeable ?? false,
+              actuator: row.actuatorInterchangeable ?? false,
+              mechanism: row.mechanismInterchangeable ?? false,
+            },
+          }
+        : {}),
       aliases: [],
       approvalStatus: row.approvalStatus,
       bearing: row.bearing,
@@ -10667,6 +10709,7 @@ async function loadPensCatalogDetails(
         isPrivate: partProduct.isPrivate,
         name: partProduct.name,
         ownerClerkId: partProduct.ownerClerkId,
+        requiresCustomization: schema.penCompatiblePart.requiresCustomization,
         partProductId: schema.penCompatiblePart.partProductId,
         penProductId: schema.penCompatiblePart.penProductId,
         productTypeName: partType.name,
@@ -10739,6 +10782,7 @@ async function loadPensCatalogDetails(
       continue;
     productsById.get(part.penProductId)?.compatibleParts.push({
       id: part.partProductId,
+      requiresCustomization: part.requiresCustomization,
       name: part.name,
       productTypeName: part.productTypeName,
       productTypeSlug: catalogProductType(part.productTypeSlug),
@@ -13484,6 +13528,8 @@ function requireBoundedText(value: string, maximum: number, label: string) {
  * @throws When a subtype field is missing, misplaced, or malformed.
  */
 function assertPensProductFields(input: ProductWriteInput) {
+  if (input.interchangeableParts && input.productTypeSlug !== "pen")
+    throw new Error("Only Pens may declare interchangeable parts.");
   const mechanismId = input.mechanismId ?? null;
   const refillModel = input.refillModel?.trim() ?? null;
   if (input.productTypeSlug === "pen-mechanism") {
@@ -13680,16 +13726,64 @@ async function replaceCompatiblePenParts(
   )
     throw new Error("Compatible parts must be visible Pen-part products.");
 
+  const [pen] = await tx
+    .select()
+    .from(schema.productDetailPen)
+    .where(eq(schema.productDetailPen.id, productId));
+  if (!pen) throw new Error("Pen does not exist.");
+  const previous = await tx
+    .select({ partProductId: schema.penCompatiblePart.partProductId })
+    .from(schema.penCompatiblePart)
+    .where(eq(schema.penCompatiblePart.penProductId, productId));
+  const previousIds = new Set(
+    previous.map(({ partProductId }) => partProductId),
+  );
+  const confirmed = new Set(input.customizationConfirmedPartProductIds ?? []);
+  if ([...confirmed].some((id) => !partProductIds.includes(id)))
+    throw new Error("Customization confirmation must name a selected part.");
+  const replacements = parts.map((part) => {
+    const key =
+      penPartInterchangeabilityKeys[
+        part.type as keyof typeof penPartInterchangeabilityKeys
+      ];
+    const requiresCustomization = !pen[`${key}Interchangeable`];
+    if (
+      requiresCustomization &&
+      !previousIds.has(part.id) &&
+      !confirmed.has(part.id)
+    )
+      throw new Error(
+        "Customization confirmation is required for non-interchangeable parts.",
+      );
+    return {
+      partProductId: part.id,
+      penProductId: productId,
+      requiresCustomization,
+    };
+  });
+
   await tx
     .delete(schema.penCompatiblePart)
     .where(eq(schema.penCompatiblePart.penProductId, productId));
-  if (partProductIds.length)
-    await tx.insert(schema.penCompatiblePart).values(
-      partProductIds.map((partProductId) => ({
-        partProductId,
-        penProductId: productId,
-      })),
-    );
+  if (replacements.length)
+    await tx.insert(schema.penCompatiblePart).values(replacements);
+}
+
+/**
+ * Maps reviewed Pen answers to their stored columns.
+ * @param value - Complete interchangeability answers.
+ * @returns Replacement Pen detail columns.
+ */
+function penInterchangeabilityValues(
+  value: NonNullable<CatalogProduct["interchangeableParts"]>,
+) {
+  return {
+    tipInterchangeable: value.tip,
+    clipInterchangeable: value.clip,
+    topCapInterchangeable: value.topCap,
+    actuatorInterchangeable: value.actuator,
+    mechanismInterchangeable: value.mechanism,
+  };
 }
 
 /**
@@ -13708,7 +13802,12 @@ async function insertProductSubtype(
   const { specs } = input;
   switch (input.productTypeSlug) {
     case "pen":
-      await tx.insert(schema.productDetailPen).values({ id: productId });
+      await tx.insert(schema.productDetailPen).values({
+        id: productId,
+        ...(input.interchangeableParts
+          ? penInterchangeabilityValues(input.interchangeableParts)
+          : {}),
+      });
       return;
     case "pen-actuator":
     case "pen-clip":
@@ -13812,6 +13911,15 @@ async function updateProductSubtype(
   const { specs } = input;
   switch (input.productTypeSlug) {
     case "pen":
+      if (input.interchangeableParts)
+        await tx
+          .update(schema.productDetailPen)
+          .set({
+            ...penInterchangeabilityValues(input.interchangeableParts),
+            updatedAt,
+          })
+          .where(eq(schema.productDetailPen.id, productId));
+      return;
     case "pen-actuator":
     case "pen-clip":
     case "pen-tip":

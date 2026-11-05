@@ -160,6 +160,13 @@ describe("public Pens catalog reads", () => {
       const actor = { clerkId: "pens-author", role: "admin" as const };
       const [pen] = await service.listProducts("pen", actor);
       expect(pen).toMatchObject({
+        interchangeableParts: {
+          tip: false,
+          clip: false,
+          topCap: false,
+          actuator: false,
+          mechanism: false,
+        },
         compatibleParts: [
           {
             id: tipId,
@@ -172,6 +179,43 @@ describe("public Pens catalog reads", () => {
         materials: [
           expect.objectContaining({ assignmentId: productMaterial.id }),
         ],
+      });
+
+      await expect(
+        service.updateProduct({
+          actor,
+          productId: penId,
+          reason: "Record reviewed interchangeability",
+          productTypeSlug: "pen",
+          makerId: maker.id,
+          name: "Author Pen",
+          slug: "author-pen",
+          materialAssignments: [
+            {
+              weight: null,
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
+          ],
+          finishOptions: [],
+          specs: {},
+          interchangeableParts: {
+            tip: true,
+            clip: false,
+            topCap: true,
+            actuator: false,
+            mechanism: true,
+          },
+        }),
+      ).resolves.toMatchObject({
+        interchangeableParts: {
+          tip: true,
+          clip: false,
+          topCap: true,
+          actuator: false,
+          mechanism: true,
+        },
       });
 
       const offering = await service.authorPensCatalog({
@@ -251,6 +295,14 @@ describe("public Pens catalog reads", () => {
       });
       const removedOptions = await service.listPensAdminOptions(actor);
       expect(removedOptions.compatibilityAssertions).toEqual([]);
+      const [reviewedPen] = await service.listProducts("pen", actor);
+      expect(reviewedPen?.interchangeableParts).toEqual({
+        tip: true,
+        clip: false,
+        topCap: true,
+        actuator: false,
+        mechanism: true,
+      });
       expect(removedOptions.compatibilityMemberships).toEqual([]);
       await expect(
         db
@@ -379,7 +431,8 @@ describe("public Pens catalog reads", () => {
         slug: "compatible-tip",
         specs: {},
       });
-      const pen = await service.createProduct({
+      /** Complete Pen draft with one non-interchangeable compatible tip. */
+      const penInput = {
         actor,
         compatiblePartProductIds: [tip.id],
         finishOptions: [],
@@ -391,10 +444,20 @@ describe("public Pens catalog reads", () => {
           },
         ],
         name: "Compatible Pen",
-        productTypeSlug: "pen",
+        productTypeSlug: "pen" as const,
         slug: "compatible-pen",
         specs: {},
+      };
+      await expect(service.createProduct(penInput)).rejects.toThrow(
+        "Customization confirmation is required",
+      );
+      const pen = await service.createProduct({
+        ...penInput,
+        customizationConfirmedPartProductIds: [tip.id],
       });
+      expect(pen.compatibleParts).toEqual([
+        expect.objectContaining({ id: tip.id, requiresCustomization: true }),
+      ]);
       expect(pen.compatibleParts).toEqual([
         expect.objectContaining({ id: tip.id, productTypeSlug: "pen-tip" }),
       ]);

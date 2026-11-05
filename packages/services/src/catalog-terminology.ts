@@ -43,3 +43,12 @@ export const collectionItemStatusSearches = [
 /** One selectable collection-item status bucket. */
 export type CollectionItemStatusSearch =
   (typeof collectionItemStatusSearches)[number];
+
+/** Maps each Pen-part product type to its standard interchangeability answer. */
+export const penPartInterchangeabilityKeys = {
+  "pen-tip": "tip",
+  "pen-clip": "clip",
+  "pen-top-cap": "topCap",
+  "pen-actuator": "actuator",
+  "pen-mechanism": "mechanism",
+} as const;
