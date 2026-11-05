@@ -416,9 +416,7 @@ function ComboboxOptions({
                   ) : null}
                   <span>{item.name}</span>
                   {item.warning ? (
-                    <span className="text-xs text-destructive">
-                      {item.warning}
-                    </span>
+                    <span className="text-xs">{item.warning}</span>
                   ) : null}
                 </span>
                 <ComboboxPrimitive.ItemIndicator>

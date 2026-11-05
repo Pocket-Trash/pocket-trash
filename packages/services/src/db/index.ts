@@ -147,6 +147,8 @@ export type {
   CollectionItemStatusTrendItem,
   CollectionsService,
   EffectiveSliderSetup,
+  InstalledPenActuation,
+  InstalledPenActuationInput,
   MaterialCombination,
   MaterialSelection,
   MaterialSpecific,

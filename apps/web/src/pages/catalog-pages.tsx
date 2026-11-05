@@ -2412,12 +2412,30 @@ export function CollectionItemDetailPage({
               label={t("web.pens.collection.installedParts" as TranslationKey)}
             >
               <ul className="grid gap-1">
-                {installedPenParts.map((part) => (
-                  <li key={part.collectionItemId}>
-                    <span>{part.displayName}</span>
-                    <PenPartRoleBadges part={part} />
-                  </li>
-                ))}
+                {installedPenParts.map((part) => {
+                  const pairing = item.installedPenActuations?.find(
+                    ({ actuatorCollectionItemId }) =>
+                      actuatorCollectionItemId === part.collectionItemId,
+                  );
+                  const mechanism = installedPenParts.find(
+                    ({ collectionItemId }) =>
+                      collectionItemId === pairing?.mechanismCollectionItemId,
+                  );
+                  return (
+                    <li key={part.collectionItemId}>
+                      <span>{part.displayName}</span>
+                      <PenPartRoleBadges part={part} />
+                      {mechanism ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("web.pens.installedActuation.summary", {
+                            actuator: part.displayName,
+                            mechanism: mechanism.displayName,
+                          })}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             </Detail>
           ) : null}

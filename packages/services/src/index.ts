@@ -86,6 +86,8 @@ export type {
   FeedbackNotificationItem,
   FeedbackPage,
   FeedbackService,
+  InstalledPenActuation,
+  InstalledPenActuationInput,
   LinearFeedbackSyncInput,
   LinearFeedbackSyncResult,
   ListAdminFeedbackOptions,

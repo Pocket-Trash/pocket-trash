@@ -716,6 +716,8 @@
                   "pen_collection_item_id PK/FK bigint",
                   "part_collection_item_id PK/FK bigint",
                   "requires_customization boolean",
+                  "actuated_mechanism_collection_item_id? FK bigint",
+                  "actuation_requires_customization boolean",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
@@ -2681,6 +2683,11 @@
             "collection_item_installed_pen_part",
             "collection_item",
             "part_collection_item_id → id"
+      ],
+      [
+            "collection_item_installed_pen_part",
+            "collection_item_installed_pen_part",
+            "pen_collection_item_id, actuated_mechanism_collection_item_id → pen_collection_item_id, part_collection_item_id"
       ],
       [
             "collection_item_material",

@@ -1522,7 +1522,18 @@ describe("CollectionItemDetailPage", () => {
     if (!item) throw new Error("Collection item fixture is required.");
     const html = renderToStaticMarkup(
       <CollectionItemDetailPage
-        item={{ ...item, productTypeSlug: "pen", productTypeName: "Pen" }}
+        item={{
+          ...item,
+          productTypeSlug: "pen",
+          productTypeName: "Pen",
+          installedPenActuations: [
+            {
+              actuatorCollectionItemId: 2001,
+              mechanismCollectionItemId: 2002,
+              requiresCustomization: false,
+            },
+          ],
+        }}
         installedPenParts={[
           {
             ...item,
@@ -1532,12 +1543,20 @@ describe("CollectionItemDetailPage", () => {
             productTypeName: "Pen clip",
             penPartRoles: ["clip", "actuator"],
           },
+          {
+            ...item,
+            collectionItemId: 2002,
+            displayName: "Installed mechanism",
+            productTypeSlug: "pen-mechanism",
+            productTypeName: "Pen mechanism",
+          },
         ]}
       />,
     );
     expect(html).toContain("Installed clip");
     expect(html).toContain(">Clip<");
     expect(html).toContain(">Actuator<");
+    expect(html).toContain("Installed clip actuates Installed mechanism");
   });
 
   it("shows live body-hosted slider facts as read-only details", () => {

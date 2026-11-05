@@ -1122,6 +1122,13 @@ const collectionItemMetadataSchema = z.object({
     .optional(),
 });
 
+/** One explicit owned actuator/mechanism pairing authored in an item draft. */
+const installedPenActuationSchema = z.object({
+  actuatorCollectionItemId: idSchema,
+  mechanismCollectionItemId: idSchema,
+  customizationConfirmed: z.boolean().optional(),
+});
+
 /** Validated create-item fields, including optional owner metadata. */
 const collectionAddSchema = z
   .object({
@@ -1147,6 +1154,7 @@ const collectionAddSchema = z
     productTypeSlug: collectionProductTypeSchema,
     installedPenPartCollectionItemIds: z.array(idSchema).default([]),
     customizationConfirmedPartCollectionItemIds: z.array(idSchema).default([]),
+    installedPenActuations: z.array(installedPenActuationSchema).optional(),
     installedRefillOfferingId: idSchema.nullable().default(null),
     installedRefillProductId: idSchema.nullable().default(null),
     serialNumber: z
@@ -1229,6 +1237,7 @@ const collectionEditSchema = z
     collectionItemId: idSchema,
     installedPenPartCollectionItemIds: z.array(idSchema).optional(),
     customizationConfirmedPartCollectionItemIds: z.array(idSchema).optional(),
+    installedPenActuations: z.array(installedPenActuationSchema).optional(),
     customFinish: finishOptionSchema.nullable(),
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
@@ -2480,6 +2489,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             parsed.data.installedPenPartCollectionItemIds,
           customizationConfirmedPartCollectionItemIds:
             parsed.data.customizationConfirmedPartCollectionItemIds,
+          installedPenActuations: parsed.data.installedPenActuations,
           customFinish: parsed.data.customFinish
             ? toFinishWriteOption(parsed.data.customFinish)
             : null,
@@ -3108,6 +3118,7 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
           parsed.data.installedPenPartCollectionItemIds,
         customizationConfirmedPartCollectionItemIds:
           parsed.data.customizationConfirmedPartCollectionItemIds,
+        installedPenActuations: parsed.data.installedPenActuations,
         customFinish: parsed.data.customFinish
           ? toFinishWriteOption(parsed.data.customFinish)
           : null,
@@ -3466,6 +3477,17 @@ function mutationFailure(error: unknown) {
   )
     return {
       fieldErrors: { penPartRoles: [error.message] },
+      formError: error.message,
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
+
+  if (
+    error instanceof Error &&
+    error.message.startsWith("web.pens.installedActuation.")
+  )
+    return {
+      fieldErrors: { installedPenActuations: [error.message] },
       formError: error.message,
       ok: false as const,
       requiresConfirmation: false as const,
