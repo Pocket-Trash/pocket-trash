@@ -942,8 +942,12 @@ export function ProductDetailPage({
               {[...compatiblePartsByType.entries()].map(([type, parts]) => (
                 <div className="grid content-start gap-2" key={type}>
                   <h3 className="font-semibold">
-                    {t(
-                      `web.pens.productType.${penPartInterchangeabilityKeys[type]}`,
+                    {catalogProductTypeLabel(
+                      t,
+                      type,
+                      t(
+                        `web.pens.productType.${penPartInterchangeabilityKeys[type]}`,
+                      ),
                     )}
                   </h3>
                   <ul className="grid gap-2 text-sm">

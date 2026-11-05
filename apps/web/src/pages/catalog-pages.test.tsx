@@ -1231,7 +1231,7 @@ describe("ProductDetailPage", () => {
       />,
     );
     expect(html).toContain("Pen clips");
-    expect(html).toContain("Pen actuators");
+    expect(html).toContain("Pen actuator (e.g. bolt pin, button)");
     expect(
       html.match(/href="\/products\/pen-clip\/actuating-clip"/gu),
     ).toHaveLength(2);
