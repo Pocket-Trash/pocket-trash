@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useForm } from "@tanstack/react-form";
 import { expect, fn } from "storybook/test";
-import { useCatalogCopy } from "@/lib/catalog-copy";
 import { Button } from "@/components/ui/button";
+import { useCatalogCopy } from "@/lib/catalog-copy";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { ProductAliasesEditor } from "./product-aliases-editor";
 
