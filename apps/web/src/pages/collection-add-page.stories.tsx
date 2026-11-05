@@ -716,17 +716,17 @@ export const ResetOwnedPenParts: Story = {
       within(dialog).getByRole("button", { name: "Yes, continue" }),
     );
     await expect(
-      canvas.getByRole("button", { name: "Remove Owned clip" }),
+      canvas.getByRole("button", { name: "Close: Owned clip" }),
     ).toBeVisible();
     await userEvent.click(
       canvas.getByText(/Selected product: Pen A/, { selector: "summary" }),
     );
     await userEvent.click(canvas.getByRole("button", { name: "Pen B" }));
     await expect(
-      canvas.queryByRole("button", { name: "Remove Owned clip" }),
+      canvas.queryByRole("button", { name: "Close: Owned clip" }),
     ).toBeNull();
     await expect(
-      canvas.queryByRole("button", { name: "Remove Owned mechanism" }),
+      canvas.queryByRole("button", { name: "Close: Owned mechanism" }),
     ).toBeNull();
     await expect(
       canvas.queryByRole("combobox", { name: /Part used to actuate/ }),

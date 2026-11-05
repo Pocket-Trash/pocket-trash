@@ -5990,10 +5990,20 @@ export function CollectionAddPage({
   /**
    * Changes browsing scope and clears every dependent selection after confirmation.
    * @param value - Selected product-type lookup, or null when cleared.
+   * @param eventDetails - Cancels the primitive's visible selection when replacement is declined.
    */
-  const changeProductType = (value: ComboboxOption | null) => {
-    if (value?.id === form.state.values.type?.id || !confirmProductChange())
+  const changeProductType = (
+    value: ComboboxOption | null,
+    eventDetails?: {
+      /** Cancels the proposed primitive selection. */
+      cancel(): void;
+    },
+  ) => {
+    if (value?.id === form.state.values.type?.id) return;
+    if (!confirmProductChange()) {
+      eventDetails?.cancel();
       return;
+    }
     applyProductSelection(null);
     form.setFieldValue("type", value);
     form.setFieldValue("productQuery", "");

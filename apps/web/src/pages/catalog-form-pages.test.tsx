@@ -868,7 +868,7 @@ describe("collection add form", () => {
     expect(html).toContain(">Zoom Zoom</span>");
     expect(html).toMatch(/<details[^>]*>/u);
     expect(html).not.toMatch(/<details[^>]* open=/u);
-    expect(html).toContain("Selected product: Zoom Zoom · Spinner");
+    expect(html).toContain("Selected product: Zoom Zoom · spinner");
     expect(html).toContain('aria-label="Close: Bronze"');
     expect(html).toContain('aria-label="Close: Polished"');
     expect(html).toContain(">Collection<");

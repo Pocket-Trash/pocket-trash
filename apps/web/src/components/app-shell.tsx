@@ -207,7 +207,7 @@ export function AppShell({
 function AppShellControls() {
   const { locale, setLocale } = useLocale();
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-2">
+    <div className="ml-auto flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2">
       <LanguageSelect
         className="w-[9.5rem] max-sm:w-[8.5rem]"
         locale={locale}
