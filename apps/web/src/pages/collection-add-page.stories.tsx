@@ -1,6 +1,6 @@
 import type { CatalogProduct } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, waitFor, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionAddPage } from "./catalog-form-pages";
 import { collectionFixture, productFixture } from "./catalog-test-fixtures";
@@ -826,10 +826,16 @@ export const CatalogDescriptionAndDetails: Story = {
       canvas.getByRole("group", { name: "Ownership history" }),
     ).toBeVisible();
     await userEvent.click(canvas.getByText("Add price, status, or notes"));
-    await userEvent.keyboard("{Enter}");
-    await expect(
-      canvas.getByRole("group", { name: "Ownership history" }),
-    ).toBeVisible();
+    canvas.getByText("Add price, status, or notes").closest("summary")?.focus();
+    await expect(canvasElement.ownerDocument.activeElement?.tagName).toBe(
+      "SUMMARY",
+    );
+    await userEvent.click(canvas.getByText("Add price, status, or notes"));
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("group", { name: "Ownership history" }),
+      ).toBeVisible(),
+    );
     await userEvent.click(
       canvas.getByText(/Selected product:/, { selector: "summary" }),
     );

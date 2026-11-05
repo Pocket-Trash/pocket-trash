@@ -274,6 +274,10 @@ export const InstalledSliderAssembly: Story = {
    * @returns A promise that resolves after the selector assertions pass.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
+    const main = canvasElement.querySelector("main");
+    await expect(
+      main && getComputedStyle(main).gridTemplateColumns.split(" ").length,
+    ).toBe(1);
     const historySelector = canvas.getByRole("combobox", {
       name: /ownership history|web\.collections\.lifecycle\.title/iu,
     });

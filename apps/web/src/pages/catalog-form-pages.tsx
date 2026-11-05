@@ -5,6 +5,7 @@ import {
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { htmlToMarkdown, markdownToHtml } from "@package/markdown";
 import type {
   CatalogColor,
   CatalogFinishOption,
@@ -5157,6 +5158,15 @@ function OwnershipLifecycleFields({
   );
 }
 
+/**
+ * Compares descriptions using the same safe Markdown normalization as the editor.
+ * @param value - Source or edited Markdown.
+ * @returns Canonical editable Markdown.
+ */
+function normalizedCollectionDescription(value: string): string {
+  return htmlToMarkdown(markdownToHtml(value)) ?? "";
+}
+
 /** Product-derived collection fields that are safe to initialize automatically. */
 type CollectionProductDefaults = Readonly<{
   /** Collection-item display name. */
@@ -5494,7 +5504,8 @@ export function CollectionAddPage({
         ? moneyFromInput(value.priceSoldInput)
         : undefined;
       const currentDescription =
-        value.description === (product.description ?? "")
+        normalizedCollectionDescription(value.description) ===
+        normalizedCollectionDescription(product.description ?? "")
           ? ""
           : value.description;
       const selectedButton =
@@ -5923,8 +5934,9 @@ export function CollectionAddPage({
     const defaults = collectionProductDefaults(product, t);
     const changed =
       current.displayName !== defaults.displayName ||
-      (descriptionRef.current?.getValue() ?? current.description) !==
-        (product.description ?? "") ||
+      normalizedCollectionDescription(
+        descriptionRef.current?.getValue() ?? current.description,
+      ) !== normalizedCollectionDescription(product.description ?? "") ||
       current.bearing !== "" ||
       current.serialNumber !== null ||
       current.material?.id !== defaults.material?.id ||
@@ -7725,7 +7737,8 @@ export function CollectionEditPage({
         insert,
       } = value;
       const currentDescription =
-        description === defaultValues.description
+        normalizedCollectionDescription(description) ===
+        normalizedCollectionDescription(defaultValues.description)
           ? (item.descriptionOverride ?? "")
           : description;
       const selectedButton = ownedButtons.find(
@@ -8114,6 +8127,45 @@ export function CollectionEditPage({
   );
   const effectiveMagnetLayout =
     selectedInsertProduct?.magnetLayout ?? product.magnetLayout;
+
+  const ownershipFields = (
+    <fieldset disabled={!item.isOwner}>
+      <OwnershipLifecycleFields
+        allowDeparture
+        onChange={(value) => form.setFieldValue("ownership", value)}
+        onPeriodChange={(periodId) => {
+          const period = ownershipPeriods.find(({ id }) => id === periodId);
+          form.setFieldValue("ownership", ownershipEditorValue(period));
+          form.setFieldValue(
+            "pricePaidInput",
+            moneyInput(period?.pricePaid, currency),
+          );
+          form.setFieldValue(
+            "priceSoldInput",
+            moneyInput(period?.priceSold, currency),
+          );
+          form.setFieldValue(
+            "pricePaidIsPublic",
+            period?.pricePaid?.isPublic ?? false,
+          );
+          if (periodId === null)
+            form.setFieldValue("metadata", (current) => ({
+              ...current,
+              statuses: {
+                public: current.statuses.public.filter(
+                  (status) => status !== "sold",
+                ),
+                private: current.statuses.private.filter(
+                  (status) => status !== "sold",
+                ),
+              },
+            }));
+        }}
+        periods={ownershipPeriods}
+        value={ownership}
+      />
+    </fieldset>
+  );
 
   return (
     <AppShell
@@ -8562,44 +8614,7 @@ export function CollectionEditPage({
             }}
             invalid={Boolean(feedback)}
           >
-            <fieldset disabled={!item.isOwner}>
-              <OwnershipLifecycleFields
-                allowDeparture
-                onChange={(value) => form.setFieldValue("ownership", value)}
-                onPeriodChange={(periodId) => {
-                  const period = ownershipPeriods.find(
-                    ({ id }) => id === periodId,
-                  );
-                  form.setFieldValue("ownership", ownershipEditorValue(period));
-                  form.setFieldValue(
-                    "pricePaidInput",
-                    moneyInput(period?.pricePaid, currency),
-                  );
-                  form.setFieldValue(
-                    "priceSoldInput",
-                    moneyInput(period?.priceSold, currency),
-                  );
-                  form.setFieldValue(
-                    "pricePaidIsPublic",
-                    period?.pricePaid?.isPublic ?? false,
-                  );
-                  if (periodId === null)
-                    form.setFieldValue("metadata", (current) => ({
-                      ...current,
-                      statuses: {
-                        public: current.statuses.public.filter(
-                          (status) => status !== "sold",
-                        ),
-                        private: current.statuses.private.filter(
-                          (status) => status !== "sold",
-                        ),
-                      },
-                    }));
-                }}
-                periods={ownershipPeriods}
-                value={ownership}
-              />
-            </fieldset>
+            {ownershipFields}
             <CollectionItemPriceField
               value={pricePaidInput}
               isPublic={pricePaidIsPublic}
@@ -8629,8 +8644,17 @@ export function CollectionEditPage({
               }
             />
           </CollectionItemStatusFields>
-        ) : null}
-        <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
+        ) : (
+          <details className="border-y py-4" open>
+            <summary className="cursor-pointer focus-visible:outline focus-visible:outline-ring">
+              <h2 className="inline">
+                {t("web.collectionItemMetadata.editDisclosure")}
+              </h2>
+            </summary>
+            <div className="pt-4">{ownershipFields}</div>
+          </details>
+        )}
+        <div className="flex flex-wrap justify-end gap-2">
           <Button
             onClick={() =>
               void navigate({

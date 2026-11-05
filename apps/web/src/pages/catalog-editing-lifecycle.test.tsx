@@ -1,3 +1,4 @@
+import { htmlToMarkdown, markdownToHtml } from "@package/markdown";
 /** @vitest-environment jsdom */
 
 import { formatTranslation } from "@pocket-trash/localizations";
@@ -133,7 +134,7 @@ function ReadyMarkdownEditor(props: {
      * Reads this fixture's document.
      * @returns Initial Markdown.
      */
-    getValue: () => document.current,
+    getValue: () => htmlToMarkdown(markdownToHtml(document.current)) ?? "",
     /**
      * Focuses this fixture without creating an editor.
      * @returns Nothing.
@@ -745,6 +746,62 @@ describe("catalog mutation lifetimes", () => {
     await click(container, "Add to collection");
     expect(addCollectionProduct).toHaveBeenCalledWith({
       data: expect.objectContaining({ description: "" }),
+    });
+  });
+
+  it("retains fallback for untouched noncanonical Markdown and shows staff read-only history", async () => {
+    const product = {
+      ...productFixture(1000, "Spinner", "spinner"),
+      description: "_Catalog description_\n",
+    };
+    vi.mocked(addCollectionProduct).mockResolvedValue({
+      ok: true,
+      collectionId: 1000,
+      collectionItemId: 42,
+    });
+    await act(async () =>
+      root.render(
+        <CollectionAddPage
+          collections={[collection]}
+          defaultCollectionName={null}
+          initialProductId={1000}
+          options={options}
+          products={[product]}
+        />,
+      ),
+    );
+    await click(container, "Add to collection");
+    expect(addCollectionProduct).toHaveBeenCalledWith({
+      data: expect.objectContaining({ description: "" }),
+    });
+    const item = {
+      ...collectionFixture(42, product, 1003),
+      isOwner: false,
+      canAdminister: true,
+    };
+    vi.spyOn(window, "prompt").mockReturnValue("Reviewed");
+    vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
+    await act(async () =>
+      root.render(
+        <CollectionEditPage
+          buttonProducts={[]}
+          collections={[collection]}
+          item={item}
+          options={options}
+          ownedButtons={[]}
+          product={product}
+        />,
+      ),
+    );
+    const history = [...container.querySelectorAll("fieldset")].find(
+      (node) =>
+        node.querySelector("legend")?.textContent === "Ownership history",
+    );
+    expect(history?.closest("fieldset[disabled]")).not.toBeNull();
+    expect(history?.closest("details")?.open).toBe(true);
+    await click(container, "Save");
+    expect(updateCollectionItem).toHaveBeenCalledWith({
+      data: expect.objectContaining({ description: "", reason: "Reviewed" }),
     });
   });
 
