@@ -14,13 +14,7 @@ import {
 } from "@/components/markdown-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
@@ -398,35 +392,13 @@ export function CollectionItemNotesEditor(props: {
             <span id={`${id}-visibility`}>
               {t("web.collectionItemMetadata.noteVisibility")}
             </span>
-            <Select
-              items={[
-                {
-                  value: "private",
-                  label: t("web.collectionItemMetadata.private"),
-                },
-                {
-                  value: "public",
-                  label: t("web.collectionItemMetadata.public"),
-                },
-              ]}
-              value={fields.isPublic ? "public" : "private"}
-              onValueChange={(value) => {
-                if (value === "public" || value === "private")
-                  form.setFieldValue("isPublic", value === "public");
-              }}
-            >
-              <SelectTrigger aria-labelledby={`${id}-visibility`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="private">
-                  {t("web.collectionItemMetadata.private")}
-                </SelectItem>
-                <SelectItem value="public">
-                  {t("web.collectionItemMetadata.public")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <Switch
+              checked={fields.isPublic}
+              label={t("web.collectionItemMetadata.public")}
+              onCheckedChange={(checked) =>
+                form.setFieldValue("isPublic", checked)
+              }
+            />
           </div>
           <Button
             type="submit"

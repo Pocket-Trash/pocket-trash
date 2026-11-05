@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { type CollectionMoneyInput, moneyFromInput } from "@/lib/catalog-money";
 import { currencies } from "@/lib/pen-formatters";
 import { useLocale } from "@/providers/locale-provider";
@@ -103,15 +104,11 @@ export function CollectionItemPriceField(props: {
           {t("web.collectionItemMetadata.soldIsPrivate")}
         </p>
       ) : (
-        <label className="flex min-h-9 items-center gap-2">
-          <input
-            type="checkbox"
-            className="size-4"
-            checked={props.isPublic ?? false}
-            onChange={(event) => props.onPublicChange?.(event.target.checked)}
-          />
-          {t("web.collectionItemMetadata.paidIsPublic")}
-        </label>
+        <Switch
+          checked={props.isPublic ?? false}
+          label={t("web.collectionItemMetadata.paidIsPublic")}
+          onCheckedChange={(checked) => props.onPublicChange?.(checked)}
+        />
       )}
     </fieldset>
   );

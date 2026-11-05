@@ -227,6 +227,22 @@ const collection = {
   updatedAt: new Date(0),
 };
 /**
+ * Finds the item visibility control outside nested collection and note editors.
+ * @param container - Mounted collection form.
+ * @returns The form-owned item visibility switch.
+ * @throws When the expected item switch is missing.
+ */
+function collectionVisibilitySwitch(container: HTMLElement): HTMLElement {
+  const control = [
+    ...container.querySelectorAll<HTMLElement>(
+      '[role="switch"][aria-label="Public"]',
+    ),
+  ].find((node) => !node.closest("dialog"));
+  if (!control) throw new Error("Missing item visibility switch");
+  return control;
+}
+
+/**
  * Edits a controlled native input through React's change boundary.
  * @param input - Target control.
  * @param value - Replacement value.
@@ -862,6 +878,175 @@ describe("catalog mutation lifetimes", () => {
     );
     expect(add?.disabled).toBe(false);
     expect(addCollectionProduct).not.toHaveBeenCalled();
+  });
+
+  it("persists item visibility from controlled add and edit switches", async () => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    vi.mocked(addCollectionProduct).mockResolvedValue({
+      ok: true,
+      collectionId: 1000,
+      collectionItemId: 42,
+    });
+    await act(async () =>
+      root.render(
+        <CollectionAddPage
+          collections={[collection]}
+          defaultCollectionName={null}
+          initialProductId={1000}
+          options={options}
+          products={[product]}
+        />,
+      ),
+    );
+    const addSwitch = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        '[role="switch"][aria-label="Public"]',
+      ),
+    ].find((node) => !node.closest("dialog"));
+    expect(addSwitch?.getAttribute("aria-checked")).toBe("true");
+    await act(async () => addSwitch?.click());
+    expect(addCollectionProduct).not.toHaveBeenCalled();
+    await click(container, "Add to collection");
+    expect(addCollectionProduct).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPrivate: true }),
+    });
+    const item = {
+      ...collectionFixture(42, product, 1003),
+      isOwner: true,
+      isPrivate: true,
+    };
+    vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
+    await act(async () =>
+      root.render(
+        <CollectionEditPage
+          buttonProducts={[]}
+          collections={[collection]}
+          item={item}
+          options={options}
+          ownedButtons={[]}
+          product={product}
+        />,
+      ),
+    );
+    const editSwitch = collectionVisibilitySwitch(container);
+    expect(editSwitch?.getAttribute("aria-checked")).toBe("false");
+    await act(async () => editSwitch?.click());
+    expect(updateCollectionItem).not.toHaveBeenCalled();
+    await click(container, "Save");
+    expect(updateCollectionItem).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPrivate: false }),
+    });
+  });
+
+  it("locks effective visibility off for a private collection", async () => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    vi.mocked(addCollectionProduct).mockResolvedValue({
+      ok: true,
+      collectionId: 1000,
+      collectionItemId: 42,
+    });
+    await act(async () =>
+      root.render(
+        <CollectionAddPage
+          collections={[{ ...collection, isPrivate: true }]}
+          defaultCollectionName={null}
+          initialProductId={1000}
+          options={options}
+          products={[product]}
+        />,
+      ),
+    );
+    const control = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        '[role="switch"][aria-label="Public"]',
+      ),
+    ].find((node) => !node.closest("dialog"));
+    expect(control?.getAttribute("aria-disabled")).toBe("true");
+    expect(control?.getAttribute("aria-checked")).toBe("false");
+    await click(container, "Add to collection");
+    expect(addCollectionProduct).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPrivate: true }),
+    });
+  });
+
+  it.each([
+    { isAdminPrivate: true },
+    { privacyInheritedFromItemId: 70 },
+  ])("keeps constrained visibility unchanged while saving item details", async (constraint) => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    const item = {
+      ...collectionFixture(42, product, 1003),
+      isOwner: true,
+      isPrivate: true,
+      ...constraint,
+    };
+    vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
+    await act(async () =>
+      root.render(
+        <CollectionEditPage
+          buttonProducts={[]}
+          collections={[collection]}
+          item={item}
+          options={options}
+          ownedButtons={[]}
+          product={product}
+        />,
+      ),
+    );
+    const control = collectionVisibilitySwitch(container);
+    expect(control?.getAttribute("aria-disabled")).toBe("true");
+    expect(control?.getAttribute("aria-checked")).toBe("false");
+    await click(container, "Save");
+    const data = vi.mocked(updateCollectionItem).mock.calls[0]?.[0]?.data;
+    expect(data).not.toHaveProperty("isPrivate");
+  });
+
+  it("does not persist a toggled item when editing is canceled", async () => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    const item = { ...collectionFixture(42, product, 1003), isOwner: true };
+    await act(async () =>
+      root.render(
+        <CollectionEditPage
+          buttonProducts={[]}
+          collections={[collection]}
+          item={item}
+          options={options}
+          ownedButtons={[]}
+          product={product}
+        />,
+      ),
+    );
+    await act(async () => collectionVisibilitySwitch(container).click());
+    const cancel = [...container.querySelectorAll("button")].find(
+      (node) => node.textContent === "Cancel" && !node.closest("dialog"),
+    );
+    await act(async () => cancel?.click());
+    expect(updateCollectionItem).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledOnce();
+  });
+
+  it("keeps nonowner ownership switches read-only and out of the tab order", async () => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    const item = { ...collectionFixture(42, product, 1003), isOwner: false };
+    await act(async () =>
+      root.render(
+        <CollectionEditPage
+          buttonProducts={[]}
+          collections={[collection]}
+          item={item}
+          options={options}
+          ownedButtons={[]}
+          product={product}
+        />,
+      ),
+    );
+    for (const label of ["Acquisition date unknown", "Currently owned"]) {
+      const control = container.querySelector<HTMLElement>(
+        `[role="switch"][aria-label="${label}"]`,
+      );
+      expect(control?.getAttribute("aria-disabled")).toBe("true");
+      expect(control?.tabIndex).toBe(-1);
+    }
   });
 
   it("confirms duplicates and preserves the collection-item creation payload", async () => {

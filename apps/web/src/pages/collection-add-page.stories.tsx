@@ -481,7 +481,7 @@ export const ConfigurablePen: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body);
     await userEvent.click(
-      canvas.getByRole("checkbox", {
+      canvas.getByRole("switch", {
         name: /serial|web\.collections\.serial\.hasSerialNumber/iu,
       }),
     );
@@ -544,6 +544,110 @@ export const SoldPriceDeselection: Story = {
   },
 };
 
+/** Public intent, destination privacy, and binary fields share working switches. */
+export const VisibilityAndBinarySwitches: Story = {
+  args: {
+    collections: [
+      {
+        id: 501,
+        name: "Public collection",
+        isPrivate: false,
+        coverImage: null,
+        coverImages: [],
+        createdAt: new Date(0),
+        description: null,
+        itemCount: 0,
+        ownerUserId: 1,
+        isAdminPrivate: false,
+        updatedAt: new Date(0),
+      },
+      {
+        id: 502,
+        name: "Private collection",
+        isPrivate: true,
+        coverImage: null,
+        coverImages: [],
+        createdAt: new Date(0),
+        description: null,
+        itemCount: 0,
+        ownerUserId: 1,
+        isAdminPrivate: false,
+        updatedAt: new Date(0),
+      },
+    ],
+  },
+  /**
+   * Exercises pointer and keyboard changes without saving an item implicitly.
+   * @param context - Collection form and real browser interactions.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const collection = canvas.getByRole("combobox", { name: "Collection" });
+    await userEvent.click(collection);
+    await userEvent.click(
+      within(canvasElement.ownerDocument.body).getByRole("option", {
+        name: "Public collection",
+      }),
+    );
+    const visibility = canvas.getByRole("switch", { name: "Public" });
+    await expect(visibility).toBeChecked();
+    await userEvent.click(visibility);
+    await expect(visibility).not.toBeChecked();
+    visibility.focus();
+    await userEvent.keyboard(" ");
+    await expect(visibility).toBeChecked();
+    await userEvent.click(collection);
+    await userEvent.click(
+      within(canvasElement.ownerDocument.body).getByRole("option", {
+        name: "Private collection",
+      }),
+    );
+    await expect(visibility).not.toBeChecked();
+    await expect(visibility).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(collection);
+    await userEvent.click(
+      within(canvasElement.ownerDocument.body).getByRole("option", {
+        name: "Public collection",
+      }),
+    );
+    await expect(visibility).toBeChecked();
+    await userEvent.click(
+      canvas.getByRole("switch", { name: "This item has a serial number" }),
+    );
+    await expect(
+      canvas.getByRole("textbox", { name: "Serial number" }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("switch", { name: "This item has a serial number" }),
+    );
+    await expect(
+      canvas.queryByRole("textbox", { name: "Serial number" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByText("Add price, status, or notes"));
+    const unknown = canvas.getByRole("switch", {
+      name: "Acquisition date unknown",
+    });
+    await userEvent.click(unknown);
+    await expect(
+      canvas.getByLabelText("Acquisition date", { exact: true }),
+    ).toBeEnabled();
+    await userEvent.click(unknown);
+    await expect(
+      canvas.getByLabelText("Acquisition date", { exact: true }),
+    ).toBeDisabled();
+    await userEvent.click(
+      canvas.getByRole("switch", { name: "Show price paid publicly" }),
+    );
+    await expect(
+      canvas.getByRole("switch", { name: "Show price paid publicly" }),
+    ).toBeChecked();
+    await expect(
+      within(canvas.getByRole("group", { name: "Public status" })).getByRole(
+        "checkbox",
+        { name: "Favorite" },
+      ),
+    ).toBeVisible();
+  },
+};
 /** Empty results have usable search and no pagination after a type is chosen. */
 export const NoMatchingProducts: Story = {
   args: { initialProductId: undefined, products: [] },

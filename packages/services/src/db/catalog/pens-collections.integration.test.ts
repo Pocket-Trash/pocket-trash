@@ -269,6 +269,23 @@ describe("owned Pens and Pen parts", () => {
         productTypeSlug: "pen",
         serialNumber: "SAGA-1234",
       });
+      const installedTipId = partItemIds.get("pen-tip");
+      if (!installedTipId) throw new Error("Missing installed tip");
+      await expect(
+        service.updateItem({
+          actor,
+          collectionItemId: installedTipId,
+          customFinish: null,
+          displayName: "Must roll back",
+          finishOptionId: null,
+          isPrivate: true,
+        }),
+      ).rejects.toThrow(/privacy/iu);
+      expect(await service.getOwnedItem(actor, installedTipId)).toMatchObject({
+        displayName: "Owned pen-tip",
+        savedIsPrivate: false,
+        privacyInheritedFromItemId: penItemId,
+      });
       await expect(
         service.updateItem({
           actor,
