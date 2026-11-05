@@ -1220,6 +1220,7 @@ describe("ProductDetailPage", () => {
             {
               id: 101,
               name: "Saga Logo Tip",
+              requiresCustomization: true,
               productTypeName: "Pen tip",
               productTypeSlug: "pen-tip",
               slug: "saga-logo-tip",
@@ -1233,6 +1234,7 @@ describe("ProductDetailPage", () => {
     );
 
     expect(html).toContain("Saga Logo Tip");
+    expect(html).toContain("Customization required");
     expect(html).toContain("saga-logo-tip");
     expect(html).not.toContain(">Configuration<");
   });

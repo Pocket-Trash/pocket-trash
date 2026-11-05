@@ -450,6 +450,17 @@ export const productFormSchema = z
     buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
     compatiblePartProductIds: z.array(idSchema).default([]),
+    customizationConfirmedPartProductIds: z.array(idSchema).default([]),
+    interchangeableParts: z
+      .object({
+        tip: z.boolean(),
+        clip: z.boolean(),
+        topCap: z.boolean(),
+        actuator: z.boolean(),
+        mechanism: z.boolean(),
+      })
+      .nullable()
+      .optional(),
     refillCompatibility: z
       .array(
         z.object({
@@ -2299,6 +2310,9 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       actor,
       aliases: parsed.data.aliases,
       compatiblePartProductIds: parsed.data.compatiblePartProductIds,
+      customizationConfirmedPartProductIds:
+        parsed.data.customizationConfirmedPartProductIds,
+      interchangeableParts: parsed.data.interchangeableParts ?? undefined,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({

@@ -662,8 +662,6 @@
                   "serial_number? text",
                   "display_name? text",
                   "description? text",
-                  "material_specific_id? FK bigint",
-                  "material_id? FK bigint",
                   "purchased_at? timestamp with time zone",
                   "sold_at? timestamp with time zone",
                   "purchased_from_user_id? FK bigint",
@@ -731,6 +729,44 @@
             "fields": [
                   "id PK bigint",
                   "collection_item_id FK bigint",
+                  "material_specific_id? FK bigint",
+                  "material_id FK bigint"
+            ],
+            "id": "collection_item_material",
+            "name": "collection_item_material",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK text",
+                  "collection_item_id FK bigint",
+                  "name text",
+                  "normalized_name text",
+                  "content text",
+                  "is_public boolean",
+                  "position integer",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_item_note",
+            "name": "collection_item_note",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "collection_item_id FK bigint",
+                  "price_paid_minor? bigint",
+                  "price_paid_currency_code? currency_code",
+                  "price_paid_is_public boolean",
+                  "price_sold_minor? bigint",
+                  "price_sold_currency_code? currency_code",
                   "effective_start_date date",
                   "start_date_imputed boolean",
                   "entry_reason text",
@@ -742,6 +778,21 @@
             ],
             "id": "collection_item_ownership_period",
             "name": "collection_item_ownership_period",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "collection_item_id PK/FK bigint",
+                  "status PK text",
+                  "is_public PK boolean",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_item_status",
+            "name": "collection_item_status",
             "status": "existing"
       },
       {
@@ -1092,6 +1143,7 @@
             "fields": [
                   "pen_product_id PK/FK bigint",
                   "part_product_id PK/FK bigint",
+                  "requires_customization boolean",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
@@ -1140,8 +1192,6 @@
                   "approval_status text",
                   "approval_decision_reason? text",
                   "approval_decided_at? timestamp with time zone",
-                  "maker_product_url? text",
-                  "maker_product_url_valid boolean",
                   "is_private boolean",
                   "private_reason? text",
                   "privated_at? timestamp with time zone",
@@ -1176,6 +1226,11 @@
             ],
             "fields": [
                   "id PK/FK bigint",
+                  "tip_interchangeable boolean",
+                  "clip_interchangeable boolean",
+                  "top_cap_interchangeable boolean",
+                  "actuator_interchangeable boolean",
+                  "mechanism_interchangeable boolean",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
@@ -1412,11 +1467,42 @@
             "fields": [
                   "id PK bigint",
                   "product_id FK bigint",
-                  "material_specific_id? FK bigint",
-                  "material_id FK bigint"
+                  "position integer",
+                  "url text",
+                  "is_valid boolean",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_link",
+            "name": "product_link",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "product_id FK bigint",
+                  "weight_value? numeric",
+                  "weight_unit? weight_unit"
             ],
             "id": "product_material",
             "name": "product_material",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "product_material_id FK bigint",
+                  "material_specific_id? FK bigint",
+                  "material_id FK bigint"
+            ],
+            "id": "product_material_component",
+            "name": "product_material_component",
             "status": "existing"
       },
       {
@@ -1441,8 +1527,8 @@
                   "slug text",
                   "is_part_or_accessory boolean",
                   "include_in_trends boolean",
-                  "image_url? text",
-                  "image_alt? text",
+                  "image_url text",
+                  "image_alt text",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
@@ -1489,6 +1575,42 @@
             "fields": [
                   "id PK bigint",
                   "generation_id FK bigint",
+                  "status text",
+                  "product_id? FK bigint",
+                  "approximate_item_count integer",
+                  "contributor_count_band integer"
+            ],
+            "id": "public_collection_item_status_trend",
+            "name": "public_collection_item_status_trend",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "generation_id FK bigint",
+                  "bucket_start date",
+                  "granularity text",
+                  "event_type text",
+                  "product_type_id? FK bigint",
+                  "maker_id? FK bigint",
+                  "material_id? FK bigint",
+                  "rounded_count? integer",
+                  "suppressed boolean"
+            ],
+            "id": "public_collection_lifecycle_trend",
+            "name": "public_collection_lifecycle_trend",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "generation_id FK bigint",
                   "product_type_id? FK bigint",
                   "material_id? FK bigint",
                   "material_specific_id? FK bigint",
@@ -1525,7 +1647,8 @@
                   "has_suppressed_values boolean",
                   "has_suppressed_part_accessory_values boolean",
                   "has_suppressed_material_values boolean",
-                  "has_suppressed_maker_product_values boolean"
+                  "has_suppressed_maker_product_values boolean",
+                  "has_suppressed_lifecycle_values boolean"
             ],
             "id": "public_trends_generation",
             "name": "public_trends_generation",
@@ -1805,6 +1928,29 @@
             ],
             "id": "scraper_runs",
             "name": "scraper_runs",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "kind PK text",
+                  "source_id PK bigint",
+                  "search_group text",
+                  "parent_id? bigint",
+                  "title text",
+                  "href text",
+                  "image_url? text",
+                  "context? text",
+                  "description? text",
+                  "search_text_a text",
+                  "search_text_b text",
+                  "search_text_c text",
+                  "search_vector tsvector"
+            ],
+            "id": "search_documents",
+            "name": "search_documents",
             "status": "existing"
       },
       {
@@ -2284,7 +2430,9 @@
                   "user_id PK/FK bigint",
                   "currency_code currency_code",
                   "locale? text",
+                  "is_profile_public boolean",
                   "measurement_system measurement_system",
+                  "publish_trends boolean",
                   "theme theme_mode"
             ],
             "id": "user_settings",
@@ -2491,11 +2639,6 @@
       ],
       [
             "collection_item",
-            "materials",
-            "material_id → id"
-      ],
-      [
-            "collection_item",
             "users",
             "purchased_from_user_id → id"
       ],
@@ -2503,11 +2646,6 @@
             "collection_item",
             "users",
             "sold_to_user_id → id"
-      ],
-      [
-            "collection_item",
-            "material_specific",
-            "material_id, material_specific_id → material_id, id"
       ],
       [
             "collection_item",
@@ -2530,7 +2668,32 @@
             "part_collection_item_id → id"
       ],
       [
+            "collection_item_material",
+            "collection_item",
+            "collection_item_id → id"
+      ],
+      [
+            "collection_item_material",
+            "materials",
+            "material_id → id"
+      ],
+      [
+            "collection_item_material",
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
+      ],
+      [
+            "collection_item_note",
+            "collection_item",
+            "collection_item_id → id"
+      ],
+      [
             "collection_item_ownership_period",
+            "collection_item",
+            "collection_item_id → id"
+      ],
+      [
+            "collection_item_status",
             "collection_item",
             "collection_item_id → id"
       ],
@@ -2785,17 +2948,27 @@
             "product_id → id"
       ],
       [
-            "product_material",
+            "product_link",
             "product",
             "product_id → id"
       ],
       [
             "product_material",
+            "product",
+            "product_id → id"
+      ],
+      [
+            "product_material_component",
+            "product_material",
+            "product_material_id → id"
+      ],
+      [
+            "product_material_component",
             "materials",
             "material_id → id"
       ],
       [
-            "product_material",
+            "product_material_component",
             "material_specific",
             "material_id, material_specific_id → material_id, id"
       ],
@@ -2840,6 +3013,36 @@
             "product_type_id → id"
       ],
       [
+            "public_collection_item_status_trend",
+            "public_trends_generation",
+            "generation_id → id"
+      ],
+      [
+            "public_collection_item_status_trend",
+            "product",
+            "product_id → id"
+      ],
+      [
+            "public_collection_lifecycle_trend",
+            "public_trends_generation",
+            "generation_id → id"
+      ],
+      [
+            "public_collection_lifecycle_trend",
+            "product_types",
+            "product_type_id → id"
+      ],
+      [
+            "public_collection_lifecycle_trend",
+            "makers",
+            "maker_id → id"
+      ],
+      [
+            "public_collection_lifecycle_trend",
+            "materials",
+            "material_id → id"
+      ],
+      [
             "public_collection_maker_product_trend",
             "public_trends_generation",
             "generation_id → id"
@@ -2861,13 +3064,13 @@
       ],
       [
             "public_collection_maker_product_trend",
-            "material_specific",
-            "material_id, material_specific_id → material_id, id"
+            "product",
+            "product_id → id"
       ],
       [
             "public_collection_maker_product_trend",
-            "product",
-            "product_id, maker_id → id, maker_id"
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
       ],
       [
             "public_part_accessory_product_type_trend",
