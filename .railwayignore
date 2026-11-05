@@ -5,6 +5,7 @@
 *
 
 !.railwayignore
+!.npmrc
 !railpack.json
 !package.json
 !pnpm-lock.yaml

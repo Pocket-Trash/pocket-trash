@@ -30,7 +30,8 @@ function createFixture(context) {
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const files = {
     ".railwayignore":
-      "*\n!.railwayignore\n!railpack.json\n!package.json\n!pnpm-lock.yaml\n!pnpm-workspace.yaml\n!tsconfig.json\n!turbo.json\n!security-audit-exceptions.json\n!scripts/\n!scripts/pnpm-install.sh\n!scripts/security-audit.mjs\n!patches/\n!patches/**\n!apps/\n!apps/scraper/\n!apps/scraper/**\n!apps/discord-bot/\n!apps/discord-bot/**\n!packages/\n!packages/database/\n!packages/database/**\n!packages/lint/\n!packages/lint/**\n!packages/queue/\n!packages/queue/**\n",
+      "*\n!.railwayignore\n!railpack.json\n!.npmrc\n!package.json\n!pnpm-lock.yaml\n!pnpm-workspace.yaml\n!tsconfig.json\n!turbo.json\n!security-audit-exceptions.json\n!scripts/\n!scripts/pnpm-install.sh\n!scripts/security-audit.mjs\n!patches/\n!patches/**\n!apps/\n!apps/scraper/\n!apps/scraper/**\n!apps/discord-bot/\n!apps/discord-bot/**\n!packages/\n!packages/database/\n!packages/database/**\n!packages/lint/\n!packages/lint/**\n!packages/queue/\n!packages/queue/**\n",
+    ".npmrc": readFileSync(join(repoRoot, ".npmrc"), "utf8"),
     "railpack.json":
       '{"steps":{"install":{"commands":["./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline"]}}}\n',
     "package.json": JSON.stringify({
@@ -99,6 +100,30 @@ function runChecker(directory) {
   return { status: result.status, output: result.stdout + result.stderr };
 }
 
+test("rejects an excluded npm registry config", (context) => {
+  const directory = createFixture(context);
+  writeFileSync(join(directory, ".railwayignore"), "\n.npmrc\n", {
+    flag: "a",
+  });
+  const result = runChecker(directory);
+  assert.notEqual(result.status, 0, result.output);
+  assert.match(result.output, /\.npmrc/);
+});
+
+test("rejects missing and untracked npm registry config", (context) => {
+  const directory = createFixture(context);
+  rmSync(join(directory, ".npmrc"));
+  let result = runChecker(directory);
+  assert.notEqual(result.status, 0, result.output);
+  assert.match(result.output, /\.npmrc/);
+
+  copyFileSync(join(repoRoot, ".npmrc"), join(directory, ".npmrc"));
+  execFileSync("git", ["rm", "--cached", "--", ".npmrc"], { cwd: directory });
+  result = runChecker(directory);
+  assert.notEqual(result.status, 0, result.output);
+  assert.match(result.output, /\.npmrc/);
+});
+
 test("rejects an excluded pnpm patch discovered from workspace metadata", (context) => {
   const directory = createFixture(context);
   writeFileSync(join(directory, ".railwayignore"), "\npatches/\n", {
@@ -152,7 +177,7 @@ test("rejects an excluded root workspace dependency", (context) => {
 test("accepts a complete tracked upload context", (context) => {
   const result = runChecker(createFixture(context));
   assert.equal(result.status, 0, result.output);
-  assert.match(result.output, /19 tracked files across 5 workspace packages/);
+  assert.match(result.output, /20 tracked files across 5 workspace packages/);
 });
 
 test("rejects missing audit and tracked service source files", (context) => {
