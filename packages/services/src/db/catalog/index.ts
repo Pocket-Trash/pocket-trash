@@ -14013,9 +14013,40 @@ async function replacePenActuation(
     const ownColumn = forward
       ? schema.penActuatorMechanism.actuatorProductId
       : schema.penActuatorMechanism.mechanismProductId;
-    await tx
-      .delete(schema.penActuatorMechanism)
-      .where(eq(ownColumn, productId));
+    const otherColumn = forward
+      ? schema.penActuatorMechanism.mechanismProductId
+      : schema.penActuatorMechanism.actuatorProductId;
+    // A filtered editor cannot intentionally remove an endpoint it cannot see.
+    const removable = await tx
+      .select({ id: schema.product.id })
+      .from(schema.penActuatorMechanism)
+      .innerJoin(schema.product, eq(schema.product.id, otherColumn))
+      .where(
+        and(
+          eq(ownColumn, productId),
+          hasPermission(input.actor, "products.manage")
+            ? undefined
+            : or(
+                eq(schema.product.ownerClerkId, input.actor.clerkId),
+                and(
+                  eq(schema.product.approvalStatus, "approved"),
+                  eq(schema.product.isPrivate, false),
+                ),
+              ),
+        ),
+      )
+      .orderBy(asc(schema.product.id))
+      .for("update", { of: schema.product });
+    if (removable.length)
+      await tx.delete(schema.penActuatorMechanism).where(
+        and(
+          eq(ownColumn, productId),
+          inArray(
+            otherColumn,
+            removable.map(({ id }) => id),
+          ),
+        ),
+      );
     if (ids.length)
       await tx.insert(schema.penActuatorMechanism).values(
         ids.map((id) => ({

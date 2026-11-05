@@ -543,3 +543,23 @@ export const RevealActuationPicker: Story = {
     ).toBeVisible();
   },
 };
+
+/** The association picker remains keyboard-operable on a narrow phone. */
+export const MobileActuatorMechanismLinks: Story = {
+  ...ActuatorMechanismLinks,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Adds and removes a mechanism at the mobile viewport width.
+   * @param context - Story interaction context.
+   */
+  play: async (context) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    await ActuatorMechanismLinks.play?.(context);
+    const input = context.canvas.getByRole("combobox", {
+      name: "Mechanisms this part actuates",
+    });
+    await expect(input.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+  },
+};

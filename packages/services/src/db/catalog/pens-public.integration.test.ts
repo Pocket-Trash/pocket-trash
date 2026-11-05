@@ -581,6 +581,71 @@ describe("public Pens catalog reads", () => {
         productId: clip.id,
         reason: "Restore associations",
       });
+      const reverseCreated = await service.createProduct({
+        ...mechanismInput,
+        name: "Reverse-created mechanism",
+        slug: "reverse-created-mechanism",
+        actuatingPartProductIds: [clip.id],
+      });
+      expect(reverseCreated.actuatingParts).toEqual([
+        expect.objectContaining({ id: clip.id }),
+      ]);
+      await service.updateProduct({
+        ...mechanismInput,
+        productId: reverseCreated.id,
+        name: reverseCreated.name,
+        slug: reverseCreated.slug,
+        reason: "Remove created reverse link",
+        actuatingPartProductIds: [],
+      });
+      for (const forward of [true, false]) {
+        const hiddenId = forward ? physicalMechanism.id : clip.id;
+        await db
+          .update(schema.product)
+          .set({ isPrivate: true, ownerClerkId: "another-owner" })
+          .where(eq(schema.product.id, hiddenId));
+        const result = forward
+          ? await service.updateProduct({
+              ...clipInput,
+              actor: { ...actor, role: "user" },
+              productId: clip.id,
+              reason: "Retain inaccessible forward link",
+              actuatedMechanismProductIds: [],
+            })
+          : await service.updateProduct({
+              ...mechanismInput,
+              actor: { ...actor, role: "user" },
+              productId: physicalMechanism.id,
+              reason: "Retain inaccessible reverse link",
+              actuatingPartProductIds: [],
+            });
+        expect(
+          forward ? result.actuatedMechanisms : result.actuatingParts,
+        ).toEqual([]);
+        expect(
+          await db
+            .select()
+            .from(schema.penActuatorMechanism)
+            .where(
+              and(
+                eq(schema.penActuatorMechanism.actuatorProductId, clip.id),
+                eq(
+                  schema.penActuatorMechanism.mechanismProductId,
+                  physicalMechanism.id,
+                ),
+              ),
+            ),
+        ).toHaveLength(1);
+        await db
+          .update(schema.product)
+          .set({ isPrivate: false, ownerClerkId: actor.clerkId })
+          .where(eq(schema.product.id, hiddenId));
+        await service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Restore visible associations",
+        });
+      }
       expect(clip.actuatedMechanisms?.map(({ id }) => id)).toEqual([
         physicalMechanism.id,
         secondMechanism.id,
