@@ -13675,7 +13675,35 @@ async function replaceCompatiblePenParts(
   productId: number,
   input: ProductWriteInput,
 ) {
-  if (input.compatiblePartProductIds === undefined) return;
+  if (input.compatiblePartProductIds === undefined) {
+    if (input.productTypeSlug === "pen" && input.interchangeableParts) {
+      for (const [type, key] of Object.entries(penPartInterchangeabilityKeys)) {
+        await tx
+          .update(schema.penCompatiblePart)
+          .set({
+            requiresCustomization: !input.interchangeableParts[key],
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.penCompatiblePart.penProductId, productId),
+              inArray(
+                schema.penCompatiblePart.partProductId,
+                tx
+                  .select({ id: sql`${schema.product.id}` })
+                  .from(schema.product)
+                  .innerJoin(
+                    schema.productType,
+                    eq(schema.product.productTypeId, schema.productType.id),
+                  )
+                  .where(eq(schema.productType.slug, type)),
+              ),
+            ),
+          );
+      }
+    }
+    return;
+  }
   const partProductIds = input.compatiblePartProductIds;
   if (input.productTypeSlug !== "pen") {
     if (partProductIds.length)

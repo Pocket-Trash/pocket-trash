@@ -736,6 +736,8 @@ type PartCustomizationRequest = {
   partIds?: number[];
   /** Whether confirmation should open inline part creation. */
   create?: boolean;
+  /** Whether confirming also changes this role's answer to No. */
+  makeNonInterchangeable?: boolean;
 };
 
 /** Product editor disclosures, shared options, and committed save lifetime. */
@@ -1718,7 +1720,7 @@ export function ProductEditor({
     form.setFieldValue("compatiblePartProductIds", next);
     form.setFieldValue("customizationConfirmedPartProductIds", (confirmed) => [
       ...confirmed.filter((id) => next.includes(id)),
-      ...(requiresCustomization
+      ...(requiresCustomization || acknowledged
         ? partIds.filter((id) => !confirmed.includes(id))
         : []),
     ]);
@@ -1974,7 +1976,51 @@ export function ProductEditor({
                             checked={
                               (field.state.value?.[key] ?? false) === answer
                             }
-                            onChange={() =>
+                            onChange={(event) => {
+                              const role = penPartProductTypes.find(
+                                ({ type }) =>
+                                  penPartInterchangeabilityKeys[type] === key,
+                              );
+                              const selectedIds =
+                                form.state.values.compatiblePartProductIds.filter(
+                                  (id) =>
+                                    options.relationshipProducts.some(
+                                      (part) =>
+                                        part.id === id &&
+                                        part.productTypeSlug === role?.type,
+                                    ),
+                                );
+                              const hasNewSelection = selectedIds.some(
+                                (id) =>
+                                  !initialProduct?.compatibleParts.some(
+                                    (part) => part.id === id,
+                                  ),
+                              );
+                              if (
+                                !answer &&
+                                role &&
+                                hasNewSelection &&
+                                !ui.confirmedPartRoles.has(role.type)
+                              ) {
+                                customizationTrigger.current =
+                                  event.currentTarget;
+                                dispatch({
+                                  type: "partCustomizationChanged",
+                                  request: {
+                                    role: role.type,
+                                    partIds: selectedIds,
+                                    makeNonInterchangeable: true,
+                                  },
+                                });
+                                return;
+                              }
+                              if (!answer)
+                                form.setFieldValue(
+                                  "customizationConfirmedPartProductIds",
+                                  (ids) => [
+                                    ...new Set([...ids, ...selectedIds]),
+                                  ],
+                                );
                               field.handleChange({
                                 tip: false,
                                 clip: false,
@@ -1983,8 +2029,8 @@ export function ProductEditor({
                                 mechanism: false,
                                 ...field.state.value,
                                 [key]: answer,
-                              })
-                            }
+                              });
+                            }}
                           />
                           {t(
                             answer
@@ -2959,6 +3005,17 @@ export function ProductEditor({
                       type: "partCustomizationConfirmed",
                       role: request.role,
                     });
+                    if (request.makeNonInterchangeable) {
+                      form.setFieldValue("interchangeableParts", (value) =>
+                        value
+                          ? {
+                              ...value,
+                              [penPartInterchangeabilityKeys[request.role]]:
+                                false,
+                            }
+                          : value,
+                      );
+                    }
                     if (request.partIds)
                       selectCompatibleParts(
                         request.role,

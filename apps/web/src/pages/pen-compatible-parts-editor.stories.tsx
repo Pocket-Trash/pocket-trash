@@ -237,3 +237,42 @@ export const CustomizationConfirmation: Story = {
     await expect(tipFact.getByRole("radio", { name: "No" })).toBeChecked();
   },
 };
+
+/** Confirms a new draft selection when its role changes from Yes to No. */
+export const DraftBecomesCustomized: Story = {
+  args: { initialProduct: undefined },
+  /**
+   * Keeps the Yes answer on cancel, then accepts the new customization exception.
+   * @param root0 - Story interaction context.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body);
+    const tipFact = within(canvas.getByRole("group", { name: "Tip" }));
+    await userEvent.click(tipFact.getByRole("radio", { name: "Yes" }));
+    const parts = within(
+      canvas.getByRole("group", { name: "Compatible parts" }),
+    );
+    await userEvent.click(parts.getByRole("checkbox", { name: /Pen tips/ }));
+    await userEvent.click(parts.getByRole("combobox", { name: "Pen tips" }));
+    await userEvent.type(
+      parts.getByRole("combobox", { name: "Pen tips" }),
+      "Fine",
+    );
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      parts.getByRole("button", { name: "Remove Fine Tip" }),
+    ).toBeVisible();
+    await userEvent.click(tipFact.getByRole("radio", { name: "No" }));
+    const dialog = await page.findByRole("dialog", {
+      name: "Confirm customization",
+    });
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    );
+    await expect(tipFact.getByRole("radio", { name: "Yes" })).toBeChecked();
+    await userEvent.click(tipFact.getByRole("radio", { name: "No" }));
+    await userEvent.click(page.getByRole("button", { name: "Yes, continue" }));
+    await expect(tipFact.getByRole("radio", { name: "No" })).toBeChecked();
+    await expect(parts.getByText("Fine Tip")).toBeVisible();
+  },
+};

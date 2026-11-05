@@ -303,6 +303,40 @@ describe("public Pens catalog reads", () => {
         actuator: false,
         mechanism: true,
       });
+      for (const tipInterchangeable of [false, true]) {
+        const updated = await service.updateProduct({
+          actor,
+          productId: penId,
+          productTypeSlug: "pen",
+          name: "Author Pen",
+          slug: "author-pen",
+          makerId: maker.id,
+          materialAssignments: [
+            {
+              weight: null,
+              materials: [
+                { materialId: material.id, materialSpecificId: null },
+              ],
+            },
+          ],
+          finishOptions: [],
+          specs: {},
+          reason: "Review interchangeability",
+          interchangeableParts: {
+            tip: tipInterchangeable,
+            clip: false,
+            topCap: true,
+            actuator: false,
+            mechanism: true,
+          },
+        });
+        expect(updated.compatibleParts).toContainEqual(
+          expect.objectContaining({
+            id: tipId,
+            requiresCustomization: !tipInterchangeable,
+          }),
+        );
+      }
       expect(removedOptions.compatibilityMemberships).toEqual([]);
       await expect(
         db
