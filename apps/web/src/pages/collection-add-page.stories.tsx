@@ -1,8 +1,9 @@
 import type { CatalogProduct } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionAddPage } from "./catalog-form-pages";
+import { collectionFixture, productFixture } from "./catalog-test-fixtures";
 
 /** Product-type image metadata used by collection stories. */
 const productTypeImage = {
@@ -226,6 +227,13 @@ const meta = {
       spinnerButtons: [],
       productTypes: [
         {
+          id: 5,
+          ...productTypeImage,
+          isPartOrAccessory: true,
+          name: "Pen Actuator",
+          slug: "pen-actuator",
+        },
+        {
           id: 1,
           ...productTypeImage,
           isPartOrAccessory: false,
@@ -257,7 +265,18 @@ const meta = {
     },
     products,
   },
-  beforeEach: mockStoryAuth,
+  /**
+   * Installs authenticated fixtures and confirms intentional product replacements.
+   * @returns Cleanup restoring the native confirmation dialog.
+   */
+  beforeEach: async () => {
+    await mockStoryAuth();
+    const original = window.confirm;
+    window.confirm = fn(() => true);
+    return () => {
+      window.confirm = original;
+    };
+  },
   component: CollectionAddPage,
   decorators: [
     (Story) => (
@@ -285,7 +304,7 @@ export const Preselected: Story = {
    * @returns A promise that resolves after chooser assertions pass.
    */
   play: async ({ canvas, userEvent }) => {
-    const chooser = canvas.getByText("Product selector", {
+    const chooser = canvas.getByText("Selected product: Product 1 · Spinner", {
       selector: "summary",
     });
     await expect(
@@ -340,9 +359,9 @@ export const Preselected: Story = {
       canvas.getByRole("button", { name: "Close: Bronze" }),
     ).toBeVisible();
     await userEvent.click(chooser);
-    const search = canvas.getByRole("searchbox", { name: "Search" });
+    const search = canvas.getByRole("searchbox", { name: "Search products" });
     await userEvent.type(search, "product 2");
-    await expect(canvas.getByText("Page 1 of 1")).toBeVisible();
+    await expect(canvas.queryByText("Page 1 of 1")).toBeNull();
     const second = canvas.getByRole("button", {
       name: "Product 2",
     });
@@ -362,7 +381,9 @@ export const Preselected: Story = {
     await userEvent.clear(search);
     await userEvent.type(search, "no match");
     await expect(
-      canvas.getByText("No items match these filters."),
+      canvas.getByText(
+        "No products match. Try another search or product type.",
+      ),
     ).toBeVisible();
     await expect(
       canvas.queryByRole("button", { name: /^Product \d+$/u }),
@@ -379,9 +400,13 @@ export const Preselected: Story = {
     await expect(
       canvas.getByRole("button", { name: "Button product" }),
     ).toBeVisible();
-    await expect(canvas.getByText("Page 1 of 1")).toBeVisible();
-    await userEvent.click(chooser);
+    await expect(canvas.queryByText("Page 1 of 1")).toBeNull();
+    await expect(canvas.queryByLabelText("Display name")).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Button product" }),
+    );
     await expect(search).not.toBeVisible();
+    await expect(chooser).toHaveFocus();
   },
 };
 
@@ -391,9 +416,55 @@ export const StandaloneSlider: Story = {
 };
 
 /** Direct visits retain the open product-type chooser. */
-export const DirectVisit: Story = { args: { initialProductId: undefined } };
+export const DirectVisit: Story = {
+  args: { initialProductId: undefined },
+  /**
+   * Reveals search only after choosing a type, and details only after a product.
+   * @param context - Browser interaction context.
+   */
+  play: async ({ canvas, userEvent, canvasElement }) => {
+    await expect(canvas.queryByRole("searchbox")).toBeNull();
+    await expect(canvas.queryByLabelText("Display name")).toBeNull();
+    await expect(canvas.queryByText("Ownership history")).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Next page" }),
+    ).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("combobox", { name: "Product type" }),
+    );
+    await userEvent.click(
+      await within(canvasElement.ownerDocument.body).findByRole("option", {
+        name: "Spinner button",
+      }),
+    );
+    await expect(
+      canvas.getByRole("searchbox", { name: "Search products" }),
+    ).toBeVisible();
+    await expect(canvas.queryByLabelText("Display name")).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Previous page" }),
+    ).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Next page" }),
+    ).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Button product" }),
+    );
+    await expect(canvas.getByLabelText("Display name")).toHaveValue(
+      "Button product",
+    );
+    await expect(
+      canvas.getByText("Selected product: Button product · Spinner button", {
+        selector: "summary",
+      }),
+    ).toHaveFocus();
+  },
+};
 /** Unknown product identifiers retain the open product-type chooser. */
-export const UnknownProduct: Story = { args: { initialProductId: 9999 } };
+export const UnknownProduct: Story = {
+  ...DirectVisit,
+  args: { initialProductId: 9999 },
+};
 
 /** Configurable Pen selections remain intact when an earlier choice makes them unsupported. */
 export const ConfigurablePen: Story = {
@@ -470,5 +541,243 @@ export const SoldPriceDeselection: Story = {
     await expect(
       context.canvas.getByRole("button", { name: /^Add to collection$/ }),
     ).toBeEnabled();
+  },
+};
+
+/** Empty results have usable search and no pagination after a type is chosen. */
+export const NoMatchingProducts: Story = {
+  args: { initialProductId: undefined, products: [] },
+  /**
+   * Shows a genuine empty result rather than an empty pre-type search.
+   * @param context - Browser interaction context.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await expect(
+      canvas.queryByText(
+        "No products match. Try another search or product type.",
+      ),
+    ).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("combobox", { name: "Product type" }),
+    );
+    await userEvent.click(
+      await within(canvasElement.ownerDocument.body).findByRole("option", {
+        name: "Spinner",
+      }),
+    );
+    await expect(
+      canvas.getByText(
+        "No products match. Try another search or product type.",
+      ),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("searchbox", { name: "Search products" }),
+    ).toBeEnabled();
+    await expect(
+      canvas.queryByRole("button", { name: "Next page" }),
+    ).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Previous page" }),
+    ).toBeNull();
+  },
+};
+
+/** Canceling product replacement preserves edited fields and browsing scope. */
+export const PreserveProductEdits: Story = {
+  /**
+   * Rejects a type change, then explicitly accepts the reset and chooses a product.
+   * @param context - Browser interaction context.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const name = canvas.getByLabelText("Display name");
+    await userEvent.clear(name);
+    await userEvent.type(name, "My daily spinner");
+    const chooser = canvas.getByText("Selected product: Product 1 · Spinner", {
+      selector: "summary",
+    });
+    await userEvent.click(chooser);
+    const search = canvas.getByRole("searchbox", { name: "Search products" });
+    await userEvent.type(search, "Product");
+    window.confirm = fn(() => false);
+    const type = canvas.getByRole("combobox", { name: "Product type" });
+    await userEvent.click(type);
+    await userEvent.click(
+      await within(canvasElement.ownerDocument.body).findByRole("option", {
+        name: "Spinner button",
+      }),
+    );
+    await expect(name).toHaveValue("My daily spinner");
+    await expect(type).toHaveValue("Spinner");
+    await expect(search).toHaveValue("Product");
+    window.confirm = fn(() => true);
+    await userEvent.click(type);
+    await userEvent.click(
+      await within(canvasElement.ownerDocument.body).findByRole("option", {
+        name: "Spinner button",
+      }),
+    );
+    await expect(canvas.queryByLabelText("Display name")).toBeNull();
+    await expect(search).toHaveValue("");
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Button product" }),
+    );
+    await expect(canvas.getByLabelText("Display name")).toHaveValue(
+      "Button product",
+    );
+    await expect(chooser).toHaveFocus();
+  },
+};
+
+/** The picker and selected summary fit within a real phone viewport. */
+export const MobileProductPicker: Story = {
+  ...DirectVisit,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Selects a product on a narrow screen and checks its summary bounds.
+   * @param context - Browser interaction context.
+   * @rejects When the collection form is missing.
+   */
+  play: async (context) => {
+    await DirectVisit.play?.(context);
+    const main = context.canvasElement.querySelector("main");
+    if (!main) throw new Error("Missing collection form.");
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    await expect(main.scrollWidth).toBeLessThanOrEqual(main.clientWidth);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+  },
+};
+
+/** Product replacement clears physical installations, pairings, and acknowledgments. */
+export const ResetOwnedPenParts: Story = {
+  /**
+   * Renders two pens with actual owned clip/mechanism choices.
+   * @returns A collection form with customizable owned parts.
+   */
+  render: () => {
+    const mechanism = productFixture(
+      7101,
+      "Mechanism catalog product",
+      "pen-mechanism",
+    );
+    const clip: CatalogProduct = {
+      ...productFixture(7102, "Clip catalog product", "pen-clip"),
+      penPartRoles: ["clip", "actuator"],
+      actuatedMechanisms: [mechanism],
+    };
+    const penA = productFixture(7100, "Pen A", "pen");
+    const penB = productFixture(7200, "Pen B", "pen");
+    return (
+      <CollectionAddPage
+        {...meta.args}
+        initialProductId={penA.id}
+        products={[penA, penB, mechanism, clip]}
+        ownedItems={[
+          {
+            ...collectionFixture(8101, mechanism, 9000),
+            displayName: "Owned mechanism",
+            privacyInheritedFromItemId: null,
+          },
+          {
+            ...collectionFixture(8102, clip, 9000),
+            displayName: "Owned clip",
+            privacyInheritedFromItemId: null,
+            penPartRoles: clip.penPartRoles,
+          },
+        ]}
+      />
+    );
+  },
+  /**
+   * Resets a configured physical pairing and requires a fresh exception on the next pen.
+   * @param context - Browser interaction context.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body);
+    const parts = canvas.getByRole("combobox", { name: "Installed parts" });
+    await userEvent.click(parts);
+    await userEvent.type(parts, "Owned mechanism");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    let dialog = await page.findByRole("dialog", {
+      name: "Confirm customization",
+    });
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Yes, continue" }),
+    );
+    const actuator = canvas.getByRole("combobox", {
+      name: /Part used to actuate/,
+    });
+    await userEvent.click(actuator);
+    await userEvent.type(actuator, "Owned clip");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    dialog = await page.findByRole("dialog", { name: "Confirm customization" });
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Yes, continue" }),
+    );
+    await expect(
+      canvas.getByRole("button", { name: "Remove Owned clip" }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByText(/Selected product: Pen A/, { selector: "summary" }),
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Pen B" }));
+    await expect(
+      canvas.queryByRole("button", { name: "Remove Owned clip" }),
+    ).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Remove Owned mechanism" }),
+    ).toBeNull();
+    await expect(
+      canvas.queryByRole("combobox", { name: /Part used to actuate/ }),
+    ).toBeNull();
+    const nextParts = canvas.getByRole("combobox", { name: "Installed parts" });
+    await userEvent.click(nextParts);
+    await userEvent.type(nextParts, "Owned clip");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    dialog = await page.findByRole("dialog", { name: "Confirm customization" });
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    );
+  },
+};
+
+/** Long actuator type explanations remain within the phone picker. */
+export const MobileActuatorPicker: Story = {
+  args: {
+    initialProductId: 5000,
+    products: [
+      {
+        ...productFixture(5000, "Actuator choice", "pen-actuator"),
+        productTypeId: 5,
+      },
+    ],
+  },
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Checks both the selected summary and its open type options on a phone.
+   * @param context - Browser interaction context.
+   * @rejects When the selected-product summary is absent.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const summary = canvasElement.querySelector("summary");
+    if (!summary) throw new Error("Missing selected product summary.");
+    await expect(summary).toHaveTextContent(
+      "Pen actuator (e.g. bolt pin, button)",
+    );
+    await expect(summary.scrollWidth).toBeLessThanOrEqual(summary.clientWidth);
+    await userEvent.click(summary);
+    await userEvent.click(
+      canvas.getByRole("combobox", { name: "Product type" }),
+    );
+    const list = await within(canvasElement.ownerDocument.body).findByRole(
+      "listbox",
+      { name: "Product type" },
+    );
+    await expect(list.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+    await expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth);
+    await userEvent.keyboard("{Escape}");
   },
 };

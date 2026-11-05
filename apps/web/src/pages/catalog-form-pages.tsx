@@ -5344,7 +5344,11 @@ export function CollectionAddPage({
   const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const initialProduct = products.find(({ id }) => id === initialProductId);
+  const initialProduct = products.find(
+    ({ id, productTypeSlug }) =>
+      id === initialProductId &&
+      collectionProductTypeIsSupported(productTypeSlug),
+  );
   const initialDefaults = collectionProductDefaults(initialProduct, t);
   const initialNewCollection = (
     collections.length === 0 && defaultCollectionName
@@ -5721,6 +5725,7 @@ export function CollectionAddPage({
     productPage,
   } = ui;
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const focusProductSummary = React.useRef(false);
   /**
    * Receives readiness without changing callback identity for legacy Markdown callers.
    * @param loading - Whether initialization is pending.
@@ -5869,6 +5874,8 @@ export function CollectionAddPage({
   );
   const productPageCount = Math.max(1, Math.ceil(matchingProducts.length / 12));
   const currentProductPage = Math.min(productPage, productPageCount - 1);
+  if (currentProductPage !== productPage)
+    dispatch({ type: "pageSelected", page: currentProductPage });
   const visibleProducts = matchingProducts.slice(
     currentProductPage * 12,
     (currentProductPage + 1) * 12,
@@ -5903,22 +5910,51 @@ export function CollectionAddPage({
     : collections;
 
   /**
-   * Selects one product, applies its unambiguous defaults, and clears stale ownership state.
-   *
-   * @param candidate - Product selected from the catalog.
+   * Confirms only product-specific draft changes that selection would discard.
+   * @returns Whether the current draft can be replaced.
    */
-  const selectProduct = (candidate: CatalogProduct) => {
-    if (form.state.values.product?.id === candidate.id) {
-      dispatch({ type: "productSelected", selected: true });
-      return;
-    }
-    const defaults = collectionProductDefaults(candidate, t);
-    form.setFieldValue("product", candidate);
-    dispatch({ type: "productSelected", selected: true });
+  const confirmProductChange = () => {
+    if (ui.save || ui.savedItemId !== null) return false;
+    if (!product) return true;
+    const current = form.state.values;
+    const defaults = collectionProductDefaults(product, t);
+    const changed =
+      current.displayName !== defaults.displayName ||
+      (descriptionRef.current?.getValue() ?? current.description) !== "" ||
+      current.bearing !== "" ||
+      current.serialNumber !== null ||
+      current.material?.id !== defaults.material?.id ||
+      current.finish?.id !== defaults.finish?.id ||
+      JSON.stringify(current.customFinish) !==
+        JSON.stringify(emptyFinishOption()) ||
+      current.installedPenPartIds.length > 0 ||
+      current.installedPenActuations.length > 0 ||
+      current.customizationConfirmedPartIds.length > 0 ||
+      current.installedRefillProductId !== null ||
+      current.installedRefillOfferingId !== null ||
+      typeof current.button?.id === "number" ||
+      current.buttonMaterial !== null ||
+      current.buttonFinish !== null ||
+      JSON.stringify(current.buttonCustomFinish) !==
+        JSON.stringify(emptyFinishOption());
+    return (
+      !changed ||
+      window.confirm(t("web.collections.productPicker.resetConfirmation"))
+    );
+  };
+
+  /**
+   * Replaces product-dependent fields while retaining the destination and personal history.
+   * @param candidate - New product, or null when browsing a different type.
+   */
+  const applyProductSelection = (candidate: CatalogProduct | null) => {
+    const defaults = collectionProductDefaults(candidate ?? undefined, t);
     form.setFieldValue("displayName", defaults.displayName);
     form.setFieldValue("description", "");
     form.setFieldValue("bearing", "");
     form.setFieldValue("serialNumber", null);
+    form.setFieldValue("installedPenPartIds", []);
+    form.setFieldValue("installedPenActuations", []);
     form.setFieldValue("customizationConfirmedPartIds", []);
     form.setFieldValue("installedRefillProductId", null);
     form.setFieldValue("installedRefillOfferingId", null);
@@ -5929,8 +5965,40 @@ export function CollectionAddPage({
     form.setFieldValue("buttonMaterial", null);
     form.setFieldValue("buttonFinish", null);
     form.setFieldValue("buttonCustomFinish", emptyFinishOption());
+    // Keyed item controls must mount after their new defaults are ready.
+    form.setFieldValue("product", candidate);
     form.setErrorMap({ onSubmit: undefined });
-    dispatch({ type: "selectorChanged", open: false });
+  };
+
+  /**
+   * Selects a product after preserving or explicitly discarding existing edits.
+   * @param candidate - Product selected from the catalog.
+   */
+  const selectProduct = (candidate: CatalogProduct) => {
+    if (ui.save || ui.savedItemId !== null) return;
+    if (form.state.values.product?.id === candidate.id) {
+      focusProductSummary.current = true;
+      dispatch({ type: "selectorChanged", open: false });
+      return;
+    }
+    if (!confirmProductChange()) return;
+    focusProductSummary.current = true;
+    applyProductSelection(candidate);
+    dispatch({ type: "productSelected", selected: true });
+  };
+
+  /**
+   * Changes browsing scope and clears every dependent selection after confirmation.
+   * @param value - Selected product-type lookup, or null when cleared.
+   */
+  const changeProductType = (value: ComboboxOption | null) => {
+    if (value?.id === form.state.values.type?.id || !confirmProductChange())
+      return;
+    applyProductSelection(null);
+    form.setFieldValue("type", value);
+    form.setFieldValue("productQuery", "");
+    dispatch({ type: "pageSelected", page: 0 });
+    dispatch({ type: "productSelected", selected: false });
   };
 
   /**
@@ -5956,164 +6024,9 @@ export function CollectionAddPage({
       ]}
       title={t("web.action.addToCollection")}
     >
-      <main className="grid max-w-5xl gap-6 p-6">
-        <Field label={displayNameLabel}>
-          <Input
-            aria-label={displayNameLabel}
-            disabled={!product}
-            onChange={(event) =>
-              form.setFieldValue("displayName", event.target.value)
-            }
-            required
-            value={displayName}
-          />
-        </Field>
-        <CatalogMarkdownEditor
-          defaultValue={description}
-          disabled={!product}
-          help={t("web.catalog.help.markdownDescription")}
-          id="collection-item-description"
-          key={product?.id ?? "no-product"}
-          label={t("web.catalog.field.description")}
-          onChange={(value) => form.setFieldValue("description", value)}
-          onLoadingChange={receiveDescriptionLoading}
-          ref={descriptionRef}
-        />
-        {product?.productTypeSlug === "spinner" ? (
-          <Field label={t("web.catalog.field.bearing")}>
-            <Input
-              aria-label={t("web.catalog.field.bearing")}
-              maxLength={200}
-              onChange={(event) =>
-                form.setFieldValue("bearing", event.target.value)
-              }
-              value={bearing}
-            />
-          </Field>
-        ) : null}
-        {product &&
-        collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
-          <SerialNumberFields
-            onChange={(value) => form.setFieldValue("serialNumber", value)}
-            t={t}
-            value={serialNumber}
-          />
-        ) : null}
-        <OwnershipLifecycleFields
-          allowDeparture={false}
-          onChange={(value) => form.setFieldValue("ownership", value)}
-          value={ownership}
-        />
-        <CollectionItemStatusFields
-          hasPublicMetadata={
-            (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
-            Boolean(metadata.notes?.some((note) => note.isPublic))
-          }
-          warning="web.collectionItemMetadata.unapprovedWarning"
-          value={metadata}
-          onChange={(value) => {
-            form.setFieldValue("metadata", value);
-            if (
-              hasCollectionSalePrice(metadata.statuses) &&
-              !value.statuses.public.includes("sold") &&
-              !value.statuses.private.includes("sold")
-            )
-              form.setFieldValue(
-                "priceSoldInput",
-                moneyInput(undefined, priceSoldInput.currencyCode),
-              );
-          }}
-          invalid={Boolean(metadataError)}
-        >
-          <CollectionItemPriceField
-            value={pricePaidInput}
-            isPublic={pricePaidIsPublic}
-            onChange={(value) => form.setFieldValue("pricePaidInput", value)}
-            onPublicChange={(value) =>
-              form.setFieldValue("pricePaidIsPublic", value)
-            }
-          />
-          {hasCollectionSalePrice(metadata.statuses) ? (
-            <CollectionItemPriceField
-              sold
-              value={priceSoldInput}
-              onChange={(value) => form.setFieldValue("priceSoldInput", value)}
-            />
-          ) : null}
-          <CollectionItemNotesEditor
-            value={metadata.notes ?? []}
-            onChange={(notes) =>
-              form.setFieldValue("metadata", (current) => ({
-                ...current,
-                notes,
-              }))
-            }
-          />
-        </CollectionItemStatusFields>
-        {syncIncomplete ? (
-          <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
-        ) : null}
-        <CollectionSelector
-          addLabel={t("web.collections.select.addNew")}
-          collections={collectionChoices}
-          label={t("web.collections.field.collection")}
-          onAdd={() => collectionDialog.current?.showModal()}
-          onChange={(collectionId) => {
-            form.setFieldValue("selectedCollectionId", collectionId);
-            if (collectionId !== -1) {
-              form.setFieldValue("newCollection", null);
-              form.setFieldValue("collectionImages", []);
-            }
-          }}
-          placeholder={t("web.collections.select.placeholder")}
-          selectedId={selectedCollectionId}
-        />
-        <dialog
-          className="m-auto w-[min(48rem,calc(100%-2rem))] rounded-xl border border-border bg-background p-0 text-foreground backdrop:bg-black/60"
-          ref={collectionDialog}
-        >
-          <div className="p-4">
-            <CollectionForm
-              copy={{
-                browse: t("web.resources.upload.browseFiles"),
-                cancel: t("action.cancel"),
-                cover: t("web.resources.upload.imagesLabel"),
-                description: t("web.collections.field.description"),
-                descriptionPlaceholder: t(
-                  "web.collections.placeholder.description",
-                ),
-                imageHelp: t("web.resources.upload.imagesHelp", {
-                  maxFileSize: formatMiB(maxImageBytes, locale),
-                  maxImages: maxImageSessionFiles,
-                  maxSessionSize: formatMiB(maxImageSessionBytes, locale),
-                }),
-                imageTypes: t("web.resources.upload.imageTypes"),
-                name: t("web.collections.field.name"),
-                namePlaceholder: t("web.collections.placeholder.name"),
-                public: t("web.resources.visibility.public"),
-                removeFile: t("web.resources.action.removeFile"),
-                submit: t("action.save"),
-                summary: t("web.collections.field.summary"),
-                summaryPlaceholder: t("web.collections.placeholder.summary"),
-              }}
-              onSubmit={(value, collectionImages) => {
-                form.setFieldValue("newCollection", value);
-                form.setFieldValue("collectionImages", collectionImages);
-                form.setFieldValue("selectedCollectionId", -1);
-                collectionDialog.current?.close();
-              }}
-            />
-            <Button
-              className="mt-3"
-              onClick={() => collectionDialog.current?.close()}
-              type="button"
-              variant="outline"
-            >
-              {t("action.cancel")}
-            </Button>
-          </div>
-        </dialog>
+      <main className="grid w-full max-w-5xl min-w-0 grid-cols-1 gap-6 p-6">
         <details
+          className={product ? "min-w-0 border-y py-4" : "min-w-0"}
           onToggle={(event) =>
             dispatch({
               type: "selectorChanged",
@@ -6122,10 +6035,42 @@ export function CollectionAddPage({
           }
           open={productSelectorOpen}
         >
-          <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            {t("web.collections.productSelector")}
+          <summary
+            hidden={!product}
+            className="cursor-pointer text-sm font-semibold wrap-anywhere focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            ref={(node) => {
+              if (
+                node &&
+                focusProductSummary.current &&
+                product &&
+                !productSelectorOpen
+              ) {
+                focusProductSummary.current = false;
+                node.focus();
+              }
+            }}
+          >
+            {product
+              ? t("web.collections.productPicker.selected", {
+                  name: product.name,
+                  type: catalogProductTypeLabel(
+                    t,
+                    product.productTypeSlug,
+                    product.productTypeName,
+                  ),
+                })
+              : t("web.collections.productSelector")}
+            {product ? (
+              <span className="mt-1 block text-xs font-normal underline">
+                {t(
+                  productSelectorOpen
+                    ? "web.collections.productPicker.keep"
+                    : "web.collections.productPicker.change",
+                )}
+              </span>
+            ) : null}
           </summary>
-          <div className="mt-4 grid gap-4">
+          <div className={product ? "mt-4 grid gap-4" : "grid gap-4"}>
             <Field label={t("web.catalog.field.productType")}>
               <CatalogCombobox
                 ariaLabel={t("web.catalog.field.productType")}
@@ -6133,29 +6078,8 @@ export function CollectionAddPage({
                   ...type,
                   name: catalogProductTypeLabel(t, type.slug, type.name),
                 }))}
-                onValueChange={(value) => {
-                  form.setFieldValue("type", value);
-                  dispatch({ type: "pageSelected", page: 0 });
-                  form.setFieldValue("productQuery", "");
-                  form.setFieldValue("product", null);
-                  dispatch({ type: "productSelected", selected: false });
-                  form.setFieldValue("displayName", "");
-                  form.setFieldValue("description", "");
-                  form.setFieldValue("bearing", "");
-                  form.setFieldValue("serialNumber", null);
-                  form.setFieldValue("customizationConfirmedPartIds", []);
-                  form.setFieldValue("installedRefillProductId", null);
-                  form.setFieldValue("installedRefillOfferingId", null);
-                  form.setFieldValue("material", null);
-                  form.setFieldValue("finish", null);
-                  form.setFieldValue("customFinish", emptyFinishOption());
-                  form.setFieldValue("button", null);
-                  form.setFieldValue("buttonMaterial", null);
-                  form.setFieldValue("buttonFinish", null);
-                  form.setFieldValue("buttonCustomFinish", emptyFinishOption());
-                  dispatch({ type: "confirmationDismissed" });
-                  form.setErrorMap({ onSubmit: undefined });
-                }}
+                disabled={Boolean(ui.save) || ui.savedItemId !== null}
+                onValueChange={changeProductType}
                 placeholder={t("web.catalog.selectProductType")}
                 value={
                   type
@@ -6170,279 +6094,464 @@ export function CollectionAddPage({
             {slug && !collectionProductTypeIsSupported(slug) ? (
               <Notice>{t("web.catalog.notImplemented")}</Notice>
             ) : null}
-            <Input
-              aria-label={t("web.action.search")}
-              onChange={(event) => {
-                form.setFieldValue("productQuery", event.target.value);
-                dispatch({ type: "pageSelected", page: 0 });
-              }}
-              placeholder={t("web.archive.searchPlaceholder")}
-              type="search"
-              value={productQuery}
-            />
-            <div className="grid grid-cols-1 gap-[18px] empty:hidden min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
-              {visibleProducts.map((candidate) => {
-                const image = candidate.images.find(
-                  ({ deletedAt }) => !deletedAt,
-                );
-                return (
-                  <Button
-                    aria-pressed={candidate.id === product?.id}
-                    className="h-full min-w-0 flex-col items-stretch justify-start gap-0 overflow-hidden p-0 text-left wrap-anywhere whitespace-normal"
-                    key={candidate.id}
-                    onClick={() => {
-                      selectProduct(candidate);
-                    }}
-                    type="button"
-                    variant={
-                      candidate.id === product?.id ? "default" : "outline"
-                    }
-                  >
-                    <span className="aspect-4/3 w-full shrink-0 overflow-hidden bg-muted">
-                      {image ? (
-                        <img
-                          alt=""
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          src={image.url}
-                        />
-                      ) : null}
+            {slug && collectionProductTypeIsSupported(slug) ? (
+              <>
+                <Input
+                  aria-label={t("web.search.directory.productsPlaceholder")}
+                  disabled={Boolean(ui.save) || ui.savedItemId !== null}
+                  onChange={(event) => {
+                    form.setFieldValue("productQuery", event.target.value);
+                    dispatch({ type: "pageSelected", page: 0 });
+                  }}
+                  placeholder={t("web.archive.searchPlaceholder")}
+                  type="search"
+                  value={productQuery}
+                />
+                <div className="grid grid-cols-1 gap-[18px] empty:hidden min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+                  {visibleProducts.map((candidate) => {
+                    const image = candidate.images.find(
+                      ({ deletedAt }) => !deletedAt,
+                    );
+                    return (
+                      <Button
+                        disabled={Boolean(ui.save) || ui.savedItemId !== null}
+                        aria-pressed={candidate.id === product?.id}
+                        className="h-full min-w-0 flex-col items-stretch justify-start gap-0 overflow-hidden p-0 text-left wrap-anywhere whitespace-normal"
+                        key={candidate.id}
+                        onClick={() => {
+                          selectProduct(candidate);
+                        }}
+                        type="button"
+                        variant={
+                          candidate.id === product?.id ? "default" : "outline"
+                        }
+                      >
+                        <span className="aspect-4/3 w-full shrink-0 overflow-hidden bg-muted">
+                          {image ? (
+                            <img
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              src={image.url}
+                            />
+                          ) : null}
+                        </span>
+                        <span className="p-3 text-sm font-semibold">
+                          {candidate.name}
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+                {matchingProducts.length === 0 ? (
+                  <Notice>
+                    {t("web.collections.productPicker.noResults")}
+                  </Notice>
+                ) : null}
+                {productPageCount > 1 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Button
+                      disabled={currentProductPage === 0}
+                      onClick={() =>
+                        dispatch({
+                          type: "pageSelected",
+                          page: currentProductPage - 1,
+                        })
+                      }
+                      type="button"
+                      variant="outline"
+                    >
+                      {t("web.collections.gallery.previousPage")}
+                    </Button>
+                    <span aria-live="polite" className="text-sm">
+                      {t("web.collections.gallery.pageStatus", {
+                        page: currentProductPage + 1,
+                        pageCount: productPageCount,
+                      })}
                     </span>
-                    <span className="p-3 text-sm font-semibold">
-                      {candidate.name}
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-            {slug && matchingProducts.length === 0 ? (
-              <Notice>{t("web.archive.noItems")}</Notice>
+                    <Button
+                      disabled={currentProductPage + 1 === productPageCount}
+                      onClick={() =>
+                        dispatch({
+                          type: "pageSelected",
+                          page: currentProductPage + 1,
+                        })
+                      }
+                      type="button"
+                      variant="outline"
+                    >
+                      {t("web.collections.gallery.nextPage")}
+                    </Button>
+                  </div>
+                ) : null}
+              </>
             ) : null}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button
-                disabled={currentProductPage === 0}
-                onClick={() =>
-                  dispatch({
-                    type: "pageSelected",
-                    page: currentProductPage - 1,
-                  })
-                }
-                type="button"
-                variant="outline"
-              >
-                {t("web.collections.gallery.previousPage")}
-              </Button>
-              <span aria-live="polite" className="text-sm">
-                {t("web.collections.gallery.pageStatus", {
-                  page: currentProductPage + 1,
-                  pageCount: productPageCount,
-                })}
-              </span>
-              <Button
-                disabled={currentProductPage + 1 === productPageCount}
-                onClick={() =>
-                  dispatch({
-                    type: "pageSelected",
-                    page: currentProductPage + 1,
-                  })
-                }
-                type="button"
-                variant="outline"
-              >
-                {t("web.collections.gallery.nextPage")}
-              </Button>
-            </div>
           </div>
         </details>
-        {product ? (
-          <CollectionProductFields
-            customFinish={customFinish}
-            finish={finish}
-            material={material}
-            onCustomFinishChange={(value) =>
-              form.setFieldValue("customFinish", value)
-            }
-            onFinishChange={(value) => form.setFieldValue("finish", value)}
-            onMaterialChange={(value) => form.setFieldValue("material", value)}
-            onOptionsChange={receiveOptions}
-            options={options}
-            product={product}
-            t={t}
-          />
-        ) : null}
-        {product?.productTypeSlug === "pen" ? (
-          <PenCollectionFields
-            allProducts={products}
-            onRefillOfferingChange={(value) =>
-              form.setFieldValue("installedRefillOfferingId", value)
-            }
-            onRefillProductChange={(value) =>
-              form.setFieldValue("installedRefillProductId", value)
-            }
-            onInstalledPartIdsChange={(value) =>
-              form.setFieldValue("installedPenPartIds", value)
-            }
-            ownedItems={ownedItems}
-            product={product}
-            refillOfferingId={installedRefillOfferingId}
-            refillProductId={installedRefillProductId}
-            installedActuations={installedPenActuations}
-            onInstalledActuationsChange={(value) =>
-              form.setFieldValue("installedPenActuations", value)
-            }
-            installedPartIds={installedPenPartIds}
-            confirmedCustomizationIds={customizationConfirmedPartIds}
-            onConfirmedCustomizationIdsChange={(ids) =>
-              form.setFieldValue("customizationConfirmedPartIds", ids)
-            }
-            t={t}
-          />
-        ) : null}
-        {product?.productTypeSlug === "slider" ? (
-          <Notice>
-            <p>{t("web.slider.relationship.inclusionHelp")}</p>
-            <ul className="mt-2 grid list-disc gap-1 pl-5">
-              <li>
-                {product.includedPlate?.name ??
-                  t("web.slider.relationship.includedPlates")}
-              </li>
-              {product.usesInserts ? (
-                <li>
-                  {product.includedInsert?.name ??
-                    t("web.slider.relationship.includedInsert")}
-                </li>
-              ) : null}
-            </ul>
-          </Notice>
-        ) : null}
-        {product && collectionIsPrivate ? (
-          <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
+        {syncIncomplete ? (
+          <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
         ) : null}
         {product ? (
-          <Button
-            aria-pressed
-            disabled={collectionIsPrivate}
-            type="button"
-            variant="outline"
-          >
-            {t("web.resources.visibility.public")}
-          </Button>
-        ) : null}
-        {product?.productTypeSlug === "spinner" ? (
-          <Field label={t("web.catalog.field.button")}>
-            <CatalogCombobox
-              ariaLabel={t("web.catalog.field.button")}
-              items={[
-                { id: "default", name: t("web.catalog.defaultButton") },
-                ...options.spinnerButtons,
-              ]}
-              onValueChange={(value) => {
-                form.setFieldValue(
-                  "button",
-                  typeof value?.id === "number"
-                    ? (options.spinnerButtons.find(
-                        ({ id }) => id === value.id,
-                      ) ?? null)
-                    : value,
-                );
-                form.setFieldValue("buttonMaterial", null);
-                form.setFieldValue("buttonFinish", null);
-                form.setFieldValue("buttonCustomFinish", emptyFinishOption());
-                dispatch({ type: "confirmationDismissed" });
-              }}
-              placeholder={t("web.catalog.defaultButton")}
-              removeLabel={t("web.action.close")}
-              showSelectedPill
-              value={button}
+          <React.Fragment key={product.id}>
+            <Field label={displayNameLabel}>
+              <Input
+                aria-label={displayNameLabel}
+                disabled={!product}
+                onChange={(event) =>
+                  form.setFieldValue("displayName", event.target.value)
+                }
+                required
+                value={displayName}
+              />
+            </Field>
+            <CatalogMarkdownEditor
+              defaultValue={description}
+              disabled={!product}
+              help={t("web.catalog.help.markdownDescription")}
+              id="collection-item-description"
+              key={product?.id ?? "no-product"}
+              label={t("web.catalog.field.description")}
+              onChange={(value) => form.setFieldValue("description", value)}
+              onLoadingChange={receiveDescriptionLoading}
+              ref={descriptionRef}
             />
-          </Field>
-        ) : null}
-        {selectedButton ? (
-          <CollectionProductFields
-            customFinish={buttonCustomFinish}
-            finish={buttonFinish}
-            material={buttonMaterial}
-            onCustomFinishChange={(value) =>
-              form.setFieldValue("buttonCustomFinish", value)
-            }
-            onFinishChange={(value) =>
-              form.setFieldValue("buttonFinish", value)
-            }
-            onMaterialChange={(value) =>
-              form.setFieldValue("buttonMaterial", value)
-            }
-            onOptionsChange={receiveOptions}
-            options={options}
-            product={selectedButton}
-            t={t}
-          />
-        ) : null}
-        {Object.keys(duplicateCounts).length ? (
-          <Notice>
-            <ul className="grid gap-1">
-              {[product, button?.id === "default" ? null : button]
-                .filter(
-                  (candidate): candidate is NonNullable<typeof candidate> =>
-                    Boolean(candidate),
+            {product?.productTypeSlug === "spinner" ? (
+              <Field label={t("web.catalog.field.bearing")}>
+                <Input
+                  aria-label={t("web.catalog.field.bearing")}
+                  maxLength={200}
+                  onChange={(event) =>
+                    form.setFieldValue("bearing", event.target.value)
+                  }
+                  value={bearing}
+                />
+              </Field>
+            ) : null}
+            {product &&
+            collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
+              <SerialNumberFields
+                onChange={(value) => form.setFieldValue("serialNumber", value)}
+                t={t}
+                value={serialNumber}
+              />
+            ) : null}
+            <OwnershipLifecycleFields
+              allowDeparture={false}
+              onChange={(value) => form.setFieldValue("ownership", value)}
+              value={ownership}
+            />
+            <CollectionItemStatusFields
+              hasPublicMetadata={
+                (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
+                Boolean(metadata.notes?.some((note) => note.isPublic))
+              }
+              warning="web.collectionItemMetadata.unapprovedWarning"
+              value={metadata}
+              onChange={(value) => {
+                form.setFieldValue("metadata", value);
+                if (
+                  hasCollectionSalePrice(metadata.statuses) &&
+                  !value.statuses.public.includes("sold") &&
+                  !value.statuses.private.includes("sold")
                 )
-                .map((candidate) => ({
-                  count: duplicateCounts[Number(candidate.id)] ?? 0,
-                  id: candidate.id,
-                  name: candidate.name,
-                }))
-                .filter(({ count }) => count > 0)
-                .map(({ count, id, name }) => (
-                  <li key={id}>
-                    {name}: {t("web.collections.duplicateWarning", { count })}
+                  form.setFieldValue(
+                    "priceSoldInput",
+                    moneyInput(undefined, priceSoldInput.currencyCode),
+                  );
+              }}
+              invalid={Boolean(metadataError)}
+            >
+              <CollectionItemPriceField
+                value={pricePaidInput}
+                isPublic={pricePaidIsPublic}
+                onChange={(value) =>
+                  form.setFieldValue("pricePaidInput", value)
+                }
+                onPublicChange={(value) =>
+                  form.setFieldValue("pricePaidIsPublic", value)
+                }
+              />
+              {hasCollectionSalePrice(metadata.statuses) ? (
+                <CollectionItemPriceField
+                  sold
+                  value={priceSoldInput}
+                  onChange={(value) =>
+                    form.setFieldValue("priceSoldInput", value)
+                  }
+                />
+              ) : null}
+              <CollectionItemNotesEditor
+                value={metadata.notes ?? []}
+                onChange={(notes) =>
+                  form.setFieldValue("metadata", (current) => ({
+                    ...current,
+                    notes,
+                  }))
+                }
+              />
+            </CollectionItemStatusFields>
+            <CollectionSelector
+              addLabel={t("web.collections.select.addNew")}
+              collections={collectionChoices}
+              label={t("web.collections.field.collection")}
+              onAdd={() => collectionDialog.current?.showModal()}
+              onChange={(collectionId) => {
+                form.setFieldValue("selectedCollectionId", collectionId);
+                if (collectionId !== -1) {
+                  form.setFieldValue("newCollection", null);
+                  form.setFieldValue("collectionImages", []);
+                }
+              }}
+              placeholder={t("web.collections.select.placeholder")}
+              selectedId={selectedCollectionId}
+            />
+            <dialog
+              className="m-auto w-[min(48rem,calc(100%-2rem))] rounded-xl border border-border bg-background p-0 text-foreground backdrop:bg-black/60"
+              ref={collectionDialog}
+            >
+              <div className="p-4">
+                <CollectionForm
+                  copy={{
+                    browse: t("web.resources.upload.browseFiles"),
+                    cancel: t("action.cancel"),
+                    cover: t("web.resources.upload.imagesLabel"),
+                    description: t("web.collections.field.description"),
+                    descriptionPlaceholder: t(
+                      "web.collections.placeholder.description",
+                    ),
+                    imageHelp: t("web.resources.upload.imagesHelp", {
+                      maxFileSize: formatMiB(maxImageBytes, locale),
+                      maxImages: maxImageSessionFiles,
+                      maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+                    }),
+                    imageTypes: t("web.resources.upload.imageTypes"),
+                    name: t("web.collections.field.name"),
+                    namePlaceholder: t("web.collections.placeholder.name"),
+                    public: t("web.resources.visibility.public"),
+                    removeFile: t("web.resources.action.removeFile"),
+                    submit: t("action.save"),
+                    summary: t("web.collections.field.summary"),
+                    summaryPlaceholder: t(
+                      "web.collections.placeholder.summary",
+                    ),
+                  }}
+                  onSubmit={(value, collectionImages) => {
+                    form.setFieldValue("newCollection", value);
+                    form.setFieldValue("collectionImages", collectionImages);
+                    form.setFieldValue("selectedCollectionId", -1);
+                    collectionDialog.current?.close();
+                  }}
+                />
+                <Button
+                  className="mt-3"
+                  onClick={() => collectionDialog.current?.close()}
+                  type="button"
+                  variant="outline"
+                >
+                  {t("action.cancel")}
+                </Button>
+              </div>
+            </dialog>
+
+            {product ? (
+              <CollectionProductFields
+                customFinish={customFinish}
+                finish={finish}
+                material={material}
+                onCustomFinishChange={(value) =>
+                  form.setFieldValue("customFinish", value)
+                }
+                onFinishChange={(value) => form.setFieldValue("finish", value)}
+                onMaterialChange={(value) =>
+                  form.setFieldValue("material", value)
+                }
+                onOptionsChange={receiveOptions}
+                options={options}
+                product={product}
+                t={t}
+              />
+            ) : null}
+            {product?.productTypeSlug === "pen" ? (
+              <PenCollectionFields
+                allProducts={products}
+                onRefillOfferingChange={(value) =>
+                  form.setFieldValue("installedRefillOfferingId", value)
+                }
+                onRefillProductChange={(value) =>
+                  form.setFieldValue("installedRefillProductId", value)
+                }
+                onInstalledPartIdsChange={(value) =>
+                  form.setFieldValue("installedPenPartIds", value)
+                }
+                ownedItems={ownedItems}
+                product={product}
+                refillOfferingId={installedRefillOfferingId}
+                refillProductId={installedRefillProductId}
+                installedActuations={installedPenActuations}
+                onInstalledActuationsChange={(value) =>
+                  form.setFieldValue("installedPenActuations", value)
+                }
+                installedPartIds={installedPenPartIds}
+                confirmedCustomizationIds={customizationConfirmedPartIds}
+                onConfirmedCustomizationIdsChange={(ids) =>
+                  form.setFieldValue("customizationConfirmedPartIds", ids)
+                }
+                t={t}
+              />
+            ) : null}
+            {product?.productTypeSlug === "slider" ? (
+              <Notice>
+                <p>{t("web.slider.relationship.inclusionHelp")}</p>
+                <ul className="mt-2 grid list-disc gap-1 pl-5">
+                  <li>
+                    {product.includedPlate?.name ??
+                      t("web.slider.relationship.includedPlates")}
                   </li>
-                ))}
-            </ul>
-          </Notice>
-        ) : null}
-        {product ? (
-          <FileDropInput
-            accept=".avif,.jpeg,.jpg,.png,.webp"
-            disabled={Boolean(ui.save)}
-            aspectRatio={4 / 3}
-            aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-            aspectRatioHelpLabel={imageGuidance.helpLabel}
-            aspectRatioWarning={imageGuidance.warning}
-            browseLabel={t("web.resources.upload.browseFiles")}
-            description={t("web.resources.upload.imagesHelp", {
-              maxFileSize: formatMiB(maxImageBytes, locale),
-              maxImages: maxImageSessionFiles,
-              maxSessionSize: formatMiB(maxImageSessionBytes, locale),
-            })}
-            fileTypes={t("web.resources.upload.imageTypes")}
-            files={images}
-            id="collection-item-images"
-            label={t("web.resources.upload.imagesLabel")}
-            multiple
-            onFilesChange={(additions) =>
-              form.setFieldValue("images", (current) => [
-                ...current,
-                ...additions,
-              ])
-            }
-            onRemove={(index) =>
-              form.setFieldValue("images", (current) =>
-                current.filter((_, candidate) => candidate !== index),
-              )
-            }
-            removeFileLabel={t("web.action.close")}
-          />
-        ) : null}
-        {formError ? <Notice>{t(formError)}</Notice> : null}
-        {product ? (
-          <Button
-            disabled={descriptionLoading || Boolean(ui.save) || !canSubmit}
-            onClick={() => void submit(Object.keys(duplicateCounts).length > 0)}
-            type="button"
-          >
-            {Object.keys(duplicateCounts).length
-              ? t("web.action.confirmAdd")
-              : t("web.action.addToCollection")}
-          </Button>
+                  {product.usesInserts ? (
+                    <li>
+                      {product.includedInsert?.name ??
+                        t("web.slider.relationship.includedInsert")}
+                    </li>
+                  ) : null}
+                </ul>
+              </Notice>
+            ) : null}
+            {product && collectionIsPrivate ? (
+              <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
+            ) : null}
+            {product ? (
+              <Button
+                aria-pressed
+                disabled={collectionIsPrivate}
+                type="button"
+                variant="outline"
+              >
+                {t("web.resources.visibility.public")}
+              </Button>
+            ) : null}
+            {product?.productTypeSlug === "spinner" ? (
+              <Field label={t("web.catalog.field.button")}>
+                <CatalogCombobox
+                  ariaLabel={t("web.catalog.field.button")}
+                  items={[
+                    { id: "default", name: t("web.catalog.defaultButton") },
+                    ...options.spinnerButtons,
+                  ]}
+                  onValueChange={(value) => {
+                    form.setFieldValue(
+                      "button",
+                      typeof value?.id === "number"
+                        ? (options.spinnerButtons.find(
+                            ({ id }) => id === value.id,
+                          ) ?? null)
+                        : value,
+                    );
+                    form.setFieldValue("buttonMaterial", null);
+                    form.setFieldValue("buttonFinish", null);
+                    form.setFieldValue(
+                      "buttonCustomFinish",
+                      emptyFinishOption(),
+                    );
+                    dispatch({ type: "confirmationDismissed" });
+                  }}
+                  placeholder={t("web.catalog.defaultButton")}
+                  removeLabel={t("web.action.close")}
+                  showSelectedPill
+                  value={button}
+                />
+              </Field>
+            ) : null}
+            {selectedButton ? (
+              <CollectionProductFields
+                customFinish={buttonCustomFinish}
+                finish={buttonFinish}
+                material={buttonMaterial}
+                onCustomFinishChange={(value) =>
+                  form.setFieldValue("buttonCustomFinish", value)
+                }
+                onFinishChange={(value) =>
+                  form.setFieldValue("buttonFinish", value)
+                }
+                onMaterialChange={(value) =>
+                  form.setFieldValue("buttonMaterial", value)
+                }
+                onOptionsChange={receiveOptions}
+                options={options}
+                product={selectedButton}
+                t={t}
+              />
+            ) : null}
+            {Object.keys(duplicateCounts).length ? (
+              <Notice>
+                <ul className="grid gap-1">
+                  {[product, button?.id === "default" ? null : button]
+                    .filter(
+                      (candidate): candidate is NonNullable<typeof candidate> =>
+                        Boolean(candidate),
+                    )
+                    .map((candidate) => ({
+                      count: duplicateCounts[Number(candidate.id)] ?? 0,
+                      id: candidate.id,
+                      name: candidate.name,
+                    }))
+                    .filter(({ count }) => count > 0)
+                    .map(({ count, id, name }) => (
+                      <li key={id}>
+                        {name}:{" "}
+                        {t("web.collections.duplicateWarning", { count })}
+                      </li>
+                    ))}
+                </ul>
+              </Notice>
+            ) : null}
+            {product ? (
+              <FileDropInput
+                accept=".avif,.jpeg,.jpg,.png,.webp"
+                disabled={Boolean(ui.save)}
+                aspectRatio={4 / 3}
+                aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+                aspectRatioHelpLabel={imageGuidance.helpLabel}
+                aspectRatioWarning={imageGuidance.warning}
+                browseLabel={t("web.resources.upload.browseFiles")}
+                description={t("web.resources.upload.imagesHelp", {
+                  maxFileSize: formatMiB(maxImageBytes, locale),
+                  maxImages: maxImageSessionFiles,
+                  maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+                })}
+                fileTypes={t("web.resources.upload.imageTypes")}
+                files={images}
+                id="collection-item-images"
+                label={t("web.resources.upload.imagesLabel")}
+                multiple
+                onFilesChange={(additions) =>
+                  form.setFieldValue("images", (current) => [
+                    ...current,
+                    ...additions,
+                  ])
+                }
+                onRemove={(index) =>
+                  form.setFieldValue("images", (current) =>
+                    current.filter((_, candidate) => candidate !== index),
+                  )
+                }
+                removeFileLabel={t("web.action.close")}
+              />
+            ) : null}
+            {formError ? <Notice>{t(formError)}</Notice> : null}
+            {product ? (
+              <Button
+                disabled={descriptionLoading || Boolean(ui.save) || !canSubmit}
+                onClick={() =>
+                  void submit(Object.keys(duplicateCounts).length > 0)
+                }
+                type="button"
+              >
+                {Object.keys(duplicateCounts).length
+                  ? t("web.action.confirmAdd")
+                  : t("web.action.addToCollection")}
+              </Button>
+            ) : null}
+          </React.Fragment>
         ) : null}
       </main>
     </AppShell>

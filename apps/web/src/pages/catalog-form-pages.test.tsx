@@ -815,6 +815,12 @@ describe("collection add form", () => {
     );
     expect(html).toContain('aria-label="Product type"');
     expect(html).toMatch(/<details[^>]* open=""/u);
+    expect(html).not.toContain('aria-label="Display name"');
+    expect(html).not.toContain('type="search"');
+    expect(html).not.toContain("Previous page");
+    expect(html).not.toContain("Next page");
+    expect(html).not.toContain("Page 1 of 1");
+    expect(html).not.toContain("Ownership history");
   });
 
   it("renders localized collection copy and a disabled primary action", () => {
@@ -862,7 +868,7 @@ describe("collection add form", () => {
     expect(html).toContain(">Zoom Zoom</span>");
     expect(html).toMatch(/<details[^>]*>/u);
     expect(html).not.toMatch(/<details[^>]* open=/u);
-    expect(html).toMatch(/<summary[^>]*>Product selector<\/summary>/u);
+    expect(html).toContain("Selected product: Zoom Zoom · Spinner");
     expect(html).toContain('aria-label="Close: Bronze"');
     expect(html).toContain('aria-label="Close: Polished"');
     expect(html).toContain(">Collection<");

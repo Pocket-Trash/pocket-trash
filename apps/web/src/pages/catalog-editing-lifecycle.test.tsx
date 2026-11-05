@@ -627,6 +627,41 @@ describe("catalog mutation lifetimes", () => {
     expect(decide).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Approved");
   });
+  it("retains a clamped product page when catalog results shrink and expand", async () => {
+    const products = Array.from({ length: 13 }, (_, index) =>
+      productFixture(1000 + index, `Spinner ${index + 1}`, "spinner"),
+    );
+    /**
+     * Renders new catalog results without replacing the collection draft.
+     * @param catalogProducts - Current catalog result source.
+     * @returns The same collection form with updated available products.
+     */
+    const tree = (catalogProducts: typeof products) => (
+      <CollectionAddPage
+        collections={[collection]}
+        defaultCollectionName={null}
+        initialProductId={1000}
+        options={options}
+        products={catalogProducts}
+      />
+    );
+    await act(async () => root.render(tree(products)));
+    const summary = container.querySelector("summary");
+    if (!summary) throw new Error("Missing product selector summary");
+    await act(async () => summary.click());
+    await click(container, "Next page");
+    expect(container.textContent).toContain("Page 2 of 2");
+    await act(async () => root.render(tree(products.slice(0, 1))));
+    expect(container.textContent).not.toContain("Previous page");
+    expect(container.textContent).not.toContain("Next page");
+    await act(async () => root.render(tree(products)));
+    expect(container.textContent).toContain("Page 1 of 2");
+    const previous = [...container.querySelectorAll("button")].find(
+      (node) => node.textContent === "Previous page",
+    );
+    expect(previous?.disabled).toBe(true);
+  });
+
   it("keeps saving eligible when the currently selected product is chosen again", async () => {
     const product = productFixture(1000, "Spinner", "spinner");
     await act(async () =>
