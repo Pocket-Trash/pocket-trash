@@ -335,7 +335,9 @@ export const RoleAwareCompatibility: Story = {
     await userEvent.type(input, "Machined");
     await userEvent.keyboard("{ArrowDown}{Enter}");
     await expect(
-      parts.getByRole("combobox", { name: "Pen actuators" }),
+      parts.getByRole("combobox", {
+        name: "Pen actuator (e.g. bolt pin, button)",
+      }),
     ).toBeVisible();
     await expect(
       parts.getAllByRole("button", { name: "Remove Machined Clip" }),
