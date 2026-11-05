@@ -1225,3 +1225,24 @@ describe("product type creation context", () => {
     expect(html).not.toContain(">Add product</button>");
   });
 });
+
+describe("product alias placement", () => {
+  it("keeps optional alternate names immediately after the slug", () => {
+    const html = renderToStaticMarkup(
+      <ProductEditor
+        initialProduct={{
+          ...productFixture(1000, "Spinner", "spinner"),
+          aliases: ["Pocket Writer"],
+        }}
+        options={emptyCatalogOptions}
+        productTypeSlug="spinner"
+      />,
+    );
+    const aliases = html.indexOf(">Aliases</h2>");
+    expect(aliases).toBeGreaterThan(html.indexOf('aria-label="Slug"'));
+    expect(aliases).toBeLessThan(html.indexOf(">Maker<"));
+    expect(html).toContain(
+      "Other names for this product that help people find it in search.",
+    );
+  });
+});

@@ -444,12 +444,35 @@ export function materialCombinationSignature(combination: {
     .join("|");
 }
 
+/** A complete product alias using the existing normalized-name and length rules. */
+const productAliasSchema = z
+  .string()
+  .trim()
+  .min(1, "web.catalog.aliases.required")
+  .max(80, "web.catalog.aliases.tooLong")
+  .refine(
+    (name) => Boolean(normalizeCatalogSearch(name)),
+    "web.catalog.aliases.required",
+  );
+
+/** Complete product aliases with case, accent, and whitespace-insensitive uniqueness. */
+export const productAliasesSchema = z
+  .array(productAliasSchema)
+  .superRefine((aliases, context) => {
+    const normalized = aliases.map(normalizeCatalogSearch);
+    if (new Set(normalized).size !== normalized.length)
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.aliases.duplicate",
+      });
+  });
+
 /**
  * Schema that validates product form values and product-type-specific specifications.
  */
 export const productFormSchema = z
   .object({
-    aliases: z.array(z.string().trim().min(1).max(80)).default([]),
+    aliases: productAliasesSchema.default([]),
     bearing: optionalBearingSchema,
     buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
@@ -518,7 +541,6 @@ export const productFormSchema = z
   .superRefine(
     (
       {
-        aliases,
         bearing,
         buttonDiameter,
         compatibleButtonId,
@@ -561,14 +583,6 @@ export const productFormSchema = z
           message: "web.catalog.error.form",
           path: ["penPartRoles"],
         });
-      const normalizedAliases = aliases.map(normalizeCatalogSearch);
-      if (new Set(normalizedAliases).size !== normalizedAliases.length) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["aliases"],
-        });
-      }
       if (
         new Set(compatiblePartProductIds).size !==
         compatiblePartProductIds.length
