@@ -393,8 +393,8 @@ describe("finish option editor", () => {
       }),
     );
 
-    expect(html).toContain(">Spinner</legend>");
-    expect(html).toContain(">Button</legend>");
+    expect(html).toContain(">Materials and finish: Spinner</legend>");
+    expect(html).toContain(">Materials and finish: Button</legend>");
     expect(html).toContain(">Ownership history</legend>");
   });
 
@@ -790,8 +790,12 @@ describe("collection edit conditional fields", () => {
       expect(html).not.toContain('aria-label="Bearing"');
     }
     expect(html).toContain("max-w-6xl");
-    expect(html).toContain("lg:grid-cols-2");
-    expect(html).toContain("lg:col-span-2");
+    expect(html).toContain(">Item details</legend>");
+    expect(html).not.toContain("lg:grid-cols-2");
+    expect(html).not.toContain("lg:col-span-2");
+    expect(html.indexOf('id="collection-edit-images"')).toBeLessThan(
+      html.indexOf("Ownership history"),
+    );
     expect(html).toContain(">Cancel</button>");
     expect(html).toContain("flex min-w-0 items-center");
     expect(html).toContain("min-w-0 flex-1 truncate");
