@@ -29,6 +29,7 @@ import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProductTypeConfiguration } from "@/hooks/use-product-type-configuration";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import { useLocale } from "@/providers/locale-provider";
 
 /** TanStack Table features required by product-type configuration. */
@@ -126,6 +127,7 @@ export function AdminTrendsConfigPage({
   /** Product types available to configure. */
   productTypes: TrendsProductTypeConfiguration[];
 }) {
+  const catalogCopy = useCatalogCopy();
   const { locale } = useLocale();
   /**
    * Formats localized Trends configuration copy.
@@ -177,7 +179,11 @@ export function AdminTrendsConfigPage({
                   key={productType.id}
                 >
                   <th className="px-4 py-3 font-medium" scope="row">
-                    {productType.name}
+                    {catalogProductTypeLabel(
+                      catalogCopy,
+                      productType.slug,
+                      productType.name,
+                    )}
                   </th>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     {productType.slug}
@@ -185,7 +191,11 @@ export function AdminTrendsConfigPage({
                   <td className="px-4 py-3 text-center">
                     <input
                       aria-label={t("web.admin.config.trends.includeLabel", {
-                        name: productType.name,
+                        name: catalogProductTypeLabel(
+                          catalogCopy,
+                          productType.slug,
+                          productType.name,
+                        ),
                       })}
                       checked={productType.includeInTrends}
                       className="size-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

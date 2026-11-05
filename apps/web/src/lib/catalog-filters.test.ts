@@ -11,6 +11,7 @@ import {
   parseCatalogFilterSearch,
   parseCatalogProductsSearch,
   parseCatalogTrendsSearch,
+  parseProductCreationSearch,
   pruneCatalogFilters,
 } from "./catalog-filters";
 
@@ -356,4 +357,32 @@ it("keeps material facets general-only and counts repeated general assignments o
       materialIds: [10],
     }),
   ).toBe(true);
+});
+
+describe("product creation search", () => {
+  it.each([
+    "pen-clip",
+    "pen-mechanism",
+    "spinner",
+  ])("carries only an explicit %s type", (type) => {
+    expect(
+      parseProductCreationSearch({
+        type,
+        q: "model 36",
+        maker: [42],
+        material: [10],
+        view: "all",
+      }),
+    ).toEqual({ type });
+  });
+  it.each([
+    undefined,
+    null,
+    "unknown",
+    ["pen", "spinner"],
+    ["pen"],
+    "pen,spinner",
+  ])("ignores ambiguous or invalid type %s", (type) => {
+    expect(parseProductCreationSearch({ type })).toEqual({ type: undefined });
+  });
 });

@@ -181,6 +181,13 @@ export type CatalogFilterCopy = {
    */
   productTypeAll: string;
   /**
+   * Formats canonical type names for the active locale when supplied.
+   * @param slug - Canonical product-type slug.
+   * @param name - Persisted display name.
+   * @returns Localized type label.
+   */
+  productTypeName?: (slug: string, name: string) => string;
+  /**
    * Builds the polite result-count announcement.
    *
    * @param count - Current matching result count.
@@ -292,12 +299,22 @@ export function CatalogFilterBar({
         const selected = facets.productTypes.find(
           ({ slug }) => slug === filters.productType,
         );
-        return selected ? { id: selected.slug, name: selected.name } : null;
+        return selected
+          ? {
+              id: selected.slug,
+              name:
+                copy.productTypeName?.(selected.slug, selected.name) ??
+                selected.name,
+            }
+          : null;
       })()
     : { id: "all", name: copy.productTypeAll };
   const productTypes = [
     { id: "all", name: copy.productTypeAll },
-    ...facets.productTypes.map(({ name, slug }) => ({ id: slug, name })),
+    ...facets.productTypes.map(({ name, slug }) => ({
+      id: slug,
+      name: copy.productTypeName?.(slug, name) ?? name,
+    })),
   ];
   const selectedMakers = facets.makers.filter(({ id }) =>
     filters.makerIds.includes(id),

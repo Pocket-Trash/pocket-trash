@@ -147,7 +147,7 @@ export function CatalogCombobox({
         value={value}
       >
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
-        <ComboboxOptions placeholder={placeholder} />
+        <ComboboxOptions ariaLabel={ariaLabel} placeholder={placeholder} />
       </ComboboxPrimitive.Root>
       {showSelectedPill && removeLabel && value && value.id !== "default" ? (
         <SelectionPill
@@ -284,11 +284,13 @@ export function CatalogMultiCombobox({
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
         {groups ? (
           <ComboboxGroupedOptions
+            ariaLabel={ariaLabel}
             emptyLabel={emptyLabel ?? placeholder}
             placeholder={placeholder}
           />
         ) : (
           <ComboboxOptions
+            ariaLabel={ariaLabel}
             emptyLabel={emptyLabel ?? placeholder}
             placeholder={placeholder}
           />
@@ -359,15 +361,19 @@ function ComboboxControl({
 /**
  * Renders the portal-hosted catalog combobox option list.
  *
+ * @param props.ariaLabel - Accessible name of the list.
  * @param props - Combobox options properties.
  * @param props.placeholder - Fallback message shown when no options match and `emptyLabel` is omitted.
  * @param props.emptyLabel - Message shown when no combobox options match.
  * @returns The rendered combobox options UI.
  */
 function ComboboxOptions({
+  ariaLabel,
   placeholder,
   emptyLabel = placeholder,
 }: {
+  /** Accessible name shared with the controlling input. */
+  ariaLabel: string;
   /**
    * Message shown when no combobox options match.
    */
@@ -380,11 +386,11 @@ function ComboboxOptions({
   return (
     <ComboboxPrimitive.Portal>
       <ComboboxPrimitive.Positioner className="z-50" sideOffset={4}>
-        <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+        <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] max-w-[calc(100vw-2rem)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
           <ComboboxPrimitive.Empty className="px-3 py-2 text-sm text-muted-foreground">
             {emptyLabel}
           </ComboboxPrimitive.Empty>
-          <ComboboxPrimitive.List>
+          <ComboboxPrimitive.List aria-label={ariaLabel}>
             {(item: ComboboxOption) => (
               <ComboboxPrimitive.Item
                 className="flex cursor-default items-center justify-between rounded-sm px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
@@ -424,15 +430,19 @@ function ComboboxOptions({
 /**
  * Renders an accessible, grouped catalog option list.
  *
+ * @param props.ariaLabel - Accessible name of the list.
  * @param props - Grouped option-list properties.
  * @param props.emptyLabel - Message shown when no option matches.
  * @param props.placeholder - Fallback empty-state message.
  * @returns The grouped popup option list.
  */
 function ComboboxGroupedOptions({
+  ariaLabel,
   placeholder,
   emptyLabel = placeholder,
 }: {
+  /** Accessible name shared with the controlling input. */
+  ariaLabel: string;
   /** Message shown when no option matches. */
   emptyLabel?: string;
   /** Fallback empty-state message. */
@@ -441,11 +451,11 @@ function ComboboxGroupedOptions({
   return (
     <ComboboxPrimitive.Portal>
       <ComboboxPrimitive.Positioner className="z-50" sideOffset={4}>
-        <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+        <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] max-w-[calc(100vw-2rem)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
           <ComboboxPrimitive.Empty className="px-3 py-2 text-sm text-muted-foreground">
             {emptyLabel}
           </ComboboxPrimitive.Empty>
-          <ComboboxPrimitive.List>
+          <ComboboxPrimitive.List aria-label={ariaLabel}>
             {(group: ComboboxOptionGroup) => (
               <ComboboxPrimitive.Group
                 className="border-b border-border pb-1 last:border-b-0 last:pb-0"

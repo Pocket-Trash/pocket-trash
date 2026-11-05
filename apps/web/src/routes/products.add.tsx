@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
 import { getCatalogOptions } from "@/lib/catalog-api";
+import { parseProductCreationSearch } from "@/lib/catalog-filters";
 import { ProductFormPage } from "@/pages/catalog-form-pages";
 
 /**
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/products/add")({
    * @rejects When catalog form options cannot be loaded.
    */
   loader: () => getCatalogOptions(),
+  validateSearch: parseProductCreationSearch,
   component: ProductAddRoute,
 });
 
@@ -33,5 +35,12 @@ export const Route = createFileRoute("/products/add")({
  * @returns The rendered route UI.
  */
 function ProductAddRoute() {
-  return <ProductFormPage options={Route.useLoaderData()} />;
+  const { type } = Route.useSearch();
+  return (
+    <ProductFormPage
+      key={type ?? "unselected"}
+      initialProductTypeSlug={type}
+      options={Route.useLoaderData()}
+    />
+  );
 }

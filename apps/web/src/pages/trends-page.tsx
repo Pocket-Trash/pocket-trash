@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import { filterCatalogTrends } from "@/lib/catalog-filters";
 import { useLocale } from "@/providers/locale-provider";
@@ -111,6 +112,7 @@ export function TrendsPage({
   statusItems = [],
 }: TrendsPageProps) {
   const { locale } = useLocale();
+  const catalogCopy = useCatalogCopy();
   /**
    * Formats Trends copy for the active locale.
    *
@@ -193,7 +195,11 @@ export function TrendsPage({
   const visibleCollectorTrends = visibleCollectionTrends.map((trend) => ({
     count: trend.collectorCount,
     productTypeId: trend.productTypeId,
-    productTypeName: trend.productTypeName,
+    productTypeName: catalogProductTypeLabel(
+      catalogCopy,
+      undefined,
+      trend.productTypeName,
+    ),
   }));
   const collectorChartTrends =
     visibleCollectorTrends.length > 8
@@ -221,7 +227,10 @@ export function TrendsPage({
         ...trends,
         ...(collectionTrends?.values ?? []),
         ...(partAccessoryTrends?.values ?? []),
-      ].map((trend) => [trend.productTypeId, trend.productTypeName]),
+      ].map((trend) => [
+        trend.productTypeId,
+        catalogProductTypeLabel(catalogCopy, undefined, trend.productTypeName),
+      ]),
     ),
   ).sort((left, right) => left[1].localeCompare(right[1], locale));
   const allMaterialValues = [
@@ -663,7 +672,14 @@ export function TrendsPage({
                 })
               }
               otherLabel={t("web.trends.other")}
-              trends={visibleTrends}
+              trends={visibleTrends.map((trend) => ({
+                ...trend,
+                productTypeName: catalogProductTypeLabel(
+                  catalogCopy,
+                  undefined,
+                  trend.productTypeName,
+                ),
+              }))}
             />
 
             <details className="rounded-md border border-border bg-card">
@@ -695,7 +711,11 @@ export function TrendsPage({
                           className="px-3 py-2 text-left font-normal"
                           scope="row"
                         >
-                          {trend.productTypeName}
+                          {catalogProductTypeLabel(
+                            catalogCopy,
+                            undefined,
+                            trend.productTypeName,
+                          )}
                         </th>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {trend.count}
@@ -1098,7 +1118,13 @@ export function TrendsPage({
                     className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
                     key={trend.productTypeId}
                   >
-                    <span className="truncate">{trend.productTypeName}</span>
+                    <span className="truncate">
+                      {catalogProductTypeLabel(
+                        catalogCopy,
+                        undefined,
+                        trend.productTypeName,
+                      )}
+                    </span>
                     <span aria-hidden="true" className="h-3 bg-muted">
                       <span
                         className="block h-full bg-chart-2"
@@ -1136,7 +1162,11 @@ export function TrendsPage({
                           className="px-3 py-2 text-left font-normal"
                           scope="row"
                         >
-                          {trend.productTypeName}
+                          {catalogProductTypeLabel(
+                            catalogCopy,
+                            undefined,
+                            trend.productTypeName,
+                          )}
                         </th>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {trend.count}
@@ -1156,7 +1186,13 @@ export function TrendsPage({
                     className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
                     key={trend.productTypeId}
                   >
-                    <span className="truncate">{trend.productTypeName}</span>
+                    <span className="truncate">
+                      {catalogProductTypeLabel(
+                        catalogCopy,
+                        undefined,
+                        trend.productTypeName,
+                      )}
+                    </span>
                     <span aria-hidden="true" className="h-3 bg-muted">
                       <span
                         className="block h-full bg-chart-3"
@@ -1194,7 +1230,11 @@ export function TrendsPage({
                           className="px-3 py-2 text-left font-normal"
                           scope="row"
                         >
-                          {trend.productTypeName}
+                          {catalogProductTypeLabel(
+                            catalogCopy,
+                            undefined,
+                            trend.productTypeName,
+                          )}
                         </th>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {trend.count}
@@ -1269,7 +1309,13 @@ export function TrendsPage({
                     className="grid grid-cols-[minmax(7rem,1fr)_minmax(5rem,4fr)_auto] items-center gap-3 text-sm"
                     key={trend.productTypeId}
                   >
-                    <span className="truncate">{trend.productTypeName}</span>
+                    <span className="truncate">
+                      {catalogProductTypeLabel(
+                        catalogCopy,
+                        undefined,
+                        trend.productTypeName,
+                      )}
+                    </span>
                     <span aria-hidden="true" className="h-3 bg-muted">
                       <span
                         className="block h-full bg-chart-3"
@@ -1307,7 +1353,11 @@ export function TrendsPage({
                           className="px-3 py-2 text-left font-normal"
                           scope="row"
                         >
-                          {trend.productTypeName}
+                          {catalogProductTypeLabel(
+                            catalogCopy,
+                            undefined,
+                            trend.productTypeName,
+                          )}
                         </th>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {trend.count}

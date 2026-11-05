@@ -31,7 +31,8 @@ vi.mock("@/components/catalog-trends-chart", () => ({
   ),
 }));
 
-vi.mock("@pocket-trash/localizations", () => ({
+vi.mock("@pocket-trash/localizations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@pocket-trash/localizations")>()),
   /**
    * Supplies deterministic localization copy to the page test.
    *

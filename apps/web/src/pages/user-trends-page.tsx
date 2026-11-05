@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserPageShell } from "@/components/user-page-shell";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import type { CatalogTrendsSearch } from "@/lib/catalog-filters";
 import {
   type CommunityTrendsSource,
@@ -155,6 +156,7 @@ export function UserTrendsPage({
     key: UserTrendsTranslationKey,
     values: Record<string, string | number> = {},
   ) => formatTranslation(key as TranslationKey, values, locale);
+  const catalogCopy = useCatalogCopy();
   const trends = summarizeUserTrends(items, collectionCount, search);
   const community = communityTrends
     ? summarizeCommunityTrends(communityTrends, search, {
@@ -164,7 +166,11 @@ export function UserTrendsPage({
     : undefined;
   const productTypes = options(items, (item) => [
     item.productTypeId,
-    item.productTypeName,
+    catalogProductTypeLabel(
+      catalogCopy,
+      item.productTypeSlug,
+      item.productTypeName,
+    ),
   ]);
   const materials = options(
     items.flatMap((item) => item.materials),
@@ -198,8 +204,23 @@ export function UserTrendsPage({
       id: "product-types",
       label: t("web.trends.productType"),
       title: t("web.trends.collectionItemsChartLabel"),
-      values: trends.productTypes,
-      community: community?.productTypes,
+      values: trends.productTypes.map((value) => ({
+        ...value,
+        label: catalogProductTypeLabel(catalogCopy, undefined, value.label),
+      })),
+      community: community?.productTypes
+        ? {
+            ...community.productTypes,
+            values: community.productTypes.values.map((value) => ({
+              ...value,
+              label: catalogProductTypeLabel(
+                catalogCopy,
+                undefined,
+                value.label,
+              ),
+            })),
+          }
+        : community?.productTypes,
     },
     {
       colorClass: "bg-chart-2",

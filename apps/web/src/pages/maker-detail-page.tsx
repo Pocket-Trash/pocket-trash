@@ -12,7 +12,7 @@ import { MaterialCombinationLinks } from "@/components/material-link";
 import { ProductCard } from "@/components/product-card";
 import { buttonVariants } from "@/components/ui/button";
 import type { PublicMakerPage } from "@/lib/catalog-api";
-import { useCatalogCopy } from "@/lib/catalog-copy";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import { cn } from "@/lib/utils";
 import { PaginatedCards } from "./catalog-pages";
 
@@ -195,6 +195,11 @@ function RelatedProducts({
                     })}
                     privateLabel={t("web.resources.moderation.privateBadge")}
                     product={product}
+                    productTypeLabel={catalogProductTypeLabel(
+                      t,
+                      product.productTypeSlug,
+                      product.productTypeName,
+                    )}
                     productLinkLabel={t("web.action.visitProductPageFor", {
                       name: product.name,
                     })}
@@ -315,7 +320,11 @@ function CollectionItemCard({ item }: CollectionItemCardProps) {
         <p className="mt-1 text-xs text-muted-foreground">
           {t("web.makers.productMakerAttribution", {
             maker: item.makerName,
-            productType: item.productTypeName,
+            productType: catalogProductTypeLabel(
+              t,
+              item.productTypeSlug,
+              item.productTypeName,
+            ),
           })}
         </p>
         {item.materials.length ? (

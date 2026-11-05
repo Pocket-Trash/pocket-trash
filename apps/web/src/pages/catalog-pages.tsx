@@ -64,7 +64,7 @@ import {
   setCollectionVisibility,
   setProductVisibility,
 } from "@/lib/catalog-api";
-import { useCatalogCopy } from "@/lib/catalog-copy";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import {
   buildCatalogFacets,
   type CatalogFilters,
@@ -133,6 +133,13 @@ function catalogFilterCopy(
   searchPlaceholderKey: TranslationKey = "web.slider.search.placeholder",
 ): CatalogFilterCopy {
   return {
+    /**
+     * Explains type labels without coupling the shared filter to locale context.
+     * @param slug - Canonical product-type slug.
+     * @param name - Persisted display name.
+     * @returns Localized display label.
+     */
+    productTypeName: (slug, name) => catalogProductTypeLabel(t, slug, name),
     all: t("web.archive.filter.all"),
     any: t("web.archive.filter.any"),
     apply: t("action.save"),
@@ -225,7 +232,11 @@ function localizedProductTypeLabel(
     "spinner-button": "web.slider.productType.spinnerButton",
   }[productType];
   const label = t(key as TranslationKey);
-  return label === key ? fallback : label;
+  return catalogProductTypeLabel(
+    t,
+    productType,
+    label === key ? fallback : label,
+  );
 }
 
 /**
@@ -376,7 +387,11 @@ export function ProductsPage({
   const t = useCatalogCopy();
   const { locale } = useLocale();
   const addProduct = onFiltersChange ? (
-    <Link className={buttonVariants({ size: "sm" })} to="/products/add">
+    <Link
+      className={buttonVariants({ size: "sm" })}
+      to="/products/add"
+      search={{ type: filters.productType ?? undefined }}
+    >
       {t("web.action.addProduct")}
     </Link>
   ) : undefined;
@@ -756,7 +771,11 @@ export function ProductDetailPage({
         ) : null}
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
           <Detail label={t("web.catalog.field.productType")}>
-            {product.productTypeName}
+            {catalogProductTypeLabel(
+              t,
+              product.productTypeSlug,
+              product.productTypeName,
+            )}
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={product.makerName} slug={product.makerSlug} />
@@ -915,7 +934,15 @@ export function ProductDetailPage({
                   className="grid content-start gap-2"
                   key={parts[0]?.productTypeSlug}
                 >
-                  <h3 className="font-semibold">{parts[0]?.productTypeName}</h3>
+                  <h3 className="font-semibold">
+                    {parts[0]
+                      ? catalogProductTypeLabel(
+                          t,
+                          parts[0].productTypeSlug,
+                          parts[0].productTypeName,
+                        )
+                      : null}
+                  </h3>
                   <ul className="grid gap-2 text-sm">
                     {parts.map((part) => (
                       <li key={part.id}>
@@ -2291,7 +2318,11 @@ export function CollectionItemDetailPage({
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
           <Detail label={t("web.catalog.field.name")}>{item.name}</Detail>
           <Detail label={t("web.catalog.field.productType")}>
-            {item.productTypeName}
+            {catalogProductTypeLabel(
+              t,
+              item.productTypeSlug,
+              item.productTypeName,
+            )}
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={item.makerName} slug={item.makerSlug} />

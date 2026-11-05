@@ -982,6 +982,37 @@ describe("ProductGrid", () => {
 });
 
 describe("ProductsPage", () => {
+  it.each([
+    "pen-clip",
+    "pen-mechanism",
+    "spinner",
+  ] as const)("carries explicit %s context even with no products", (productType) => {
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        filters={{
+          ...emptyCatalogFilters(),
+          productType,
+          makerIds: [42],
+          materialIds: [10],
+          query: "model 36",
+        }}
+        onFiltersChange={() => {}}
+        products={[]}
+      />,
+    );
+    expect(html).toContain(`/products/add?type=${productType}`);
+    expect(html).not.toContain("/products/add?maker");
+    expect(html).not.toContain("/products/add?material");
+    expect(html).not.toContain("/products/add?q");
+  });
+  it("does not infer a type from one result", () => {
+    const html = renderToStaticMarkup(
+      <ProductsPage onFiltersChange={() => {}} products={[product]} />,
+    );
+    expect(html).toContain('href="/products/add"');
+    expect(html).not.toContain("/products/add?type=");
+  });
+
   it("intersects product filters with central-index rank order", () => {
     const first = { ...product, id: 1, name: "First", slug: "first" };
     const second = { ...product, id: 2, name: "Second", slug: "second" };
