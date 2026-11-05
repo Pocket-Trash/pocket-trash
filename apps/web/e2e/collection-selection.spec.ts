@@ -36,9 +36,9 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     }
     await page.getByRole("link", { name: "Add to collection" }).click();
     await expect(page).toHaveURL(addToCollectionUrl);
-    await expect(page.locator("main input").first()).toHaveValue(
-      fixture.spinnerProductName,
-    );
+    await expect(
+      page.getByRole("textbox", { name: "Display name", exact: true }),
+    ).toHaveValue(fixture.spinnerProductName);
     const defaultCollectionName = await page
       .getByRole("combobox", { name: "Collection" })
       .and(page.locator("input"))

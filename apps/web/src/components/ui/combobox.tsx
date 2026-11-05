@@ -106,8 +106,12 @@ export function CatalogCombobox({
    * Reports selection changes.
    *
    * @param value - Next selection, or `null` when cleared.
+   * @param eventDetails - Cancellable primitive event, when selection comes from the popup.
    */
-  onValueChange: (value: ComboboxOption | null) => void;
+  onValueChange: (
+    value: ComboboxOption | null,
+    eventDetails?: ComboboxPrimitive.Root.ChangeEventDetails,
+  ) => void;
   /**
    * Text shown in the empty search input and when no options match.
    */
@@ -139,8 +143,8 @@ export function CatalogCombobox({
         itemToStringLabel={(item) => item.name}
         items={items}
         onOpenChange={(open) => dispatch({ type: "popupChanged", open })}
-        onValueChange={(nextValue) => {
-          onValueChange(nextValue);
+        onValueChange={(nextValue, eventDetails) => {
+          onValueChange(nextValue, eventDetails);
           dispatch({ type: "selected" });
         }}
         open={open}
