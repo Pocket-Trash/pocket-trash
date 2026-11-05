@@ -799,6 +799,17 @@ describe("owned Pens and Pen parts", () => {
         ],
       });
       expect(
+        (await service.listOwned(actor)).find(
+          ({ collectionItemId }) => collectionItemId === customPenItemId,
+        )?.installedPenActuations,
+      ).toEqual([
+        {
+          actuatorCollectionItemId: actuatorItemId,
+          mechanismCollectionItemId: mechanismItemId,
+          requiresCustomization: true,
+        },
+      ]);
+      expect(
         await db
           .select()
           .from(schema.collectionItemInstalledPenPart)

@@ -228,3 +228,27 @@ export const Disabled: Story = {
     ).toBeDisabled();
   },
 };
+
+/** The open warning popup has a name and readable text while highlighted. */
+export const WarningPopupAccessibility: Story = {
+  args: {
+    items: [
+      { id: 1, name: "Custom clip", warning: "Compatibility not recorded" },
+    ],
+  },
+  /**
+   * Leaves the warning highlighted so the accessibility audit covers the open list.
+   * @param context - Story interaction context.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(canvas.getByRole("combobox", { name: "Material" }));
+    await userEvent.keyboard("{ArrowDown}");
+    const list = await within(canvasElement.ownerDocument.body).findByRole(
+      "listbox",
+      { name: "Material" },
+    );
+    await expect(
+      within(list).getByText("Compatibility not recorded"),
+    ).toBeVisible();
+  },
+};

@@ -8179,10 +8179,15 @@ export function createCollectionsService(
                   )
               : [];
             const before = {
-              installedPenActuations: await installedPenActuationAuditState(
-                tx,
-                input.collectionItemId,
-              ),
+              ...(item.penProductId != null
+                ? {
+                    installedPenActuations:
+                      await installedPenActuationAuditState(
+                        tx,
+                        input.collectionItemId,
+                      ),
+                  }
+                : {}),
               collectionId: item.collectionId,
               description: item.description,
               displayName: item.displayName,
@@ -8719,10 +8724,15 @@ export function createCollectionsService(
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
-              installedPenActuations: await installedPenActuationAuditState(
-                tx,
-                input.collectionItemId,
-              ),
+              ...(item.penProductId != null
+                ? {
+                    installedPenActuations:
+                      await installedPenActuationAuditState(
+                        tx,
+                        input.collectionItemId,
+                      ),
+                  }
+                : {}),
               collectionId: targetCollectionId,
               description:
                 input.description === undefined
