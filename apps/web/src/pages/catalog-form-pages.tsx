@@ -5194,6 +5194,7 @@ export function CollectionAddPage({
     } as CollectionItemMetadataWrite,
     ownership: ownershipEditorValue() as OwnershipEditorValue,
     installedPenPartIds: [] as number[],
+    customizationConfirmedPartIds: [] as number[],
     installedRefillProductId: null as number | null,
     installedRefillOfferingId: null as number | null,
     material: initialDefaults.material as CatalogLookup | null,
@@ -5278,6 +5279,7 @@ export function CollectionAddPage({
         buttonMaterial,
         selectedCollectionId,
         installedPenPartIds,
+        customizationConfirmedPartIds,
         customFinish,
         displayName,
         finish,
@@ -5326,6 +5328,8 @@ export function CollectionAddPage({
         collectionId: selectedCollectionId === -1 ? null : selectedCollectionId,
         confirmed,
         installedPenPartCollectionItemIds: installedPenPartIds,
+        customizationConfirmedPartCollectionItemIds:
+          customizationConfirmedPartIds,
         customFinish: finish?.id === "custom" ? customFinish : null,
         displayName,
         description: currentDescription,
@@ -5381,6 +5385,7 @@ export function CollectionAddPage({
     pricePaidIsPublic,
     ownership,
     installedPenPartIds,
+    customizationConfirmedPartIds,
     installedRefillProductId,
     installedRefillOfferingId,
     material,
@@ -5708,6 +5713,10 @@ export function CollectionAddPage({
    * @param candidate - Product selected from the catalog.
    */
   const selectProduct = (candidate: CatalogProduct) => {
+    if (form.state.values.product?.id === candidate.id) {
+      dispatch({ type: "productSelected", selected: true });
+      return;
+    }
     const defaults = collectionProductDefaults(candidate, t);
     form.setFieldValue("product", candidate);
     dispatch({ type: "productSelected", selected: true });
@@ -5715,7 +5724,7 @@ export function CollectionAddPage({
     form.setFieldValue("description", "");
     form.setFieldValue("bearing", "");
     form.setFieldValue("serialNumber", null);
-    form.setFieldValue("installedPenPartIds", []);
+    form.setFieldValue("customizationConfirmedPartIds", []);
     form.setFieldValue("installedRefillProductId", null);
     form.setFieldValue("installedRefillOfferingId", null);
     form.setFieldValue("material", defaults.material);
@@ -5939,7 +5948,7 @@ export function CollectionAddPage({
                   form.setFieldValue("description", "");
                   form.setFieldValue("bearing", "");
                   form.setFieldValue("serialNumber", null);
-                  form.setFieldValue("installedPenPartIds", []);
+                  form.setFieldValue("customizationConfirmedPartIds", []);
                   form.setFieldValue("installedRefillProductId", null);
                   form.setFieldValue("installedRefillOfferingId", null);
                   form.setFieldValue("material", null);
@@ -6083,6 +6092,10 @@ export function CollectionAddPage({
             refillOfferingId={installedRefillOfferingId}
             refillProductId={installedRefillProductId}
             installedPartIds={installedPenPartIds}
+            confirmedCustomizationIds={customizationConfirmedPartIds}
+            onConfirmedCustomizationIdsChange={(ids) =>
+              form.setFieldValue("customizationConfirmedPartIds", ids)
+            }
             t={t}
           />
         ) : null}
@@ -6308,7 +6321,7 @@ function SerialNumberFields({
  * @param props - Catalog, owned parts, controlled selections, and translator.
  * @returns Pen part and refill fields with non-blocking compatibility warnings.
  */
-function PenCollectionFields({
+export function PenCollectionFields({
   allProducts,
   currentCollectionItemId,
   onRefillOfferingChange,
@@ -6319,6 +6332,9 @@ function PenCollectionFields({
   refillOfferingId,
   refillProductId,
   installedPartIds,
+  savedInstalledPartIds = [],
+  confirmedCustomizationIds,
+  onConfirmedCustomizationIdsChange,
   t,
 }: {
   /** Visible catalog products, including refill models. */
@@ -6353,6 +6369,15 @@ function PenCollectionFields({
   refillProductId: number | null;
   /** Installed physical Pen-part collection item identifiers. */
   installedPartIds: number[];
+  /** Previously saved installations, retained without repeated acknowledgment. */
+  savedInstalledPartIds?: number[];
+  /** Exceptions explicitly acknowledged during this draft. */
+  confirmedCustomizationIds: number[];
+  /**
+   * Records explicit acknowledgments for this draft's selected parts.
+   * @param ids - Confirmed owned collection-item identifiers.
+   */
+  onConfirmedCustomizationIdsChange: (ids: number[]) => void;
   /** Catalog translator. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
@@ -6361,9 +6386,79 @@ function PenCollectionFields({
   );
   const availableParts = ownedItems.filter(
     (item) =>
-      compatiblePartProductIds.has(item.productId) &&
+      item.productTypeSlug in penPartInterchangeabilityKeys &&
+      !item.isAdminPrivate &&
       (item.privacyInheritedFromItemId === null ||
         item.privacyInheritedFromItemId === currentCollectionItemId),
+  );
+  const [customization, requestCustomization] = React.useReducer(
+    (_state: number[] | null, next: number[] | null) => next,
+    null,
+  );
+  const confirmationTitle = React.useId();
+  /**
+   * Opens the confirmation and restores its trigger on dismissal.
+   * @param node - Mounted native dialog.
+   * @returns Cleanup after confirmation unmounts.
+   */
+  const bindConfirmation = React.useCallback(
+    (node: HTMLDialogElement | null) => {
+      if (!node) return;
+      const trigger = document.activeElement;
+      node.showModal();
+      return () => {
+        node.close();
+        if (trigger instanceof HTMLElement) trigger.focus();
+      };
+    },
+    [],
+  );
+  /**
+   * Identifies missing ordinary interchangeability for an owned part.
+   * @param item - Owned part being considered.
+   * @returns Whether its functional role normally requires customization.
+   */
+  const nonInterchangeable = (item: UserCollectionItem) => {
+    const key =
+      penPartInterchangeabilityKeys[item.productTypeSlug as PenPartProductType];
+    return !product.interchangeableParts?.[key];
+  };
+  /**
+   * Identifies a new exception still awaiting explicit acknowledgment.
+   * @param item - Eligible owned part.
+   * @returns Whether this particular installation needs confirmation.
+   */
+  const needsConfirmation = (item: UserCollectionItem) =>
+    !savedInstalledPartIds.includes(item.collectionItemId) &&
+    !confirmedCustomizationIds.includes(item.collectionItemId) &&
+    (nonInterchangeable(item) || !compatiblePartProductIds.has(item.productId));
+  /**
+   * Holds a proposed selection until every new exception is acknowledged.
+   * @param ids - Complete proposed set of installed owned parts.
+   */
+  const selectParts = (ids: number[]) => {
+    if (
+      availableParts.some(
+        (item) =>
+          ids.includes(item.collectionItemId) && needsConfirmation(item),
+      )
+    ) {
+      requestCustomization(ids);
+      return;
+    }
+    onInstalledPartIdsChange(ids);
+    onConfirmedCustomizationIdsChange(
+      confirmedCustomizationIds.filter((id) => ids.includes(id)),
+    );
+  };
+  const unconfirmedSelection = availableParts.filter(
+    (item) =>
+      installedPartIds.includes(item.collectionItemId) &&
+      needsConfirmation(item),
+  );
+  const pendingParts = availableParts.filter(
+    (item) =>
+      customization?.includes(item.collectionItemId) && needsConfirmation(item),
   );
   const warning = t("web.pens.collection.notSupported" as TranslationKey);
   const refills = allProducts
@@ -6394,9 +6489,14 @@ function PenCollectionFields({
             items={availableParts.map((item) => ({
               id: item.collectionItemId,
               name: item.displayName,
+              warning: !compatiblePartProductIds.has(item.productId)
+                ? warning
+                : nonInterchangeable(item)
+                  ? t("web.pens.interchangeableParts.customization")
+                  : undefined,
             }))}
             onValueChange={(next) =>
-              onInstalledPartIdsChange(next.map(({ id }) => Number(id)))
+              selectParts(next.map(({ id }) => Number(id)))
             }
             placeholder={t(
               "web.pens.collection.noInstalledParts" as TranslationKey,
@@ -6409,10 +6509,87 @@ function PenCollectionFields({
               .map((item) => ({
                 id: item.collectionItemId,
                 name: item.displayName,
+                warning: !compatiblePartProductIds.has(item.productId)
+                  ? warning
+                  : nonInterchangeable(item)
+                    ? t("web.pens.interchangeableParts.customization")
+                    : undefined,
               }))}
           />
+          {unconfirmedSelection.length ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => selectParts(installedPartIds)}
+            >
+              {t("web.pens.interchangeableParts.confirmationTitle")}
+            </Button>
+          ) : null}
         </Field>
       ) : null}
+      {customization && typeof document !== "undefined"
+        ? createPortal(
+            <dialog
+              ref={bindConfirmation}
+              aria-labelledby={confirmationTitle}
+              className="m-auto w-[min(32rem,calc(100%-2rem))] border border-border bg-card p-6 text-card-foreground backdrop:bg-black/60"
+              onCancel={(event) => {
+                event.preventDefault();
+                requestCustomization(null);
+              }}
+            >
+              <h2 id={confirmationTitle} className="text-lg font-semibold">
+                {t("web.pens.interchangeableParts.confirmationTitle")}
+              </h2>
+              <ul className="mt-3 grid gap-1 text-sm">
+                {pendingParts.map((item) => (
+                  <li key={item.collectionItemId}>{item.displayName}</li>
+                ))}
+              </ul>
+              <p className="mt-3 text-sm">
+                {t(
+                  pendingParts.some(nonInterchangeable)
+                    ? "web.pens.interchangeableParts.confirmation"
+                    : "web.pens.collection.unlistedConfirmation",
+                )}
+              </p>
+              {pendingParts.some(
+                (item) => !compatiblePartProductIds.has(item.productId),
+              ) ? (
+                <p className="mt-2 text-sm text-muted-foreground">{warning}</p>
+              ) : null}
+              <div className="mt-4 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => requestCustomization(null)}
+                >
+                  {t("action.cancel")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    onInstalledPartIdsChange(customization);
+                    onConfirmedCustomizationIdsChange([
+                      ...new Set([
+                        ...confirmedCustomizationIds.filter((id) =>
+                          customization.includes(id),
+                        ),
+                        ...pendingParts.map(
+                          ({ collectionItemId }) => collectionItemId,
+                        ),
+                      ]),
+                    ]);
+                    requestCustomization(null);
+                  }}
+                >
+                  {t("web.pens.interchangeableParts.continue")}
+                </Button>
+              </div>
+            </dialog>,
+            document.body,
+          )
+        : null}
       <Field label={t("web.pens.collection.refill" as TranslationKey)}>
         <CatalogCombobox
           ariaLabel={t("web.pens.collection.refill" as TranslationKey)}
@@ -6847,6 +7024,7 @@ export function CollectionEditPage({
     ownership: ownershipEditorValue(
       ownershipPeriods.at(-1),
     ) as OwnershipEditorValue,
+    customizationConfirmedPartIds: [] as number[],
     installedPenPartIds: (item.installedPenPartCollectionItemIds ??
       []) as number[],
     installedRefillProductId: item.installedRefillProductId ?? null,
@@ -6992,6 +7170,7 @@ export function CollectionEditPage({
         serialNumber,
         ownership,
         installedPenPartIds,
+        customizationConfirmedPartIds,
         installedRefillProductId,
         installedRefillOfferingId,
         material,
@@ -7087,6 +7266,8 @@ export function CollectionEditPage({
           collectionId,
           collectionItemId: item.collectionItemId,
           installedPenPartCollectionItemIds: installedPenPartIds,
+          customizationConfirmedPartCollectionItemIds:
+            customizationConfirmedPartIds,
           customFinish: finish?.id === "custom" ? customFinish : null,
           displayName,
           description: currentDescription,
@@ -7174,6 +7355,7 @@ export function CollectionEditPage({
     pricePaidIsPublic,
     ownership,
     installedPenPartIds,
+    customizationConfirmedPartIds,
     installedRefillProductId,
     installedRefillOfferingId,
     material,
@@ -7585,6 +7767,13 @@ export function CollectionEditPage({
               refillOfferingId={installedRefillOfferingId}
               refillProductId={installedRefillProductId}
               installedPartIds={installedPenPartIds}
+              savedInstalledPartIds={
+                item.installedPenPartCollectionItemIds ?? []
+              }
+              confirmedCustomizationIds={customizationConfirmedPartIds}
+              onConfirmedCustomizationIdsChange={(ids) =>
+                form.setFieldValue("customizationConfirmedPartIds", ids)
+              }
               t={t}
             />
           ) : null}

@@ -76,9 +76,11 @@ describe("owned Pens and Pen parts", () => {
             product.id,
           ]),
         );
-        await tx
-          .insert(schema.productDetailPen)
-          .values({ id: ids.get("pen")! });
+        await tx.insert(schema.productDetailPen).values({
+          id: ids.get("pen")!,
+          tipInterchangeable: true,
+          clipInterchangeable: true,
+        });
         await tx
           .insert(schema.productDetailPenPart)
           .values(
@@ -239,7 +241,7 @@ describe("owned Pens and Pen parts", () => {
           productTypeSlug: "pen",
           serialNumber: null,
         }),
-      ).rejects.toThrow("compatible and owned by you");
+      ).rejects.toThrow("Customization confirmation");
       const penItemId = await service.addPenProduct({
         actor,
         collectionId: pensCollection.id,
@@ -254,6 +256,142 @@ describe("owned Pens and Pen parts", () => {
         productTypeSlug: "pen",
         serialNumber: "SAGA-1234",
       });
+      await expect(
+        service.updateItem({
+          actor,
+          collectionItemId: penItemId,
+          displayName: "Owned Pen",
+          customFinish: null,
+          finishOptionId: null,
+          installedPenPartCollectionItemIds: [
+            partItemIds.get("pen-tip")!,
+            partItemIds.get("pen-clip")!,
+          ],
+          customizationConfirmedPartCollectionItemIds: [
+            partItemIds.get("pen-clip")!,
+          ],
+        }),
+      ).resolves.toBeUndefined();
+      const customized = await db
+        .select()
+        .from(schema.collectionItemInstalledPenPart)
+        .where(
+          eq(
+            schema.collectionItemInstalledPenPart.penCollectionItemId,
+            penItemId,
+          ),
+        );
+      expect(customized).toContainEqual(
+        expect.objectContaining({
+          partCollectionItemId: partItemIds.get("pen-clip"),
+          requiresCustomization: true,
+        }),
+      );
+      await expect(
+        service.updateItem({
+          actor,
+          collectionItemId: penItemId,
+          displayName: "Owned Pen",
+          customFinish: null,
+          finishOptionId: null,
+          installedPenPartCollectionItemIds: [
+            partItemIds.get("pen-tip")!,
+            partItemIds.get("pen-clip")!,
+          ],
+        }),
+      ).resolves.toBeUndefined();
+      expect(
+        await db
+          .select()
+          .from(schema.penCompatiblePart)
+          .where(eq(schema.penCompatiblePart.penProductId, penId)),
+      ).toHaveLength(1);
+      const [unchangedPen] = await db
+        .select()
+        .from(schema.productDetailPen)
+        .where(eq(schema.productDetailPen.id, penId));
+      expect(unchangedPen).toMatchObject({
+        tipInterchangeable: true,
+        clipInterchangeable: true,
+      });
+      const ordinaryUpdate = {
+        actor,
+        collectionItemId: penItemId,
+        displayName: "Owned Pen",
+        customFinish: null,
+        finishOptionId: null,
+      };
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: [penItemId],
+          customizationConfirmedPartCollectionItemIds: [penItemId],
+        }),
+      ).rejects.toThrow("available and owned");
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: [
+            partItemIds.get("pen-tip")!,
+            partItemIds.get("pen-tip")!,
+          ],
+        }),
+      ).rejects.toThrow("only once");
+      const capItemId = partItemIds.get("pen-top-cap")!;
+      await db
+        .update(schema.collectionItem)
+        .set({
+          isPrivate: true,
+          privateReason: "Staff privacy",
+          privatedAt: new Date(),
+          privatedByClerkId: "staff",
+        })
+        .where(eq(schema.collectionItem.id, capItemId));
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: [capItemId],
+          customizationConfirmedPartCollectionItemIds: [capItemId],
+        }),
+      ).rejects.toThrow("available and owned");
+      await db
+        .update(schema.collectionItem)
+        .set({
+          isPrivate: false,
+          privateReason: null,
+          privatedAt: null,
+          privatedByClerkId: null,
+        })
+        .where(eq(schema.collectionItem.id, capItemId));
+      const [otherOwner] = await db
+        .insert(schema.user)
+        .values({ clerkId: "other-pens-owner", username: "Other Pens owner" })
+        .returning();
+      if (!otherOwner) throw new Error("Other owner missing.");
+      const [otherCollection] = await db
+        .insert(schema.userCollection)
+        .values({
+          ownerId: otherOwner.id,
+          name: "Other Pens",
+          normalizedName: "other pens",
+        })
+        .returning();
+      if (!otherCollection) throw new Error("Other collection missing.");
+      await db
+        .update(schema.collectionItem)
+        .set({ ownerId: otherOwner.id, collectionId: otherCollection.id })
+        .where(eq(schema.collectionItem.id, capItemId));
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: [capItemId],
+          customizationConfirmedPartCollectionItemIds: [capItemId],
+        }),
+      ).rejects.toThrow("available and owned");
+      await db
+        .update(schema.collectionItem)
+        .set({ ownerId: owner.id, collectionId: partsCollection.id })
+        .where(eq(schema.collectionItem.id, capItemId));
       const allItemIds = [penItemId, ...partItemIds.values()];
       await db.insert(schema.collectionItemImage).values(
         allItemIds.map((collectionItemId, index) => ({
@@ -274,7 +412,11 @@ describe("owned Pens and Pen parts", () => {
       expect(
         items.find(({ collectionItemId }) => collectionItemId === penItemId),
       ).toMatchObject({
-        installedPenPartCollectionItemIds: [partItemIds.get("pen-tip")],
+        installedPenPartCollectionItemIds: [
+          partItemIds.get("pen-tip"),
+          partItemIds.get("pen-clip"),
+        ],
+        customizedPenPartCollectionItemIds: [partItemIds.get("pen-clip")],
         installedRefillOfferingId: offering.id,
         installedRefillProductId: refillId,
         productTypeSlug: "pen",
@@ -306,6 +448,54 @@ describe("owned Pens and Pen parts", () => {
           .from(schema.collectionDetailPen)
           .where(eq(schema.collectionDetailPen.id, penItemId)),
       ).toHaveLength(1);
+      const actuatorItemId = partItemIds.get("pen-actuator")!;
+      const customPenInput = {
+        actor,
+        collectionId: pensCollection.id,
+        installedPenPartCollectionItemIds: [actuatorItemId],
+        customFinish: null,
+        displayName: "Customized Pen",
+        finishOptionId: null,
+        installedRefillOfferingId: null,
+        installedRefillProductId: null,
+        materialAssignmentId: materialIdByProduct.get(penId)!,
+        productId: penId,
+        productTypeSlug: "pen" as const,
+        serialNumber: null,
+      };
+      await db.insert(schema.penCompatiblePart).values({
+        penProductId: penId,
+        partProductId: productId.get("pen-actuator")!,
+      });
+      await expect(service.addPenProduct(customPenInput)).rejects.toThrow(
+        "Customization confirmation",
+      );
+      const customPenItemId = await service.addPenProduct({
+        ...customPenInput,
+        customizationConfirmedPartCollectionItemIds: [actuatorItemId],
+      });
+      expect(
+        await db
+          .select()
+          .from(schema.collectionItemInstalledPenPart)
+          .where(
+            eq(
+              schema.collectionItemInstalledPenPart.penCollectionItemId,
+              customPenItemId,
+            ),
+          ),
+      ).toContainEqual(
+        expect.objectContaining({
+          partCollectionItemId: actuatorItemId,
+          requiresCustomization: true,
+        }),
+      );
+      await expect(
+        service.addPenProduct({
+          ...customPenInput,
+          customizationConfirmedPartCollectionItemIds: [actuatorItemId],
+        }),
+      ).rejects.toThrow("unavailable");
     } finally {
       await client.close();
     }

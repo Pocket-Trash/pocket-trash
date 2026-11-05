@@ -2100,6 +2100,8 @@ export type UserCollectionItem = {
   collectionItemId: number;
   /** Same-owner physical Pen parts installed on this item. */
   installedPenPartCollectionItemIds?: number[];
+  /** Owned installations explicitly confirmed as customization exceptions. */
+  customizedPenPartCollectionItemIds?: number[];
   /**
    * Display name.
    */
@@ -2416,6 +2418,8 @@ export type CollectionsService = {
     collectionId?: number | null;
     /** Same-owner physical Pen parts installed on the new Pen. */
     installedPenPartCollectionItemIds: number[];
+    /** Explicit acknowledgment for new customized owned installations. */
+    customizationConfirmedPartCollectionItemIds?: number[];
     /** Optional custom finish snapshot. */
     customFinish: ProductWriteFinishOption | null;
     /** Optional description override. */
@@ -2925,6 +2929,8 @@ export type CollectionsService = {
     collectionItemId: number;
     /** Replacement physical parts installed on an owned Pen. */
     installedPenPartCollectionItemIds?: number[];
+    /** Explicit acknowledgment for new customized owned installations. */
+    customizationConfirmedPartCollectionItemIds?: number[];
     /**
      * Custom finish.
      */
@@ -6330,6 +6336,8 @@ export function createCollectionsService(
               ownerId: owner.id,
               productId: input.productId,
               partCollectionItemIds: input.installedPenPartCollectionItemIds,
+              customizationConfirmedPartCollectionItemIds:
+                input.customizationConfirmedPartCollectionItemIds,
             });
             await createCollectionFinishOption(tx, {
               collectionItemId: item.id,
@@ -6345,6 +6353,8 @@ export function createCollectionsService(
                 collectionId: resolvedCollection.id,
                 installedPenPartCollectionItemIds:
                   input.installedPenPartCollectionItemIds,
+                customizationConfirmedPartCollectionItemIds:
+                  input.customizationConfirmedPartCollectionItemIds ?? [],
                 description: normalizeOptionalDescription(input.description),
                 displayName: input.displayName.trim(),
                 id: item.id,
@@ -8279,6 +8289,8 @@ export function createCollectionsService(
                 ownerId: item.ownerId,
                 productId,
                 partCollectionItemIds: input.installedPenPartCollectionItemIds,
+                customizationConfirmedPartCollectionItemIds:
+                  input.customizationConfirmedPartCollectionItemIds,
               });
             }
 
@@ -8646,6 +8658,8 @@ export function createCollectionsService(
                 ? {
                     installedPenPartCollectionItemIds:
                       input.installedPenPartCollectionItemIds,
+                    customizationConfirmedPartCollectionItemIds:
+                      input.customizationConfirmedPartCollectionItemIds ?? [],
                   }
                 : {}),
               installedRefillOfferingId:
@@ -11657,6 +11671,7 @@ async function queryOwnedItems(
       collectionId: row.collectionId,
       collectionItemId: row.collectionItemId,
       installedPenPartCollectionItemIds: [],
+      customizedPenPartCollectionItemIds: [],
       collectionName: row.collectionName,
       displayName: row.displayName,
       description: row.descriptionOverride ?? row.productDescription,
@@ -11754,6 +11769,8 @@ async function queryOwnedItems(
     const [installedParts, ownershipPeriods] = await Promise.all([
       db
         .select({
+          requiresCustomization:
+            schema.collectionItemInstalledPenPart.requiresCustomization,
           partCollectionItemId:
             schema.collectionItemInstalledPenPart.partCollectionItemId,
           penCollectionItemId:
@@ -11784,6 +11801,12 @@ async function queryOwnedItems(
       items.map((item) => [item.collectionItemId, item]),
     );
     for (const installedPart of installedParts) {
+      if (installedPart.requiresCustomization)
+        itemsById
+          .get(installedPart.penCollectionItemId)
+          ?.customizedPenPartCollectionItemIds?.push(
+            installedPart.partCollectionItemId,
+          );
       itemsById
         .get(installedPart.penCollectionItemId)
         ?.installedPenPartCollectionItemIds?.push(
@@ -13103,7 +13126,7 @@ async function replaceProductLinks(
 async function replaceInstalledPenParts(
   tx: CatalogTransaction,
   input: {
-    /** Destination collection for any installed physical parts. */
+    /** Destination collection for installed parts. */
     collectionId: number;
     /** Owned Pen receiving the parts. */
     collectionItemId: number;
@@ -13111,51 +13134,131 @@ async function replaceInstalledPenParts(
     ownerId: number;
     /** Catalog Pen product. */
     productId: number;
-    /** Replacement owned Pen-part collection items. */
+    /** Replacement owned Pen-part items. */
     partCollectionItemIds: number[];
+    /** Particular exceptions explicitly acknowledged by the owner. */
+    customizationConfirmedPartCollectionItemIds?: number[];
   },
 ): Promise<void> {
   const partIds = [...new Set(input.partCollectionItemIds)];
   if (partIds.length !== input.partCollectionItemIds.length)
     throw new Error("An installed Pen part may be selected only once.");
-  const [compatibleParts, parts] = await Promise.all([
-    tx
-      .select({ partProductId: schema.penCompatiblePart.partProductId })
-      .from(schema.penCompatiblePart)
-      .where(eq(schema.penCompatiblePart.penProductId, input.productId)),
-    partIds.length
-      ? tx
-          .select({
-            id: schema.collectionItem.id,
-            ownerId: schema.collectionItem.ownerId,
-            productId: sql<
-              number | null
-            >`collection_catalog_product(${schema.collectionItem.id})`.mapWith(
-              schema.product.id,
-            ),
-          })
-          .from(schema.collectionItem)
-          .where(
-            and(
-              inArray(schema.collectionItem.id, partIds),
-              eq(schema.collectionItem.owned, true),
-            ),
-          )
-      : Promise.resolve([]),
-  ]);
-  const compatibleProductIds = new Set(
-    compatibleParts.map(({ partProductId }) => partProductId),
+  const confirmed = new Set(
+    input.customizationConfirmedPartCollectionItemIds ?? [],
   );
+  if ([...confirmed].some((id) => !partIds.includes(id)))
+    throw new Error(
+      "Customization confirmation must name a selected owned part.",
+    );
+  const [pen] = await tx
+    .select()
+    .from(schema.productDetailPen)
+    .where(eq(schema.productDetailPen.id, input.productId));
+  if (partIds.length && !pen)
+    throw new Error("Only Pens may have installed Pen parts.");
+  const compatibleParts = await tx
+    .select({ partProductId: schema.penCompatiblePart.partProductId })
+    .from(schema.penCompatiblePart)
+    .where(eq(schema.penCompatiblePart.penProductId, input.productId));
+  const previous = await tx
+    .select()
+    .from(schema.collectionItemInstalledPenPart)
+    .where(
+      eq(
+        schema.collectionItemInstalledPenPart.penCollectionItemId,
+        input.collectionItemId,
+      ),
+    );
+  const parts = partIds.length
+    ? await tx
+        .select({
+          id: schema.collectionItem.id,
+          ownerId: schema.collectionItem.ownerId,
+          ownerClerkId: schema.user.clerkId,
+          isPrivate: schema.collectionItem.isPrivate,
+          privatedByClerkId: schema.collectionItem.privatedByClerkId,
+          productId: schema.product.id,
+          type: schema.productType.slug,
+        })
+        .from(schema.collectionItem)
+        .innerJoin(
+          schema.user,
+          eq(schema.user.id, schema.collectionItem.ownerId),
+        )
+        .innerJoin(
+          schema.productDetailPenPart,
+          eq(
+            schema.productDetailPenPart.id,
+            sql`collection_catalog_product(${schema.collectionItem.id})`,
+          ),
+        )
+        .innerJoin(
+          schema.product,
+          eq(schema.product.id, schema.productDetailPenPart.id),
+        )
+        .innerJoin(
+          schema.productType,
+          eq(schema.productType.id, schema.product.productTypeId),
+        )
+        .where(
+          and(
+            inArray(schema.collectionItem.id, partIds),
+            eq(schema.collectionItem.owned, true),
+          ),
+        )
+    : [];
   if (
     parts.length !== partIds.length ||
     parts.some(
       (part) =>
         part.ownerId !== input.ownerId ||
-        part.productId === null ||
-        !compatibleProductIds.has(part.productId),
+        !(part.type in penPartInterchangeabilityKeys) ||
+        (part.isPrivate &&
+          part.privatedByClerkId !== null &&
+          part.privatedByClerkId !== part.ownerClerkId),
     )
   )
-    throw new Error("Installed Pen parts must be compatible and owned by you.");
+    throw new Error("Installed Pen parts must be available and owned by you.");
+  const occupied = partIds.length
+    ? await tx
+        .select()
+        .from(schema.collectionItemInstalledPenPart)
+        .where(
+          inArray(
+            schema.collectionItemInstalledPenPart.partCollectionItemId,
+            partIds,
+          ),
+        )
+    : [];
+  if (
+    occupied.some((part) => part.penCollectionItemId !== input.collectionItemId)
+  )
+    throw new Error("Installed Pen part is unavailable.");
+  const compatibleIds = new Set(
+    compatibleParts.map(({ partProductId }) => partProductId),
+  );
+  const replacements = parts.map((part) => {
+    const key =
+      penPartInterchangeabilityKeys[
+        part.type as keyof typeof penPartInterchangeabilityKeys
+      ];
+    const needsCustomization =
+      !compatibleIds.has(part.productId) || !pen?.[`${key}Interchangeable`];
+    const existing = previous.find(
+      ({ partCollectionItemId }) => partCollectionItemId === part.id,
+    );
+    if (needsCustomization && !existing && !confirmed.has(part.id))
+      throw new Error(
+        "Customization confirmation is required for this owned Pen part.",
+      );
+    return {
+      partCollectionItemId: part.id,
+      penCollectionItemId: input.collectionItemId,
+      requiresCustomization:
+        needsCustomization &&
+        (confirmed.has(part.id) || (existing?.requiresCustomization ?? false)),
+    };
+  });
   if (partIds.length)
     await tx
       .update(schema.collectionItem)
@@ -13169,14 +13272,8 @@ async function replaceInstalledPenParts(
         input.collectionItemId,
       ),
     );
-  if (partIds.length) {
-    await tx.insert(schema.collectionItemInstalledPenPart).values(
-      partIds.map((partCollectionItemId) => ({
-        partCollectionItemId,
-        penCollectionItemId: input.collectionItemId,
-      })),
-    );
-  }
+  if (replacements.length)
+    await tx.insert(schema.collectionItemInstalledPenPart).values(replacements);
 }
 
 /**
