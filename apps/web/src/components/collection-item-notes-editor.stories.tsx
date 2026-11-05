@@ -73,8 +73,8 @@ export const NoteLifecycle: Story = {
       await context.canvas.findByRole("dialog", { name: "Add note" }),
     );
     await expect(
-      modal.getByRole("combobox", { name: "Note visibility" }),
-    ).toHaveTextContent("Private");
+      modal.getByRole("switch", { name: "Public" }),
+    ).not.toBeChecked();
     await context.userEvent.type(
       modal.getByRole("textbox", { name: "Note name" }),
       "Setup",
@@ -108,15 +108,7 @@ export const NoteLifecycle: Story = {
     const edit = within(
       await context.canvas.findByRole("dialog", { name: "Edit note" }),
     );
-    await context.userEvent.click(
-      edit.getByRole("combobox", { name: "Note visibility" }),
-    );
-    await context.userEvent.click(
-      await within(context.canvasElement.ownerDocument.body).findByRole(
-        "option",
-        { name: /^Public$/ },
-      ),
-    );
+    await context.userEvent.click(edit.getByRole("switch", { name: "Public" }));
     await waitFor(() =>
       expect(edit.getByRole("button", { name: "Save note" })).toBeEnabled(),
     );
@@ -197,15 +189,7 @@ export const IndependentOrdering: Story = {
     const edit = within(
       await context.canvas.findByRole("dialog", { name: "Edit note" }),
     );
-    await context.userEvent.click(
-      edit.getByRole("combobox", { name: "Note visibility" }),
-    );
-    await context.userEvent.click(
-      await within(context.canvasElement.ownerDocument.body).findByRole(
-        "option",
-        { name: /^Public$/ },
-      ),
-    );
+    await context.userEvent.click(edit.getByRole("switch", { name: "Public" }));
     await waitFor(() =>
       expect(edit.getByRole("button", { name: "Save note" })).toBeEnabled(),
     );

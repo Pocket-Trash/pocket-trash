@@ -144,6 +144,7 @@ describe("standalone slider collection items", () => {
           async (slug) =>
             collectionsService.addSliderProduct({
               actor,
+              isPrivate: true,
               collectionId: primary.id,
               customFinish: null,
               displayName: slug,
@@ -167,6 +168,89 @@ describe("standalone slider collection items", () => {
             }),
         ),
       );
+      expect(await collectionsService.listOwned(actor)).toEqual(
+        expect.arrayContaining(
+          itemIds.map((collectionItemId) =>
+            expect.objectContaining({ collectionItemId, isPrivate: true }),
+          ),
+        ),
+      );
+      for (const collectionItemId of itemIds) {
+        await collectionsService.updateItem({
+          actor,
+          collectionItemId,
+          customFinish: null,
+          displayName: "Public item",
+          finishOptionId: null,
+          isPrivate: false,
+        });
+      }
+      expect(await collectionsService.listOwned(actor)).toEqual(
+        expect.arrayContaining(
+          itemIds.map((collectionItemId) =>
+            expect.objectContaining({ collectionItemId, isPrivate: false }),
+          ),
+        ),
+      );
+      const privateItemId = itemIds[1];
+      if (!privateItemId) throw new Error("Missing privacy fixture");
+      await db
+        .update(schema.collectionItem)
+        .set({
+          isPrivate: true,
+          privatedByClerkId: otherOwner.clerkId,
+          privatedAt: new Date(),
+          privateReason: "Staff fixture",
+        })
+        .where(eq(schema.collectionItem.id, privateItemId));
+      await expect(
+        collectionsService.updateItem({
+          actor,
+          collectionItemId: privateItemId,
+          customFinish: null,
+          displayName: "Must roll back",
+          finishOptionId: null,
+          isPrivate: false,
+        }),
+      ).rejects.toThrow("private by an administrator");
+      expect(
+        await collectionsService.getOwnedItem(actor, privateItemId),
+      ).toMatchObject({ displayName: "Public item", isPrivate: true });
+      await collectionsService.updateItem({
+        actor,
+        collectionItemId: privateItemId,
+        customFinish: null,
+        displayName: "Public item",
+        finishOptionId: null,
+        isPrivate: true,
+      });
+      expect(
+        await db
+          .select({
+            privatedByClerkId: schema.collectionItem.privatedByClerkId,
+          })
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.id, privateItemId)),
+      ).toEqual([{ privatedByClerkId: otherOwner.clerkId }]);
+      await expect(
+        collectionsService.updateItem({
+          actor: { clerkId: otherOwner.clerkId, role: "user" },
+          collectionItemId: privateItemId,
+          customFinish: null,
+          displayName: "Unauthorized",
+          finishOptionId: null,
+          isPrivate: false,
+        }),
+      ).rejects.toThrow("does not exist");
+      await db
+        .update(schema.collectionItem)
+        .set({
+          isPrivate: false,
+          privatedByClerkId: null,
+          privatedAt: null,
+          privateReason: null,
+        })
+        .where(eq(schema.collectionItem.id, privateItemId));
       const sliderItemId = itemIds[0];
       const insertItemId = itemIds[2];
       if (!sliderItemId || !insertItemId) throw new Error("Items missing.");

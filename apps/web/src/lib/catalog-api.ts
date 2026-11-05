@@ -1140,6 +1140,7 @@ const collectionAddSchema = z
     collectionId: idSchema.nullable().optional().default(null),
     confirmed: z.boolean(),
     customFinish: finishOptionSchema.nullable(),
+    isPrivate: z.boolean().optional(),
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
     finishOptionId: idSchema.nullable(),
@@ -1239,6 +1240,7 @@ const collectionEditSchema = z
     customizationConfirmedPartCollectionItemIds: z.array(idSchema).optional(),
     installedPenActuations: z.array(installedPenActuationSchema).optional(),
     customFinish: finishOptionSchema.nullable(),
+    isPrivate: z.boolean().optional(),
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
     finishOptionId: idSchema.nullable(),
@@ -2484,6 +2486,9 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
       if (penProductType.success) {
         collectionItemId = await s.db.collections.addPenProduct({
           actor,
+          ...(parsed.data.isPrivate !== undefined
+            ? { isPrivate: parsed.data.isPrivate }
+            : {}),
           collectionId: parsed.data.collectionId,
           installedPenPartCollectionItemIds:
             parsed.data.installedPenPartCollectionItemIds,
@@ -2514,6 +2519,9 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           collectionItemId = (
             await s.db.collections.addSpinner({
               actor,
+              ...(parsed.data.isPrivate !== undefined
+                ? { isPrivate: parsed.data.isPrivate }
+                : {}),
               bearing: parsed.data.bearing,
               buttonCustomFinish: parsed.data.buttonCustomFinish
                 ? toFinishWriteOption(parsed.data.buttonCustomFinish)
@@ -2540,6 +2548,9 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         } else if (parsed.data.productTypeSlug === "spinner-button") {
           collectionItemId = await s.db.collections.addSpinnerButton({
             actor,
+            ...(parsed.data.isPrivate !== undefined
+              ? { isPrivate: parsed.data.isPrivate }
+              : {}),
             customFinish: parsed.data.customFinish
               ? toFinishWriteOption(parsed.data.customFinish)
               : null,
@@ -2560,6 +2571,9 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             .parse(parsed.data.productTypeSlug);
           collectionItemId = await s.db.collections.addSliderProduct({
             actor,
+            ...(parsed.data.isPrivate !== undefined
+              ? { isPrivate: parsed.data.isPrivate }
+              : {}),
             collectionId: parsed.data.collectionId,
             customFinish: parsed.data.customFinish
               ? toFinishWriteOption(parsed.data.customFinish)

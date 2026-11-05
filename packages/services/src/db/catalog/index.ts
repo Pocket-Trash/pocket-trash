@@ -2459,6 +2459,8 @@ export type CollectionsService = {
    * @rejects When the product type, configuration, ownership, persistence, auditing, or logging fails.
    */
   addPenProduct(input: {
+    /** Requested item privacy, when authored by the caller. */
+    isPrivate?: boolean;
     /** Authenticated actor. */
     actor: Actor;
     /** Collection identifier. */
@@ -2510,6 +2512,8 @@ export type CollectionsService = {
    * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
    */
   addSpinner(input: {
+    /** Requested item privacy, when authored by the caller. */
+    isPrivate?: boolean;
     /**
      * Authenticated actor.
      */
@@ -2590,6 +2594,8 @@ export type CollectionsService = {
    * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
    */
   addSpinnerButton(input: {
+    /** Requested item privacy, when authored by the caller. */
+    isPrivate?: boolean;
     /**
      * Authenticated actor.
      */
@@ -2641,6 +2647,8 @@ export type CollectionsService = {
    * @rejects When the product type, material, authorization, persistence, auditing, or logging fails.
    */
   addSliderProduct(input: {
+    /** Requested item privacy, when authored by the caller. */
+    isPrivate?: boolean;
     /** Authenticated actor. */
     actor: Actor;
     /** Collection identifier. */
@@ -2960,6 +2968,8 @@ export type CollectionsService = {
    * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
    */
   updateItem(input: {
+    /** Requested item privacy, when authored by the caller. */
+    isPrivate?: boolean;
     /**
      * Authenticated actor.
      */
@@ -6148,6 +6158,7 @@ export function createCatalogService(
  * @param audit - Audit writer.
  * @param logger - Structured operation logger.
  * @returns Collection database operations.
+ * @rejects When a returned collection operation fails authorization, persistence, or auditing.
  */
 export function createCollectionsService(
   db: Database,
@@ -6155,6 +6166,145 @@ export function createCollectionsService(
   audit: AuditService,
   logger: Logger,
 ): CollectionsService {
+  /**
+   * Applies visibility with the existing ownership, moderation, and inheritance guards.
+   * @param tx - Transaction owning the item mutation.
+   * @param input - Authenticated visibility request.
+   * @param actorUser - Actor resolved before entering the transaction.
+   * @rejects When authorization, inheritance, persistence, or auditing fails.
+   */
+  async function applyItemVisibility(
+    tx: CatalogTransaction,
+    input: Parameters<CollectionsService["setItemVisibility"]>[0],
+    actorUser: NonNullable<Awaited<ReturnType<UsersService["getByClerkId"]>>>,
+  ): Promise<void> {
+    const canManage = hasPermission(input.actor, "collections.manage");
+
+    const [item] = await tx
+      .select({
+        collectionIsPrivate: schema.userCollection.isPrivate,
+        installedButtonId: schema.collectionDetailSpinner.installedButtonId,
+        installedInsertId: schema.collectionDetailSlider.installedInsertId,
+        installedPlateId: schema.collectionDetailSlider.installedPlateId,
+        installedParentId: sql<number | null>`coalesce(
+              (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
+              (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
+              (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id}),
+          (select pen_collection_item_id from collection_item_installed_pen_part where part_collection_item_id = ${schema.collectionItem.id})
+            )`,
+        isPrivate: schema.collectionItem.isPrivate,
+        ownerId: schema.collectionItem.ownerId,
+        privatedByClerkId: schema.collectionItem.privatedByClerkId,
+      })
+      .from(schema.collectionItem)
+      .innerJoin(
+        schema.userCollection,
+        eq(schema.collectionItem.collectionId, schema.userCollection.id),
+      )
+      .leftJoin(
+        schema.collectionDetailSpinner,
+        eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
+      )
+      .leftJoin(
+        schema.collectionDetailSlider,
+        eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
+      )
+      .where(eq(schema.collectionItem.id, input.collectionItemId))
+      .for("update", { of: schema.collectionItem })
+      .limit(1);
+    if (!item || (item.ownerId !== actorUser.id && !canManage))
+      throw new Error("Collection item does not exist.");
+    if (item.installedParentId != null) {
+      throw new CollectionItemPrivacyInheritedError(item.installedParentId);
+    }
+    const actorIsModerating = item.ownerId !== actorUser.id;
+    if (
+      !input.isPrivate &&
+      item.privatedByClerkId &&
+      item.privatedByClerkId !== input.actor.clerkId &&
+      !actorIsModerating
+    ) {
+      throw new Error("Collection item is private by an administrator.");
+    }
+    if (item.isPrivate === input.isPrivate) return;
+    const installedComponentIds = [
+      item.installedButtonId,
+      item.installedPlateId,
+      item.installedInsertId,
+    ].filter((id): id is number => id !== null);
+    if (item.isPrivate && !input.isPrivate && !item.collectionIsPrivate) {
+      await assertAssemblyComponentsMayBePublic(tx, {
+        componentIds: installedComponentIds,
+        operation: "publish",
+      });
+    }
+    const before = {
+      id: input.collectionItemId,
+      isPrivate: item.isPrivate,
+    };
+    await tx
+      .update(schema.collectionItem)
+      .set(
+        privacyUpdate({
+          actorClerkId: input.actor.clerkId,
+          actorIsModerating,
+          isPrivate: input.isPrivate,
+          reason: input.reason,
+        }),
+      )
+      .where(eq(schema.collectionItem.id, input.collectionItemId));
+    await writeCollectionAudit(audit, tx, {
+      actor: input.actor,
+      actorUser,
+      after: { ...before, isPrivate: input.isPrivate },
+      before,
+      definition: collectionAudit.itemVisibilityChanged,
+      ownerUserId: item.ownerId,
+      reason: input.reason,
+      targetId: input.collectionItemId,
+    });
+    if (item.isPrivate !== input.isPrivate && installedComponentIds.length) {
+      const components = await tx
+        .select({
+          id: schema.collectionItem.id,
+          ownerClerkId: schema.user.clerkId,
+          privatedByClerkId: schema.collectionItem.privatedByClerkId,
+          savedIsPrivate: schema.collectionItem.isPrivate,
+        })
+        .from(schema.collectionItem)
+        .innerJoin(
+          schema.user,
+          eq(schema.collectionItem.ownerId, schema.user.id),
+        )
+        .where(inArray(schema.collectionItem.id, installedComponentIds));
+      for (const component of components) {
+        const staffForcedPrivate = Boolean(
+          component.savedIsPrivate &&
+            component.privatedByClerkId !== null &&
+            component.privatedByClerkId !== component.ownerClerkId,
+        );
+        await writeCollectionAudit(audit, tx, {
+          actor: input.actor,
+          actorUser,
+          after: {
+            effectiveIsPrivate: staffForcedPrivate || input.isPrivate,
+            inheritedFromItemId: input.collectionItemId,
+            savedIsPrivate: component.savedIsPrivate,
+          },
+          before: {
+            effectiveIsPrivate: staffForcedPrivate || item.isPrivate,
+            inheritedFromItemId: input.collectionItemId,
+            savedIsPrivate: component.savedIsPrivate,
+          },
+          definition: collectionAudit.itemVisibilityChanged,
+          ownerUserId: item.ownerId,
+          reason: input.reason,
+          targetId: component.id,
+        });
+      }
+    }
+  }
+
   return {
     /**
      * Applies one serialized collection-item approval transition with transactional auditing.
@@ -6399,6 +6549,17 @@ export function createCollectionsService(
               productFinishOptionId: input.finishOptionId,
               productId: input.productId,
             });
+            if (input.isPrivate !== undefined) {
+              await applyItemVisibility(
+                tx,
+                {
+                  actor: input.actor,
+                  collectionItemId: item.id,
+                  isPrivate: input.isPrivate,
+                },
+                owner,
+              );
+            }
             await touchCollection(tx, resolvedCollection.id);
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -6585,6 +6746,17 @@ export function createCollectionsService(
               productFinishOptionId: input.spinnerFinishOptionId,
               productId: input.spinnerProductId,
             });
+            if (input.isPrivate !== undefined) {
+              await applyItemVisibility(
+                tx,
+                {
+                  actor: input.actor,
+                  collectionItemId: spinnerItem.id,
+                  isPrivate: input.isPrivate,
+                },
+                owner,
+              );
+            }
             await touchCollection(tx, collectionId);
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -6685,6 +6857,17 @@ export function createCollectionsService(
               productFinishOptionId: input.finishOptionId,
               productId: input.productId,
             });
+            if (input.isPrivate !== undefined) {
+              await applyItemVisibility(
+                tx,
+                {
+                  actor: input.actor,
+                  collectionItemId: item.id,
+                  isPrivate: input.isPrivate,
+                },
+                owner,
+              );
+            }
             await touchCollection(tx, collectionId);
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -6832,6 +7015,17 @@ export function createCollectionsService(
               productFinishOptionId: input.finishOptionId,
               productId: input.productId,
             });
+            if (input.isPrivate !== undefined) {
+              await applyItemVisibility(
+                tx,
+                {
+                  actor: input.actor,
+                  collectionItemId: item.id,
+                  isPrivate: input.isPrivate,
+                },
+                owner,
+              );
+            }
             await touchCollection(tx, resolvedCollection.id);
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -7856,133 +8050,10 @@ export function createCollectionsService(
      * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
      */
     async setItemVisibility(input) {
-      const canManage = hasPermission(input.actor, "collections.manage");
       const actorUser = await users.getByClerkId(input.actor.clerkId);
       if (!actorUser) throw new Error("Collection item does not exist.");
       await db.transaction(async (tx) => {
-        const [item] = await tx
-          .select({
-            collectionIsPrivate: schema.userCollection.isPrivate,
-            installedButtonId: schema.collectionDetailSpinner.installedButtonId,
-            installedInsertId: schema.collectionDetailSlider.installedInsertId,
-            installedPlateId: schema.collectionDetailSlider.installedPlateId,
-            installedParentId: sql<number | null>`coalesce(
-              (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
-              (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
-              (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id})
-            )`,
-            isPrivate: schema.collectionItem.isPrivate,
-            ownerId: schema.collectionItem.ownerId,
-            privatedByClerkId: schema.collectionItem.privatedByClerkId,
-          })
-          .from(schema.collectionItem)
-          .innerJoin(
-            schema.userCollection,
-            eq(schema.collectionItem.collectionId, schema.userCollection.id),
-          )
-          .leftJoin(
-            schema.collectionDetailSpinner,
-            eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
-          )
-          .leftJoin(
-            schema.collectionDetailSlider,
-            eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
-          )
-          .where(eq(schema.collectionItem.id, input.collectionItemId))
-          .limit(1);
-        if (!item || (item.ownerId !== actorUser.id && !canManage))
-          throw new Error("Collection item does not exist.");
-        if (item.installedParentId != null) {
-          throw new CollectionItemPrivacyInheritedError(item.installedParentId);
-        }
-        const actorIsModerating = item.ownerId !== actorUser.id;
-        if (
-          !input.isPrivate &&
-          item.privatedByClerkId &&
-          item.privatedByClerkId !== input.actor.clerkId &&
-          !actorIsModerating
-        ) {
-          throw new Error("Collection item is private by an administrator.");
-        }
-        const installedComponentIds = [
-          item.installedButtonId,
-          item.installedPlateId,
-          item.installedInsertId,
-        ].filter((id): id is number => id !== null);
-        if (item.isPrivate && !input.isPrivate && !item.collectionIsPrivate) {
-          await assertAssemblyComponentsMayBePublic(tx, {
-            componentIds: installedComponentIds,
-            operation: "publish",
-          });
-        }
-        const before = {
-          id: input.collectionItemId,
-          isPrivate: item.isPrivate,
-        };
-        await tx
-          .update(schema.collectionItem)
-          .set(
-            privacyUpdate({
-              actorClerkId: input.actor.clerkId,
-              actorIsModerating,
-              isPrivate: input.isPrivate,
-              reason: input.reason,
-            }),
-          )
-          .where(eq(schema.collectionItem.id, input.collectionItemId));
-        await writeCollectionAudit(audit, tx, {
-          actor: input.actor,
-          actorUser,
-          after: { ...before, isPrivate: input.isPrivate },
-          before,
-          definition: collectionAudit.itemVisibilityChanged,
-          ownerUserId: item.ownerId,
-          reason: input.reason,
-          targetId: input.collectionItemId,
-        });
-        if (
-          item.isPrivate !== input.isPrivate &&
-          installedComponentIds.length
-        ) {
-          const components = await tx
-            .select({
-              id: schema.collectionItem.id,
-              ownerClerkId: schema.user.clerkId,
-              privatedByClerkId: schema.collectionItem.privatedByClerkId,
-              savedIsPrivate: schema.collectionItem.isPrivate,
-            })
-            .from(schema.collectionItem)
-            .innerJoin(
-              schema.user,
-              eq(schema.collectionItem.ownerId, schema.user.id),
-            )
-            .where(inArray(schema.collectionItem.id, installedComponentIds));
-          for (const component of components) {
-            const staffForcedPrivate = Boolean(
-              component.savedIsPrivate &&
-                component.privatedByClerkId !== null &&
-                component.privatedByClerkId !== component.ownerClerkId,
-            );
-            await writeCollectionAudit(audit, tx, {
-              actor: input.actor,
-              actorUser,
-              after: {
-                effectiveIsPrivate: staffForcedPrivate || input.isPrivate,
-                inheritedFromItemId: input.collectionItemId,
-                savedIsPrivate: component.savedIsPrivate,
-              },
-              before: {
-                effectiveIsPrivate: staffForcedPrivate || item.isPrivate,
-                inheritedFromItemId: input.collectionItemId,
-                savedIsPrivate: component.savedIsPrivate,
-              },
-              definition: collectionAudit.itemVisibilityChanged,
-              ownerUserId: item.ownerId,
-              reason: input.reason,
-              targetId: component.id,
-            });
-          }
-        }
+        await applyItemVisibility(tx, input, actorUser);
       });
     },
     /**
@@ -8721,9 +8792,22 @@ export function createCollectionsService(
               input.metadata,
               input.ownership,
             );
+            if (input.isPrivate !== undefined) {
+              await applyItemVisibility(
+                tx,
+                {
+                  actor: input.actor,
+                  collectionItemId: input.collectionItemId,
+                  isPrivate: input.isPrivate,
+                  reason: input.reason,
+                },
+                owner,
+              );
+            }
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
+              isPrivate: input.isPrivate ?? item.isPrivate,
               ...(item.penProductId != null
                 ? {
                     installedPenActuations:

@@ -373,7 +373,7 @@ export const LifecycleSalePrice: Story = {
    */
   play: async (context) => {
     await context.userEvent.click(
-      context.canvas.getByRole("checkbox", { name: "Currently owned" }),
+      context.canvas.getByRole("switch", { name: "Currently owned" }),
     );
     await context.userEvent.click(
       context.canvas.getByRole("combobox", { name: "Departure reason" }),

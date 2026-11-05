@@ -71,6 +71,7 @@ import { PenActuationLinks } from "@/components/pen-actuation-links";
 import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { FileDropInput } from "@/components/resource-file-input";
+import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { SliderMagnetConfigurationEditor } from "@/components/slider-magnet-configuration-editor";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,6 +93,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { UserPageShell } from "@/components/user-page-shell";
 import { usePenSettings } from "@/hooks/use-pen-settings";
 import {
@@ -4930,6 +4932,7 @@ function ownershipEditorValue(
  */
 function OwnershipLifecycleFields({
   allowDeparture,
+  disabled = false,
   onChange,
   onPeriodChange,
   periods = [],
@@ -4937,6 +4940,8 @@ function OwnershipLifecycleFields({
 }: {
   /** Whether this form can close an ownership period. */
   allowDeparture: boolean;
+  /** Whether ownership fields are read-only for the viewer. */
+  disabled?: boolean;
   /**
    * Receives lifecycle field changes.
    *
@@ -5006,23 +5011,18 @@ function OwnershipLifecycleFields({
           </Select>
         </Field>
       ) : null}
-      <label className="flex items-center gap-3 text-sm">
-        <input
-          checked={value.startDateUnknown}
-          className="size-4"
-          onChange={(event) =>
-            onChange({
-              ...value,
-              effectiveStartDate: event.target.checked
-                ? ""
-                : value.effectiveStartDate,
-              startDateUnknown: event.target.checked,
-            })
-          }
-          type="checkbox"
-        />
-        <span>{t("web.collections.lifecycle.acquisitionDateUnknown")}</span>
-      </label>
+      <Switch
+        checked={value.startDateUnknown}
+        disabled={disabled}
+        label={t("web.collections.lifecycle.acquisitionDateUnknown")}
+        onCheckedChange={(checked) =>
+          onChange({
+            ...value,
+            effectiveStartDate: checked ? "" : value.effectiveStartDate,
+            startDateUnknown: checked,
+          })
+        }
+      />
       <Field label={t("web.collections.lifecycle.acquisitionDate")}>
         <Input
           aria-label={t("web.collections.lifecycle.acquisitionDate")}
@@ -5066,25 +5066,19 @@ function OwnershipLifecycleFields({
       </Field>
       {allowDeparture ? (
         <>
-          <label className="flex items-center gap-3 text-sm">
-            <input
-              checked={value.currentlyOwned}
-              className="size-4"
-              disabled={value.periodId === null}
-              onChange={(event) =>
-                onChange({
-                  ...value,
-                  currentlyOwned: event.target.checked,
-                  effectiveEndDate: event.target.checked
-                    ? ""
-                    : value.effectiveEndDate,
-                  exitReason: event.target.checked ? "" : value.exitReason,
-                })
-              }
-              type="checkbox"
-            />
-            <span>{t("web.collections.lifecycle.currentlyOwned")}</span>
-          </label>
+          <Switch
+            checked={value.currentlyOwned}
+            disabled={disabled || value.periodId === null}
+            label={t("web.collections.lifecycle.currentlyOwned")}
+            onCheckedChange={(checked) =>
+              onChange({
+                ...value,
+                currentlyOwned: checked,
+                effectiveEndDate: checked ? "" : value.effectiveEndDate,
+                exitReason: checked ? "" : value.exitReason,
+              })
+            }
+          />
           {!value.currentlyOwned ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t("web.collections.lifecycle.departureDate")}>
@@ -5388,6 +5382,7 @@ export function CollectionAddPage({
     product: (initialProduct ?? null) as CatalogProduct | null,
     displayName: initialDefaults.displayName,
     description: initialProduct?.description ?? "",
+    isPublic: true,
     bearing: "",
     serialNumber: null as string | null,
     pricePaidInput: moneyInput(undefined, currency),
@@ -5545,6 +5540,7 @@ export function CollectionAddPage({
         customFinish: finish?.id === "custom" ? customFinish : null,
         displayName,
         description: currentDescription,
+        isPrivate: collectionIsPrivate || !value.isPublic,
         finishOptionId:
           finish?.id === "custom" ? null : finish ? Number(finish.id) : null,
         installedRefillOfferingId,
@@ -5583,6 +5579,7 @@ export function CollectionAddPage({
   });
   const {
     images,
+    isPublic,
     product,
     newCollection,
     selectedCollectionId,
@@ -6452,14 +6449,13 @@ export function CollectionAddPage({
               <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
             ) : null}
             {product ? (
-              <Button
-                aria-pressed
-                disabled={collectionIsPrivate}
-                type="button"
-                variant="outline"
-              >
-                {t("web.resources.visibility.public")}
-              </Button>
+              <PublicResourceSwitch
+                checked={isPublic && !collectionIsPrivate}
+                disabled={collectionIsPrivate || Boolean(ui.save)}
+                onCheckedChange={(checked) =>
+                  form.setFieldValue("isPublic", checked)
+                }
+              />
             ) : null}
             {Object.keys(duplicateCounts).length ? (
               <Notice>
@@ -6630,15 +6626,11 @@ function SerialNumberFields({
   const label = t("web.collections.serial.hasSerialNumber" as TranslationKey);
   return (
     <div className="grid gap-3">
-      <label className="flex items-center gap-2 text-sm font-medium">
-        <input
-          checked={value !== null}
-          className="size-4 accent-primary"
-          onChange={(event) => onChange(event.target.checked ? "" : null)}
-          type="checkbox"
-        />
-        {label}
-      </label>
+      <Switch
+        checked={value !== null}
+        label={label}
+        onCheckedChange={(checked) => onChange(checked ? "" : null)}
+      />
       {value !== null ? (
         <Field
           label={t("web.collections.field.serialNumber" as TranslationKey)}
@@ -7556,6 +7548,7 @@ export function CollectionEditPage({
     collectionId: item.collectionId,
     displayName: item.displayName,
     description: item.descriptionOverride ?? product.description ?? "",
+    isPublic: !(item.savedIsPrivate ?? item.isPrivate),
     bearing: item.bearingOverride ?? "",
     serialNumber: (item.serialNumber ?? null) as string | null,
     pricePaidInput: moneyInput(ownershipPeriods.at(-1)?.pricePaid, currency),
@@ -7828,6 +7821,13 @@ export function CollectionEditPage({
           customFinish: finish?.id === "custom" ? customFinish : null,
           displayName,
           description: currentDescription,
+          ...(!item.isAdminPrivate &&
+          item.isOwner &&
+          item.privacyInheritedFromItemId == null &&
+          (value.isPublic !== defaultValues.isPublic ||
+            value.collectionId !== item.collectionId)
+            ? { isPrivate: collectionIsPrivate || !value.isPublic }
+            : {}),
           finishOptionId:
             finish?.id === "current" || finish?.id === "custom"
               ? null
@@ -7900,6 +7900,7 @@ export function CollectionEditPage({
   });
   const {
     images,
+    isPublic,
     existingImages,
     collectionId,
     displayName,
@@ -8128,10 +8129,21 @@ export function CollectionEditPage({
   const effectiveMagnetLayout =
     selectedInsertProduct?.magnetLayout ?? product.magnetLayout;
 
+  const collectionIsPrivate =
+    collections.find(({ id }) => id === collectionId)?.isPrivate ??
+    (collectionId === item.collectionId ? item.collectionIsPrivate : true);
+  const inheritedPrivacy = item.privacyInheritedFromItemId != null;
+  const visibilityLocked =
+    collectionIsPrivate ||
+    inheritedPrivacy ||
+    item.isAdminPrivate ||
+    !item.isOwner;
+
   const ownershipFields = (
     <fieldset disabled={!item.isOwner}>
       <OwnershipLifecycleFields
         allowDeparture
+        disabled={!item.isOwner}
         onChange={(value) => form.setFieldValue("ownership", value)}
         onPeriodChange={(periodId) => {
           const period = ownershipPeriods.find(({ id }) => id === periodId);
@@ -8499,6 +8511,27 @@ export function CollectionEditPage({
             placeholder={t("web.collections.select.placeholder")}
             selectedId={collectionId}
           />
+          {collectionIsPrivate ? (
+            <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
+          ) : null}
+          {inheritedPrivacy ? (
+            <Notice>{t("web.slider.privacy.inheritedDescription")}</Notice>
+          ) : null}
+          {item.isAdminPrivate ? (
+            <Notice>{t("web.resources.visibility.adminPrivateTooltip")}</Notice>
+          ) : null}
+          <PublicResourceSwitch
+            checked={
+              !collectionIsPrivate &&
+              !item.isAdminPrivate &&
+              (inheritedPrivacy ? !item.isPrivate : isPublic)
+            }
+            disabled={visibilityLocked || Boolean(ui.save)}
+            onCheckedChange={(checked) =>
+              form.setFieldValue("isPublic", checked)
+            }
+          />
+
           {feedback ? (
             <Notice>
               {t(feedback.message)}

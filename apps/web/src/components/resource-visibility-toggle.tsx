@@ -1,4 +1,3 @@
-import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
@@ -9,6 +8,7 @@ import { useCallback, useId, useRef } from "react";
 import { toast } from "sonner";
 import { type EffectEntity, useEffectReducer } from "use-effect-reducer";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -49,29 +49,14 @@ export function PublicResourceSwitch({
    */
   onCheckedChange(checked: boolean): void;
 }) {
-  const id = useId();
   const { locale } = useLocale();
-  const publicLabel = formatTranslation(
-    "web.resources.visibility.public",
-    {},
-    locale,
-  );
   return (
-    <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
-      <label className="text-sm font-medium" htmlFor={id}>
-        {publicLabel}
-      </label>
-      <SwitchPrimitive.Root
-        aria-label={publicLabel}
-        checked={checked}
-        className="flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-muted-foreground/35 p-0.5 outline-none transition-colors data-[checked]:bg-green-600 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:data-[checked]:bg-green-500"
-        disabled={disabled}
-        id={id}
-        onCheckedChange={onCheckedChange}
-      >
-        <SwitchPrimitive.Thumb className="size-5 rounded-full bg-white shadow-sm transition-transform data-[checked]:translate-x-5" />
-      </SwitchPrimitive.Root>
-    </div>
+    <Switch
+      checked={checked}
+      disabled={disabled}
+      label={formatTranslation("web.resources.visibility.public", {}, locale)}
+      onCheckedChange={onCheckedChange}
+    />
   );
 }
 
