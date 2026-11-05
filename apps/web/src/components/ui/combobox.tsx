@@ -76,6 +76,7 @@ type RemoveLabelBuilder = (name: string) => string;
  * @param props.disabled - Whether input, selection, and removal controls are disabled.
  * @param props.items - Options available for selection.
  * @param props.onValueChange - Callback invoked with the selection, or `null` when cleared.
+ * @param props.portalContainer - Native modal that owns the popup when supplied.
  * @param props.placeholder - Text shown in the empty search input and when no options match.
  * @param props.removeLabel - Prefix combined with the selected option name for the optional removal control.
  * @param props.showSelectedPill - Whether to allow a selection pill when `removeLabel` is truthy, `value` is non-null, and `value.id` is not `"default"`.
@@ -88,6 +89,7 @@ export function CatalogCombobox({
   items,
   onValueChange,
   placeholder,
+  portalContainer,
   removeLabel,
   showSelectedPill = false,
   value,
@@ -116,6 +118,8 @@ export function CatalogCombobox({
    * Text shown in the empty search input and when no options match.
    */
   placeholder: string;
+  /** Native modal that owns this popup, when it must remain in the top layer. */
+  portalContainer?: React.RefObject<HTMLElement | null>;
   /**
    * Prefix combined with the selected option name for the optional removal
    * control.
@@ -151,7 +155,11 @@ export function CatalogCombobox({
         value={value}
       >
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
-        <ComboboxOptions ariaLabel={ariaLabel} placeholder={placeholder} />
+        <ComboboxOptions
+          ariaLabel={ariaLabel}
+          portalContainer={portalContainer}
+          placeholder={placeholder}
+        />
       </ComboboxPrimitive.Root>
       {showSelectedPill && removeLabel && value && value.id !== "default" ? (
         <SelectionPill
@@ -377,15 +385,20 @@ function ComboboxControl({
  *
  * @param props.ariaLabel - Accessible name of the list.
  * @param props - Combobox options properties.
+ * @param props.ariaLabel - Accessible name of the list.
+ * @param props.portalContainer - Native modal that owns the popup when supplied.
  * @param props.placeholder - Fallback message shown when no options match and `emptyLabel` is omitted.
  * @param props.emptyLabel - Message shown when no combobox options match.
  * @returns The rendered combobox options UI.
  */
 function ComboboxOptions({
+  portalContainer,
   ariaLabel,
   placeholder,
   emptyLabel = placeholder,
 }: {
+  /** Native modal that owns this popup, when provided. */
+  portalContainer?: React.RefObject<HTMLElement | null>;
   /** Accessible name shared with the controlling input. */
   ariaLabel: string;
   /**
@@ -398,7 +411,7 @@ function ComboboxOptions({
   placeholder: string;
 }) {
   return (
-    <ComboboxPrimitive.Portal>
+    <ComboboxPrimitive.Portal container={portalContainer}>
       <ComboboxPrimitive.Positioner className="z-50" sideOffset={4}>
         <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] max-w-[calc(100vw-2rem)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
           <ComboboxPrimitive.Empty className="px-3 py-2 text-sm text-muted-foreground">
@@ -444,6 +457,7 @@ function ComboboxOptions({
  *
  * @param props.ariaLabel - Accessible name of the list.
  * @param props - Grouped option-list properties.
+ * @param props.ariaLabel - Accessible name of the list.
  * @param props.emptyLabel - Message shown when no option matches.
  * @param props.placeholder - Fallback empty-state message.
  * @returns The grouped popup option list.

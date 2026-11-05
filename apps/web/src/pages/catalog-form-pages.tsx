@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faArrowRotateLeft,
+  faPenToSquare,
   faTrash,
   faXmark,
 } from "@fortawesome/pro-light-svg-icons";
@@ -94,7 +95,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserPageShell } from "@/components/user-page-shell";
+import { useMediaQuery } from "@/hooks/use-browser-layout";
 import { usePenSettings } from "@/hooks/use-pen-settings";
 import {
   filterButtonsByDiameter,
@@ -989,6 +997,27 @@ export function MaterialAssignmentsEditor({
   t,
   value,
 }: MaterialAssignmentsEditorProps) {
+  const desktop = useMediaQuery("(min-width: 640px)");
+  const modalContainer = React.useRef<HTMLDialogElement>(null);
+  const titleId = React.useId();
+  const helpId = React.useId();
+  /**
+   * Commits the native desktop modal and restores its opening control on dismissal.
+   * @param node - Mounted modal for the current editing session.
+   * @returns Cleanup when this modal closes or changes layout.
+   */
+  const bindDialog = React.useCallback((node: HTMLDialogElement | null) => {
+    if (!node) return;
+    modalContainer.current = node;
+    const trigger = document.activeElement;
+    node.showModal();
+    return () => {
+      node.close();
+      modalContainer.current = null;
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus();
+    };
+  }, []);
   const [editing, dispatch] = React.useReducer(
     (
       state: MaterialAssignmentSession,
@@ -1042,7 +1071,18 @@ export function MaterialAssignmentsEditor({
           materialCombinationSignature(assignment) ===
             materialCombinationSignature(current.assignment),
       );
-    return incomplete || duplicate ? { incomplete, duplicate } : undefined;
+    const invalidSpecific = current.assignment.materials.some(
+      ({ materialId, materialSpecificId }) =>
+        materialSpecificId !== null &&
+        !(options.materialSpecifics ?? []).some(
+          (specific) =>
+            specific.id === materialSpecificId &&
+            specific.materialId === materialId,
+        ),
+    );
+    return incomplete || duplicate || invalidSpecific
+      ? { incomplete, duplicate, invalidSpecific }
+      : undefined;
   };
   const draftForm = useForm({
     defaultValues: editing.initial,
@@ -1074,16 +1114,12 @@ export function MaterialAssignmentsEditor({
    * Opens a new or existing material combination.
    *
    * @param index - Existing assignment index, or null for a new assignment.
-   * @param componentCount - Number of empty component rows for a new assignment.
    */
-  const open = (index: number | null, componentCount = 1) => {
+  const open = (index: number | null) => {
     const assignment =
       index === null
         ? {
-            materials: Array.from({ length: componentCount }, () => ({
-              materialId: 0,
-              materialSpecificId: null,
-            })),
+            materials: [{ materialId: 0, materialSpecificId: null }],
             weight: { unit: "g", value: "" } as const,
           }
         : value[index];
@@ -1115,184 +1151,294 @@ export function MaterialAssignmentsEditor({
       }),
     );
 
-  return (
-    <>
-      {value.map((assignment, index) => (
-        <div className="flex items-center gap-2" key={index}>
-          <span className="min-w-0 flex-1 wrap-anywhere">
-            {label(assignment)}
-          </span>
-          <Button onClick={() => open(index)} type="button" variant="outline">
-            {t("web.catalog.materialCombination.edit")}
-          </Button>
-          <Button
-            aria-label={t("web.action.close")}
-            onClick={() => onChange(value.filter((_, i) => i !== index))}
-            type="button"
-            variant="outline"
+  const body = (
+    <div className="grid min-h-0 gap-4 overflow-y-auto p-6">
+      <p className="text-sm text-muted-foreground" id={helpId}>
+        {t("web.catalog.materialOptions.help")}
+      </p>
+      {draft.materials.map((selection, index) => {
+        const specifics = (options.materialSpecifics ?? []).filter(
+          ({ materialId }) => materialId === selection.materialId,
+        );
+        return (
+          <div
+            className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            key={index}
           >
-            <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
-          </Button>
-        </div>
-      ))}
-      <Button
-        disabled={singleAssignment && value.length > 0}
-        onClick={() => open(null)}
-        type="button"
-        variant="outline"
-      >
-        {t("web.catalog.materialCombination.addSingle")}
-      </Button>
-      <Button
-        disabled={singleAssignment && value.length > 0}
-        onClick={() => open(null, 2)}
-        type="button"
-        variant="outline"
-      >
-        {t("web.catalog.materialCombination.add")}
-      </Button>
-      <LookupDialog
-        kind="material"
-        t={t}
-        onCreated={(material) => {
-          onOptionsChange((current) => ({
-            ...current,
-            materials: [...current.materials, material].sort((a, b) =>
-              a.name.localeCompare(b.name),
-            ),
-          }));
-          draftForm.setFieldValue("assignment.materials", (current) => [
-            ...current.filter(({ materialId }) => materialId !== 0),
-            { materialId: material.id, materialSpecificId: null },
-          ]);
-        }}
-      />
-      <Sheet
-        onOpenChange={(open) => {
-          if (!open) dispatch({ type: "closed" });
-        }}
-        open={isOpen}
-      >
-        <SheetContent className="sm:w-[40rem] sm:max-w-[90vw]">
-          <SheetHeader>
-            <SheetTitle>
-              {t("web.catalog.materialCombination.title")}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="grid min-h-0 gap-4 overflow-y-auto p-6">
-            {draft.materials.map((selection, index) => (
-              <div
-                className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-                key={index}
-              >
+            <Field label={t("web.catalog.materialOptions.material")}>
+              <CatalogCombobox
+                portalContainer={desktop ? modalContainer : undefined}
+                ariaLabel={t("web.catalog.materialOptions.materialLabel", {
+                  number: index + 1,
+                })}
+                items={options.materials}
+                onValueChange={(material) =>
+                  draftForm.setFieldValue("assignment.materials", (current) =>
+                    current.map((row, i) => {
+                      if (i !== index) return row;
+                      const materialId = Number(material?.id ?? 0);
+                      const compatible = (options.materialSpecifics ?? []).some(
+                        (specific) =>
+                          specific.id === row.materialSpecificId &&
+                          specific.materialId === materialId,
+                      );
+                      return {
+                        materialId,
+                        materialSpecificId: compatible
+                          ? row.materialSpecificId
+                          : null,
+                      };
+                    }),
+                  )
+                }
+                placeholder={t("web.catalog.selectMaterial")}
+                value={
+                  options.materials.find(
+                    ({ id }) => id === selection.materialId,
+                  ) ?? null
+                }
+              />
+            </Field>
+            <Field label={t("web.catalog.materialOptions.grade")}>
+              {specifics.length ? (
                 <CatalogCombobox
-                  ariaLabel={t("web.catalog.materialCombination.component", {
+                  portalContainer={desktop ? modalContainer : undefined}
+                  ariaLabel={t("web.catalog.materialOptions.gradeLabel", {
                     number: index + 1,
                   })}
-                  items={options.materials}
-                  onValueChange={(material) =>
-                    draftForm.setFieldValue("assignment.materials", (current) =>
-                      current.map((row, i) =>
-                        i === index
-                          ? {
-                              materialId: Number(material?.id ?? 0),
-                              materialSpecificId: null,
-                            }
-                          : row,
-                      ),
-                    )
-                  }
-                  placeholder={t("web.catalog.selectMaterial")}
-                  value={
-                    options.materials.find(
-                      ({ id }) => id === selection.materialId,
-                    ) ?? null
-                  }
-                />
-                <CatalogCombobox
-                  ariaLabel={t("web.materials.specific.optional")}
-                  items={(options.materialSpecifics ?? []).filter(
-                    ({ materialId }) => materialId === selection.materialId,
-                  )}
+                  items={[
+                    {
+                      id: "none",
+                      name: t("web.catalog.materialOptions.notSpecified"),
+                    },
+                    ...specifics,
+                  ]}
                   onValueChange={(specific) =>
                     draftForm.setFieldValue("assignment.materials", (current) =>
                       current.map((row, i) =>
                         i === index
                           ? {
                               ...row,
-                              materialSpecificId: specific
-                                ? Number(specific.id)
-                                : null,
+                              materialSpecificId:
+                                specific && specific.id !== "none"
+                                  ? Number(specific.id)
+                                  : null,
                             }
                           : row,
                       ),
                     )
                   }
-                  placeholder={t("web.materials.specific.general")}
-                  removeLabel={t("web.action.close")}
-                  showSelectedPill
+                  placeholder={t("web.catalog.materialOptions.notSpecified")}
                   value={
-                    (options.materialSpecifics ?? []).find(
+                    specifics.find(
                       ({ id }) => id === selection.materialSpecificId,
                     ) ?? null
                   }
                 />
-                <Button
-                  aria-label={t("web.action.close")}
-                  onClick={() =>
-                    draftForm.setFieldValue("assignment.materials", (current) =>
-                      current.filter((_, i) => i !== index),
-                    )
-                  }
-                  type="button"
-                  variant="outline"
-                >
-                  <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
-                </Button>
-              </div>
-            ))}
+              ) : (
+                <p className="text-sm font-normal text-muted-foreground">
+                  {t(
+                    selection.materialId
+                      ? "web.catalog.materialOptions.noGrades"
+                      : "web.catalog.materialOptions.chooseMaterial",
+                  )}
+                </p>
+              )}
+            </Field>
             <Button
+              aria-label={t("web.catalog.materialOptions.removeComponent", {
+                number: index + 1,
+              })}
+              title={t("web.catalog.materialOptions.removeComponent", {
+                number: index + 1,
+              })}
+              className="shrink-0 self-end"
+              size="icon"
               onClick={() =>
-                draftForm.setFieldValue("assignment.materials", (current) => [
-                  ...current,
-                  { materialId: 0, materialSpecificId: null },
-                ])
+                draftForm.setFieldValue("assignment.materials", (current) =>
+                  current.filter((_, i) => i !== index),
+                )
               }
               type="button"
               variant="outline"
             >
-              {t("web.catalog.materialCombination.addSingle")}
+              <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
             </Button>
-            {feedback?.incomplete ? (
-              <p className="text-sm text-destructive" role="alert">
-                {t("web.catalog.materialCombination.empty")}
-              </p>
-            ) : null}
-            {feedback?.duplicate ? (
-              <p className="text-sm text-destructive" role="alert">
-                {t("web.catalog.materialCombination.duplicate")}
-              </p>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button
-                onClick={() => dispatch({ type: "closed" })}
-                type="button"
-                variant="outline"
-              >
-                {t("action.cancel")}
-              </Button>
-              <Button
-                disabled={!canSave}
-                onClick={() => void draftForm.handleSubmit()}
-                type="button"
-              >
-                {t("action.save")}
-              </Button>
-            </div>
           </div>
-        </SheetContent>
-      </Sheet>
-    </>
+        );
+      })}
+      <Button
+        className="h-auto min-h-9 whitespace-normal"
+        onClick={() =>
+          draftForm.setFieldValue("assignment.materials", (current) => [
+            ...current,
+            { materialId: 0, materialSpecificId: null },
+          ])
+        }
+        type="button"
+        variant="outline"
+      >
+        {t("web.catalog.materialOptions.addComponent")}
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        {t("web.catalog.materialOptions.gradeHelp")}
+      </p>
+      {feedback?.incomplete ? (
+        <p className="text-sm text-destructive" role="alert">
+          {t("web.catalog.materialCombination.empty")}
+        </p>
+      ) : null}
+      {feedback?.duplicate ? (
+        <p className="text-sm text-destructive" role="alert">
+          {t("web.catalog.materialCombination.duplicate")}
+        </p>
+      ) : null}
+      {feedback?.invalidSpecific ? (
+        <p className="text-sm text-destructive" role="alert">
+          {t("web.materials.validation.invalidSpecific")}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          onClick={() => dispatch({ type: "closed" })}
+          type="button"
+          variant="outline"
+        >
+          {t("action.cancel")}
+        </Button>
+        <Button
+          disabled={!canSave}
+          onClick={() => void draftForm.handleSubmit()}
+          type="button"
+        >
+          {t("action.save")}
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <TooltipProvider>
+      <div className="grid min-w-0 gap-2">
+        <p className="text-xs text-muted-foreground">
+          {t("web.catalog.materialOptions.help")}
+        </p>
+        {value.map((assignment, index) => (
+          <div className="flex min-w-0 items-center gap-2" key={index}>
+            <span className="min-w-0 flex-1 wrap-anywhere">
+              {label(assignment)}
+            </span>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label={t("web.catalog.materialCombination.edit")}
+                    className="shrink-0"
+                    size="icon"
+                    onClick={() => open(index)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <FontAwesomeIcon aria-hidden="true" icon={faPenToSquare} />
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                {t("web.catalog.materialCombination.edit")}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label={t("web.catalog.materialOptions.removeOption")}
+                    className="shrink-0"
+                    size="icon"
+                    onClick={() =>
+                      onChange(value.filter((_, i) => i !== index))
+                    }
+                    type="button"
+                    variant="outline"
+                  >
+                    <FontAwesomeIcon aria-hidden="true" icon={faXmark} />
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                {t("web.catalog.materialOptions.removeOption")}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ))}
+        <Button
+          disabled={singleAssignment && value.length > 0}
+          onClick={() => open(null)}
+          type="button"
+          variant="outline"
+        >
+          {t("web.catalog.materialOptions.addOption")}
+        </Button>
+        <div className="mt-4 grid gap-2">
+          <p className="text-sm text-muted-foreground">
+            {t("web.catalog.materialOptions.missing")}
+          </p>
+          <LookupDialog
+            kind="material"
+            triggerLabel={t("web.catalog.materialOptions.addToList")}
+            t={t}
+            onCreated={(material) =>
+              onOptionsChange((current) => ({
+                ...current,
+                materials: [...current.materials, material].sort((a, b) =>
+                  a.name.localeCompare(b.name),
+                ),
+              }))
+            }
+          />
+        </div>
+        {desktop ? (
+          isOpen && typeof document !== "undefined" ? (
+            createPortal(
+              <dialog
+                ref={bindDialog}
+                aria-labelledby={titleId}
+                aria-describedby={helpId}
+                className="m-auto max-h-[85dvh] w-[min(40rem,calc(100%-2rem))] flex-col border border-border bg-card p-0 text-card-foreground shadow-lg backdrop:bg-black/55 open:flex"
+                onCancel={(event) => {
+                  event.preventDefault();
+                  dispatch({ type: "closed" });
+                }}
+              >
+                <h2
+                  className="border-b border-border px-6 py-4 text-lg font-semibold"
+                  id={titleId}
+                >
+                  {t("web.catalog.materialOptions.title")}
+                </h2>
+                {body}
+              </dialog>,
+              document.body,
+            )
+          ) : null
+        ) : (
+          <Sheet
+            onOpenChange={(open) => {
+              if (!open) dispatch({ type: "closed" });
+            }}
+            open={isOpen}
+          >
+            <SheetContent aria-describedby={helpId}>
+              <SheetHeader>
+                <SheetTitle>
+                  {t("web.catalog.materialOptions.title")}
+                </SheetTitle>
+              </SheetHeader>
+              {body}
+            </SheetContent>
+          </Sheet>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -1609,15 +1755,7 @@ export function ProductEditor({
           materialSpecificId: specific?.id ?? null,
         })),
         weight: weight ?? { unit: "g", value: "" },
-      })) ??
-      (productTypeSlug === "refill"
-        ? []
-        : [
-            {
-              materials: [{ materialId: 0, materialSpecificId: null }],
-              weight: { unit: "g", value: "" },
-            },
-          ]),
+      })) ?? [],
     name: initialProduct?.name ?? "",
     productId: initialProduct?.id ?? null,
     productTypeSlug,
@@ -3418,7 +3556,7 @@ export function FinishOptionsEditor({
   };
 
   return (
-    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+    <fieldset className="grid min-w-0 grid-cols-1 gap-4 rounded-lg border border-border p-4">
       <legend className="px-1 text-sm font-medium">
         {t("web.slider.appearance.label")}
       </legend>
@@ -3669,6 +3807,8 @@ type LookupDialogProps = (
       onCreated: (value: CatalogLookup) => void;
     }
 ) & {
+  /** Clear action name when the lookup is created outside product-option editing. */
+  triggerLabel?: string;
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 };
@@ -3934,7 +4074,7 @@ function LookupDialog(props: LookupDialogProps) {
         type="button"
         variant="outline"
       >
-        {t(action)}
+        {props.triggerLabel ?? t(action)}
       </Button>
       <dialog
         aria-labelledby={titleId}
@@ -3945,7 +4085,7 @@ function LookupDialog(props: LookupDialogProps) {
       >
         <div className="grid gap-4 p-6">
           <h2 className="text-lg font-semibold" id={titleId}>
-            {t(action)}
+            {props.triggerLabel ?? t(action)}
           </h2>
           <form.Field name="name">
             {() => (
@@ -4031,7 +4171,7 @@ function LookupDialog(props: LookupDialogProps) {
               }}
               type="button"
             >
-              {t(action)}
+              {props.triggerLabel ?? t(action)}
             </Button>
           </div>
         </div>
@@ -8565,7 +8705,7 @@ export function CollectionEditPage({
             />
           ) : null}
         </div>
-        <div className="grid min-w-0 content-start gap-5">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-5">
           <FileDropInput
             accept=".avif,.jpeg,.jpg,.png,.webp"
             disabled={Boolean(ui.save)}

@@ -17,6 +17,7 @@ import type { CatalogOptions } from "@/lib/catalog-api";
 import {
   addCollectionProduct,
   createCatalogMaker,
+  createCatalogMaterial,
   saveCatalogProduct,
   saveCollection,
   updateCollectionItem,
@@ -96,6 +97,7 @@ vi.mock("@/lib/catalog-api", async (original) => ({
   ...(await original<object>()),
   saveCatalogProduct: vi.fn(),
   createCatalogMaker: vi.fn(),
+  createCatalogMaterial: vi.fn(),
   addCollectionProduct: vi.fn(),
   updateCollectionItem: vi.fn(),
   saveCollection: vi.fn(),
@@ -311,6 +313,14 @@ describe("catalog mutation lifetimes", () => {
   let root: Root;
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) =>
+        Object.assign(new EventTarget(), {
+          matches: query === "(min-width: 640px)",
+        }),
+      ),
+    );
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -326,6 +336,7 @@ describe("catalog mutation lifetimes", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("retains product drafts and server field errors, then allows a successful repeat save", async () => {
@@ -578,6 +589,66 @@ describe("catalog mutation lifetimes", () => {
       data: { name: "New maker", rootUrl: "https://example.com" },
     });
     expect(dialog.open).toBe(false);
+  });
+
+  it("creates a reusable material without assigning it to the product", async () => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    for (const assignment of product.materials)
+      assignment.weight = { unit: "g", value: "42" };
+    vi.mocked(createCatalogMaterial).mockResolvedValue({
+      ok: true,
+      material: {
+        id: 2000,
+        name: "New metal",
+        slug: "new-metal",
+        description: null,
+        images: [],
+        specifics: [],
+      },
+    });
+    vi.mocked(saveCatalogProduct).mockResolvedValue({ ok: true, product });
+    await act(async () =>
+      root.render(
+        <ProductEditor
+          initialProduct={product}
+          options={options}
+          productTypeSlug="spinner"
+        />,
+      ),
+    );
+    await click(container, "Add to material list");
+    const dialog = [...container.querySelectorAll("dialog")].find(
+      (node) => node.open,
+    );
+    if (!dialog) throw new Error("Missing material-list creation dialog.");
+    await act(async () => edit(input(dialog, "Name"), "New metal"));
+    await click(dialog, "Add to material list");
+    expect(createCatalogMaterial).toHaveBeenCalledExactlyOnceWith({
+      data: { name: "New metal" },
+    });
+    expect(dialog.open).toBe(false);
+    await act(async () =>
+      container
+        .querySelector("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        ),
+    );
+    expect(saveCatalogProduct).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          materialAssignments: product.materials.map(
+            ({ materials, weight }) => ({
+              weight: weight ?? { unit: "g", value: "" },
+              materials: materials.map(({ id, specific }) => ({
+                materialId: id,
+                materialSpecificId: specific?.id ?? null,
+              })),
+            }),
+          ),
+        }),
+      }),
+    );
   });
 
   it("preserves an open part draft through Activity cleanup and returns focus on cancellation", async () => {
