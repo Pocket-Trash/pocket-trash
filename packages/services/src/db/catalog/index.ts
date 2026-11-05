@@ -723,6 +723,10 @@ export function resolveEffectiveSliderSetup(input: {
  * Fully hydrated catalog product returned to callers.
  */
 export type CatalogProduct = {
+  /** Physical mechanisms operated by this actuator-role part. */
+  actuatedMechanisms?: CatalogPenActuationPart[];
+  /** Physical actuator-role parts that operate this mechanism product. */
+  actuatingParts?: CatalogPenActuationPart[];
   /** Complete functional roles of a physical Pen part. */
   penPartRoles?: PenPartRole[];
   /** Standard Pen interchangeability; omitted for other product types. */
@@ -933,11 +937,17 @@ export type CatalogRefillCompatibilityTarget = {
 };
 
 /** One Pen-part product that can be installed on a Pen. */
-export type CatalogCompatiblePenPart = {
-  /** Complete roles performed by this one physical part. */
-  penPartRoles?: PenPartRole[];
+export type CatalogCompatiblePenPart = CatalogPenActuationPart & {
+  /** Visible physical mechanisms this part operates. */
+  actuatedMechanisms?: CatalogPenActuationPart[];
   /** Standard Pen must be customized to fit this part. */
   requiresCustomization?: boolean;
+};
+
+/** Non-recursive identity and roles of a physical association endpoint. */
+type CatalogPenActuationPart = {
+  /** Complete roles performed by this one physical part. */
+  penPartRoles?: PenPartRole[];
   /** Database identifier. */
   id: number;
   /** Display name. */
@@ -995,6 +1005,10 @@ export type CatalogPensAdminOptions = {
  * Validated fields accepted when creating or updating a catalog product.
  */
 export type ProductWriteInput = {
+  /** Complete forward relationship replacement; omission preserves existing links. */
+  actuatedMechanismProductIds?: number[];
+  /** Complete reverse relationship replacement on a physical mechanism. */
+  actuatingPartProductIds?: number[];
   /** Complete reviewed role set; omission preserves existing assignments. */
   penPartRoles?: PenPartRole[];
   /** Selected parts explicitly acknowledged as customization exceptions. */
@@ -3823,6 +3837,7 @@ export function createCatalogService(
             await insertProductSubtype(tx, row.id, input);
             await replaceRefillCompatibility(tx, row.id, input);
             await replaceCompatiblePenParts(tx, row.id, input);
+            await replacePenActuation(tx, row.id, input);
             await replaceProductAliases(
               tx,
               row.id,
@@ -6056,6 +6071,7 @@ export function createCatalogService(
             await updateProductSubtype(tx, input.productId, input);
             await replaceRefillCompatibility(tx, input.productId, input);
             await replaceCompatiblePenParts(tx, input.productId, input);
+            await replacePenActuation(tx, input.productId, input);
             if (input.aliases !== undefined)
               await replaceProductAliases(
                 tx,
@@ -9037,6 +9053,9 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     compatibleParts: product.compatibleParts,
     interchangeableParts: product.interchangeableParts ?? null,
     penPartRoles: product.penPartRoles ?? [],
+    actuatedMechanismProductIds:
+      product.actuatedMechanisms?.map(({ id }) => id) ?? [],
+    actuatingPartProductIds: product.actuatingParts?.map(({ id }) => id) ?? [],
     description: product.description,
     diameter: product.diameter,
     finishOptions: product.finishOptions.map((option) => ({
@@ -10831,6 +10850,19 @@ async function loadPensCatalogDetails(
       slug: part.slug,
     });
   }
+  const summaries = products.flatMap((product) => [
+    product,
+    ...product.compatibleParts,
+  ]);
+  const actuation = await loadPenActuation(
+    db,
+    summaries.map(({ id }) => id),
+    viewer,
+  );
+  for (const part of summaries)
+    part.actuatedMechanisms = actuation.forward.get(part.id) ?? [];
+  for (const product of products)
+    product.actuatingParts = actuation.reverse.get(product.id) ?? [];
   for (const offering of offerings) {
     productsById.get(offering.refillProductId)?.refillOfferings.push({
       id: offering.id,
@@ -13824,6 +13856,177 @@ async function replaceProductAliases(
 }
 
 /**
+ * Loads both directions of physical actuation without exposing hidden endpoints.
+ * @param db - Read-capable database or transaction.
+ * @param productIds - Product identities whose relationships are requested.
+ * @param viewer - Current visibility context.
+ * @returns Visible summaries indexed in both directions.
+ */
+async function loadPenActuation(
+  db: Pick<Database, "select">,
+  productIds: number[],
+  viewer?: CatalogViewer,
+) {
+  const forward = new Map<number, CatalogPenActuationPart[]>();
+  const reverse = new Map<number, CatalogPenActuationPart[]>();
+  if (!productIds.length) return { forward, reverse };
+  const actuator = alias(schema.product, "actuating_product");
+  const mechanism = alias(schema.product, "actuated_product");
+  const actuatorType = alias(schema.productType, "actuating_type");
+  const mechanismType = alias(schema.productType, "actuated_type");
+  const rows = await db
+    .select({
+      actuator,
+      mechanism,
+      actuatorType,
+      mechanismType,
+    })
+    .from(schema.penActuatorMechanism)
+    .innerJoin(
+      actuator,
+      eq(actuator.id, schema.penActuatorMechanism.actuatorProductId),
+    )
+    .innerJoin(
+      mechanism,
+      eq(mechanism.id, schema.penActuatorMechanism.mechanismProductId),
+    )
+    .innerJoin(actuatorType, eq(actuatorType.id, actuator.productTypeId))
+    .innerJoin(mechanismType, eq(mechanismType.id, mechanism.productTypeId))
+    .where(
+      or(inArray(actuator.id, productIds), inArray(mechanism.id, productIds)),
+    )
+    .orderBy(asc(actuator.id), asc(mechanism.id));
+  const roles = await loadPenPartRoles(
+    db,
+    rows.flatMap(({ actuator, mechanism }) => [actuator.id, mechanism.id]),
+  );
+  for (const row of rows) {
+    const endpoints = [row.actuator, row.mechanism];
+    if (
+      endpoints.some(
+        (part) =>
+          !hasPermission(viewer, "products.manage") &&
+          !(part.approvalStatus === "approved" && !part.isPrivate) &&
+          part.ownerClerkId !== viewer?.clerkId,
+      )
+    )
+      continue;
+    const actuatorPart: CatalogPenActuationPart = {
+      id: row.actuator.id,
+      name: row.actuator.name,
+      slug: row.actuator.slug,
+      productTypeName: row.actuatorType.name,
+      productTypeSlug: catalogProductType(row.actuatorType.slug),
+      penPartRoles: getPenPartRoles({
+        productTypeSlug: row.actuatorType.slug,
+        penPartRoles: roles.get(row.actuator.id),
+      }),
+    };
+    const mechanismPart: CatalogPenActuationPart = {
+      id: row.mechanism.id,
+      name: row.mechanism.name,
+      slug: row.mechanism.slug,
+      productTypeName: row.mechanismType.name,
+      productTypeSlug: catalogProductType(row.mechanismType.slug),
+      penPartRoles: getPenPartRoles({
+        productTypeSlug: row.mechanismType.slug,
+        penPartRoles: roles.get(row.mechanism.id),
+      }),
+    };
+    const mechanisms = forward.get(actuatorPart.id) ?? [];
+    mechanisms.push(mechanismPart);
+    forward.set(actuatorPart.id, mechanisms);
+    const actuators = reverse.get(mechanismPart.id) ?? [];
+    actuators.push(actuatorPart);
+    reverse.set(mechanismPart.id, actuators);
+  }
+  return { forward, reverse };
+}
+
+/**
+ * Replaces either editor's view of the same physical actuation relationship.
+ * @param tx - Caller-owned catalog transaction.
+ * @param productId - Authored endpoint identity.
+ * @param input - Validated product draft and actor.
+ * @rejects When endpoints are invalid, hidden, duplicated or self-referential.
+ */
+async function replacePenActuation(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+) {
+  const directions = [
+    { ids: input.actuatedMechanismProductIds, forward: true },
+    { ids: input.actuatingPartProductIds, forward: false },
+  ];
+  for (const { ids, forward } of directions) {
+    if (ids === undefined) continue;
+    if (
+      new Set(ids).size !== ids.length ||
+      ids.some((id) => !Number.isSafeInteger(id) || id <= 0 || id === productId)
+    )
+      throw new Error("web.pens.actuation.invalid");
+    const ownRoles = await loadPenPartRoles(tx, [productId]);
+    const actuator = getPenPartRoles({
+      productTypeSlug: input.productTypeSlug,
+      penPartRoles: ownRoles.get(productId),
+    }).includes("actuator");
+    if (forward ? !actuator : input.productTypeSlug !== "pen-mechanism") {
+      if (ids.length) throw new Error("web.pens.actuation.invalid");
+      continue;
+    }
+    const targets = ids.length
+      ? await tx
+          .select({
+            id: schema.product.id,
+            productTypeSlug: schema.productType.slug,
+            approvalStatus: schema.product.approvalStatus,
+            isPrivate: schema.product.isPrivate,
+            ownerClerkId: schema.product.ownerClerkId,
+          })
+          .from(schema.product)
+          .innerJoin(
+            schema.productType,
+            eq(schema.productType.id, schema.product.productTypeId),
+          )
+          .where(inArray(schema.product.id, ids))
+          .orderBy(asc(schema.product.id))
+          .for("update", { of: schema.product })
+      : [];
+    const targetRoles = await loadPenPartRoles(tx, ids);
+    if (
+      targets.length !== ids.length ||
+      targets.some(
+        (part) =>
+          (forward
+            ? part.productTypeSlug !== "pen-mechanism"
+            : !getPenPartRoles({
+                ...part,
+                penPartRoles: targetRoles.get(part.id),
+              }).includes("actuator")) ||
+          (!hasPermission(input.actor, "products.manage") &&
+            part.ownerClerkId !== input.actor.clerkId &&
+            (part.isPrivate || part.approvalStatus !== "approved")),
+      )
+    )
+      throw new Error("web.pens.actuation.invalid");
+    const ownColumn = forward
+      ? schema.penActuatorMechanism.actuatorProductId
+      : schema.penActuatorMechanism.mechanismProductId;
+    await tx
+      .delete(schema.penActuatorMechanism)
+      .where(eq(ownColumn, productId));
+    if (ids.length)
+      await tx.insert(schema.penActuatorMechanism).values(
+        ids.map((id) => ({
+          actuatorProductId: forward ? productId : id,
+          mechanismProductId: forward ? id : productId,
+        })),
+      );
+  }
+}
+
+/**
  * Loads explicitly assigned canonical roles for a bounded set of products.
  * @param db - Read-capable database or transaction.
  * @param productIds - Physical part identities to load.
@@ -13877,6 +14080,17 @@ async function replacePenPartRoles(
   if (input.penPartRoles === undefined) return;
   const previous =
     (await loadPenPartRoles(tx, [productId])).get(productId) ?? [];
+  if (
+    previous.includes("actuator") &&
+    !input.penPartRoles.includes("actuator")
+  ) {
+    const [association] = await tx
+      .select({ id: schema.penActuatorMechanism.mechanismProductId })
+      .from(schema.penActuatorMechanism)
+      .where(eq(schema.penActuatorMechanism.actuatorProductId, productId))
+      .limit(1);
+    if (association) throw new Error("web.pens.actuation.roleInUse");
+  }
   if (previous.some((role) => !input.penPartRoles?.includes(role))) {
     const [compatible] = await tx
       .select({ id: schema.penCompatiblePart.penProductId })
