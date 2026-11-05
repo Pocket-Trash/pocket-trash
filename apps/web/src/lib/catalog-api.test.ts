@@ -6,6 +6,7 @@ import {
   collectionProductTypeIsSupported,
   collectionWriteSchema,
   pensAdminWriteSchema,
+  productAliasesSchema,
   productApprovalSchema,
   productDeletionSchema,
   productFormSchema,
@@ -890,5 +891,31 @@ describe("physical actuation product writes", () => {
     });
     expect(result.actuatingPartProductIds).toEqual([1011]);
     expect(result.actuatedMechanismProductIds).toBeUndefined();
+  });
+});
+
+describe("product alias names", () => {
+  it("keeps a complete comma-containing name and trims its outside whitespace", () => {
+    expect(
+      productAliasesSchema.parse(["  Model 36, special edition  "]),
+    ).toEqual(["Model 36, special edition"]);
+  });
+  it.each(
+    [
+      [""],
+      ["   "],
+      ["\u0301"],
+      ["x".repeat(81)],
+      ["Model 36", "  MODEL   36  "],
+      ["Café", "Cafe"],
+    ].map((aliases) => ({ aliases })),
+  )("rejects invalid or normalized duplicate names $aliases", ({ aliases }) => {
+    expect(productAliasesSchema.safeParse(aliases).success).toBe(false);
+  });
+  it("accepts the existing 80-character limit and an empty optional set", () => {
+    expect(productAliasesSchema.parse(["x".repeat(80)])).toEqual([
+      "x".repeat(80),
+    ]);
+    expect(productAliasesSchema.parse([])).toEqual([]);
   });
 });

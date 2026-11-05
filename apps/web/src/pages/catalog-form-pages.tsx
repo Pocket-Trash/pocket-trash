@@ -70,6 +70,7 @@ import {
 import { PenActuationLinks } from "@/components/pen-actuation-links";
 import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
+import { ProductAliasesEditor } from "@/components/product-aliases-editor";
 import { FileDropInput } from "@/components/resource-file-input";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { SliderMagnetConfigurationEditor } from "@/components/slider-magnet-configuration-editor";
@@ -1816,6 +1817,17 @@ export function ProductEditor({
             )}
           </form.Subscribe>
         ) : null}
+        {!quickCreate ? (
+          <form.Field name="aliases">
+            {(field) => (
+              <ProductAliasesEditor
+                error={serverErrors.aliases?.errors[0]}
+                onChange={field.handleChange}
+                value={field.state.value}
+              />
+            )}
+          </form.Field>
+        ) : null}
         <form.Field name="makerId">
           {(field) => {
             const selected =
@@ -2212,27 +2224,6 @@ export function ProductEditor({
                   </fieldset>
                 ))}
               </fieldset>
-            )}
-          </form.Field>
-        ) : null}
-        {!quickCreate ? (
-          <form.Field name="aliases">
-            {(field) => (
-              <Field label={t("web.pens.admin.aliases" as TranslationKey)}>
-                <Input
-                  aria-label={t("web.pens.admin.aliases" as TranslationKey)}
-                  onChange={(event) =>
-                    field.handleChange(
-                      event.target.value
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    )
-                  }
-                  value={field.state.value.join(", ")}
-                />
-                <FieldError error={serverErrors.aliases?.errors[0]} t={t} />
-              </Field>
             )}
           </form.Field>
         ) : null}

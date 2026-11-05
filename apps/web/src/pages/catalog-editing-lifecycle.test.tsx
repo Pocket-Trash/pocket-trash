@@ -264,7 +264,9 @@ function edit(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
  */
 function input(container: HTMLElement, label: string) {
   const control = [...container.querySelectorAll("input")].find(
-    (node) => node.getAttribute("aria-label") === label,
+    (node) =>
+      node.getAttribute("aria-label") === label ||
+      [...(node.labels ?? [])].some((element) => element.textContent === label),
   );
   if (!control) throw new Error(`Missing input: ${label}`);
   return control;
@@ -326,6 +328,91 @@ describe("catalog mutation lifetimes", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.restoreAllMocks();
+  });
+
+  it("saves complete alias badges only with the product", async () => {
+    const product = {
+      ...productFixture(1000, "Spinner", "spinner"),
+      aliases: ["Original"],
+    };
+    vi.mocked(saveCatalogProduct).mockResolvedValue({ ok: true, product });
+    await act(async () =>
+      root.render(
+        <ProductEditor
+          initialProduct={product}
+          options={options}
+          productTypeSlug="spinner"
+        />,
+      ),
+    );
+    const details = container.querySelector("details");
+    if (!details) throw new Error("Missing alias disclosure");
+    expect(details.open).toBe(false);
+    details.open = true;
+    const alias = input(container, "Alternative product name");
+    await act(async () => edit(alias, " Model 36, special edition "));
+    const enter = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => alias.dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    expect(saveCatalogProduct).not.toHaveBeenCalled();
+    expect(alias.value).toBe("");
+    expect(
+      container.querySelector(
+        '[aria-label="Remove alias Model 36, special edition"]',
+      ),
+    ).not.toBeNull();
+    await click(container, "Save");
+    expect(saveCatalogProduct).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          aliases: ["Original", "Model 36, special edition"],
+          name: "Spinner",
+        }),
+      }),
+    );
+    expect(product.aliases).toEqual(["Original"]);
+  });
+
+  it("keeps canceled alias edits out of saved product data", async () => {
+    const product = {
+      ...productFixture(1000, "Spinner", "spinner"),
+      aliases: ["Original"],
+    };
+    const cancel = vi.fn();
+    await act(async () =>
+      root.render(
+        <ProductEditor
+          initialProduct={product}
+          options={options}
+          productTypeSlug="spinner"
+          onCancel={cancel}
+        />,
+      ),
+    );
+    const details = container.querySelector("details");
+    if (!details) throw new Error("Missing alias disclosure");
+    details.open = true;
+    const remove = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Remove alias Original"]',
+    );
+    if (!remove) throw new Error("Missing alias remove action");
+    await act(async () => remove.click());
+    await act(async () =>
+      edit(input(container, "Alternative product name"), "Another name"),
+    );
+    await click(container, "Add");
+    const cancelButton = [...container.querySelectorAll("button")].find(
+      (node) => node.textContent === "Cancel" && !node.closest("dialog"),
+    );
+    if (!cancelButton) throw new Error("Missing main product cancel action");
+    await act(async () => cancelButton.click());
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(saveCatalogProduct).not.toHaveBeenCalled();
+    expect(product.aliases).toEqual(["Original"]);
   });
 
   it("retains product drafts and server field errors, then allows a successful repeat save", async () => {
