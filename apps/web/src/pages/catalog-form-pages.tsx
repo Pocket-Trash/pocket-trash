@@ -6392,7 +6392,20 @@ export function PenCollectionFields({
         item.privacyInheritedFromItemId === currentCollectionItemId),
   );
   const [customization, requestCustomization] = React.useReducer(
-    (_state: number[] | null, next: number[] | null) => next,
+    (
+      _state: number[] | null,
+      event:
+        | {
+            /** Selection awaiting the owner's acknowledgment. */
+            type: "selectionRequested";
+            /** Proposed installed owned parts. */
+            ids: number[];
+          }
+        | {
+            /** Explicit confirmation or cancellation closes the request. */
+            type: "customizationConfirmed" | "confirmationDismissed";
+          },
+    ) => (event.type === "selectionRequested" ? event.ids : null),
     null,
   );
   const confirmationTitle = React.useId();
@@ -6443,7 +6456,7 @@ export function PenCollectionFields({
           ids.includes(item.collectionItemId) && needsConfirmation(item),
       )
     ) {
-      requestCustomization(ids);
+      requestCustomization({ type: "selectionRequested", ids });
       return;
     }
     onInstalledPartIdsChange(ids);
@@ -6461,6 +6474,15 @@ export function PenCollectionFields({
       customization?.includes(item.collectionItemId) && needsConfirmation(item),
   );
   const warning = t("web.pens.collection.notSupported" as TranslationKey);
+  const partOptions = availableParts.map((item) => ({
+    id: item.collectionItemId,
+    name: item.displayName,
+    warning: !compatiblePartProductIds.has(item.productId)
+      ? warning
+      : nonInterchangeable(item)
+        ? t("web.pens.interchangeableParts.customization")
+        : undefined,
+  }));
   const refills = allProducts
     .filter(({ productTypeSlug }) => productTypeSlug === "refill")
     .map((refill) => ({
@@ -6486,15 +6508,7 @@ export function PenCollectionFields({
             ariaLabel={t(
               "web.pens.collection.installedParts" as TranslationKey,
             )}
-            items={availableParts.map((item) => ({
-              id: item.collectionItemId,
-              name: item.displayName,
-              warning: !compatiblePartProductIds.has(item.productId)
-                ? warning
-                : nonInterchangeable(item)
-                  ? t("web.pens.interchangeableParts.customization")
-                  : undefined,
-            }))}
+            items={partOptions}
             onValueChange={(next) =>
               selectParts(next.map(({ id }) => Number(id)))
             }
@@ -6502,19 +6516,9 @@ export function PenCollectionFields({
               "web.pens.collection.noInstalledParts" as TranslationKey,
             )}
             removeLabel={t("web.action.close")}
-            value={availableParts
-              .filter(({ collectionItemId }) =>
-                installedPartIds.includes(collectionItemId),
-              )
-              .map((item) => ({
-                id: item.collectionItemId,
-                name: item.displayName,
-                warning: !compatiblePartProductIds.has(item.productId)
-                  ? warning
-                  : nonInterchangeable(item)
-                    ? t("web.pens.interchangeableParts.customization")
-                    : undefined,
-              }))}
+            value={partOptions.filter(({ id }) =>
+              installedPartIds.includes(id),
+            )}
           />
           {unconfirmedSelection.length ? (
             <Button
@@ -6535,7 +6539,7 @@ export function PenCollectionFields({
               className="m-auto w-[min(32rem,calc(100%-2rem))] border border-border bg-card p-6 text-card-foreground backdrop:bg-black/60"
               onCancel={(event) => {
                 event.preventDefault();
-                requestCustomization(null);
+                requestCustomization({ type: "confirmationDismissed" });
               }}
             >
               <h2 id={confirmationTitle} className="text-lg font-semibold">
@@ -6562,7 +6566,9 @@ export function PenCollectionFields({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => requestCustomization(null)}
+                  onClick={() =>
+                    requestCustomization({ type: "confirmationDismissed" })
+                  }
                 >
                   {t("action.cancel")}
                 </Button>
@@ -6580,7 +6586,7 @@ export function PenCollectionFields({
                         ),
                       ]),
                     ]);
-                    requestCustomization(null);
+                    requestCustomization({ type: "customizationConfirmed" });
                   }}
                 >
                   {t("web.pens.interchangeableParts.continue")}

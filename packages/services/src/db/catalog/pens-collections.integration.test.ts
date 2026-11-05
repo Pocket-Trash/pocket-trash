@@ -340,6 +340,21 @@ describe("owned Pens and Pen parts", () => {
       const capItemId = partItemIds.get("pen-top-cap")!;
       await db
         .update(schema.collectionItem)
+        .set({ owned: false })
+        .where(eq(schema.collectionItem.id, capItemId));
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: [capItemId],
+          customizationConfirmedPartCollectionItemIds: [capItemId],
+        }),
+      ).rejects.toThrow("available and owned");
+      await db
+        .update(schema.collectionItem)
+        .set({ owned: true })
+        .where(eq(schema.collectionItem.id, capItemId));
+      await db
+        .update(schema.collectionItem)
         .set({
           isPrivate: true,
           privateReason: "Staff privacy",

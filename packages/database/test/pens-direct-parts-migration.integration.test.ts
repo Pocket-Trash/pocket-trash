@@ -143,6 +143,15 @@ it("converts configured and installed Pen parts without changing source listings
       },
     ],
   });
+  await database.exec(
+    `UPDATE collection_item SET owned = false WHERE id IN (SELECT id FROM collection_detail_pen_tip)`,
+  );
+  await expect(
+    database.exec(`UPDATE pen_compatible_part SET updated_at = now()`),
+  ).resolves.toBeDefined();
+  await database.exec(
+    `UPDATE collection_item SET owned = true WHERE id IN (SELECT id FROM collection_detail_pen_tip)`,
+  );
   await expect(
     database.query(`SELECT source_record_id FROM catalog_source_listing`),
   ).resolves.toMatchObject({ rows: [{ source_record_id: "pen-1" }] });
