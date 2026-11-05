@@ -65,15 +65,19 @@ Use the Node and pnpm versions declared in [package.json](../package.json). Foll
 
 Roy must approve each vulnerability exception. Every exception requires a GHSA,
 an owner, a follow-up Linear issue, and a UTC expiry within seven days.
-Record the metadata in `security-audit-exceptions.json` and the matching GHSA in
-`auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`. The
-`scripts/security-audit.mjs` validator rejects incomplete, mismatched, overlong,
-or expired exceptions before pnpm audits dependencies.
+Record the metadata in `security-audit-exceptions.json`. General advisory
+exceptions must match `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`.
+The Vercel Zod exception instead uses exact version, development-only status,
+and reviewed dependency-path checks in `scripts/security-audit.mjs`; never add
+it to the global advisory ignore list. The validator rejects incomplete,
+mismatched, overlong, future-approved, or expired exceptions before auditing.
 
-`GHSA-vfj7-8cjw-p6xm` has a temporary exception. No patched `braces` release
-exists, and the affected paths are development tooling. Roy Anger owns the
-exception. [ENG-337](https://linear.app/pocket-trash/issue/ENG-337) tracks its
-removal. The renewed exception expires at `2026-10-30T02:34:35Z`.
+`GHSA-mrhx-c7xc-m3w5` remains approved only for Zod 3.22.4 on six reviewed
+Vercel CLI development-tooling paths. Roy Anger renewed this exception on
+`2026-11-05T20:44:03Z`, expiring at `2026-11-12T20:44:03Z`.
+[ENG-574](https://linear.app/pocket-trash/issue/ENG-574) tracks removal.
+Application Zod 4 remains patched; further renewal requires owner approval.
+The withdrawn braces advisory has no active exception.
 
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).
