@@ -672,7 +672,14 @@ export function TrendsPage({
                 })
               }
               otherLabel={t("web.trends.other")}
-              trends={visibleTrends}
+              trends={visibleTrends.map((trend) => ({
+                ...trend,
+                productTypeName: catalogProductTypeLabel(
+                  catalogCopy,
+                  undefined,
+                  trend.productTypeName,
+                ),
+              }))}
             />
 
             <details className="rounded-md border border-border bg-card">

@@ -195,6 +195,11 @@ function RelatedProducts({
                     })}
                     privateLabel={t("web.resources.moderation.privateBadge")}
                     product={product}
+                    productTypeLabel={catalogProductTypeLabel(
+                      t,
+                      product.productTypeSlug,
+                      product.productTypeName,
+                    )}
                     productLinkLabel={t("web.action.visitProductPageFor", {
                       name: product.name,
                     })}

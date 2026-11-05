@@ -133,6 +133,13 @@ function catalogFilterCopy(
   searchPlaceholderKey: TranslationKey = "web.slider.search.placeholder",
 ): CatalogFilterCopy {
   return {
+    /**
+     * Explains type labels without coupling the shared filter to locale context.
+     * @param slug - Canonical product-type slug.
+     * @param name - Persisted display name.
+     * @returns Localized display label.
+     */
+    productTypeName: (slug, name) => catalogProductTypeLabel(t, slug, name),
     all: t("web.archive.filter.all"),
     any: t("web.archive.filter.any"),
     apply: t("action.save"),

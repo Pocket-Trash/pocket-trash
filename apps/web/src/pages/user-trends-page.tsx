@@ -204,8 +204,23 @@ export function UserTrendsPage({
       id: "product-types",
       label: t("web.trends.productType"),
       title: t("web.trends.collectionItemsChartLabel"),
-      values: trends.productTypes,
-      community: community?.productTypes,
+      values: trends.productTypes.map((value) => ({
+        ...value,
+        label: catalogProductTypeLabel(catalogCopy, undefined, value.label),
+      })),
+      community: community?.productTypes
+        ? {
+            ...community.productTypes,
+            values: community.productTypes.values.map((value) => ({
+              ...value,
+              label: catalogProductTypeLabel(
+                catalogCopy,
+                undefined,
+                value.label,
+              ),
+            })),
+          }
+        : community?.productTypes,
     },
     {
       colorClass: "bg-chart-2",

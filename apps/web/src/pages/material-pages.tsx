@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { useViewportWidth } from "@/hooks/use-browser-layout";
 import { usePageCorrection } from "@/hooks/use-page-correction";
 import { cardImageUrl } from "@/lib/card-image";
-import { useCatalogCopy } from "@/lib/catalog-copy";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import {
   type DirectorySearchState,
   rankedDirectoryIds,
@@ -383,6 +383,11 @@ function MaterialProductCard({ product }: MaterialProductCardProps) {
         })}
         privateLabel={t("web.resources.moderation.privateBadge")}
         product={product}
+        productTypeLabel={catalogProductTypeLabel(
+          t,
+          product.productTypeSlug,
+          product.productTypeName,
+        )}
         productLinkLabel={t("web.action.visitProductPageFor", {
           name: product.name,
         })}

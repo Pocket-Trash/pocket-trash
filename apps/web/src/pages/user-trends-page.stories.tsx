@@ -293,3 +293,65 @@ const communityTrends: CommunityTrendsSource = {
     stale: false,
   },
 };
+
+/** Personal product-type charts use the same actuator explanation as selectors. */
+export const PersonalActuator: Story = {
+  args: {
+    collectionCount: 1,
+    items: [
+      {
+        ...baseItem,
+        productTypeId: 2,
+        productTypeSlug: "pen-actuator",
+        productTypeName: "Pen actuator",
+      },
+    ],
+    onSearchChange: fn(),
+    search: {},
+  },
+  /**
+   * Verifies product-type table labels rather than only the filter dropdown.
+   * @param context - Browser interaction context.
+   */
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getAllByRole("rowheader", {
+        name: "Pen actuator (e.g. bolt pin, button)",
+      }).length,
+    ).toBeGreaterThan(0);
+    await expect(
+      canvas.queryAllByRole("rowheader", { name: "Pen actuator" }),
+    ).toHaveLength(0);
+    await expect(
+      canvas.queryAllByRole("rowheader", { name: "Pen actuators" }),
+    ).toHaveLength(0);
+  },
+};
+
+/** A community-only actuator bucket is also localized before comparison. */
+export const CommunityActuator: Story = {
+  ...PersonalActuator,
+  args: {
+    collectionCount: 1,
+    items: [baseItem],
+    onSearchChange: fn(),
+    search: {},
+    communityTrends: {
+      makerProducts: null,
+      materials: null,
+      collectionItems: {
+        generatedAt: new Date("2026-11-05T00:00:00Z"),
+        hasSuppressedValues: false,
+        stale: false,
+        values: [
+          {
+            collectorCount: 10,
+            count: 15,
+            productTypeId: 2,
+            productTypeName: "Pen actuators",
+          },
+        ],
+      },
+    },
+  },
+};

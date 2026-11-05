@@ -2,7 +2,6 @@ import type { CatalogProduct } from "@package/services";
 import { MakerLink } from "@/components/maker-link";
 import { Badge } from "@/components/ui/badge";
 import { cardImageUrl } from "@/lib/card-image";
-import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 
 /**
  * Renders a catalog product summary with its first active image and counts.
@@ -29,7 +28,7 @@ export function ProductCard({
   privateLabel,
   product,
   productLinkLabel,
-  productTypeLabel,
+  productTypeLabel = product.productTypeName,
   searchContext,
 }: {
   /** Localized review state shown to authorized viewers. */
@@ -65,7 +64,6 @@ export function ProductCard({
   /** Context explaining a type, alias, or owner search match. */
   searchContext?: string;
 }) {
-  const t = useCatalogCopy();
   const image = product.images.find(({ deletedAt }) => !deletedAt);
   const productLink = product.productLinks.find(({ isValid }) => isValid);
 
@@ -96,13 +94,7 @@ export function ProductCard({
           {product.name}
         </h2>
         <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
-          {productTypeLabel ??
-            catalogProductTypeLabel(
-              t,
-              product.productTypeSlug,
-              product.productTypeName,
-            )}{" "}
-          ·{" "}
+          {productTypeLabel} ·{" "}
           <MakerLink
             className="relative z-20"
             name={product.makerName}

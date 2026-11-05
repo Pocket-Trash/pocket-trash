@@ -1,6 +1,5 @@
 import type { PublicProductTypeTrend } from "@package/services";
 import Highcharts from "highcharts/es-modules/masters/highcharts.src.js";
-import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import "highcharts/es-modules/masters/modules/accessibility.src.js";
 import "highcharts/es-modules/masters/modules/drilldown.src.js";
 import { useCallback } from "react";
@@ -51,7 +50,6 @@ export function CatalogTrendsChart({
   /** Exact public catalog-product counts in descending order. */
   trends: PublicProductTypeTrend[];
 }) {
-  const t = useCatalogCopy();
   const chartRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (!node) return;
@@ -66,7 +64,7 @@ export function CatalogTrendsChart({
            */
           click: () => onProductTypeSelect(trend.productTypeId),
         },
-        name: catalogProductTypeLabel(t, undefined, trend.productTypeName),
+        name: trend.productTypeName,
         y: trend.count,
       }));
 
@@ -99,11 +97,7 @@ export function CatalogTrendsChart({
               series: [
                 {
                   data: overflow.map((trend) => [
-                    catalogProductTypeLabel(
-                      t,
-                      undefined,
-                      trend.productTypeName,
-                    ),
+                    trend.productTypeName,
                     trend.count,
                   ]),
                   id: "other-product-types",
@@ -139,7 +133,6 @@ export function CatalogTrendsChart({
       onProductTypeSelect,
       otherLabel,
       trends,
-      t,
     ],
   );
 

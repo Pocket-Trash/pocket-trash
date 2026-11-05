@@ -34,7 +34,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import {
   type CatalogFacet,
   type CatalogFacets,
@@ -182,6 +181,13 @@ export type CatalogFilterCopy = {
    */
   productTypeAll: string;
   /**
+   * Formats canonical type names for the active locale when supplied.
+   * @param slug - Canonical product-type slug.
+   * @param name - Persisted display name.
+   * @returns Localized type label.
+   */
+  productTypeName?: (slug: string, name: string) => string;
+  /**
    * Builds the polite result-count announcement.
    *
    * @param count - Current matching result count.
@@ -252,7 +258,6 @@ export function CatalogFilterBar({
   /** Current matching result count announced after filter changes. */
   resultCount: number;
 }) {
-  const t = useCatalogCopy();
   const desktopRootRef = React.useRef<HTMLDivElement>(null);
   const advancedId = React.useId();
   const nextFilters = pruneCatalogFilters(filters, facets);
@@ -297,7 +302,9 @@ export function CatalogFilterBar({
         return selected
           ? {
               id: selected.slug,
-              name: catalogProductTypeLabel(t, selected.slug, selected.name),
+              name:
+                copy.productTypeName?.(selected.slug, selected.name) ??
+                selected.name,
             }
           : null;
       })()
@@ -306,7 +313,7 @@ export function CatalogFilterBar({
     { id: "all", name: copy.productTypeAll },
     ...facets.productTypes.map(({ name, slug }) => ({
       id: slug,
-      name: catalogProductTypeLabel(t, slug, name),
+      name: copy.productTypeName?.(slug, name) ?? name,
     })),
   ];
   const selectedMakers = facets.makers.filter(({ id }) =>
