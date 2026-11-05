@@ -546,6 +546,13 @@ describe("catalog mutation lifetimes", () => {
 
   it("preserves an open part draft through Activity cleanup and returns focus on cancellation", async () => {
     const product = productFixture(1000, "Pen", "pen");
+    product.interchangeableParts = {
+      tip: true,
+      clip: false,
+      topCap: false,
+      actuator: false,
+      mechanism: false,
+    };
     /**
      * Keeps embedded part creation alive through Activity visibility changes.
      * @param mode - Activity visibility.
