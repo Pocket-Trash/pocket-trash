@@ -956,6 +956,11 @@ export function ProductDetailPage({
                         >
                           {part.name}
                         </Link>
+                        {part.requiresCustomization ? (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {t("web.pens.interchangeableParts.customization")}
+                          </span>
+                        ) : null}
                       </li>
                     ))}
                   </ul>

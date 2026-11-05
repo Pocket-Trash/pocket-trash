@@ -23,6 +23,7 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
+import { penPartInterchangeabilityKeys } from "@package/services/catalog-terminology";
 import {
   maxImageBytes,
   maxImageSessionBytes,
@@ -727,8 +728,22 @@ type ProductValidation = {
   /** Field errors returned by the existing schema or server. */
   fields?: Record<string, string[] | undefined>;
 };
+/** Requested customization action, held until explicit confirmation. */
+type PartCustomizationRequest = {
+  /** Functional part type requiring customization. */
+  role: PenPartProductType;
+  /** Complete replacement selection for this role, when selecting parts. */
+  partIds?: number[];
+  /** Whether confirmation should open inline part creation. */
+  create?: boolean;
+};
+
 /** Product editor disclosures, shared options, and committed save lifetime. */
 type ProductEditorState = {
+  /** Pending role-specific confirmation. */
+  customization: PartCustomizationRequest | null;
+  /** Roles explicitly acknowledged during this edit session. */
+  confirmedPartRoles: Set<PenPartProductType>;
   /** Current shared lookup choices. */
   options: CatalogOptions;
   /** Identifier retained after saving before an upload retry. */
@@ -748,6 +763,18 @@ type ProductEditorState = {
 };
 /** Product editing intents and save completion. */
 type ProductEditorEvent =
+  | {
+      /** Requests or dismisses customization confirmation. */
+      type: "partCustomizationChanged";
+      /** Pending action, or null when dismissed. */
+      request: PartCustomizationRequest | null;
+    }
+  | {
+      /** Records explicit confirmation for one role. */
+      type: "partCustomizationConfirmed";
+      /** Confirmed role. */
+      role: PenPartProductType;
+    }
   | {
       /** Accepts the stable shared-control options callback. */
       type: "lookupOptionsChanged";
@@ -829,6 +856,14 @@ const productEditorReducer: EffectReducer<
   ProductEditorEffect
 > = (state, event, exec) => {
   switch (event.type) {
+    case "partCustomizationChanged":
+      return { ...state, customization: event.request };
+    case "partCustomizationConfirmed":
+      return {
+        ...state,
+        customization: null,
+        confirmedPartRoles: new Set([...state.confirmedPartRoles, event.role]),
+      };
     case "lookupOptionsChanged":
       return {
         ...state,
@@ -1303,6 +1338,8 @@ export function ProductEditor({
     productEditorReducer,
     () => ({
       options: initialOptions,
+      customization: null,
+      confirmedPartRoles: new Set<PenPartProductType>(),
       savedProductId: initialProduct?.id ?? null,
       showMaterialWeights:
         initialProduct?.materials.some(({ weight }) => weight !== null) ??
@@ -1449,6 +1486,28 @@ export function ProductEditor({
     },
     [dispatch],
   );
+  const customizationDialog = React.useRef<HTMLDialogElement>(null);
+  const customizationTrigger = React.useRef<HTMLElement | null>(null);
+  const customizationTitleId = React.useId();
+  /**
+   * Owns customization dialog focus and dismissal for its mounted lifetime.
+   * @param node - Current dialog, or null after removal.
+   * @returns Cleanup closing the dialog and restoring its trigger.
+   */
+  const bindCustomizationDialog = React.useCallback(
+    (node: HTMLDialogElement | null) => {
+      customizationDialog.current = node;
+      if (!node) return;
+      node.showModal();
+      return () => {
+        node.close();
+        customizationTrigger.current?.focus();
+        if (customizationDialog.current === node)
+          customizationDialog.current = null;
+      };
+    },
+    [],
+  );
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const plateDialog = React.useRef<HTMLDialogElement>(null);
   const plateTrigger = React.useRef<HTMLButtonElement>(null);
@@ -1474,6 +1533,17 @@ export function ProductEditor({
     };
   }, []);
   const defaultValues: ProductEditorValue = {
+    interchangeableParts:
+      productTypeSlug === "pen"
+        ? (initialProduct?.interchangeableParts ?? {
+            tip: false,
+            clip: false,
+            topCap: false,
+            actuator: false,
+            mechanism: false,
+          })
+        : null,
+    customizationConfirmedPartProductIds: [],
     aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
     buttonDiameter: initialProduct?.buttonDiameter ?? { unit: "mm", value: "" },
@@ -1603,6 +1673,55 @@ export function ProductEditor({
       dispatch({ type: "magnetSnapshotDiscarded" });
     }
     form.setFieldValue("magnetLayout", layout);
+  };
+
+  const interchangeableParts = useStore(
+    form.store,
+    (state) => state.values.interchangeableParts,
+  );
+  /**
+   * Applies a role's selection after any required customization acknowledgment.
+   * @param role - Part role being edited.
+   * @param partIds - Complete next selection for that role.
+   * @param acknowledged - Whether this action has just been explicitly confirmed.
+   */
+  const selectCompatibleParts = (
+    role: PenPartProductType,
+    partIds: number[],
+    acknowledged = false,
+  ) => {
+    const current = form.state.values.compatiblePartProductIds;
+    const requiresCustomization =
+      !interchangeableParts?.[penPartInterchangeabilityKeys[role]];
+    if (
+      requiresCustomization &&
+      !acknowledged &&
+      !ui.confirmedPartRoles.has(role) &&
+      partIds.some((id) => !current.includes(id))
+    ) {
+      customizationTrigger.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      dispatch({
+        type: "partCustomizationChanged",
+        request: { role, partIds },
+      });
+      return;
+    }
+    const roleIds = new Set(
+      options.relationshipProducts
+        .filter((part) => part.productTypeSlug === role)
+        .map(({ id }) => id),
+    );
+    const next = [...current.filter((id) => !roleIds.has(id)), ...partIds];
+    form.setFieldValue("compatiblePartProductIds", next);
+    form.setFieldValue("customizationConfirmedPartProductIds", (confirmed) => [
+      ...confirmed.filter((id) => next.includes(id)),
+      ...(requiresCustomization
+        ? partIds.filter((id) => !confirmed.includes(id))
+        : []),
+    ]);
   };
 
   return (
@@ -1822,6 +1941,62 @@ export function ProductEditor({
                   t={t}
                 />
               </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "pen" ? (
+          <form.Field name="interchangeableParts">
+            {(field) => (
+              <fieldset className="grid gap-3 border border-border p-4">
+                <legend className="px-1 font-semibold">
+                  {t("web.pens.interchangeableParts.heading")}
+                </legend>
+                <p className="text-sm text-muted-foreground">
+                  {t("web.pens.interchangeableParts.help")}
+                </p>
+                {Object.values(penPartInterchangeabilityKeys).map((key) => (
+                  <fieldset
+                    className="flex flex-wrap items-center justify-between gap-3"
+                    key={key}
+                  >
+                    <legend className="float-left text-sm font-medium">
+                      {t(`catalog.penPartRoles.${key}`)}
+                    </legend>
+                    <div className="flex gap-4">
+                      {[true, false].map((answer) => (
+                        <label
+                          className="flex items-center gap-2 text-sm"
+                          key={String(answer)}
+                        >
+                          <input
+                            type="radio"
+                            name={`interchangeability-${key}`}
+                            checked={
+                              (field.state.value?.[key] ?? false) === answer
+                            }
+                            onChange={() =>
+                              field.handleChange({
+                                tip: false,
+                                clip: false,
+                                topCap: false,
+                                actuator: false,
+                                mechanism: false,
+                                ...field.state.value,
+                                [key]: answer,
+                              })
+                            }
+                          />
+                          {t(
+                            answer
+                              ? "web.pens.interchangeableParts.yes"
+                              : "web.pens.interchangeableParts.no",
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ))}
+              </fieldset>
             )}
           </form.Field>
         ) : null}
@@ -2106,45 +2281,56 @@ export function ProductEditor({
                     );
                     return (
                       <div className="grid gap-2" key={role.type}>
-                        <label className="flex items-center gap-2 text-sm font-medium">
+                        <label
+                          className={`flex items-center gap-2 text-sm font-medium ${!interchangeableParts?.[penPartInterchangeabilityKeys[role.type]] ? "text-muted-foreground" : ""}`}
+                        >
                           <input
                             checked={checked}
                             onChange={(event) => {
+                              if (
+                                event.target.checked &&
+                                !interchangeableParts?.[
+                                  penPartInterchangeabilityKeys[role.type]
+                                ] &&
+                                !ui.confirmedPartRoles.has(role.type)
+                              ) {
+                                customizationTrigger.current =
+                                  event.currentTarget;
+                                dispatch({
+                                  type: "partCustomizationChanged",
+                                  request: { role: role.type },
+                                });
+                                return;
+                              }
                               dispatch({
                                 type: "partRoleToggled",
                                 role: role.type,
                               });
                               if (!event.target.checked)
-                                field.handleChange(
-                                  field.state.value.filter(
-                                    (id) =>
-                                      !items.some(
-                                        (candidate) => candidate.id === id,
-                                      ),
-                                  ),
-                                );
+                                selectCompatibleParts(role.type, []);
                             }}
                             type="checkbox"
                           />
                           {t(role.label)}
+                          {!interchangeableParts?.[
+                            penPartInterchangeabilityKeys[role.type]
+                          ] ? (
+                            <span className="text-xs">
+                              {t("web.pens.interchangeableParts.customization")}
+                            </span>
+                          ) : null}
                         </label>
                         {checked ? (
                           <div className="grid gap-2 pl-6">
                             <CatalogMultiCombobox
                               ariaLabel={t(role.label)}
                               items={items}
-                              onValueChange={(value) => {
-                                const otherRoleIds = field.state.value.filter(
-                                  (id) =>
-                                    !items.some(
-                                      (candidate) => candidate.id === id,
-                                    ),
-                                );
-                                field.handleChange([
-                                  ...otherRoleIds,
-                                  ...value.map(({ id }) => Number(id)),
-                                ]);
-                              }}
+                              onValueChange={(value) =>
+                                selectCompatibleParts(
+                                  role.type,
+                                  value.map(({ id }) => Number(id)),
+                                )
+                              }
                               placeholder={t("web.catalog.selectProductType")}
                               removeLabel={(name) =>
                                 t("web.action.removeSelection", { name })
@@ -2155,10 +2341,24 @@ export function ProductEditor({
                               aria-haspopup="dialog"
                               onClick={(event) => {
                                 partTrigger.current = event.currentTarget;
-                                dispatch({
-                                  type: "partCreationChanged",
-                                  partType: role.type,
-                                });
+                                if (
+                                  !interchangeableParts?.[
+                                    penPartInterchangeabilityKeys[role.type]
+                                  ] &&
+                                  !ui.confirmedPartRoles.has(role.type)
+                                ) {
+                                  customizationTrigger.current =
+                                    event.currentTarget;
+                                  dispatch({
+                                    type: "partCustomizationChanged",
+                                    request: { role: role.type, create: true },
+                                  });
+                                } else {
+                                  dispatch({
+                                    type: "partCreationChanged",
+                                    partType: role.type,
+                                  });
+                                }
                               }}
                               type="button"
                               variant="outline"
@@ -2714,6 +2914,73 @@ export function ProductEditor({
             document.body,
           )
         : null}
+      {typeof document !== "undefined" && ui.customization
+        ? createPortal(
+            <dialog
+              ref={bindCustomizationDialog}
+              aria-labelledby={customizationTitleId}
+              className="m-auto w-[min(32rem,calc(100%-2rem))] border border-border bg-card p-6 text-card-foreground backdrop:bg-black/60"
+              onCancel={(event) => {
+                event.preventDefault();
+                dispatch({ type: "partCustomizationChanged", request: null });
+              }}
+            >
+              <h2 id={customizationTitleId} className="text-lg font-semibold">
+                {t("web.pens.interchangeableParts.confirmationTitle")}
+              </h2>
+              <p className="mt-2 font-medium">
+                {t(
+                  `catalog.penPartRoles.${penPartInterchangeabilityKeys[ui.customization.role]}`,
+                )}
+              </p>
+              <p className="mt-2 text-sm">
+                {t("web.pens.interchangeableParts.confirmation")}
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    dispatch({
+                      type: "partCustomizationChanged",
+                      request: null,
+                    })
+                  }
+                >
+                  {t("action.cancel")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const request = ui.customization;
+                    if (!request) return;
+                    customizationDialog.current?.close();
+                    dispatch({
+                      type: "partCustomizationConfirmed",
+                      role: request.role,
+                    });
+                    if (request.partIds)
+                      selectCompatibleParts(
+                        request.role,
+                        request.partIds,
+                        true,
+                      );
+                    else if (request.create)
+                      dispatch({
+                        type: "partCreationChanged",
+                        partType: request.role,
+                      });
+                    else if (!openPartRoles.has(request.role))
+                      dispatch({ type: "partRoleToggled", role: request.role });
+                  }}
+                >
+                  {t("web.pens.interchangeableParts.continue")}
+                </Button>
+              </div>
+            </dialog>,
+            document.body,
+          )
+        : null}
       {typeof document !== "undefined" &&
       productTypeSlug === "pen" &&
       activePartType
@@ -2750,6 +3017,15 @@ export function ProductEditor({
                       ...form.state.values.compatiblePartProductIds,
                       part.id,
                     ]);
+                    if (
+                      !interchangeableParts?.[
+                        penPartInterchangeabilityKeys[activePartType]
+                      ]
+                    )
+                      form.setFieldValue(
+                        "customizationConfirmedPartProductIds",
+                        (ids) => [...ids, part.id],
+                      );
                     partDialog.current?.close();
                     dispatch({ type: "partCreationChanged", partType: null });
                     partTrigger.current?.focus();
