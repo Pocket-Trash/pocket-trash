@@ -385,7 +385,6 @@ function ComboboxControl({
  *
  * @param props.ariaLabel - Accessible name of the list.
  * @param props - Combobox options properties.
- * @param props.ariaLabel - Accessible name of the list.
  * @param props.portalContainer - Native modal that owns the popup when supplied.
  * @param props.placeholder - Fallback message shown when no options match and `emptyLabel` is omitted.
  * @param props.emptyLabel - Message shown when no combobox options match.
@@ -457,7 +456,6 @@ function ComboboxOptions({
  *
  * @param props.ariaLabel - Accessible name of the list.
  * @param props - Grouped option-list properties.
- * @param props.ariaLabel - Accessible name of the list.
  * @param props.emptyLabel - Message shown when no option matches.
  * @param props.placeholder - Fallback empty-state message.
  * @returns The grouped popup option list.
