@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   foreignKey,
   index,
@@ -58,6 +59,22 @@ const collectionDetailId = () =>
 /** Catalog marker for a Pen product. */
 export const productDetailPen = pgTable("product_detail_pen", {
   id: productDetailId(),
+  /** Whether a different tip can be fitted without customization. */
+  tipInterchangeable: boolean("tip_interchangeable").default(false).notNull(),
+  /** Whether a different clip can be fitted without customization. */
+  clipInterchangeable: boolean("clip_interchangeable").default(false).notNull(),
+  /** Whether a different top cap can be fitted without customization. */
+  topCapInterchangeable: boolean("top_cap_interchangeable")
+    .default(false)
+    .notNull(),
+  /** Whether a different actuator can be fitted without customization. */
+  actuatorInterchangeable: boolean("actuator_interchangeable")
+    .default(false)
+    .notNull(),
+  /** Whether a different mechanism can be fitted without customization. */
+  mechanismInterchangeable: boolean("mechanism_interchangeable")
+    .default(false)
+    .notNull(),
   ...entityTimestamps,
 });
 
@@ -265,6 +282,10 @@ export const penCompatiblePart = pgTable(
     partProductId: bigint("part_product_id", { mode: "number" })
       .notNull()
       .references(() => productDetailPenPart.id, { onDelete: "restrict" }),
+    /** Whether this relationship requires customization of the standard Pen. */
+    requiresCustomization: boolean("requires_customization")
+      .default(false)
+      .notNull(),
     ...entityTimestamps,
   },
   (table) => [

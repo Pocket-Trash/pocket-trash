@@ -1,0 +1,1 @@
+ALTER TABLE "pen_compatible_part" ADD COLUMN "requires_customization" boolean DEFAULT false NOT NULL;
