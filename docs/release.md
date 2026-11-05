@@ -63,21 +63,13 @@ deployment succeeds.
 
 Use the Node and pnpm versions declared in [package.json](../package.json). Follow [dependency coding standards](coding-standards-references/dependencies-secrets.md) for release-age policy, approved exact-version exceptions and security audits.
 
-Roy must approve each vulnerability exception. Every exception requires a GHSA,
-an owner, a follow-up Linear issue, and a UTC expiry within seven days.
-Record the metadata in `security-audit-exceptions.json`. General advisory
-exceptions must match `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`.
-The Vercel Zod exception instead uses exact version, development-only status,
-and reviewed dependency-path checks in `scripts/security-audit.mjs`; never add
-it to the global advisory ignore list. The validator rejects incomplete,
-mismatched, overlong, future-approved, or expired exceptions before auditing.
+Roy must approve each vulnerability exception. Record its GHSA, owner,
+follow-up issue, approval time and expiry within seven days in
+`security-audit-exceptions.json`. The `scripts/security-audit.mjs` validator
+checks metadata and scope before auditing dependencies.
 
-`GHSA-mrhx-c7xc-m3w5` remains approved only for Zod 3.22.4 on six reviewed
-Vercel CLI development-tooling paths. Roy Anger renewed this exception on
-`2026-11-05T20:44:03Z`, expiring at `2026-11-12T20:44:03Z`.
-[ENG-574](https://linear.app/pocket-trash/issue/ENG-574) tracks removal.
-Application Zod 4 remains patched; further renewal requires owner approval.
-The withdrawn braces advisory has no active exception.
+Track exception reviews and follow-up work in
+[Dependency policy and exception cleanup](https://linear.app/pocket-trash/project/dependency-policy-and-exception-cleanup-8585f316e087).
 
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).
