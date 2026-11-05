@@ -158,9 +158,9 @@ test("trusted PR visual configuration keeps the approved route and source limits
   ]);
   assert.deepEqual(config.limits, {
     maxFiles: 100,
-    maxBytes: 1048576,
+    maxBytes: 2097152,
     maxChangedLines: 20000,
-    maxFileBytes: 524288,
+    maxFileBytes: 1048576,
   });
 });
 

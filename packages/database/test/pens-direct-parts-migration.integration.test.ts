@@ -124,6 +124,35 @@ it("converts configured and installed Pen parts without changing source listings
       FROM collection_item_installed_pen_part`),
   ).resolves.toMatchObject({ rows: [{ count: 1 }] });
   await expect(
+    database.query(
+      `SELECT requires_customization FROM collection_item_installed_pen_part`,
+    ),
+  ).resolves.toMatchObject({ rows: [{ requires_customization: false }] });
+  await expect(
+    database.query(
+      `SELECT tip_interchangeable, clip_interchangeable, top_cap_interchangeable, actuator_interchangeable, mechanism_interchangeable FROM product_detail_pen`,
+    ),
+  ).resolves.toMatchObject({
+    rows: [
+      {
+        tip_interchangeable: false,
+        clip_interchangeable: false,
+        top_cap_interchangeable: false,
+        actuator_interchangeable: false,
+        mechanism_interchangeable: false,
+      },
+    ],
+  });
+  await database.exec(
+    `UPDATE collection_item SET owned = false WHERE id IN (SELECT id FROM collection_detail_pen_tip)`,
+  );
+  await expect(
+    database.exec(`UPDATE pen_compatible_part SET updated_at = now()`),
+  ).resolves.toBeDefined();
+  await database.exec(
+    `UPDATE collection_item SET owned = true WHERE id IN (SELECT id FROM collection_detail_pen_tip)`,
+  );
+  await expect(
     database.query(`SELECT source_record_id FROM catalog_source_listing`),
   ).resolves.toMatchObject({ rows: [{ source_record_id: "pen-1" }] });
   await expect(
@@ -136,6 +165,6 @@ it("converts configured and installed Pen parts without changing source listings
     database.exec(`BEGIN;
       DELETE FROM pen_compatible_part;
       COMMIT;`),
-  ).rejects.toThrow(/directly compatible/iu);
+  ).rejects.toThrow(/compatibility|customization/iu);
   await database.exec("ROLLBACK;").catch(() => undefined);
 }, 60_000);

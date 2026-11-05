@@ -1,0 +1,1 @@
+ALTER TABLE "collection_item_installed_pen_part" ADD COLUMN "requires_customization" boolean DEFAULT false NOT NULL;

@@ -1107,6 +1107,7 @@ const collectionAddSchema = z
     productId: idSchema,
     productTypeSlug: collectionProductTypeSchema,
     installedPenPartCollectionItemIds: z.array(idSchema).default([]),
+    customizationConfirmedPartCollectionItemIds: z.array(idSchema).default([]),
     installedRefillOfferingId: idSchema.nullable().default(null),
     installedRefillProductId: idSchema.nullable().default(null),
     serialNumber: z
@@ -1188,6 +1189,7 @@ const collectionEditSchema = z
     collectionId: idSchema.optional(),
     collectionItemId: idSchema,
     installedPenPartCollectionItemIds: z.array(idSchema).optional(),
+    customizationConfirmedPartCollectionItemIds: z.array(idSchema).optional(),
     customFinish: finishOptionSchema.nullable(),
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
@@ -2429,6 +2431,8 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           collectionId: parsed.data.collectionId,
           installedPenPartCollectionItemIds:
             parsed.data.installedPenPartCollectionItemIds,
+          customizationConfirmedPartCollectionItemIds:
+            parsed.data.customizationConfirmedPartCollectionItemIds,
           customFinish: parsed.data.customFinish
             ? toFinishWriteOption(parsed.data.customFinish)
             : null,
@@ -3055,6 +3059,8 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
         ...parsed.data,
         installedPenPartCollectionItemIds:
           parsed.data.installedPenPartCollectionItemIds,
+        customizationConfirmedPartCollectionItemIds:
+          parsed.data.customizationConfirmedPartCollectionItemIds,
         customFinish: parsed.data.customFinish
           ? toFinishWriteOption(parsed.data.customFinish)
           : null,

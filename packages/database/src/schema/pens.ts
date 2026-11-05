@@ -560,6 +560,10 @@ export const collectionItemInstalledPenPart = pgTable(
     })
       .notNull()
       .references(() => collectionItem.id, { onDelete: "restrict" }),
+    /** Whether the owner confirmed a customization exception for this installation. */
+    requiresCustomization: boolean("requires_customization")
+      .default(false)
+      .notNull(),
     ...entityTimestamps,
   },
   (table) => [

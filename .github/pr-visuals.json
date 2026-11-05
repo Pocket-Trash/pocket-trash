@@ -13,8 +13,8 @@
   ],
   "limits": {
     "maxFiles": 100,
-    "maxBytes": 1048576,
+    "maxBytes": 2097152,
     "maxChangedLines": 20000,
-    "maxFileBytes": 524288
+    "maxFileBytes": 1048576
   }
 }

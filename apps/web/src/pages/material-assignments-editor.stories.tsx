@@ -131,14 +131,11 @@ export const MultipleMaterials: Story = {
     });
     await userEvent.click(edit);
     const page = within(canvasElement.ownerDocument.body);
-    await expect(
-      page.getByRole("dialog", { name: "Material combination" }),
-    ).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Material combination" });
+    await expect(dialog).toBeVisible();
     await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
     await userEvent.keyboard("{Escape}");
-    await expect(
-      page.getByRole("dialog", { name: "Material combination" }),
-    ).toHaveAttribute("data-closed");
+    await waitFor(() => expect(dialog).not.toBeVisible());
     await waitFor(() => expect(edit).toHaveFocus());
   },
 };
