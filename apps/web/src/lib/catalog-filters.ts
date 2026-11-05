@@ -361,6 +361,17 @@ export function parseCatalogFilterSearch(
 }
 
 /**
+ * Keeps only an explicit supported type when entering product creation.
+ * @param search - Untrusted creation-route search values.
+ * @returns Editable creation context without unrelated catalog filters.
+ */
+export function parseProductCreationSearch(
+  search: Record<string, unknown>,
+): Pick<CatalogFilterSearch, "type"> {
+  return { type: isCatalogProductType(search.type) ? search.type : undefined };
+}
+
+/**
  * Normalizes product filters and the explicit list view.
  *
  * @param search - Unknown route search values.

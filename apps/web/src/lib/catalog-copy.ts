@@ -56,3 +56,36 @@ export function useCatalogCopy() {
   return (key: string, values: Readonly<Record<string, unknown>> = {}) =>
     formatCatalogCopy(key, values, locale);
 }
+
+/**
+ * Explains the actuator type consistently while retaining other catalog names.
+ * @param t - Active-locale catalog formatter.
+ * @param slug - Canonical product-type slug.
+ * @param fallback - Existing type or maker-preferred label.
+ * @returns Type label with actuator examples when relevant.
+ */
+export function catalogProductTypeLabel(
+  t: ReturnType<typeof useCatalogCopy>,
+  slug: string | null | undefined,
+  fallback: string,
+) {
+  // Trends responses expose only the canonical English type name.
+  return slug === "pen-actuator" ||
+    (!slug && /^pen actuators?$/i.test(fallback))
+    ? t("catalog.productTypes.pen-actuator")
+    : fallback;
+}
+
+/**
+ * Names a complete creation action independently of the type's display label.
+ * @param t - Active-locale catalog formatter.
+ * @param slug - Canonical product-type slug, when selected.
+ * @returns Localized creation action or the unselected product fallback.
+ */
+export function catalogProductCreateLabel(
+  t: ReturnType<typeof useCatalogCopy>,
+  slug?: string,
+) {
+  const key = `web.catalog.addProductType.${slug}`;
+  return translationKeySet.has(key) ? t(key) : t("web.action.addProduct");
+}

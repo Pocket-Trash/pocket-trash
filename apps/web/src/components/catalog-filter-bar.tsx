@@ -34,6 +34,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { catalogProductTypeLabel, useCatalogCopy } from "@/lib/catalog-copy";
 import {
   type CatalogFacet,
   type CatalogFacets,
@@ -251,6 +252,7 @@ export function CatalogFilterBar({
   /** Current matching result count announced after filter changes. */
   resultCount: number;
 }) {
+  const t = useCatalogCopy();
   const desktopRootRef = React.useRef<HTMLDivElement>(null);
   const advancedId = React.useId();
   const nextFilters = pruneCatalogFilters(filters, facets);
@@ -292,12 +294,20 @@ export function CatalogFilterBar({
         const selected = facets.productTypes.find(
           ({ slug }) => slug === filters.productType,
         );
-        return selected ? { id: selected.slug, name: selected.name } : null;
+        return selected
+          ? {
+              id: selected.slug,
+              name: catalogProductTypeLabel(t, selected.slug, selected.name),
+            }
+          : null;
       })()
     : { id: "all", name: copy.productTypeAll };
   const productTypes = [
     { id: "all", name: copy.productTypeAll },
-    ...facets.productTypes.map(({ name, slug }) => ({ id: slug, name })),
+    ...facets.productTypes.map(({ name, slug }) => ({
+      id: slug,
+      name: catalogProductTypeLabel(t, slug, name),
+    })),
   ];
   const selectedMakers = facets.makers.filter(({ id }) =>
     filters.makerIds.includes(id),

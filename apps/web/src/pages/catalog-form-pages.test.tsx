@@ -12,6 +12,7 @@ import {
   FinishOptionsEditor,
   PensAdminEditor,
   ProductEditor,
+  ProductFormPage,
 } from "./catalog-form-pages";
 import { collectionFixture, productFixture } from "./catalog-test-fixtures";
 
@@ -1077,7 +1078,7 @@ describe("Pens catalog administration", () => {
     expect(html).toContain("Compatible parts");
     expect(html).toContain("Pen tips");
     expect(html).toContain("Fine Tip");
-    expect(html).toContain("Add product");
+    expect(html).toContain("Add pen tip");
   });
 
   it("renders typed product fields and structured admin actions", () => {
@@ -1150,5 +1151,67 @@ describe("Pens catalog administration", () => {
     expect(html).toContain("Precise V5");
     expect(html).toContain("Refill group: Parker G2");
     expect(html).not.toContain("Individual refill: Precise V5");
+  });
+});
+
+describe("product type creation context", () => {
+  const options = {
+    ...emptyCatalogOptions,
+    productTypes: [
+      {
+        id: 1,
+        name: "Pen mechanism",
+        slug: "pen-mechanism",
+        ...productTypeImage,
+        isPartOrAccessory: true,
+      },
+    ],
+  };
+  it("preselects an available type without requiring a product result", () => {
+    const html = renderToStaticMarkup(
+      <ProductFormPage
+        options={options}
+        initialProductTypeSlug="pen-mechanism"
+      />,
+    );
+    expect(html).toContain('value="Pen mechanism"');
+    expect(html).toContain("Add pen mechanism");
+  });
+  it.each([
+    undefined,
+    "invalid",
+    "spinner",
+  ])("keeps unavailable %s context unselected", (initialProductTypeSlug) => {
+    const html = renderToStaticMarkup(
+      <ProductFormPage
+        options={options}
+        initialProductTypeSlug={initialProductTypeSlug}
+      />,
+    );
+    expect(html).not.toContain("<form");
+  });
+  it.each([
+    ["pen", "Add pen"],
+    ["pen-actuator", "Add pen actuator"],
+    ["pen-clip", "Add pen clip"],
+    ["pen-mechanism", "Add pen mechanism"],
+    ["pen-tip", "Add pen tip"],
+    ["pen-top-cap", "Add pen top cap"],
+    ["refill", "Add refill"],
+    ["slider", "Add slider"],
+    ["slider-insert", "Add slider insert"],
+    ["slider-plate", "Add slider plate"],
+    ["spinner", "Add spinner"],
+    ["spinner-button", "Add spinner button"],
+  ] as const)("names %s creation, including embedded creation", (productTypeSlug, label) => {
+    const html = renderToStaticMarkup(
+      <ProductEditor
+        options={options}
+        productTypeSlug={productTypeSlug}
+        onCreated={() => {}}
+      />,
+    );
+    expect(html).toContain(label);
+    expect(html).not.toContain(">Add product</button>");
   });
 });

@@ -183,12 +183,11 @@ export const InlineCreationCancel: Story = {
    * @rejects When the Pen-tip creation control is absent.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
-    const addButtons = canvas.getAllByRole("button", { name: "Add product" });
-    const addTip = addButtons[0];
+    const addTip = canvas.getByRole("button", { name: "Add pen tip" });
     if (!addTip) throw new Error("Missing Pen-tip creation control.");
     await userEvent.click(addTip);
     const page = within(canvasElement.ownerDocument.body);
-    const dialog = await page.findByRole("dialog", { name: "Add product" });
+    const dialog = await page.findByRole("dialog", { name: "Add pen tip" });
     await expect(dialog).toBeVisible();
     await userEvent.click(
       within(dialog).getByRole("button", { name: "Cancel" }),

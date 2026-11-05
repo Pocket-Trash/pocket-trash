@@ -567,7 +567,7 @@ describe("catalog mutation lifetimes", () => {
     if (!role) throw new Error("Missing Pen tip disclosure");
     await act(async () => role.click());
     const trigger = [...container.querySelectorAll("button")].find(
-      (node) => node.textContent === "Add product",
+      (node) => node.textContent === "Add pen tip",
     );
     if (!trigger) throw new Error("Missing part creation trigger");
     await act(async () => trigger.click());

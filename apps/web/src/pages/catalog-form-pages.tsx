@@ -118,7 +118,11 @@ import {
   softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
-import { useCatalogCopy } from "@/lib/catalog-copy";
+import {
+  catalogProductCreateLabel,
+  catalogProductTypeLabel,
+  useCatalogCopy,
+} from "@/lib/catalog-copy";
 import {
   hasCollectionSalePrice,
   moneyFromInput,
@@ -143,19 +147,31 @@ import { useLocale } from "@/providers/locale-provider";
  *
  * @param props - Product form page properties.
  * @param props.initialProduct - Existing product being edited.
+ * @param props.initialProductTypeSlug - Explicit creation-route type, if available.
  * @param props.options - Catalog lookup options.
  * @returns The product form page.
  */
 export function ProductFormPage({
   initialProduct,
+  initialProductTypeSlug,
   options: initialOptions,
 }: {
   /** Existing product being edited. */
   initialProduct?: CatalogProduct;
+  /** Explicit type requested by the creation route. */
+  initialProductTypeSlug?: string;
   /** Catalog lookup options. */
   options: CatalogOptions;
 }) {
   const t = useCatalogCopy();
+  const productTypes = initialOptions.productTypes.map((type) => ({
+    ...type,
+    name: catalogProductTypeLabel(t, type.slug, type.name),
+  }));
+  const initialType = productTypes.find(
+    ({ slug }) =>
+      slug === initialProductTypeSlug && productTypeIsSupported(slug),
+  );
   const typeForm = useForm({
     defaultValues: {
       productType: initialProduct
@@ -163,7 +179,7 @@ export function ProductFormPage({
             id: initialProduct.productTypeId,
             name: initialProduct.productTypeName,
           }
-        : (null as ComboboxOption | null),
+        : (initialType ?? (null as ComboboxOption | null)),
     },
   });
   const selectedType = useStore(
@@ -179,19 +195,25 @@ export function ProductFormPage({
       breadcrumbItems={[
         { label: t("web.navigation.products"), to: "/products" },
       ]}
-      title={initialProduct ? initialProduct.name : t("web.action.addProduct")}
+      title={
+        initialProduct
+          ? initialProduct.name
+          : catalogProductCreateLabel(t, productType)
+      }
     >
       <main className="grid w-full max-w-6xl gap-6 p-6">
         {!initialProduct ? (
           <Field label={t("web.catalog.field.productType")}>
             <CatalogCombobox
               ariaLabel={t("web.catalog.field.productType")}
-              items={initialOptions.productTypes}
+              items={productTypes}
               onValueChange={(value) =>
                 typeForm.setFieldValue("productType", value)
               }
               placeholder={t("web.catalog.selectProductType")}
-              value={selectedType}
+              value={
+                productTypes.find(({ id }) => id === selectedType?.id) ?? null
+              }
             />
           </Field>
         ) : null}
@@ -650,7 +672,7 @@ const penPartProductTypes: Array<{
   { label: "web.pens.productType.tip", type: "pen-tip" },
   { label: "web.pens.productType.clip", type: "pen-clip" },
   { label: "web.pens.productType.mechanism", type: "pen-mechanism" },
-  { label: "web.pens.productType.actuator", type: "pen-actuator" },
+  { label: "catalog.productTypes.pen-actuator", type: "pen-actuator" },
   { label: "web.pens.productType.topCap", type: "pen-top-cap" },
 ];
 
@@ -2141,7 +2163,7 @@ export function ProductEditor({
                               type="button"
                               variant="outline"
                             >
-                              {t("web.action.addProduct")}
+                              {catalogProductCreateLabel(t, role.type)}
                             </Button>
                           </div>
                         ) : null}
@@ -2648,7 +2670,9 @@ export function ProductEditor({
               }
               type="submit"
             >
-              {initialProduct ? t("action.save") : t("web.action.addProduct")}
+              {initialProduct
+                ? t("action.save")
+                : catalogProductCreateLabel(t, productTypeSlug)}
             </Button>
           )}
         </form.Subscribe>
@@ -2706,7 +2730,7 @@ export function ProductEditor({
             >
               <div className="grid gap-4 p-6">
                 <h2 className="text-lg font-semibold" id={partDialogTitleId}>
-                  {t("web.action.addProduct")}
+                  {catalogProductCreateLabel(t, ui.activePartType ?? undefined)}
                 </h2>
                 <ProductEditor
                   onCancel={() => {
@@ -5568,7 +5592,10 @@ export function CollectionAddPage({
             <Field label={t("web.catalog.field.productType")}>
               <CatalogCombobox
                 ariaLabel={t("web.catalog.field.productType")}
-                items={options.productTypes}
+                items={options.productTypes.map((type) => ({
+                  ...type,
+                  name: catalogProductTypeLabel(t, type.slug, type.name),
+                }))}
                 onValueChange={(value) => {
                   form.setFieldValue("type", value);
                   dispatch({ type: "pageSelected", page: 0 });
@@ -5593,7 +5620,14 @@ export function CollectionAddPage({
                   form.setErrorMap({ onSubmit: undefined });
                 }}
                 placeholder={t("web.catalog.selectProductType")}
-                value={type}
+                value={
+                  type
+                    ? {
+                        ...type,
+                        name: catalogProductTypeLabel(t, slug, type.name),
+                      }
+                    : null
+                }
               />
             </Field>
             {slug && !collectionProductTypeIsSupported(slug) ? (
