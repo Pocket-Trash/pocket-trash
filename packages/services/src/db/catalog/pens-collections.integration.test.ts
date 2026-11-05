@@ -358,6 +358,183 @@ describe("owned Pens and Pen parts", () => {
         customFinish: null,
         finishOptionId: null,
       };
+      const mechanismItemId = partItemIds.get("pen-mechanism");
+      const clipItemId = partItemIds.get("pen-clip");
+      const actuatorItemIdForLink = partItemIds.get("pen-actuator");
+      const tipItemId = partItemIds.get("pen-tip");
+      const mechanismCatalogId = productId.get("pen-mechanism");
+      const clipCatalogId = productId.get("pen-clip");
+      if (
+        !mechanismItemId ||
+        !clipItemId ||
+        !actuatorItemIdForLink ||
+        !tipItemId ||
+        !mechanismCatalogId ||
+        !clipCatalogId
+      )
+        throw new Error("Owned actuation fixtures missing.");
+      const mechanismMaterialId = materialIdByProduct.get(mechanismCatalogId);
+      if (!mechanismMaterialId)
+        throw new Error("Mechanism material fixture missing.");
+      const linkedParts = [tipItemId, clipItemId, mechanismItemId];
+      await db.insert(schema.penActuatorMechanism).values({
+        actuatorProductId: clipCatalogId,
+        mechanismProductId: mechanismCatalogId,
+      });
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: linkedParts,
+        customizationConfirmedPartCollectionItemIds: [mechanismItemId],
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: clipItemId,
+            mechanismCollectionItemId: mechanismItemId,
+          },
+        ],
+      });
+      expect(
+        (await service.listOwned(actor)).find(
+          ({ collectionItemId }) => collectionItemId === penItemId,
+        ),
+      ).toMatchObject({
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: clipItemId,
+            mechanismCollectionItemId: mechanismItemId,
+            requiresCustomization: false,
+          },
+        ],
+      });
+      const linked = await db
+        .select()
+        .from(schema.collectionItemInstalledPenPart)
+        .where(
+          eq(
+            schema.collectionItemInstalledPenPart.penCollectionItemId,
+            penItemId,
+          ),
+        );
+      expect(linked).toHaveLength(3);
+      expect(
+        linked.filter(
+          ({ partCollectionItemId }) => partCollectionItemId === clipItemId,
+        ),
+      ).toHaveLength(1);
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: linkedParts,
+      });
+      expect(
+        (await service.listOwned(actor)).find(
+          ({ collectionItemId }) => collectionItemId === penItemId,
+        )?.installedPenActuations,
+      ).toHaveLength(1);
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: [
+            ...linkedParts,
+            actuatorItemIdForLink,
+          ],
+          customizationConfirmedPartCollectionItemIds: [actuatorItemIdForLink],
+          installedPenActuations: [
+            {
+              actuatorCollectionItemId: actuatorItemIdForLink,
+              mechanismCollectionItemId: mechanismItemId,
+            },
+          ],
+        }),
+      ).rejects.toThrow("web.pens.installedActuation.confirmationRequired");
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: [
+          ...linkedParts,
+          actuatorItemIdForLink,
+        ],
+        customizationConfirmedPartCollectionItemIds: [actuatorItemIdForLink],
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: actuatorItemIdForLink,
+            mechanismCollectionItemId: mechanismItemId,
+            customizationConfirmed: true,
+          },
+        ],
+      });
+      expect(
+        (await service.listOwned(actor)).find(
+          ({ collectionItemId }) => collectionItemId === penItemId,
+        )?.installedPenActuations,
+      ).toEqual([
+        {
+          actuatorCollectionItemId: actuatorItemIdForLink,
+          mechanismCollectionItemId: mechanismItemId,
+          requiresCustomization: true,
+        },
+      ]);
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: [
+          ...linkedParts,
+          actuatorItemIdForLink,
+        ],
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: actuatorItemIdForLink,
+            mechanismCollectionItemId: mechanismItemId,
+          },
+        ],
+      });
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenPartCollectionItemIds: linkedParts,
+          installedPenActuations: [
+            {
+              actuatorCollectionItemId: clipItemId,
+              mechanismCollectionItemId: mechanismItemId,
+            },
+            {
+              actuatorCollectionItemId: clipItemId,
+              mechanismCollectionItemId: mechanismItemId,
+            },
+          ],
+        }),
+      ).rejects.toThrow("web.pens.installedActuation.invalid");
+      await expect(
+        db
+          .update(schema.collectionItemInstalledPenPart)
+          .set({
+            actuatedMechanismCollectionItemId: tipItemId,
+          })
+          .where(
+            eq(
+              schema.collectionItemInstalledPenPart.partCollectionItemId,
+              actuatorItemIdForLink,
+            ),
+          ),
+      ).rejects.toThrow();
+      for (const pair of [
+        {
+          actuatorCollectionItemId: tipItemId,
+          mechanismCollectionItemId: mechanismItemId,
+        },
+        {
+          actuatorCollectionItemId: clipItemId,
+          mechanismCollectionItemId: clipItemId,
+        },
+      ])
+        await expect(
+          service.updateItem({
+            ...ordinaryUpdate,
+            installedPenPartCollectionItemIds: linkedParts,
+            installedPenActuations: [pair],
+          }),
+        ).rejects.toThrow("web.pens.installedActuation.invalid");
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: [tipItemId, clipItemId],
+        installedPenActuations: [],
+      });
       await expect(
         service.updateItem({
           ...ordinaryUpdate,
@@ -500,11 +677,103 @@ describe("owned Pens and Pen parts", () => {
           .from(schema.collectionDetailPen)
           .where(eq(schema.collectionDetailPen.id, penItemId)),
       ).toHaveLength(1);
+      const alternateMechanismItemId = await service.addPenProduct({
+        actor,
+        collectionId: partsCollection.id,
+        productId: mechanismCatalogId,
+        productTypeSlug: "pen-mechanism",
+        displayName: "Second owned mechanism",
+        installedPenPartCollectionItemIds: [],
+        customFinish: null,
+        finishOptionId: null,
+        installedRefillProductId: null,
+        installedRefillOfferingId: null,
+        serialNumber: null,
+        materialAssignmentId: materialIdByProduct.get(mechanismCatalogId)!,
+      });
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: [
+          ...linkedParts,
+          alternateMechanismItemId,
+        ],
+        customizationConfirmedPartCollectionItemIds: [
+          mechanismItemId,
+          alternateMechanismItemId,
+        ],
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: clipItemId,
+            mechanismCollectionItemId: mechanismItemId,
+          },
+        ],
+      });
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: clipItemId,
+            mechanismCollectionItemId: alternateMechanismItemId,
+          },
+        ],
+      });
+      expect(
+        (await service.listOwned(actor)).find(
+          ({ collectionItemId }) => collectionItemId === penItemId,
+        )?.installedPenActuations,
+      ).toEqual([
+        {
+          actuatorCollectionItemId: clipItemId,
+          mechanismCollectionItemId: alternateMechanismItemId,
+          requiresCustomization: false,
+        },
+      ]);
+      await db
+        .update(schema.product)
+        .set({ isPrivate: true })
+        .where(eq(schema.product.id, mechanismCatalogId));
+      await expect(
+        service.updateItem({
+          ...ordinaryUpdate,
+          installedPenActuations: [
+            {
+              actuatorCollectionItemId: clipItemId,
+              mechanismCollectionItemId: mechanismItemId,
+            },
+          ],
+        }),
+      ).rejects.toThrow("web.pens.installedActuation.confirmationRequired");
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: clipItemId,
+            mechanismCollectionItemId: mechanismItemId,
+            customizationConfirmed: true,
+          },
+        ],
+      });
+      await db
+        .update(schema.product)
+        .set({ isPrivate: false })
+        .where(eq(schema.product.id, mechanismCatalogId));
+      await service.updateItem({
+        ...ordinaryUpdate,
+        installedPenPartCollectionItemIds: [tipItemId, clipItemId],
+        installedPenActuations: [],
+      });
       const actuatorItemId = partItemIds.get("pen-actuator")!;
       const customPenInput = {
         actor,
         collectionId: pensCollection.id,
-        installedPenPartCollectionItemIds: [actuatorItemId],
+        installedPenPartCollectionItemIds: [actuatorItemId, mechanismItemId],
+        installedPenActuations: [
+          {
+            actuatorCollectionItemId: actuatorItemId,
+            mechanismCollectionItemId: mechanismItemId,
+            customizationConfirmed: true,
+          },
+        ],
         customFinish: null,
         displayName: "Customized Pen",
         finishOptionId: null,
@@ -524,7 +793,10 @@ describe("owned Pens and Pen parts", () => {
       );
       const customPenItemId = await service.addPenProduct({
         ...customPenInput,
-        customizationConfirmedPartCollectionItemIds: [actuatorItemId],
+        customizationConfirmedPartCollectionItemIds: [
+          actuatorItemId,
+          mechanismItemId,
+        ],
       });
       expect(
         await db
@@ -545,7 +817,10 @@ describe("owned Pens and Pen parts", () => {
       await expect(
         service.addPenProduct({
           ...customPenInput,
-          customizationConfirmedPartCollectionItemIds: [actuatorItemId],
+          customizationConfirmedPartCollectionItemIds: [
+            actuatorItemId,
+            mechanismItemId,
+          ],
         }),
       ).rejects.toThrow("unavailable");
     } finally {

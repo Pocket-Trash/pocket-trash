@@ -1,0 +1,6 @@
+ALTER TABLE "collection_item_installed_pen_part" ADD COLUMN "actuated_mechanism_collection_item_id" bigint;--> statement-breakpoint
+ALTER TABLE "collection_item_installed_pen_part" ADD COLUMN "actuation_requires_customization" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "collection_item_installed_pen_part" ADD CONSTRAINT "installed_pen_actuation_mechanism_unique" UNIQUE("pen_collection_item_id","actuated_mechanism_collection_item_id");--> statement-breakpoint
+ALTER TABLE "collection_item_installed_pen_part" ADD CONSTRAINT "installed_pen_actuation_mechanism_fk" FOREIGN KEY ("pen_collection_item_id","actuated_mechanism_collection_item_id") REFERENCES "collection_item_installed_pen_part"("pen_collection_item_id","part_collection_item_id");--> statement-breakpoint
+ALTER TABLE "collection_item_installed_pen_part" ADD CONSTRAINT "installed_pen_actuation_distinct" CHECK ("part_collection_item_id" <> "actuated_mechanism_collection_item_id");--> statement-breakpoint
+ALTER TABLE "collection_item_installed_pen_part" ADD CONSTRAINT "installed_pen_actuation_confirmation_target" CHECK (NOT "actuation_requires_customization" OR "actuated_mechanism_collection_item_id" IS NOT NULL);

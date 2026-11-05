@@ -125,9 +125,17 @@ it("converts configured and installed Pen parts without changing source listings
   ).resolves.toMatchObject({ rows: [{ count: 1 }] });
   await expect(
     database.query(
-      `SELECT requires_customization FROM collection_item_installed_pen_part`,
+      `SELECT requires_customization, actuated_mechanism_collection_item_id, actuation_requires_customization FROM collection_item_installed_pen_part`,
     ),
-  ).resolves.toMatchObject({ rows: [{ requires_customization: false }] });
+  ).resolves.toMatchObject({
+    rows: [
+      {
+        requires_customization: false,
+        actuated_mechanism_collection_item_id: null,
+        actuation_requires_customization: false,
+      },
+    ],
+  });
   await expect(
     database.query(
       `SELECT tip_interchangeable, clip_interchangeable, top_cap_interchangeable, actuator_interchangeable, mechanism_interchangeable FROM product_detail_pen`,

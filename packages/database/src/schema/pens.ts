@@ -588,12 +588,41 @@ export const collectionItemInstalledPenPart = pgTable(
     requiresCustomization: boolean("requires_customization")
       .default(false)
       .notNull(),
+    /** Installed physical mechanism operated by this one owned part. */
+    actuatedMechanismCollectionItemId: bigint(
+      "actuated_mechanism_collection_item_id",
+      { mode: "number" },
+    ),
+    /** Explicit acknowledgment for an unrecorded actuator/mechanism pairing. */
+    actuationRequiresCustomization: boolean("actuation_requires_customization")
+      .default(false)
+      .notNull(),
     ...entityTimestamps,
   },
   (table) => [
     primaryKey({
       columns: [table.penCollectionItemId, table.partCollectionItemId],
     }),
+    foreignKey({
+      columns: [
+        table.penCollectionItemId,
+        table.actuatedMechanismCollectionItemId,
+      ],
+      foreignColumns: [table.penCollectionItemId, table.partCollectionItemId],
+      name: "installed_pen_actuation_mechanism_fk",
+    }),
+    unique("installed_pen_actuation_mechanism_unique").on(
+      table.penCollectionItemId,
+      table.actuatedMechanismCollectionItemId,
+    ),
+    check(
+      "installed_pen_actuation_distinct",
+      sql`${table.partCollectionItemId} <> ${table.actuatedMechanismCollectionItemId}`,
+    ),
+    check(
+      "installed_pen_actuation_confirmation_target",
+      sql`NOT ${table.actuationRequiresCustomization} OR ${table.actuatedMechanismCollectionItemId} IS NOT NULL`,
+    ),
     unique("collection_item_installed_pen_part_part_unique").on(
       table.partCollectionItemId,
     ),

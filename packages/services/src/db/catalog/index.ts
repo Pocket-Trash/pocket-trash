@@ -2080,8 +2080,29 @@ export type CollectionItemMetadataWrite = {
   saleDate?: string;
 };
 
+/** One physical owned part operating one installed physical mechanism. */
+export type InstalledPenActuation = {
+  /** Installed actuator-role owned item, also a clip when it has both roles. */
+  actuatorCollectionItemId: number;
+  /** Installed physical mechanism owned item. */
+  mechanismCollectionItemId: number;
+  /** Owner previously confirmed a pairing absent from catalog associations. */
+  requiresCustomization: boolean;
+};
+
+/** Complete authored owned pairing and its explicit customization acknowledgment. */
+export type InstalledPenActuationInput = Omit<
+  InstalledPenActuation,
+  "requiresCustomization"
+> & {
+  /** Explicit acknowledgment for a new unrecorded physical pairing. */
+  customizationConfirmed?: boolean;
+};
+
 /** Owned collection item with its product snapshot and visibility state. */
 export type UserCollectionItem = {
+  /** Relationships between the physical installed mechanisms and actuating parts. */
+  installedPenActuations?: InstalledPenActuation[];
   /** Functional roles of the source physical Pen-part product. */
   penPartRoles?: PenPartRole[];
   /** Already-redacted metadata for the current viewer. */
@@ -2446,6 +2467,8 @@ export type CollectionsService = {
     installedPenPartCollectionItemIds: number[];
     /** Explicit acknowledgment for new customized owned installations. */
     customizationConfirmedPartCollectionItemIds?: number[];
+    /** Complete installed actuation replacement; omission preserves retained pairs. */
+    installedPenActuations?: InstalledPenActuationInput[];
     /** Optional custom finish snapshot. */
     customFinish: ProductWriteFinishOption | null;
     /** Optional description override. */
@@ -2957,6 +2980,8 @@ export type CollectionsService = {
     installedPenPartCollectionItemIds?: number[];
     /** Explicit acknowledgment for new customized owned installations. */
     customizationConfirmedPartCollectionItemIds?: number[];
+    /** Complete installed actuation replacement; omission preserves retained pairs. */
+    installedPenActuations?: InstalledPenActuationInput[];
     /**
      * Custom finish.
      */
@@ -6366,6 +6391,7 @@ export function createCollectionsService(
               partCollectionItemIds: input.installedPenPartCollectionItemIds,
               customizationConfirmedPartCollectionItemIds:
                 input.customizationConfirmedPartCollectionItemIds,
+              installedPenActuations: input.installedPenActuations,
             });
             await createCollectionFinishOption(tx, {
               collectionItemId: item.id,
@@ -6379,6 +6405,10 @@ export function createCollectionsService(
               actorUser: owner,
               after: {
                 collectionId: resolvedCollection.id,
+                installedPenActuations: await installedPenActuationAuditState(
+                  tx,
+                  item.id,
+                ),
                 installedPenPartCollectionItemIds:
                   input.installedPenPartCollectionItemIds,
                 customizationConfirmedPartCollectionItemIds:
@@ -8149,6 +8179,10 @@ export function createCollectionsService(
                   )
               : [];
             const before = {
+              installedPenActuations: await installedPenActuationAuditState(
+                tx,
+                input.collectionItemId,
+              ),
               collectionId: item.collectionId,
               description: item.description,
               displayName: item.displayName,
@@ -8310,15 +8344,37 @@ export function createCollectionsService(
               })
               .where(eq(schema.collectionItem.id, input.collectionItemId));
 
-            if (input.installedPenPartCollectionItemIds !== undefined) {
+            if (
+              input.installedPenPartCollectionItemIds !== undefined ||
+              input.installedPenActuations !== undefined
+            ) {
+              const retainedParts =
+                input.installedPenPartCollectionItemIds === undefined
+                  ? await tx
+                      .select({
+                        id: schema.collectionItemInstalledPenPart
+                          .partCollectionItemId,
+                      })
+                      .from(schema.collectionItemInstalledPenPart)
+                      .where(
+                        eq(
+                          schema.collectionItemInstalledPenPart
+                            .penCollectionItemId,
+                          input.collectionItemId,
+                        ),
+                      )
+                  : [];
               await replaceInstalledPenParts(tx, {
                 collectionId: targetCollectionId,
                 collectionItemId: input.collectionItemId,
                 ownerId: item.ownerId,
                 productId,
-                partCollectionItemIds: input.installedPenPartCollectionItemIds,
+                partCollectionItemIds:
+                  input.installedPenPartCollectionItemIds ??
+                  retainedParts.map(({ id }) => id),
                 customizationConfirmedPartCollectionItemIds:
                   input.customizationConfirmedPartCollectionItemIds,
+                installedPenActuations: input.installedPenActuations,
               });
             }
 
@@ -8663,6 +8719,10 @@ export function createCollectionsService(
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
+              installedPenActuations: await installedPenActuationAuditState(
+                tx,
+                input.collectionItemId,
+              ),
               collectionId: targetCollectionId,
               description:
                 input.description === undefined
@@ -11732,6 +11792,7 @@ async function queryOwnedItems(
       collectionItemId: row.collectionItemId,
       installedPenPartCollectionItemIds: [],
       customizedPenPartCollectionItemIds: [],
+      installedPenActuations: [],
       collectionName: row.collectionName,
       displayName: row.displayName,
       description: row.descriptionOverride ?? row.productDescription,
@@ -11829,6 +11890,12 @@ async function queryOwnedItems(
     const [installedParts, ownershipPeriods] = await Promise.all([
       db
         .select({
+          actuatedMechanismCollectionItemId:
+            schema.collectionItemInstalledPenPart
+              .actuatedMechanismCollectionItemId,
+          actuationRequiresCustomization:
+            schema.collectionItemInstalledPenPart
+              .actuationRequiresCustomization,
           requiresCustomization:
             schema.collectionItemInstalledPenPart.requiresCustomization,
           partCollectionItemId:
@@ -11872,6 +11939,15 @@ async function queryOwnedItems(
       items.map((item) => [item.collectionItemId, item]),
     );
     for (const installedPart of installedParts) {
+      if (installedPart.actuatedMechanismCollectionItemId !== null)
+        itemsById
+          .get(installedPart.penCollectionItemId)
+          ?.installedPenActuations?.push({
+            actuatorCollectionItemId: installedPart.partCollectionItemId,
+            mechanismCollectionItemId:
+              installedPart.actuatedMechanismCollectionItemId,
+            requiresCustomization: installedPart.actuationRequiresCustomization,
+          });
       if (installedPart.requiresCustomization)
         itemsById
           .get(installedPart.penCollectionItemId)
@@ -13187,6 +13263,41 @@ async function replaceProductLinks(
 }
 
 /**
+ * Captures persisted owned actuation evidence for the item audit.
+ * @param tx - Active collection transaction.
+ * @param collectionItemId - Owned Pen whose saved pairs are requested.
+ * @returns Stable physical pair identities and their saved acknowledgments.
+ */
+async function installedPenActuationAuditState(
+  tx: CatalogTransaction,
+  collectionItemId: number,
+) {
+  return await tx
+    .select({
+      actuatorCollectionItemId:
+        schema.collectionItemInstalledPenPart.partCollectionItemId,
+      mechanismCollectionItemId:
+        schema.collectionItemInstalledPenPart.actuatedMechanismCollectionItemId,
+      requiresCustomization:
+        schema.collectionItemInstalledPenPart.actuationRequiresCustomization,
+    })
+    .from(schema.collectionItemInstalledPenPart)
+    .where(
+      and(
+        eq(
+          schema.collectionItemInstalledPenPart.penCollectionItemId,
+          collectionItemId,
+        ),
+        isNotNull(
+          schema.collectionItemInstalledPenPart
+            .actuatedMechanismCollectionItemId,
+        ),
+      ),
+    )
+    .orderBy(asc(schema.collectionItemInstalledPenPart.partCollectionItemId));
+}
+
+/**
  * Replaces one owned Pen's installed parts after validating compatibility and ownership.
  *
  * @param tx - Active catalog transaction.
@@ -13209,6 +13320,8 @@ async function replaceInstalledPenParts(
     partCollectionItemIds: number[];
     /** Particular exceptions explicitly acknowledged by the owner. */
     customizationConfirmedPartCollectionItemIds?: number[];
+    /** Complete installed actuation replacement; omission preserves retained pairs. */
+    installedPenActuations?: InstalledPenActuationInput[];
   },
 ): Promise<void> {
   const partIds = [...new Set(input.partCollectionItemIds)];
@@ -13314,6 +13427,83 @@ async function replaceInstalledPenParts(
     tx,
     parts.map(({ productId }) => productId),
   );
+  const actuations: InstalledPenActuationInput[] =
+    input.installedPenActuations ??
+    previous.flatMap((part) =>
+      part.actuatedMechanismCollectionItemId !== null &&
+      partIds.includes(part.partCollectionItemId) &&
+      partIds.includes(part.actuatedMechanismCollectionItemId)
+        ? [
+            {
+              actuatorCollectionItemId: part.partCollectionItemId,
+              mechanismCollectionItemId: part.actuatedMechanismCollectionItemId,
+            },
+          ]
+        : [],
+    );
+  if (
+    new Set(
+      actuations.map(
+        ({ actuatorCollectionItemId }) => actuatorCollectionItemId,
+      ),
+    ).size !== actuations.length ||
+    new Set(
+      actuations.map(
+        ({ mechanismCollectionItemId }) => mechanismCollectionItemId,
+      ),
+    ).size !== actuations.length
+  )
+    throw new Error("web.pens.installedActuation.invalid");
+  const catalogActuations = await loadPenActuation(
+    tx,
+    parts.map(({ productId }) => productId),
+    parts[0] ? { clerkId: parts[0].ownerClerkId, role: "user" } : undefined,
+  );
+  const installedActuations = new Map<
+    number,
+    {
+      /** Physical mechanism selected for this installed actuator. */
+      mechanismCollectionItemId: number;
+      /** Retained explicit acknowledgment for an unrecorded pairing. */
+      requiresCustomization: boolean;
+    }
+  >();
+  for (const pairing of actuations) {
+    const actuator = parts.find(
+      ({ id }) => id === pairing.actuatorCollectionItemId,
+    );
+    const mechanism = parts.find(
+      ({ id }) => id === pairing.mechanismCollectionItemId,
+    );
+    if (
+      !actuator ||
+      !mechanism ||
+      actuator.id === mechanism.id ||
+      mechanism.type !== "pen-mechanism" ||
+      !getPenPartRoles({
+        productTypeSlug: actuator.type,
+        penPartRoles: rolesByProduct.get(actuator.productId),
+      }).includes("actuator")
+    )
+      throw new Error("web.pens.installedActuation.invalid");
+    const existing = previous.find(
+      (part) =>
+        part.partCollectionItemId === actuator.id &&
+        part.actuatedMechanismCollectionItemId === mechanism.id,
+    );
+    const known =
+      catalogActuations.forward
+        .get(actuator.productId)
+        ?.some(({ id }) => id === mechanism.productId) ?? false;
+    if (!known && !existing && !pairing.customizationConfirmed)
+      throw new Error("web.pens.installedActuation.confirmationRequired");
+    installedActuations.set(actuator.id, {
+      mechanismCollectionItemId: mechanism.id,
+      requiresCustomization:
+        existing?.actuationRequiresCustomization ??
+        (!known && Boolean(pairing.customizationConfirmed)),
+    });
+  }
   const replacements = parts.map((part) => {
     const needsCustomization =
       !compatibleIds.has(part.productId) ||
@@ -13334,6 +13524,10 @@ async function replaceInstalledPenParts(
     return {
       partCollectionItemId: part.id,
       penCollectionItemId: input.collectionItemId,
+      actuatedMechanismCollectionItemId:
+        installedActuations.get(part.id)?.mechanismCollectionItemId ?? null,
+      actuationRequiresCustomization:
+        installedActuations.get(part.id)?.requiresCustomization ?? false,
       requiresCustomization:
         needsCustomization &&
         (confirmed.has(part.id) || (existing?.requiresCustomization ?? false)),
