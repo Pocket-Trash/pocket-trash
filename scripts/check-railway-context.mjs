@@ -55,6 +55,7 @@ while (pendingPackageNames.length > 0) {
 
 /** Install and build entry points required in the tracked upload context. */
 const requiredBuildFiles = [
+  ".npmrc",
   ".railwayignore",
   "railpack.json",
   "package.json",

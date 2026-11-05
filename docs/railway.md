@@ -59,15 +59,18 @@ For the production Discord bot service:
 The root [`railpack.json`](../railpack.json) authenticates native installs before
 GitHub Actions can configure a new PR environment. The root
 [`.railwayignore`](../.railwayignore) keeps CLI uploads below Railway's source-upload
-limit. It must include pnpm's referenced patches, the security audit script and
-exception manifest, and workspace dependencies of the root manifest, scraper,
-and Discord bot. CI and the production workflow run
+limit. It must include the root `.npmrc` registry configuration, pnpm's referenced
+patches, the security audit script and exception manifest, and workspace
+dependencies of the root manifest, scraper, and Discord bot. CI and the production workflow run
 `node scripts/check-railway-context.mjs` to reject missing, untracked, or excluded
 build inputs before upload. When adding build inputs, update the allowlist and
 the watched paths in `.railway/railway.ts` together.
 
 Railway needs `FONTAWESOME_PACKAGE_TOKEN` while installing the workspace because
-the supply-chain audit resolves the complete lockfile. The Deploy workflow copies
+the supply-chain audit resolves the complete lockfile, including web-only packages.
+The tracked `.npmrc` routes `@fortawesome` packages to `npm.fontawesome.com`; it
+contains no credentials. Keep it in CLI uploads so pnpm does not request private
+packages from the public npm registry. The Deploy workflow copies
 the token from Infisical into each PR environment and production before their
 builds. Railpack runs `scripts/pnpm-install.sh` so credentials stay in a
 permission-restricted temporary npm user config. Keep the preview template
