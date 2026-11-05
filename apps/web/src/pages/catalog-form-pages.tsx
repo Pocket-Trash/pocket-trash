@@ -5377,7 +5377,7 @@ export function CollectionAddPage({
       : null) as ComboboxOption | null,
     product: (initialProduct ?? null) as CatalogProduct | null,
     displayName: initialDefaults.displayName,
-    description: "",
+    description: initialProduct?.description ?? "",
     bearing: "",
     serialNumber: null as string | null,
     pricePaidInput: moneyInput(undefined, currency),
@@ -5493,7 +5493,10 @@ export function CollectionAddPage({
       const priceSold = hasCollectionSalePrice(value.metadata.statuses)
         ? moneyFromInput(value.priceSoldInput)
         : undefined;
-      const currentDescription = value.description;
+      const currentDescription =
+        value.description === (product.description ?? "")
+          ? ""
+          : value.description;
       const selectedButton =
         typeof value.button?.id === "number"
           ? ui.options.spinnerButtons.find(({ id }) => id === value.button?.id)
@@ -5920,7 +5923,8 @@ export function CollectionAddPage({
     const defaults = collectionProductDefaults(product, t);
     const changed =
       current.displayName !== defaults.displayName ||
-      (descriptionRef.current?.getValue() ?? current.description) !== "" ||
+      (descriptionRef.current?.getValue() ?? current.description) !==
+        (product.description ?? "") ||
       current.bearing !== "" ||
       current.serialNumber !== null ||
       current.material?.id !== defaults.material?.id ||
@@ -5950,7 +5954,7 @@ export function CollectionAddPage({
   const applyProductSelection = (candidate: CatalogProduct | null) => {
     const defaults = collectionProductDefaults(candidate ?? undefined, t);
     form.setFieldValue("displayName", defaults.displayName);
-    form.setFieldValue("description", "");
+    form.setFieldValue("description", candidate?.description ?? "");
     form.setFieldValue("bearing", "");
     form.setFieldValue("serialNumber", null);
     form.setFieldValue("installedPenPartIds", []);
@@ -6217,7 +6221,7 @@ export function CollectionAddPage({
             <CatalogMarkdownEditor
               defaultValue={description}
               disabled={!product}
-              help={t("web.catalog.help.markdownDescription")}
+              help={t("web.catalog.help.collectionDescriptionOverride")}
               id="collection-item-description"
               key={product?.id ?? "no-product"}
               label={t("web.catalog.field.description")}
@@ -6225,81 +6229,151 @@ export function CollectionAddPage({
               onLoadingChange={receiveDescriptionLoading}
               ref={descriptionRef}
             />
-            {product?.productTypeSlug === "spinner" ? (
-              <Field label={t("web.catalog.field.bearing")}>
-                <Input
-                  aria-label={t("web.catalog.field.bearing")}
-                  maxLength={200}
-                  onChange={(event) =>
-                    form.setFieldValue("bearing", event.target.value)
-                  }
-                  value={bearing}
-                />
-              </Field>
-            ) : null}
-            {product &&
-            collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
-              <SerialNumberFields
-                onChange={(value) => form.setFieldValue("serialNumber", value)}
-                t={t}
-                value={serialNumber}
-              />
-            ) : null}
-            <OwnershipLifecycleFields
-              allowDeparture={false}
-              onChange={(value) => form.setFieldValue("ownership", value)}
-              value={ownership}
-            />
-            <CollectionItemStatusFields
-              hasPublicMetadata={
-                (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
-                Boolean(metadata.notes?.some((note) => note.isPublic))
-              }
-              warning="web.collectionItemMetadata.unapprovedWarning"
-              value={metadata}
-              onChange={(value) => {
-                form.setFieldValue("metadata", value);
-                if (
-                  hasCollectionSalePrice(metadata.statuses) &&
-                  !value.statuses.public.includes("sold") &&
-                  !value.statuses.private.includes("sold")
-                )
-                  form.setFieldValue(
-                    "priceSoldInput",
-                    moneyInput(undefined, priceSoldInput.currencyCode),
-                  );
-              }}
-              invalid={Boolean(metadataError)}
-            >
-              <CollectionItemPriceField
-                value={pricePaidInput}
-                isPublic={pricePaidIsPublic}
-                onChange={(value) =>
-                  form.setFieldValue("pricePaidInput", value)
-                }
-                onPublicChange={(value) =>
-                  form.setFieldValue("pricePaidIsPublic", value)
-                }
-              />
-              {hasCollectionSalePrice(metadata.statuses) ? (
-                <CollectionItemPriceField
-                  sold
-                  value={priceSoldInput}
+            <fieldset className="grid min-w-0 gap-5">
+              <legend className="mb-3 font-semibold">
+                {t("web.collections.itemDetails.title")}
+              </legend>
+              {product?.productTypeSlug === "spinner" ? (
+                <Field label={t("web.catalog.field.bearing")}>
+                  <Input
+                    aria-label={t("web.catalog.field.bearing")}
+                    maxLength={200}
+                    onChange={(event) =>
+                      form.setFieldValue("bearing", event.target.value)
+                    }
+                    value={bearing}
+                  />
+                </Field>
+              ) : null}
+              {product &&
+              collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
+                <SerialNumberFields
                   onChange={(value) =>
-                    form.setFieldValue("priceSoldInput", value)
+                    form.setFieldValue("serialNumber", value)
                   }
+                  t={t}
+                  value={serialNumber}
                 />
               ) : null}
-              <CollectionItemNotesEditor
-                value={metadata.notes ?? []}
-                onChange={(notes) =>
-                  form.setFieldValue("metadata", (current) => ({
-                    ...current,
-                    notes,
-                  }))
-                }
-              />
-            </CollectionItemStatusFields>
+
+              {product ? (
+                <CollectionProductFields
+                  customFinish={customFinish}
+                  finish={finish}
+                  material={material}
+                  onCustomFinishChange={(value) =>
+                    form.setFieldValue("customFinish", value)
+                  }
+                  onFinishChange={(value) =>
+                    form.setFieldValue("finish", value)
+                  }
+                  onMaterialChange={(value) =>
+                    form.setFieldValue("material", value)
+                  }
+                  onOptionsChange={receiveOptions}
+                  options={options}
+                  product={product}
+                  t={t}
+                />
+              ) : null}
+              {product?.productTypeSlug === "pen" ? (
+                <PenCollectionFields
+                  allProducts={products}
+                  onRefillOfferingChange={(value) =>
+                    form.setFieldValue("installedRefillOfferingId", value)
+                  }
+                  onRefillProductChange={(value) =>
+                    form.setFieldValue("installedRefillProductId", value)
+                  }
+                  onInstalledPartIdsChange={(value) =>
+                    form.setFieldValue("installedPenPartIds", value)
+                  }
+                  ownedItems={ownedItems}
+                  product={product}
+                  refillOfferingId={installedRefillOfferingId}
+                  refillProductId={installedRefillProductId}
+                  installedActuations={installedPenActuations}
+                  onInstalledActuationsChange={(value) =>
+                    form.setFieldValue("installedPenActuations", value)
+                  }
+                  installedPartIds={installedPenPartIds}
+                  confirmedCustomizationIds={customizationConfirmedPartIds}
+                  onConfirmedCustomizationIdsChange={(ids) =>
+                    form.setFieldValue("customizationConfirmedPartIds", ids)
+                  }
+                  t={t}
+                />
+              ) : null}
+              {product?.productTypeSlug === "slider" ? (
+                <Notice>
+                  <p>{t("web.slider.relationship.inclusionHelp")}</p>
+                  <ul className="mt-2 grid list-disc gap-1 pl-5">
+                    <li>
+                      {product.includedPlate?.name ??
+                        t("web.slider.relationship.includedPlates")}
+                    </li>
+                    {product.usesInserts ? (
+                      <li>
+                        {product.includedInsert?.name ??
+                          t("web.slider.relationship.includedInsert")}
+                      </li>
+                    ) : null}
+                  </ul>
+                </Notice>
+              ) : null}
+              {product?.productTypeSlug === "spinner" ? (
+                <Field label={t("web.catalog.field.button")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.catalog.field.button")}
+                    items={[
+                      { id: "default", name: t("web.catalog.defaultButton") },
+                      ...options.spinnerButtons,
+                    ]}
+                    onValueChange={(value) => {
+                      form.setFieldValue(
+                        "button",
+                        typeof value?.id === "number"
+                          ? (options.spinnerButtons.find(
+                              ({ id }) => id === value.id,
+                            ) ?? null)
+                          : value,
+                      );
+                      form.setFieldValue("buttonMaterial", null);
+                      form.setFieldValue("buttonFinish", null);
+                      form.setFieldValue(
+                        "buttonCustomFinish",
+                        emptyFinishOption(),
+                      );
+                      dispatch({ type: "confirmationDismissed" });
+                    }}
+                    placeholder={t("web.catalog.defaultButton")}
+                    removeLabel={t("web.action.close")}
+                    showSelectedPill
+                    value={button}
+                  />
+                </Field>
+              ) : null}
+              {selectedButton ? (
+                <CollectionProductFields
+                  customFinish={buttonCustomFinish}
+                  finish={buttonFinish}
+                  material={buttonMaterial}
+                  onCustomFinishChange={(value) =>
+                    form.setFieldValue("buttonCustomFinish", value)
+                  }
+                  onFinishChange={(value) =>
+                    form.setFieldValue("buttonFinish", value)
+                  }
+                  onMaterialChange={(value) =>
+                    form.setFieldValue("buttonMaterial", value)
+                  }
+                  onOptionsChange={receiveOptions}
+                  options={options}
+                  product={selectedButton}
+                  t={t}
+                />
+              ) : null}
+            </fieldset>
             <CollectionSelector
               addLabel={t("web.collections.select.addNew")}
               collections={collectionChoices}
@@ -6362,70 +6436,6 @@ export function CollectionAddPage({
                 </Button>
               </div>
             </dialog>
-
-            {product ? (
-              <CollectionProductFields
-                customFinish={customFinish}
-                finish={finish}
-                material={material}
-                onCustomFinishChange={(value) =>
-                  form.setFieldValue("customFinish", value)
-                }
-                onFinishChange={(value) => form.setFieldValue("finish", value)}
-                onMaterialChange={(value) =>
-                  form.setFieldValue("material", value)
-                }
-                onOptionsChange={receiveOptions}
-                options={options}
-                product={product}
-                t={t}
-              />
-            ) : null}
-            {product?.productTypeSlug === "pen" ? (
-              <PenCollectionFields
-                allProducts={products}
-                onRefillOfferingChange={(value) =>
-                  form.setFieldValue("installedRefillOfferingId", value)
-                }
-                onRefillProductChange={(value) =>
-                  form.setFieldValue("installedRefillProductId", value)
-                }
-                onInstalledPartIdsChange={(value) =>
-                  form.setFieldValue("installedPenPartIds", value)
-                }
-                ownedItems={ownedItems}
-                product={product}
-                refillOfferingId={installedRefillOfferingId}
-                refillProductId={installedRefillProductId}
-                installedActuations={installedPenActuations}
-                onInstalledActuationsChange={(value) =>
-                  form.setFieldValue("installedPenActuations", value)
-                }
-                installedPartIds={installedPenPartIds}
-                confirmedCustomizationIds={customizationConfirmedPartIds}
-                onConfirmedCustomizationIdsChange={(ids) =>
-                  form.setFieldValue("customizationConfirmedPartIds", ids)
-                }
-                t={t}
-              />
-            ) : null}
-            {product?.productTypeSlug === "slider" ? (
-              <Notice>
-                <p>{t("web.slider.relationship.inclusionHelp")}</p>
-                <ul className="mt-2 grid list-disc gap-1 pl-5">
-                  <li>
-                    {product.includedPlate?.name ??
-                      t("web.slider.relationship.includedPlates")}
-                  </li>
-                  {product.usesInserts ? (
-                    <li>
-                      {product.includedInsert?.name ??
-                        t("web.slider.relationship.includedInsert")}
-                    </li>
-                  ) : null}
-                </ul>
-              </Notice>
-            ) : null}
             {product && collectionIsPrivate ? (
               <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
             ) : null}
@@ -6438,58 +6448,6 @@ export function CollectionAddPage({
               >
                 {t("web.resources.visibility.public")}
               </Button>
-            ) : null}
-            {product?.productTypeSlug === "spinner" ? (
-              <Field label={t("web.catalog.field.button")}>
-                <CatalogCombobox
-                  ariaLabel={t("web.catalog.field.button")}
-                  items={[
-                    { id: "default", name: t("web.catalog.defaultButton") },
-                    ...options.spinnerButtons,
-                  ]}
-                  onValueChange={(value) => {
-                    form.setFieldValue(
-                      "button",
-                      typeof value?.id === "number"
-                        ? (options.spinnerButtons.find(
-                            ({ id }) => id === value.id,
-                          ) ?? null)
-                        : value,
-                    );
-                    form.setFieldValue("buttonMaterial", null);
-                    form.setFieldValue("buttonFinish", null);
-                    form.setFieldValue(
-                      "buttonCustomFinish",
-                      emptyFinishOption(),
-                    );
-                    dispatch({ type: "confirmationDismissed" });
-                  }}
-                  placeholder={t("web.catalog.defaultButton")}
-                  removeLabel={t("web.action.close")}
-                  showSelectedPill
-                  value={button}
-                />
-              </Field>
-            ) : null}
-            {selectedButton ? (
-              <CollectionProductFields
-                customFinish={buttonCustomFinish}
-                finish={buttonFinish}
-                material={buttonMaterial}
-                onCustomFinishChange={(value) =>
-                  form.setFieldValue("buttonCustomFinish", value)
-                }
-                onFinishChange={(value) =>
-                  form.setFieldValue("buttonFinish", value)
-                }
-                onMaterialChange={(value) =>
-                  form.setFieldValue("buttonMaterial", value)
-                }
-                onOptionsChange={receiveOptions}
-                options={options}
-                product={selectedButton}
-                t={t}
-              />
             ) : null}
             {Object.keys(duplicateCounts).length ? (
               <Notice>
@@ -6547,6 +6505,61 @@ export function CollectionAddPage({
                 removeFileLabel={t("web.action.close")}
               />
             ) : null}
+            <CollectionItemStatusFields
+              hasPublicMetadata={
+                (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
+                Boolean(metadata.notes?.some((note) => note.isPublic))
+              }
+              warning="web.collectionItemMetadata.unapprovedWarning"
+              value={metadata}
+              onChange={(value) => {
+                form.setFieldValue("metadata", value);
+                if (
+                  hasCollectionSalePrice(metadata.statuses) &&
+                  !value.statuses.public.includes("sold") &&
+                  !value.statuses.private.includes("sold")
+                )
+                  form.setFieldValue(
+                    "priceSoldInput",
+                    moneyInput(undefined, priceSoldInput.currencyCode),
+                  );
+              }}
+              invalid={Boolean(metadataError)}
+            >
+              <OwnershipLifecycleFields
+                allowDeparture={false}
+                onChange={(value) => form.setFieldValue("ownership", value)}
+                value={ownership}
+              />
+              <CollectionItemPriceField
+                value={pricePaidInput}
+                isPublic={pricePaidIsPublic}
+                onChange={(value) =>
+                  form.setFieldValue("pricePaidInput", value)
+                }
+                onPublicChange={(value) =>
+                  form.setFieldValue("pricePaidIsPublic", value)
+                }
+              />
+              {hasCollectionSalePrice(metadata.statuses) ? (
+                <CollectionItemPriceField
+                  sold
+                  value={priceSoldInput}
+                  onChange={(value) =>
+                    form.setFieldValue("priceSoldInput", value)
+                  }
+                />
+              ) : null}
+              <CollectionItemNotesEditor
+                value={metadata.notes ?? []}
+                onChange={(notes) =>
+                  form.setFieldValue("metadata", (current) => ({
+                    ...current,
+                    notes,
+                  }))
+                }
+              />
+            </CollectionItemStatusFields>
             {formError ? <Notice>{t(formError)}</Notice> : null}
             {product ? (
               <Button
@@ -7283,7 +7296,9 @@ export function CollectionProductFields({
   return (
     <fieldset className="grid min-w-0 gap-5 rounded-lg border border-border p-4">
       <legend className="max-w-full wrap-anywhere px-1 text-sm font-semibold">
-        {product.name}
+        {t("web.collections.itemDetails.materialsAndFinish", {
+          name: product.name,
+        })}
       </legend>
       <Field label={t("web.catalog.field.materials")}>
         <CatalogCombobox
@@ -7528,7 +7543,7 @@ export function CollectionEditPage({
     existingImages: item.images,
     collectionId: item.collectionId,
     displayName: item.displayName,
-    description: item.descriptionOverride ?? "",
+    description: item.descriptionOverride ?? product.description ?? "",
     bearing: item.bearingOverride ?? "",
     serialNumber: (item.serialNumber ?? null) as string | null,
     pricePaidInput: moneyInput(ownershipPeriods.at(-1)?.pricePaid, currency),
@@ -7709,7 +7724,10 @@ export function CollectionEditPage({
         plate,
         insert,
       } = value;
-      const currentDescription = description;
+      const currentDescription =
+        description === defaultValues.description
+          ? (item.descriptionOverride ?? "")
+          : description;
       const selectedButton = ownedButtons.find(
         ({ collectionItemId }) => collectionItemId === button?.id,
       );
@@ -8104,8 +8122,18 @@ export function CollectionEditPage({
       ]}
       title={item.displayName}
     >
-      <main className="grid w-full max-w-6xl min-w-0 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2">
+      <main className="grid w-full max-w-6xl min-w-0 gap-5 rounded-xl border border-border bg-card p-6 grid-cols-1">
         <div className="grid min-w-0 content-start gap-5">
+          <p className="text-sm font-semibold wrap-anywhere">
+            {t("web.collections.productPicker.selected", {
+              name: product.name,
+              type: catalogProductTypeLabel(
+                t,
+                product.productTypeSlug,
+                product.productTypeName,
+              ),
+            })}
+          </p>
           <Field label={displayNameLabel}>
             <Input
               aria-label={displayNameLabel}
@@ -8125,131 +8153,289 @@ export function CollectionEditPage({
             onLoadingChange={receiveDescriptionLoading}
             ref={descriptionRef}
           />
-          {item.productTypeSlug === "spinner" ? (
-            <Field label={t("web.catalog.field.bearing")}>
-              <Input
-                aria-label={t("web.catalog.field.bearing")}
-                maxLength={200}
-                onChange={(event) =>
-                  form.setFieldValue("bearing", event.target.value)
-                }
-                value={bearing}
-              />
-            </Field>
-          ) : null}
-          {collectionProductTypeSupportsSerial(item.productTypeSlug) ? (
-            <SerialNumberFields
-              onChange={(value) => form.setFieldValue("serialNumber", value)}
-              t={t}
-              value={serialNumber}
-            />
-          ) : null}
-          <fieldset disabled={!item.isOwner}>
-            <OwnershipLifecycleFields
-              allowDeparture
-              onChange={(value) => form.setFieldValue("ownership", value)}
-              onPeriodChange={(periodId) => {
-                const period = ownershipPeriods.find(
-                  ({ id }) => id === periodId,
-                );
-                form.setFieldValue("ownership", ownershipEditorValue(period));
-                form.setFieldValue(
-                  "pricePaidInput",
-                  moneyInput(period?.pricePaid, currency),
-                );
-                form.setFieldValue(
-                  "priceSoldInput",
-                  moneyInput(period?.priceSold, currency),
-                );
-                form.setFieldValue(
-                  "pricePaidIsPublic",
-                  period?.pricePaid?.isPublic ?? false,
-                );
-                if (periodId === null)
-                  form.setFieldValue("metadata", (current) => ({
-                    ...current,
-                    statuses: {
-                      public: current.statuses.public.filter(
-                        (status) => status !== "sold",
-                      ),
-                      private: current.statuses.private.filter(
-                        (status) => status !== "sold",
-                      ),
-                    },
-                  }));
-              }}
-              periods={ownershipPeriods}
-              value={ownership}
-            />
-          </fieldset>
-          {item.isOwner ? (
-            <CollectionItemStatusFields
-              hasPublicMetadata={
-                (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
-                Boolean(metadata.notes?.some((note) => note.isPublic))
-              }
-              saleDateRecorded={ownershipPeriods.at(-1)?.exitReason === "sale"}
-              warning={
-                item.collectionIsPrivate
-                  ? "web.collectionItemMetadata.collectionPrivateWarning"
-                  : item.isPrivate
-                    ? "web.collectionItemMetadata.itemPrivateWarning"
-                    : item.approvalStatus !== "approved"
-                      ? "web.collectionItemMetadata.unapprovedWarning"
-                      : product.isPrivate ||
-                          product.approvalStatus !== "approved"
-                        ? "web.collectionItemMetadata.unavailableWarning"
-                        : undefined
-              }
-              editing
-              value={metadata}
-              onChange={(value) => {
-                form.setFieldValue("metadata", value);
-                if (
-                  hasCollectionSalePrice(metadata.statuses) &&
-                  !value.statuses.public.includes("sold") &&
-                  !value.statuses.private.includes("sold") &&
-                  ownership.periodId === ownershipPeriods.at(-1)?.id
-                )
-                  form.setFieldValue(
-                    "priceSoldInput",
-                    moneyInput(undefined, priceSoldInput.currencyCode),
-                  );
-              }}
-              invalid={Boolean(feedback)}
-            >
-              <CollectionItemPriceField
-                value={pricePaidInput}
-                isPublic={pricePaidIsPublic}
-                onChange={(value) =>
-                  form.setFieldValue("pricePaidInput", value)
-                }
-                onPublicChange={(value) =>
-                  form.setFieldValue("pricePaidIsPublic", value)
-                }
-              />
-              {metadata.statuses.public.includes("sold") ||
-              metadata.statuses.private.includes("sold") ||
-              (!ownership.currentlyOwned && ownership.exitReason === "sale") ? (
-                <CollectionItemPriceField
-                  sold
-                  value={priceSoldInput}
-                  onChange={(value) =>
-                    form.setFieldValue("priceSoldInput", value)
+          <fieldset className="grid min-w-0 gap-5">
+            <legend className="mb-3 font-semibold">
+              {t("web.collections.itemDetails.title")}
+            </legend>
+            {item.productTypeSlug === "spinner" ? (
+              <Field label={t("web.catalog.field.bearing")}>
+                <Input
+                  aria-label={t("web.catalog.field.bearing")}
+                  maxLength={200}
+                  onChange={(event) =>
+                    form.setFieldValue("bearing", event.target.value)
                   }
+                  value={bearing}
                 />
-              ) : null}
-              <CollectionItemNotesEditor
-                value={metadata.notes ?? []}
-                onChange={(notes) =>
-                  form.setFieldValue("metadata", (current) => ({
-                    ...current,
-                    notes,
-                  }))
-                }
+              </Field>
+            ) : null}
+            {collectionProductTypeSupportsSerial(item.productTypeSlug) ? (
+              <SerialNumberFields
+                onChange={(value) => form.setFieldValue("serialNumber", value)}
+                t={t}
+                value={serialNumber}
               />
-            </CollectionItemStatusFields>
-          ) : null}
+            ) : null}
+
+            <CollectionProductFields
+              currentFinish={item.finishOption}
+              customFinish={customFinish}
+              finish={finish}
+              material={material}
+              onCustomFinishChange={(value) =>
+                form.setFieldValue("customFinish", value)
+              }
+              onFinishChange={(value) => form.setFieldValue("finish", value)}
+              onMaterialChange={(value) =>
+                form.setFieldValue("material", value)
+              }
+              onOptionsChange={receiveOptions}
+              options={options}
+              product={product}
+              t={t}
+            />
+            {item.productTypeSlug === "pen" ? (
+              <PenCollectionFields
+                allProducts={catalogProducts}
+                currentCollectionItemId={item.collectionItemId}
+                onRefillOfferingChange={(value) =>
+                  form.setFieldValue("installedRefillOfferingId", value)
+                }
+                onRefillProductChange={(value) =>
+                  form.setFieldValue("installedRefillProductId", value)
+                }
+                onInstalledPartIdsChange={(value) =>
+                  form.setFieldValue("installedPenPartIds", value)
+                }
+                ownedItems={ownedItems}
+                product={product}
+                refillOfferingId={installedRefillOfferingId}
+                refillProductId={installedRefillProductId}
+                installedActuations={installedPenActuations}
+                onInstalledActuationsChange={(value) =>
+                  form.setFieldValue("installedPenActuations", value)
+                }
+                installedPartIds={installedPenPartIds}
+                savedInstalledActuations={item.installedPenActuations ?? []}
+                savedInstalledPartIds={
+                  item.installedPenPartCollectionItemIds ?? []
+                }
+                confirmedCustomizationIds={customizationConfirmedPartIds}
+                onConfirmedCustomizationIdsChange={(ids) =>
+                  form.setFieldValue("customizationConfirmedPartIds", ids)
+                }
+                t={t}
+              />
+            ) : null}
+            {item.productTypeSlug === "spinner" ? (
+              <Field label={t("web.catalog.field.button")}>
+                <CatalogCombobox
+                  ariaLabel={t("web.catalog.field.button")}
+                  items={[
+                    { id: "default", name: t("web.catalog.defaultButton") },
+                    ...ownedButtons
+                      .filter(
+                        (candidate) =>
+                          candidate.collectionId === collectionId ||
+                          candidate.collectionItemId === item.installedButtonId,
+                      )
+                      .map(({ collectionItemId, displayName }) => ({
+                        id: collectionItemId,
+                        name: displayName,
+                      })),
+                  ]}
+                  onValueChange={(value) => {
+                    form.setFieldValue("button", value);
+                    const selected = ownedButtons.find(
+                      ({ collectionItemId }) => collectionItemId === value?.id,
+                    );
+                    form.setFieldValue(
+                      "buttonMaterial",
+                      collectionMaterialChoice(
+                        buttonProducts.find(
+                          ({ id }) => id === selected?.productId,
+                        ),
+                        selected?.materials,
+                      ),
+                    );
+                    form.setFieldValue(
+                      "buttonFinish",
+                      selected?.finishOption
+                        ? {
+                            id: "current",
+                            name: localizedFinishLabel(
+                              selected.finishOption,
+                              t,
+                            ),
+                          }
+                        : null,
+                    );
+                    form.setFieldValue(
+                      "buttonCustomFinish",
+                      emptyFinishOption(),
+                    );
+                  }}
+                  placeholder={t("web.catalog.defaultButton")}
+                  removeLabel={t("web.action.close")}
+                  showSelectedPill
+                  value={button}
+                />
+              </Field>
+            ) : null}
+            {item.productTypeSlug === "slider" ? (
+              <>
+                <Field label={t("web.slider.component.installedPlate")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.component.installedPlate")}
+                    items={[
+                      {
+                        id: "default",
+                        name: t("web.slider.component.noPlate"),
+                      },
+                      ...ownedSliderComponents
+                        .filter(
+                          (candidate) =>
+                            candidate.productTypeSlug === "slider-plate" &&
+                            (candidate.installedOnSliderId === null ||
+                              candidate.installedOnSliderId ===
+                                item.collectionItemId),
+                        )
+                        .map(({ collectionItemId, displayName }) => ({
+                          id: collectionItemId,
+                          name: displayName,
+                        })),
+                    ]}
+                    onValueChange={(value) =>
+                      form.setFieldValue("plate", value)
+                    }
+                    placeholder={t("web.slider.component.noPlate")}
+                    removeLabel={t("web.action.close")}
+                    showSelectedPill
+                    value={plate}
+                  />
+                </Field>
+                {product.usesInserts ? (
+                  <Field label={t("web.slider.component.installedInsert")}>
+                    <CatalogCombobox
+                      ariaLabel={t("web.slider.component.installedInsert")}
+                      items={[
+                        {
+                          id: "default",
+                          name: t("web.slider.component.noInsert"),
+                        },
+                        ...ownedSliderComponents
+                          .filter(
+                            (candidate) =>
+                              candidate.productTypeSlug === "slider-insert" &&
+                              (candidate.installedOnSliderId === null ||
+                                candidate.installedOnSliderId ===
+                                  item.collectionItemId),
+                          )
+                          .map(({ collectionItemId, displayName }) => ({
+                            id: collectionItemId,
+                            name: displayName,
+                          })),
+                      ]}
+                      onValueChange={(value) => {
+                        const nextInsert = ownedSliderComponents.find(
+                          ({ collectionItemId }) =>
+                            collectionItemId === value?.id,
+                        );
+                        const nextLayout =
+                          options.relationshipProducts.find(
+                            ({ id }) => id === nextInsert?.productId,
+                          )?.magnetLayout ?? product.magnetLayout;
+                        if (
+                          effectiveMagnetLayout !== nextLayout &&
+                          magnetConfiguration !== null
+                        ) {
+                          form.setFieldValue("magnetConfiguration", null);
+                          dispatch({ type: "magnetLayoutChanged" });
+                        }
+                        form.setFieldValue("insert", value);
+                      }}
+                      placeholder={t("web.slider.component.noInsert")}
+                      removeLabel={t("web.action.close")}
+                      showSelectedPill
+                      value={insert}
+                    />
+                  </Field>
+                ) : null}
+                {effectiveMagnetLayout ? (
+                  <SliderMagnetConfigurationEditor
+                    layout={effectiveMagnetLayout}
+                    onChange={(value) => {
+                      form.setFieldValue("magnetConfiguration", value);
+                      dispatch({ type: "magnetConfigurationEdited" });
+                    }}
+                    presets={options.magnetPresets}
+                    t={t}
+                    value={magnetConfiguration}
+                  />
+                ) : null}
+                {magnetConfigurationNotice ? (
+                  <Notice>{t("web.slider.magnet.layoutChanged")}</Notice>
+                ) : null}
+                {collectionId !== item.collectionId ||
+                selectedPlate?.collectionId !== collectionId ||
+                selectedInsert?.collectionId !== collectionId ? (
+                  <Notice>
+                    {t("web.slider.component.moveAssemblySummary", {
+                      count:
+                        1 +
+                        Number(Boolean(selectedPlate)) +
+                        Number(Boolean(selectedInsert)),
+                    })}
+                  </Notice>
+                ) : null}
+                <Notice>
+                  <ul className="grid gap-1">
+                    <li>
+                      {t("web.slider.component.installedPlate")}:{" "}
+                      {selectedPlate?.displayName ??
+                        t("web.slider.component.noPlate")}
+                    </li>
+                    {product.usesInserts ? (
+                      <li>
+                        {t("web.slider.component.installedInsert")}:{" "}
+                        {selectedInsert?.displayName ??
+                          t("web.slider.component.noInsert")}
+                      </li>
+                    ) : null}
+                  </ul>
+                </Notice>
+              </>
+            ) : null}
+            {item.installedOnSliderId !== null &&
+            collectionId !== item.collectionId ? (
+              <Notice>
+                {t("web.slider.component.moveAssemblySummary", {
+                  count: assemblyMoveItemCount,
+                })}
+              </Notice>
+            ) : null}
+            {selectedButton && selectedButtonProduct ? (
+              <CollectionProductFields
+                currentFinish={selectedButton.finishOption}
+                customFinish={buttonCustomFinish}
+                finish={buttonFinish}
+                material={buttonMaterial}
+                onCustomFinishChange={(value) =>
+                  form.setFieldValue("buttonCustomFinish", value)
+                }
+                onFinishChange={(value) =>
+                  form.setFieldValue("buttonFinish", value)
+                }
+                onMaterialChange={(value) =>
+                  form.setFieldValue("buttonMaterial", value)
+                }
+                onOptionsChange={receiveOptions}
+                options={options}
+                product={selectedButtonProduct}
+                t={t}
+              />
+            ) : null}
+          </fieldset>
           <CollectionSelector
             addLabel={t("web.collections.select.addNew")}
             collections={collections}
@@ -8261,254 +8447,6 @@ export function CollectionEditPage({
             placeholder={t("web.collections.select.placeholder")}
             selectedId={collectionId}
           />
-          <CollectionProductFields
-            currentFinish={item.finishOption}
-            customFinish={customFinish}
-            finish={finish}
-            material={material}
-            onCustomFinishChange={(value) =>
-              form.setFieldValue("customFinish", value)
-            }
-            onFinishChange={(value) => form.setFieldValue("finish", value)}
-            onMaterialChange={(value) => form.setFieldValue("material", value)}
-            onOptionsChange={receiveOptions}
-            options={options}
-            product={product}
-            t={t}
-          />
-          {item.productTypeSlug === "pen" ? (
-            <PenCollectionFields
-              allProducts={catalogProducts}
-              currentCollectionItemId={item.collectionItemId}
-              onRefillOfferingChange={(value) =>
-                form.setFieldValue("installedRefillOfferingId", value)
-              }
-              onRefillProductChange={(value) =>
-                form.setFieldValue("installedRefillProductId", value)
-              }
-              onInstalledPartIdsChange={(value) =>
-                form.setFieldValue("installedPenPartIds", value)
-              }
-              ownedItems={ownedItems}
-              product={product}
-              refillOfferingId={installedRefillOfferingId}
-              refillProductId={installedRefillProductId}
-              installedActuations={installedPenActuations}
-              onInstalledActuationsChange={(value) =>
-                form.setFieldValue("installedPenActuations", value)
-              }
-              installedPartIds={installedPenPartIds}
-              savedInstalledActuations={item.installedPenActuations ?? []}
-              savedInstalledPartIds={
-                item.installedPenPartCollectionItemIds ?? []
-              }
-              confirmedCustomizationIds={customizationConfirmedPartIds}
-              onConfirmedCustomizationIdsChange={(ids) =>
-                form.setFieldValue("customizationConfirmedPartIds", ids)
-              }
-              t={t}
-            />
-          ) : null}
-          {item.productTypeSlug === "spinner" ? (
-            <Field label={t("web.catalog.field.button")}>
-              <CatalogCombobox
-                ariaLabel={t("web.catalog.field.button")}
-                items={[
-                  { id: "default", name: t("web.catalog.defaultButton") },
-                  ...ownedButtons
-                    .filter(
-                      (candidate) =>
-                        candidate.collectionId === collectionId ||
-                        candidate.collectionItemId === item.installedButtonId,
-                    )
-                    .map(({ collectionItemId, displayName }) => ({
-                      id: collectionItemId,
-                      name: displayName,
-                    })),
-                ]}
-                onValueChange={(value) => {
-                  form.setFieldValue("button", value);
-                  const selected = ownedButtons.find(
-                    ({ collectionItemId }) => collectionItemId === value?.id,
-                  );
-                  form.setFieldValue(
-                    "buttonMaterial",
-                    collectionMaterialChoice(
-                      buttonProducts.find(
-                        ({ id }) => id === selected?.productId,
-                      ),
-                      selected?.materials,
-                    ),
-                  );
-                  form.setFieldValue(
-                    "buttonFinish",
-                    selected?.finishOption
-                      ? {
-                          id: "current",
-                          name: localizedFinishLabel(selected.finishOption, t),
-                        }
-                      : null,
-                  );
-                  form.setFieldValue("buttonCustomFinish", emptyFinishOption());
-                }}
-                placeholder={t("web.catalog.defaultButton")}
-                removeLabel={t("web.action.close")}
-                showSelectedPill
-                value={button}
-              />
-            </Field>
-          ) : null}
-          {item.productTypeSlug === "slider" ? (
-            <>
-              <Field label={t("web.slider.component.installedPlate")}>
-                <CatalogCombobox
-                  ariaLabel={t("web.slider.component.installedPlate")}
-                  items={[
-                    {
-                      id: "default",
-                      name: t("web.slider.component.noPlate"),
-                    },
-                    ...ownedSliderComponents
-                      .filter(
-                        (candidate) =>
-                          candidate.productTypeSlug === "slider-plate" &&
-                          (candidate.installedOnSliderId === null ||
-                            candidate.installedOnSliderId ===
-                              item.collectionItemId),
-                      )
-                      .map(({ collectionItemId, displayName }) => ({
-                        id: collectionItemId,
-                        name: displayName,
-                      })),
-                  ]}
-                  onValueChange={(value) => form.setFieldValue("plate", value)}
-                  placeholder={t("web.slider.component.noPlate")}
-                  removeLabel={t("web.action.close")}
-                  showSelectedPill
-                  value={plate}
-                />
-              </Field>
-              {product.usesInserts ? (
-                <Field label={t("web.slider.component.installedInsert")}>
-                  <CatalogCombobox
-                    ariaLabel={t("web.slider.component.installedInsert")}
-                    items={[
-                      {
-                        id: "default",
-                        name: t("web.slider.component.noInsert"),
-                      },
-                      ...ownedSliderComponents
-                        .filter(
-                          (candidate) =>
-                            candidate.productTypeSlug === "slider-insert" &&
-                            (candidate.installedOnSliderId === null ||
-                              candidate.installedOnSliderId ===
-                                item.collectionItemId),
-                        )
-                        .map(({ collectionItemId, displayName }) => ({
-                          id: collectionItemId,
-                          name: displayName,
-                        })),
-                    ]}
-                    onValueChange={(value) => {
-                      const nextInsert = ownedSliderComponents.find(
-                        ({ collectionItemId }) =>
-                          collectionItemId === value?.id,
-                      );
-                      const nextLayout =
-                        options.relationshipProducts.find(
-                          ({ id }) => id === nextInsert?.productId,
-                        )?.magnetLayout ?? product.magnetLayout;
-                      if (
-                        effectiveMagnetLayout !== nextLayout &&
-                        magnetConfiguration !== null
-                      ) {
-                        form.setFieldValue("magnetConfiguration", null);
-                        dispatch({ type: "magnetLayoutChanged" });
-                      }
-                      form.setFieldValue("insert", value);
-                    }}
-                    placeholder={t("web.slider.component.noInsert")}
-                    removeLabel={t("web.action.close")}
-                    showSelectedPill
-                    value={insert}
-                  />
-                </Field>
-              ) : null}
-              {effectiveMagnetLayout ? (
-                <SliderMagnetConfigurationEditor
-                  layout={effectiveMagnetLayout}
-                  onChange={(value) => {
-                    form.setFieldValue("magnetConfiguration", value);
-                    dispatch({ type: "magnetConfigurationEdited" });
-                  }}
-                  presets={options.magnetPresets}
-                  t={t}
-                  value={magnetConfiguration}
-                />
-              ) : null}
-              {magnetConfigurationNotice ? (
-                <Notice>{t("web.slider.magnet.layoutChanged")}</Notice>
-              ) : null}
-              {collectionId !== item.collectionId ||
-              selectedPlate?.collectionId !== collectionId ||
-              selectedInsert?.collectionId !== collectionId ? (
-                <Notice>
-                  {t("web.slider.component.moveAssemblySummary", {
-                    count:
-                      1 +
-                      Number(Boolean(selectedPlate)) +
-                      Number(Boolean(selectedInsert)),
-                  })}
-                </Notice>
-              ) : null}
-              <Notice>
-                <ul className="grid gap-1">
-                  <li>
-                    {t("web.slider.component.installedPlate")}:{" "}
-                    {selectedPlate?.displayName ??
-                      t("web.slider.component.noPlate")}
-                  </li>
-                  {product.usesInserts ? (
-                    <li>
-                      {t("web.slider.component.installedInsert")}:{" "}
-                      {selectedInsert?.displayName ??
-                        t("web.slider.component.noInsert")}
-                    </li>
-                  ) : null}
-                </ul>
-              </Notice>
-            </>
-          ) : null}
-          {item.installedOnSliderId !== null &&
-          collectionId !== item.collectionId ? (
-            <Notice>
-              {t("web.slider.component.moveAssemblySummary", {
-                count: assemblyMoveItemCount,
-              })}
-            </Notice>
-          ) : null}
-          {selectedButton && selectedButtonProduct ? (
-            <CollectionProductFields
-              currentFinish={selectedButton.finishOption}
-              customFinish={buttonCustomFinish}
-              finish={buttonFinish}
-              material={buttonMaterial}
-              onCustomFinishChange={(value) =>
-                form.setFieldValue("buttonCustomFinish", value)
-              }
-              onFinishChange={(value) =>
-                form.setFieldValue("buttonFinish", value)
-              }
-              onMaterialChange={(value) =>
-                form.setFieldValue("buttonMaterial", value)
-              }
-              onOptionsChange={receiveOptions}
-              options={options}
-              product={selectedButtonProduct}
-              t={t}
-            />
-          ) : null}
           {feedback ? (
             <Notice>
               {t(feedback.message)}
@@ -8589,6 +8527,109 @@ export function CollectionEditPage({
             targetType="collection_item"
           />
         </div>
+        {item.isOwner ? (
+          <CollectionItemStatusFields
+            hasPublicMetadata={
+              (pricePaidIsPublic && Boolean(pricePaidInput.amount.trim())) ||
+              Boolean(metadata.notes?.some((note) => note.isPublic))
+            }
+            saleDateRecorded={ownershipPeriods.at(-1)?.exitReason === "sale"}
+            warning={
+              item.collectionIsPrivate
+                ? "web.collectionItemMetadata.collectionPrivateWarning"
+                : item.isPrivate
+                  ? "web.collectionItemMetadata.itemPrivateWarning"
+                  : item.approvalStatus !== "approved"
+                    ? "web.collectionItemMetadata.unapprovedWarning"
+                    : product.isPrivate || product.approvalStatus !== "approved"
+                      ? "web.collectionItemMetadata.unavailableWarning"
+                      : undefined
+            }
+            editing
+            value={metadata}
+            onChange={(value) => {
+              form.setFieldValue("metadata", value);
+              if (
+                hasCollectionSalePrice(metadata.statuses) &&
+                !value.statuses.public.includes("sold") &&
+                !value.statuses.private.includes("sold") &&
+                ownership.periodId === ownershipPeriods.at(-1)?.id
+              )
+                form.setFieldValue(
+                  "priceSoldInput",
+                  moneyInput(undefined, priceSoldInput.currencyCode),
+                );
+            }}
+            invalid={Boolean(feedback)}
+          >
+            <fieldset disabled={!item.isOwner}>
+              <OwnershipLifecycleFields
+                allowDeparture
+                onChange={(value) => form.setFieldValue("ownership", value)}
+                onPeriodChange={(periodId) => {
+                  const period = ownershipPeriods.find(
+                    ({ id }) => id === periodId,
+                  );
+                  form.setFieldValue("ownership", ownershipEditorValue(period));
+                  form.setFieldValue(
+                    "pricePaidInput",
+                    moneyInput(period?.pricePaid, currency),
+                  );
+                  form.setFieldValue(
+                    "priceSoldInput",
+                    moneyInput(period?.priceSold, currency),
+                  );
+                  form.setFieldValue(
+                    "pricePaidIsPublic",
+                    period?.pricePaid?.isPublic ?? false,
+                  );
+                  if (periodId === null)
+                    form.setFieldValue("metadata", (current) => ({
+                      ...current,
+                      statuses: {
+                        public: current.statuses.public.filter(
+                          (status) => status !== "sold",
+                        ),
+                        private: current.statuses.private.filter(
+                          (status) => status !== "sold",
+                        ),
+                      },
+                    }));
+                }}
+                periods={ownershipPeriods}
+                value={ownership}
+              />
+            </fieldset>
+            <CollectionItemPriceField
+              value={pricePaidInput}
+              isPublic={pricePaidIsPublic}
+              onChange={(value) => form.setFieldValue("pricePaidInput", value)}
+              onPublicChange={(value) =>
+                form.setFieldValue("pricePaidIsPublic", value)
+              }
+            />
+            {metadata.statuses.public.includes("sold") ||
+            metadata.statuses.private.includes("sold") ||
+            (!ownership.currentlyOwned && ownership.exitReason === "sale") ? (
+              <CollectionItemPriceField
+                sold
+                value={priceSoldInput}
+                onChange={(value) =>
+                  form.setFieldValue("priceSoldInput", value)
+                }
+              />
+            ) : null}
+            <CollectionItemNotesEditor
+              value={metadata.notes ?? []}
+              onChange={(notes) =>
+                form.setFieldValue("metadata", (current) => ({
+                  ...current,
+                  notes,
+                }))
+              }
+            />
+          </CollectionItemStatusFields>
+        ) : null}
         <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
           <Button
             onClick={() =>

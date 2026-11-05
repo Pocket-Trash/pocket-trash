@@ -113,6 +113,13 @@ function ReadyMarkdownEditor(props: {
   ref?: React.Ref<MarkdownEditorHandle>;
   /** Initial document. */
   defaultValue?: string;
+  /** Accessible editor label. */
+  label?: string;
+  /**
+   * Reports edited Markdown.
+   * @param value - Current Markdown.
+   */
+  onChange?: (value: string) => void;
   /**
    * Reports committed editor readiness.
    * @param loading - Whether initialization is pending.
@@ -120,12 +127,13 @@ function ReadyMarkdownEditor(props: {
   onLoadingChange?: (loading: boolean) => void;
 }) {
   const reported = useRef(false);
+  const document = useRef(props.defaultValue ?? "");
   useImperativeHandle(props.ref, () => ({
     /**
      * Reads this fixture's document.
      * @returns Initial Markdown.
      */
-    getValue: () => props.defaultValue ?? "",
+    getValue: () => document.current,
     /**
      * Focuses this fixture without creating an editor.
      * @returns Nothing.
@@ -147,7 +155,18 @@ function ReadyMarkdownEditor(props: {
     },
     [onLoadingChange],
   );
-  return <span ref={bind} />;
+  return (
+    <span ref={bind}>
+      <textarea
+        aria-label={props.label}
+        defaultValue={props.defaultValue}
+        onChange={(event) => {
+          document.current = event.target.value;
+          props.onChange?.(event.target.value);
+        }}
+      />
+    </span>
+  );
 }
 
 vi.mock("@/components/catalog-markdown-editor", () => ({
@@ -627,6 +646,108 @@ describe("catalog mutation lifetimes", () => {
     expect(decide).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Approved");
   });
+  it.each([
+    ["untouched", null, "Catalog description", ""],
+    ["edited", null, "My personal description", "My personal description"],
+    ["blank", null, "", ""],
+    [
+      "existing override",
+      "My saved override",
+      "My saved override",
+      "My saved override",
+    ],
+    [
+      "explicit override matching catalog",
+      "Catalog description",
+      "Catalog description",
+      "Catalog description",
+    ],
+  ])("preserves %s description semantics when editing", async (_case, originalOverride, edited, expected) => {
+    const product = {
+      ...productFixture(1000, "Spinner", "spinner"),
+      description: "Catalog description",
+    };
+    const item = {
+      ...collectionFixture(42, product, 1003),
+      descriptionOverride: originalOverride,
+    };
+    vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
+    await act(async () =>
+      root.render(
+        <CollectionEditPage
+          buttonProducts={[]}
+          collections={[collection]}
+          item={item}
+          options={options}
+          ownedButtons={[]}
+          product={product}
+        />,
+      ),
+    );
+    const editor = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Description"]',
+    );
+    if (!editor) throw new Error("Missing description");
+    expect(editor.value).toBe(originalOverride ?? product.description);
+    if (edited !== editor.value)
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(editor, edited);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    await click(container, "Save");
+    expect(updateCollectionItem).toHaveBeenCalledWith({
+      data: expect.objectContaining({ description: expected }),
+    });
+  });
+
+  it("prefills a directly selected product without freezing its catalog description", async () => {
+    const product = {
+      ...productFixture(1000, "Spinner", "spinner"),
+      description: "Catalog description",
+    };
+    vi.mocked(addCollectionProduct).mockResolvedValue({
+      ok: true,
+      collectionId: 1000,
+      collectionItemId: 42,
+    });
+    await act(async () =>
+      root.render(
+        <CollectionAddPage
+          collections={[collection]}
+          defaultCollectionName={null}
+          initialProductId={1000}
+          options={options}
+          products={[product]}
+        />,
+      ),
+    );
+    const editor = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Description"]',
+    );
+    expect(editor?.value).toBe("Catalog description");
+    const metadata = [...container.querySelectorAll("details")].find((node) =>
+      node.querySelector("summary")?.textContent?.includes("Add price"),
+    );
+    expect(metadata?.open).toBe(false);
+    expect(metadata?.textContent).toContain("Ownership history");
+    const images = container.querySelector("#collection-item-images");
+    expect(
+      images &&
+        metadata &&
+        Boolean(
+          images.compareDocumentPosition(metadata) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+    ).toBe(true);
+    await click(container, "Add to collection");
+    expect(addCollectionProduct).toHaveBeenCalledWith({
+      data: expect.objectContaining({ description: "" }),
+    });
+  });
+
   it("retains a clamped product page when catalog results shrink and expand", async () => {
     const products = Array.from({ length: 13 }, (_, index) =>
       productFixture(1000 + index, `Spinner ${index + 1}`, "spinner"),

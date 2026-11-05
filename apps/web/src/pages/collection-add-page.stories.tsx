@@ -781,3 +781,70 @@ export const MobileActuatorPicker: Story = {
     await userEvent.keyboard("{Escape}");
   },
 };
+
+/** Product descriptions are editable starting text above a clearly ordered item form. */
+export const CatalogDescriptionAndDetails: Story = {
+  args: {
+    products: [
+      { ...product, description: "Catalog **description**" },
+      ...products.slice(1),
+    ],
+  },
+  /**
+   * Checks real Markdown prefill, section order, keyboard disclosure, and product replacement.
+   * @param context - Real collection form and browser interactions.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Source" }));
+    const description = canvas.getByRole("textbox", { name: "Description" });
+    await expect(description).toHaveValue("Catalog **description**");
+    await expect(
+      canvas.getByText(/Your edits apply only to this item/),
+    ).toBeVisible();
+    const details = canvas.getByRole("group", { name: "Item details" });
+    await expect(
+      within(details).getByRole("textbox", { name: "Bearing" }),
+    ).toBeVisible();
+    await expect(
+      within(details).getByRole("combobox", { name: "Button" }),
+    ).toBeVisible();
+    const metadata = canvas
+      .getByText("Add price, status, or notes", { selector: "h2" })
+      .closest("details");
+    await expect(metadata).not.toHaveAttribute("open");
+    const images = canvasElement.querySelector("#collection-item-images");
+    await expect(
+      Boolean(
+        images &&
+          metadata &&
+          images.compareDocumentPosition(metadata) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    await userEvent.click(canvas.getByText("Add price, status, or notes"));
+    await expect(
+      canvas.getByRole("group", { name: "Ownership history" }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByText("Add price, status, or notes"));
+    await userEvent.keyboard("{Enter}");
+    await expect(
+      canvas.getByRole("group", { name: "Ownership history" }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByText(/Selected product:/, { selector: "summary" }),
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Product 2" }));
+    await expect(window.confirm).not.toHaveBeenCalled();
+    await userEvent.click(canvas.getByRole("button", { name: "Source" }));
+    await expect(
+      canvas.getByRole("textbox", { name: "Description" }),
+    ).toHaveValue("");
+  },
+};
+
+/** Description and item details retain the same flow on a small phone. */
+export const MobileItemDetails: Story = {
+  ...CatalogDescriptionAndDetails,
+  globals: { viewport: { value: "mobile1", isRotated: false } },
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+};
