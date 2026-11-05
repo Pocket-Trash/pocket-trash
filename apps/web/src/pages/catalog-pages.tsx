@@ -78,6 +78,7 @@ import {
   type CatalogSearchMatch,
   catalogTypeDisplayLabel,
   matchCatalogSearch,
+  normalizeCatalogSearch,
 } from "@/lib/catalog-search";
 import {
   type DirectorySearchState,
@@ -1310,11 +1311,15 @@ export function UserCollectionsPage({
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
 }) {
   const t = useCatalogCopy();
+  const facetItems = items.filter((item) =>
+    matchesCatalogFilters(collectionFilterItem(item, items), filters),
+  );
+  const facetMatchingIds = new Set(
+    facetItems.map(({ collectionId }) => collectionId),
+  );
   const matchingIds = new Set(
-    items
+    facetItems
       .filter((item) => {
-        if (!matchesCatalogFilters(collectionFilterItem(item, items), filters))
-          return false;
         return Boolean(
           matchCatalogSearch(
             {
@@ -1323,6 +1328,8 @@ export function UserCollectionsPage({
                 item.productTypeSlug,
                 item.productTypeName,
               ),
+              aliases: [item.name],
+              description: item.description,
               englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
               makerId: item.makerId,
               makerName: item.makerName,
@@ -1337,9 +1344,18 @@ export function UserCollectionsPage({
       })
       .map(({ collectionId }) => collectionId),
   );
-  const filtered = hasCatalogFilters(filters)
-    ? collections.filter(({ id }) => matchingIds.has(id))
-    : collections;
+  const query = normalizeCatalogSearch(filters.query);
+  const hasFacets = hasCatalogFilters({ ...filters, query: "", strict: false });
+  const filtered = collections.filter((collection) => {
+    if (hasFacets && !facetMatchingIds.has(collection.id)) return false;
+    return (
+      !query ||
+      matchingIds.has(collection.id) ||
+      [collection.name, collection.summary, collection.description].some(
+        (text) => text && normalizeCatalogSearch(text).includes(query),
+      )
+    );
+  });
   const facets = buildCatalogFacets(
     items.map((item) => collectionFilterItem(item, items)),
     filters.productType,
@@ -1492,6 +1508,8 @@ export function CollectionPage({
             item.productTypeSlug,
             item.productTypeName,
           ),
+          aliases: userArea ? [item.name] : undefined,
+          description: userArea ? item.description : undefined,
           englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
           makerId: item.makerId,
           makerName: item.makerName,

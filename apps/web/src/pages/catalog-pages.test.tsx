@@ -500,6 +500,60 @@ describe("PublicCollectionPage", () => {
 });
 
 describe("UserCollectionsPage", () => {
+  it.each([
+    "name",
+    "summary",
+    "description",
+  ] as const)("finds an empty private collection by its %s", (field) => {
+    const collection = owners[0]?.collections[1];
+    if (!collection) throw new Error("Collection fixture required.");
+    const html = renderToStaticMarkup(
+      <UserCollectionsPage
+        collections={[{ ...collection, [field]: "Café archive" }]}
+        filters={{ ...emptyCatalogFilters(), query: "cafe" }}
+        items={[]}
+      />,
+    );
+    expect(html).toContain(`/user/collections/${collection.id}`);
+  });
+
+  it("intersects collection text matches with item facets", () => {
+    const collection = owners[0]?.collections[0];
+    const item = owners[0]?.items[0];
+    if (!collection || !item) throw new Error("Collection fixtures required.");
+    /**
+     * Renders the directory with the selected makers.
+     * @param makerIds - Selected maker identifiers.
+     * @returns Rendered directory markup.
+     */
+    const render = (makerIds: number[]) =>
+      renderToStaticMarkup(
+        <UserCollectionsPage
+          collections={[{ ...collection, isPrivate: true }]}
+          filters={{ ...emptyCatalogFilters(), query: "Daily", makerIds }}
+          items={[item]}
+        />,
+      );
+    expect(render([item.makerId])).toContain(
+      `/user/collections/${collection.id}`,
+    );
+    expect(render([999])).not.toContain(`/user/collections/${collection.id}`);
+  });
+
+  it("rolls private item description matches up to their collection", () => {
+    const collection = owners[0]?.collections[0];
+    const item = owners[0]?.items[0];
+    if (!collection || !item) throw new Error("Collection fixtures required.");
+    const html = renderToStaticMarkup(
+      <UserCollectionsPage
+        collections={[{ ...collection, isPrivate: true }]}
+        filters={{ ...emptyCatalogFilters(), query: "engraving" }}
+        items={[{ ...item, isPrivate: true, description: "Unique engraving" }]}
+      />,
+    );
+    expect(html).toContain(`/user/collections/${collection.id}`);
+  });
+
   it("places filters and actions above the collection cards", () => {
     const html = renderToStaticMarkup(
       <UserCollectionsPage
@@ -542,6 +596,24 @@ describe("UserCollectionsPage", () => {
 });
 
 describe("CollectionPage", () => {
+  it.each([
+    "name",
+    "description",
+  ] as const)("finds private items by their %s in the owner area", (field) => {
+    const collection = owners[0]?.collections[0];
+    const item = owners[0]?.items[0];
+    if (!collection || !item) throw new Error("Collection fixtures required.");
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={{ ...collection, isPrivate: true }}
+        filters={{ ...emptyCatalogFilters(), query: "engraving" }}
+        items={[{ ...item, isPrivate: true, [field]: "Unique engraving" }]}
+        userArea
+      />,
+    );
+    expect(html).toContain(item.displayName);
+  });
+
   it("keeps private collection search client-side", () => {
     const collection = owners[0]?.collections[0];
     const item = owners[0]?.items[0];
