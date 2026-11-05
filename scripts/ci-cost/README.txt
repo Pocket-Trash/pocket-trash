@@ -1,6 +1,0 @@
-ENG-380 evidence, collected 2026-11-04. Trigger window: 2026-10-08T00:00:00Z through 2026-10-21T23:59:59Z.
-Run python3 reproduce.py to replay de-duplication and normalized totals offline.
-runs.tsv: included run attempts; jobs.tsv: all non-skipped job snapshots, including copies; prs.tsv: denominator; excluded.tsv: excluded CI/Deploy PR-event runs.
-Sources: GitHub REST /repos/Pocket-Trash/pocket-trash/actions/workflows/{ci,deploy}.yml/runs?created=2026-10-08..2026-10-21&event=pull_request&per_page=100 (paginate); /actions/runs/{run}/attempts/{attempt}/jobs?per_page=100 (paginate). Job log EVENT_ACTION and BASE_SHA establish event and base-main ancestry. PR file lists distinguish code from documentation.
-local.json: sanitized derived observations from three automatic Codex sessions; partial coverage October 16-18, 20 worktrees, not a complete local history. Deduplicated by session/execution ID; only terminal validate:pr output included. Empty selected arrays mean missing plan output or precondition failure, never zero selected checks. Seconds are successful runner-reported totals; no failure duration inferred.
-Raw session output and CI logs are excluded to avoid copying unrelated information and masked environment blocks.
