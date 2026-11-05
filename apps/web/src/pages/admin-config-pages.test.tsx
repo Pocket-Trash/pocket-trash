@@ -6,7 +6,8 @@ import {
   AdminTrendsConfigPage,
 } from "./admin-config-pages";
 
-vi.mock("@pocket-trash/localizations", () => ({
+vi.mock("@pocket-trash/localizations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@pocket-trash/localizations")>()),
   /**
    * Returns the localization key as stable test copy.
    *
