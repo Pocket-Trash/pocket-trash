@@ -1,5 +1,7 @@
 import type { CatalogImage, CatalogProduct } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
+import { expect } from "storybook/test";
+import { StoryProviders } from "../../.storybook/story-fixtures";
 import { ProductCard } from "./product-card";
 
 /**
@@ -159,5 +161,41 @@ export const WithProductLink: Story = {
         },
       ],
     },
+  },
+};
+
+/** A mobile part summary retains all functional roles without clipping the card. */
+export const MultiRoleMobile: Story = {
+  args: {
+    product: {
+      ...product,
+      productTypeSlug: "pen-clip",
+      productTypeName: "Pen clip",
+      penPartRoles: ["tip", "clip", "top-cap", "actuator", "mechanism"],
+      imageCount: 1,
+      images: [image],
+    },
+  },
+  decorators: [
+    (Story) => (
+      <StoryProviders>
+        <Story />
+      </StoryProviders>
+    ),
+  ],
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Verifies role wrapping at an actual narrow browser viewport.
+   * @param root0 - Story interaction context.
+   */
+  play: async ({ canvas }) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    await expect(canvas.getByText("Clip", { exact: true })).toBeVisible();
+    await expect(canvas.getByText("Actuator", { exact: true })).toBeVisible();
+    const article = canvas.getByRole("article");
+    await expect(article.scrollWidth).toBeLessThanOrEqual(article.clientWidth);
+    await expect(article.scrollHeight).toBeLessThanOrEqual(
+      article.clientHeight + 1,
+    );
   },
 };

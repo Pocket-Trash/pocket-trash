@@ -1481,6 +1481,29 @@ describe("ProductDetailPage", () => {
 });
 
 describe("CollectionItemDetailPage", () => {
+  it("summarizes the roles of an installed physical pen clip", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{ ...item, productTypeSlug: "pen", productTypeName: "Pen" }}
+        installedPenParts={[
+          {
+            ...item,
+            collectionItemId: 2001,
+            displayName: "Installed clip",
+            productTypeSlug: "pen-clip",
+            productTypeName: "Pen clip",
+            penPartRoles: ["clip", "actuator"],
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain("Installed clip");
+    expect(html).toContain(">Clip<");
+    expect(html).toContain(">Actuator<");
+  });
+
   it("shows live body-hosted slider facts as read-only details", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");

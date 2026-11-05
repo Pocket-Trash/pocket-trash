@@ -1764,7 +1764,7 @@ export function ProductEditor({
 
   return (
     <form
-      className="grid min-w-0 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
+      className="grid min-w-0 grid-cols-1 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -1777,7 +1777,7 @@ export function ProductEditor({
         void form.handleSubmit();
       }}
     >
-      <div className="grid min-w-0 content-start gap-5">
+      <div className="grid min-w-0 grid-cols-1 content-start gap-5">
         <form.Field name="name">
           {(field) => (
             <Field label={t("web.catalog.field.name")}>
@@ -2898,7 +2898,7 @@ export function ProductEditor({
         ) : null}
       </div>
 
-      <div className="grid min-w-0 content-start gap-5">
+      <div className="grid min-w-0 grid-cols-1 content-start gap-5">
         <form.Field name="description">
           {(field) => (
             <CatalogMarkdownEditor

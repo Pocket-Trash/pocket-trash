@@ -391,3 +391,50 @@ export const SecondaryRoleCustomization: Story = {
     ).toHaveLength(2);
   },
 };
+
+/** Mobile authoring retains the primary role and wraps additional role controls. */
+export const MobileFunctionalRoles: Story = {
+  ...MultipleFunctionalRoles,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Exercises keyboard role assignment and checks horizontal fit on a small phone.
+   * @param context - Story interaction context.
+   */
+  play: async (context) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    await MultipleFunctionalRoles.play?.(context);
+    const roles = context.canvas.getByRole("group", {
+      name: "What does this part do?",
+    });
+    await expect(roles.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+    await expect(roles.scrollWidth).toBeLessThanOrEqual(roles.clientWidth);
+  },
+};
+/** Mobile compatibility shows one clip in both role groups. */
+export const MobileRoleCompatibility: Story = {
+  ...RoleAwareCompatibility,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Exercises synchronized selection and checks wrapping on a small phone.
+   * @param context - Story interaction context.
+   */
+  play: async ({ canvas, userEvent }) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    const parts = canvas.getByRole("group", { name: "Compatible parts" });
+    const queries = within(parts);
+    await userEvent.click(queries.getByRole("checkbox", { name: "Pen clips" }));
+    const input = queries.getByRole("combobox", { name: "Pen clips" });
+    await userEvent.click(input);
+    await userEvent.type(input, "Machined");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      queries.getAllByRole("button", { name: "Remove Machined Clip" }),
+    ).toHaveLength(2);
+    await expect(parts.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
+    await expect(parts.scrollWidth).toBeLessThanOrEqual(parts.clientWidth);
+  },
+};

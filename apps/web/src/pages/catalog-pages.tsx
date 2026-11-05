@@ -2401,7 +2401,10 @@ export function CollectionItemDetailPage({
             >
               <ul className="grid gap-1">
                 {installedPenParts.map((part) => (
-                  <li key={part.collectionItemId}>{part.displayName}</li>
+                  <li key={part.collectionItemId}>
+                    <span>{part.displayName}</span>
+                    <PenPartRoleBadges part={part} />
+                  </li>
                 ))}
               </ul>
             </Detail>

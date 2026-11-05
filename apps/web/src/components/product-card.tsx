@@ -1,5 +1,6 @@
 import type { CatalogProduct } from "@package/services";
 import { MakerLink } from "@/components/maker-link";
+import { PenPartRoleBadges } from "@/components/pen-part-role-badges";
 import { Badge } from "@/components/ui/badge";
 import { cardImageUrl } from "@/lib/card-image";
 
@@ -68,7 +69,7 @@ export function ProductCard({
   const productLink = product.productLinks.find(({ isValid }) => isValid);
 
   return (
-    <article className="flex h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-transform group-hover:-translate-y-0.5 group-hover:border-primary">
+    <article className="flex min-h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-transform group-hover:-translate-y-0.5 group-hover:border-primary">
       {image ? (
         <div className="aspect-4/3 w-full shrink-0 bg-muted">
           <img
@@ -101,6 +102,11 @@ export function ProductCard({
             slug={product.makerSlug}
           />
         </p>
+        {product.penPartRoles?.length ? (
+          <div className="mt-2">
+            <PenPartRoleBadges part={product} />
+          </div>
+        ) : null}
         {searchContext ? (
           <p className="mt-1 text-xs text-primary">{searchContext}</p>
         ) : null}
