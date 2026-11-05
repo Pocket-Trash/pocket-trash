@@ -16,7 +16,7 @@ import { ProductEditor } from "./catalog-form-pages";
 function product(
   id: number,
   name: string,
-  productTypeSlug: "pen" | "pen-clip" | "pen-tip",
+  productTypeSlug: CatalogProduct["productTypeSlug"],
 ): CatalogProduct {
   return {
     aliases: [],
@@ -438,5 +438,128 @@ export const MobileRoleCompatibility: Story = {
       window.innerWidth,
     );
     await expect(parts.scrollWidth).toBeLessThanOrEqual(parts.clientWidth);
+  },
+};
+
+/** Physical mechanism fixture, separate from the Click action classifier. */
+const physicalMechanism = {
+  ...product(1010, "Click cartridge", "pen-mechanism"),
+  mechanismId: 1020,
+};
+/** Second physical product operated by the same actuating clip. */
+const alternateMechanism = {
+  ...physicalMechanism,
+  id: 1011,
+  name: "Bolt cartridge",
+  slug: "bolt-cartridge",
+};
+
+/** One clip can select multiple physical mechanisms through a searchable picker. */
+export const ActuatorMechanismLinks: Story = {
+  args: {
+    productTypeSlug: "pen-clip",
+    initialProduct: { ...dualClip, actuatedMechanisms: [physicalMechanism] },
+    options: {
+      ...options,
+      relationshipProducts: [physicalMechanism, alternateMechanism, dualClip],
+    },
+  },
+  /**
+   * Selects another physical mechanism by keyboard and removes the original link.
+   * @param context - Story interaction context.
+   */
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.getByText("Click cartridge")).toBeVisible();
+    await expect(
+      canvas.getByRole("checkbox", { name: /Actuator.*Remove this part/ }),
+    ).toBeDisabled();
+    const input = canvas.getByRole("combobox", {
+      name: "Mechanisms this part actuates",
+    });
+    await userEvent.click(input);
+    await userEvent.type(input, "Bolt");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      canvas.getByRole("button", { name: "Remove Bolt cartridge" }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Remove Click cartridge" }),
+    );
+    await expect(
+      canvas.queryByRole("button", { name: "Remove Click cartridge" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "Remove Bolt cartridge" }),
+    ).toBeVisible();
+  },
+};
+
+/** The reverse picker discovers a clip assigned the Actuator role. */
+export const MechanismActuatingParts: Story = {
+  args: {
+    productTypeSlug: "pen-mechanism",
+    initialProduct: physicalMechanism,
+    options: {
+      ...options,
+      mechanisms: [{ id: 1020, name: "Click", slug: "click" }],
+      relationshipProducts: [tip, dualClip],
+    },
+  },
+  /**
+   * Finds the dual-role clip and shows its shared identity after selection.
+   * @param context - Story interaction context.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const input = canvas.getByRole("combobox", {
+      name: "Parts that actuate this mechanism",
+    });
+    await userEvent.click(input);
+    await userEvent.type(input, "Machined");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(
+      canvas.getByRole("button", { name: "Remove Machined Clip" }),
+    ).toBeVisible();
+    await expect(canvas.getByText("One part, multiple roles")).toBeVisible();
+    await expect(
+      canvas.getByRole("combobox", { name: "Mechanism" }),
+    ).toBeVisible();
+  },
+};
+
+/** A role toggle progressively exposes the mechanism selector on a clip. */
+export const RevealActuationPicker: Story = {
+  args: { productTypeSlug: "pen-clip", initialProduct: clip },
+  /**
+   * Shows the relationship selector only after Actuator is assigned.
+   * @param context - Story interaction context.
+   */
+  play: async ({ canvas, userEvent }) => {
+    await expect(
+      canvas.queryByRole("combobox", { name: "Mechanisms this part actuates" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("checkbox", { name: "Actuator" }));
+    await expect(
+      canvas.getByRole("combobox", { name: "Mechanisms this part actuates" }),
+    ).toBeVisible();
+  },
+};
+
+/** The association picker remains keyboard-operable on a narrow phone. */
+export const MobileActuatorMechanismLinks: Story = {
+  ...ActuatorMechanismLinks,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  /**
+   * Adds and removes a mechanism at the mobile viewport width.
+   * @param context - Story interaction context.
+   */
+  play: async (context) => {
+    await expect(window.innerWidth).toBeLessThanOrEqual(400);
+    await ActuatorMechanismLinks.play?.(context);
+    const input = context.canvas.getByRole("combobox", {
+      name: "Mechanisms this part actuates",
+    });
+    await expect(input.getBoundingClientRect().right).toBeLessThanOrEqual(
+      window.innerWidth,
+    );
   },
 };

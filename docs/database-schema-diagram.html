@@ -1142,6 +1142,20 @@
                   "full"
             ],
             "fields": [
+                  "actuator_product_id PK/FK bigint",
+                  "mechanism_product_id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "pen_actuator_mechanism",
+            "name": "pen_actuator_mechanism",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
                   "pen_product_id PK/FK bigint",
                   "part_product_id PK/FK bigint",
                   "requires_customization boolean",
@@ -2782,6 +2796,16 @@
             "material_specific",
             "materials",
             "material_id → id"
+      ],
+      [
+            "pen_actuator_mechanism",
+            "product_detail_pen_part",
+            "actuator_product_id → id"
+      ],
+      [
+            "pen_actuator_mechanism",
+            "product_detail_pen_mechanism",
+            "mechanism_product_id → id"
       ],
       [
             "pen_compatible_part",

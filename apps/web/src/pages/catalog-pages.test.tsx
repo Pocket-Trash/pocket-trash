@@ -1239,6 +1239,42 @@ describe("ProductDetailPage", () => {
     expect(html).toContain(">Actuator<");
   });
 
+  it("shows physical mechanism links on a compatible dual-role clip", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          productTypeSlug: "pen",
+          compatibleParts: [
+            {
+              id: 101,
+              name: "Actuating Clip",
+              slug: "actuating-clip",
+              productTypeName: "Pen clip",
+              productTypeSlug: "pen-clip",
+              penPartRoles: ["clip", "actuator"],
+              actuatedMechanisms: [
+                {
+                  id: 102,
+                  name: "Click cartridge",
+                  slug: "click-cartridge",
+                  productTypeName: "Pen mechanism",
+                  productTypeSlug: "pen-mechanism",
+                  penPartRoles: ["mechanism"],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(html).toContain("Actuating Clip");
+    expect(html).toContain("Click cartridge");
+    expect(html).toContain("click-cartridge");
+    expect(html).toContain("One part, multiple roles");
+  });
+
   it("groups and links compatible Pen parts without configuration copy", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage

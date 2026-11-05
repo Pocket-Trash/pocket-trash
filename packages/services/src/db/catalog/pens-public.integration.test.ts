@@ -482,16 +482,235 @@ describe("public Pens catalog reads", () => {
         specs: {},
         penPartRoles: ["clip", "actuator"],
       };
+      const mechanismInput: ProductWriteInput = {
+        ...clipInput,
+        name: "Associated mechanism",
+        slug: "associated-mechanism",
+        productTypeSlug: "pen-mechanism",
+        penPartRoles: ["mechanism"],
+        mechanismId: mechanism.id,
+      };
+      const physicalMechanism = await service.createProduct(mechanismInput);
+      const secondMechanism = await service.createProduct({
+        ...mechanismInput,
+        name: "Second associated mechanism",
+        slug: "second-associated-mechanism",
+      });
+      clipInput.actuatedMechanismProductIds = [
+        physicalMechanism.id,
+        secondMechanism.id,
+      ];
       const clip = await service.createProduct(clipInput);
       expect(clip).toMatchObject({
         productTypeSlug: "pen-clip",
         penPartRoles: ["clip", "actuator"],
       });
+      const [actuatorRole] = await db
+        .select({ id: schema.catalogTerminologyConcept.id })
+        .from(schema.catalogTerminologyConcept)
+        .where(
+          and(
+            eq(schema.catalogTerminologyConcept.namespace, "pen-part-role"),
+            eq(schema.catalogTerminologyConcept.key, "actuator"),
+          ),
+        );
+      if (!actuatorRole) throw new Error("Missing Actuator role fixture.");
+      await expect(
+        db
+          .delete(schema.penPartRoleAssignment)
+          .where(
+            and(
+              eq(schema.penPartRoleAssignment.partProductId, clip.id),
+              eq(schema.penPartRoleAssignment.conceptId, actuatorRole.id),
+            ),
+          ),
+      ).rejects.toThrow();
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          actor: { clerkId: "another-owner", role: "user" },
+          reason: "Unauthorized relationship edit",
+          actuatedMechanismProductIds: [],
+        }),
+      ).rejects.toThrow("Product does not exist");
+      await expect(
+        service.updateProduct({
+          ...mechanismInput,
+          productId: physicalMechanism.id,
+          reason: "Reject self relationship",
+          actuatingPartProductIds: [physicalMechanism.id],
+        }),
+      ).rejects.toThrow("web.pens.actuation.invalid");
+      await expect(
+        service.updateProduct({
+          ...mechanismInput,
+          productId: physicalMechanism.id,
+          reason: "Reject non-actuator endpoint",
+          actuatingPartProductIds: [tip.id],
+        }),
+      ).rejects.toThrow("web.pens.actuation.invalid");
+      await db
+        .update(schema.product)
+        .set({ approvalStatus: "approved" })
+        .where(eq(schema.product.id, clip.id));
+      await db
+        .update(schema.product)
+        .set({ isPrivate: true })
+        .where(eq(schema.product.id, physicalMechanism.id));
+      expect(
+        (await service.listProducts("pen-clip"))
+          .find(({ id }) => id === clip.id)
+          ?.actuatedMechanisms?.some(({ id }) => id === physicalMechanism.id),
+      ).toBe(false);
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          actor: { ...actor, role: "user" },
+          reason: "Allow own private endpoint",
+          actuatedMechanismProductIds: [physicalMechanism.id],
+        }),
+      ).resolves.toBeDefined();
+      await db
+        .update(schema.product)
+        .set({ isPrivate: false })
+        .where(eq(schema.product.id, physicalMechanism.id));
+      await service.updateProduct({
+        ...clipInput,
+        productId: clip.id,
+        reason: "Restore associations",
+      });
+      const reverseCreated = await service.createProduct({
+        ...mechanismInput,
+        name: "Reverse-created mechanism",
+        slug: "reverse-created-mechanism",
+        actuatingPartProductIds: [clip.id],
+      });
+      expect(reverseCreated.actuatingParts).toEqual([
+        expect.objectContaining({ id: clip.id }),
+      ]);
+      await service.updateProduct({
+        ...mechanismInput,
+        productId: reverseCreated.id,
+        name: reverseCreated.name,
+        slug: reverseCreated.slug,
+        reason: "Remove created reverse link",
+        actuatingPartProductIds: [],
+      });
+      for (const forward of [true, false]) {
+        const hiddenId = forward ? physicalMechanism.id : clip.id;
+        await db
+          .update(schema.product)
+          .set({ isPrivate: true, ownerClerkId: "another-owner" })
+          .where(eq(schema.product.id, hiddenId));
+        const result = forward
+          ? await service.updateProduct({
+              ...clipInput,
+              actor: { ...actor, role: "user" },
+              productId: clip.id,
+              reason: "Retain inaccessible forward link",
+              actuatedMechanismProductIds: [],
+            })
+          : await service.updateProduct({
+              ...mechanismInput,
+              actor: { ...actor, role: "user" },
+              productId: physicalMechanism.id,
+              reason: "Retain inaccessible reverse link",
+              actuatingPartProductIds: [],
+            });
+        expect(
+          forward ? result.actuatedMechanisms : result.actuatingParts,
+        ).toEqual([]);
+        expect(
+          await db
+            .select()
+            .from(schema.penActuatorMechanism)
+            .where(
+              and(
+                eq(schema.penActuatorMechanism.actuatorProductId, clip.id),
+                eq(
+                  schema.penActuatorMechanism.mechanismProductId,
+                  physicalMechanism.id,
+                ),
+              ),
+            ),
+        ).toHaveLength(1);
+        await db
+          .update(schema.product)
+          .set({ isPrivate: false, ownerClerkId: actor.clerkId })
+          .where(eq(schema.product.id, hiddenId));
+        await service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Restore visible associations",
+        });
+      }
+      expect(clip.actuatedMechanisms?.map(({ id }) => id)).toEqual([
+        physicalMechanism.id,
+        secondMechanism.id,
+      ]);
+      expect(
+        (await service.listProducts("pen-mechanism", actor)).find(
+          ({ id }) => id === physicalMechanism.id,
+        )?.actuatingParts,
+      ).toEqual([
+        expect.objectContaining({
+          id: clip.id,
+          penPartRoles: ["clip", "actuator"],
+        }),
+      ]);
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Retain associated role",
+          penPartRoles: ["clip"],
+        }),
+      ).rejects.toThrow("web.pens.actuation.roleInUse");
+      await expect(
+        service.createProduct({
+          ...clipInput,
+          name: "Invalid mechanism endpoint",
+          slug: "invalid-mechanism-endpoint",
+          actuatedMechanismProductIds: [tip.id],
+        }),
+      ).rejects.toThrow("web.pens.actuation.invalid");
+      await expect(
+        service.updateProduct({
+          ...mechanismInput,
+          productId: physicalMechanism.id,
+          reason: "Reject duplicate relationship",
+          actuatingPartProductIds: [clip.id, clip.id],
+        }),
+      ).rejects.toThrow("web.pens.actuation.invalid");
+      await expect(
+        service.updateProduct({
+          ...mechanismInput,
+          productId: physicalMechanism.id,
+          reason: "Remove reverse relationship",
+          actuatingPartProductIds: [],
+        }),
+      ).resolves.toMatchObject({ actuatingParts: [] });
+      expect(
+        (await service.listProducts("pen-clip", actor)).find(
+          ({ id }) => id === clip.id,
+        )?.actuatedMechanisms,
+      ).toEqual([expect.objectContaining({ id: secondMechanism.id })]);
+      await expect(
+        service.updateProduct({
+          ...clipInput,
+          productId: clip.id,
+          reason: "Clear forward relationships",
+          actuatedMechanismProductIds: [],
+        }),
+      ).resolves.toMatchObject({ actuatedMechanisms: [] });
       await expect(
         service.updateProduct({
           ...clipInput,
           productId: clip.id,
           reason: "Remove unused additional role",
+          actuatedMechanismProductIds: [],
           penPartRoles: ["clip"],
         }),
       ).resolves.toMatchObject({ penPartRoles: ["clip"] });
@@ -500,8 +719,33 @@ describe("public Pens catalog reads", () => {
           ...clipInput,
           productId: clip.id,
           reason: "Restore actuator role",
+          actuatedMechanismProductIds: [],
         }),
       ).resolves.toMatchObject({ penPartRoles: ["clip", "actuator"] });
+      await expect(
+        service.updateProduct({
+          ...mechanismInput,
+          productId: physicalMechanism.id,
+          reason: "Author reverse relationship",
+          actuatingPartProductIds: [clip.id],
+        }),
+      ).resolves.toMatchObject({
+        actuatingParts: [expect.objectContaining({ id: clip.id })],
+      });
+      const oldRelationshipWriter = { ...clipInput };
+      delete oldRelationshipWriter.actuatedMechanismProductIds;
+      await expect(
+        service.updateProduct({
+          ...oldRelationshipWriter,
+          productId: clip.id,
+          reason: "Preserve associations from older writer",
+        }),
+      ).resolves.toMatchObject({
+        actuatedMechanisms: [
+          expect.objectContaining({ id: physicalMechanism.id }),
+        ],
+      });
+      expect(await db.select().from(schema.penCompatiblePart)).toHaveLength(0);
       await expect(
         service.createProduct({
           ...clipInput,
@@ -552,6 +796,9 @@ describe("public Pens catalog reads", () => {
         compatiblePartProductIds: [clip.id],
         customizationConfirmedPartProductIds: [clip.id],
       });
+      expect(multiRolePen.compatibleParts[0]?.actuatedMechanisms).toEqual([
+        expect.objectContaining({ id: physicalMechanism.id }),
+      ]);
       expect(multiRolePen.compatibleParts).toEqual([
         expect.objectContaining({
           id: clip.id,
@@ -572,7 +819,7 @@ describe("public Pens catalog reads", () => {
           reason: "Remove a used role",
           penPartRoles: ["clip"],
         }),
-      ).rejects.toThrow("web.pens.partRoles.inUse");
+      ).rejects.toThrow("web.pens.actuation.roleInUse");
       const oldWriterClipInput = { ...clipInput };
       delete oldWriterClipInput.penPartRoles;
       await expect(

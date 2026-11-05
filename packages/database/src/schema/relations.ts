@@ -669,6 +669,16 @@ export const relations = defineRelations(tables, (r) => ({
       to: [r.product.id],
     }),
   },
+  penActuatorMechanism: {
+    actuator: r.one.productDetailPenPart({
+      from: [r.penActuatorMechanism.actuatorProductId],
+      to: [r.productDetailPenPart.id],
+    }),
+    mechanism: r.one.productDetailPenMechanism({
+      from: [r.penActuatorMechanism.mechanismProductId],
+      to: [r.productDetailPenMechanism.id],
+    }),
+  },
   penPartRoleAssignment: {
     concept: r.one.catalogTerminologyConcept({
       from: [r.penPartRoleAssignment.conceptId],
@@ -699,6 +709,7 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   productDetailPenPart: {
+    actuatedMechanisms: r.many.penActuatorMechanism(),
     compatiblePens: r.many.penCompatiblePart(),
     product: r.one.product({
       from: [r.productDetailPenPart.id],
@@ -740,6 +751,7 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   productDetailPenMechanism: {
+    actuatingParts: r.many.penActuatorMechanism(),
     collectionItems: r.many.collectionDetailPenMechanism(),
     mechanism: r.one.mechanism({
       from: [r.productDetailPenMechanism.mechanismId],

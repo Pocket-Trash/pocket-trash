@@ -298,6 +298,30 @@ export const penCompatiblePart = pgTable(
   ],
 );
 
+/** Physical actuating part and the physical mechanism product it operates. */
+export const penActuatorMechanism = pgTable(
+  "pen_actuator_mechanism",
+  {
+    actuatorProductId: bigint("actuator_product_id", { mode: "number" })
+      .notNull()
+      .references(() => productDetailPenPart.id, { onDelete: "restrict" }),
+    mechanismProductId: bigint("mechanism_product_id", { mode: "number" })
+      .notNull()
+      .references(() => productDetailPenMechanism.id, { onDelete: "restrict" }),
+    ...entityTimestamps,
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.actuatorProductId, table.mechanismProductId],
+    }),
+    index("pen_actuator_mechanism_reverse_idx").on(table.mechanismProductId),
+    check(
+      "pen_actuator_mechanism_distinct",
+      sql`${table.actuatorProductId} <> ${table.mechanismProductId}`,
+    ),
+  ],
+);
+
 /** Nose profile assigned to a Pen or Pen-tip product. */
 export const penNoseProfileAssignment = pgTable(
   "pen_nose_profile_assignment",
@@ -782,6 +806,7 @@ export const pensTables = {
   collectionItemInstalledPenPart,
   penNoseProfileAssignment,
   penCompatiblePart,
+  penActuatorMechanism,
   penPartRoleAssignment,
   productAlias,
   productDetailPen,
