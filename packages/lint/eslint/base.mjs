@@ -15,6 +15,8 @@ export default defineConfig([
       "**/.tanstack/**",
       "**/.expo/**",
       "**/coverage/**",
+      "**/playwright-report/**",
+      "**/test-results/**",
       "**/storybook-static/**",
       "**/routeTree.gen.ts",
       "apps/api/.wrangler/**",
