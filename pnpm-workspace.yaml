@@ -52,6 +52,8 @@ minimumReleaseAgeExclude:
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeStrict: true
 overrides:
+  "@vercel/nft@1.10.0>glob": "14.0.2"
+  "@joshwooding/vite-plugin-react-docgen-typescript@0.7.0>glob": "14.0.2"
   "@tootallnate/once@2": "2.0.1"
   "ajv@8": "8.18.0"
   "baseline-browser-mapping@2": "2.11.26"
