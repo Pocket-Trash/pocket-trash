@@ -18,37 +18,6 @@ minimumReleaseAgeExclude:
   - "@pocket-trash/skills"
   # ENG-364: accept the patched source-map release; remove after 2026-10-07T14:08:09.382Z.
   - "source-map-js@1.2.2"
-  # ENG-332: accept the reviewed Clerk security fix; remove after all versions mature by 2026-10-08T20:48:58.312Z.
-  - "@clerk/localizations@4.21.2"
-  - "@clerk/shared@4.38.0"
-  - "@clerk/ui@1.38.1"
-  # ENG-299: retain the patched TanStack release; remove after 2026-10-07T17:48:34.385Z.
-  - "@tanstack/react-start@1.168.60"
-  # ENG-299: retain the patched TanStack release; remove after 2026-10-07T17:48:11.683Z.
-  - "@tanstack/start-server-core@1.169.39"
-  # ENG-299: preserve the patched TanStack graph; remove after each version matures by 2026-10-07T22:49:52.170Z.
-  - "@tanstack/highlight@1.0.0"
-  - "@tanstack/react-router@1.170.41"
-  - "@tanstack/react-start-client@1.168.39"
-  - "@tanstack/react-start-rsc@0.1.59"
-  - "@tanstack/react-start-server@1.167.46"
-  - "@tanstack/react-store@0.11.2"
-  - "@tanstack/router-core@1.171.34"
-  - "@tanstack/router-generator@1.167.40"
-  - "@tanstack/router-plugin@1.168.42"
-  - "@tanstack/start-client-core@1.170.34"
-  - "@tanstack/start-plugin-core@1.171.49"
-  - "@tanstack/start-storage-context@1.167.36"
-  - "@tanstack/store@0.11.2"
-  # ENG-318: retain the tested Storybook graph; remove after 2026-10-06T17:20:05.303Z.
-  - "@storybook/addon-a11y@10.6.1"
-  - "@storybook/addon-vitest@10.6.1"
-  - "@storybook/builder-vite@10.6.1"
-  - "@storybook/react-dom-shim@10.6.1"
-  - "@storybook/react-vite@10.6.1"
-  - "@storybook/react@10.6.1"
-  - "@storybook/tanstack-react@10.6.1"
-  - "storybook@10.6.1"
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeStrict: true
 overrides:
