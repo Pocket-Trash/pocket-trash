@@ -18,7 +18,7 @@
     "users:reconcile": "tsx ../../packages/infisical-runner/src/cli.ts api users:reconcile -- tsx src/scripts/reconcile-clerk-users.ts"
   },
   "dependencies": {
-    "@clerk/backend": "^3.11.0",
+    "@clerk/backend": "3.26.4",
     "@hono/zod-openapi": "^1.6.3",
     "@package/logger": "workspace:*",
     "@package/services": "workspace:*",
