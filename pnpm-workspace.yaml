@@ -2,7 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
 patchedDependencies:
-  "@railway/cli@5.62.1": patches/@railway__cli@5.62.1.patch
+  "@railway/cli@5.71.0": patches/@railway__cli@5.71.0.patch
 allowBuilds:
   "@railway/cli": true
   bufferutil: false
