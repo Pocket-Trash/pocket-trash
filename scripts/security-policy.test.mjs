@@ -75,8 +75,8 @@ test("pins patched Undici releases without changing consumer major versions", ()
 
 test("provides the locked deployment executables", async () => {
   const commands = [
-    ["skills", "1.7.0"],
-    ["railway", "5.62.1"],
+    ["skills", "1.7.4"],
+    ["railway", "5.71.0"],
     ["vercel", "59.26.0"],
   ];
 

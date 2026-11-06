@@ -55,9 +55,9 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "0.5.13",
     "@package/tsconfig": "workspace:*",
     "@types/pg": "^8.23.1",
-    "pg": "^8.23.0"
+    "pg": "8.23.1"
   }
 }
