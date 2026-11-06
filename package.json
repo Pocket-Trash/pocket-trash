@@ -71,7 +71,7 @@
     "@storybook/builder-vite": "10.6.2",
     "@types/node": "latest",
     "eslint": "^10.11.0",
-    "eslint-plugin-jsdoc": "64.5.4",
+    "eslint-plugin-jsdoc": "65.4.2",
     "railway": "3.16.0",
     "skills": "1.7.4",
     "tsx": "latest",
