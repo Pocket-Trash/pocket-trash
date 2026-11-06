@@ -203,12 +203,12 @@ test("removes the withdrawn braces exception and retains only scoped Vercel Zod 
   assert.doesNotMatch(workspacePolicy, /GHSA-vfj7-8cjw-p6xm|ignoreGhsas:/);
 });
 
-test("locks mature security fixes without changing supported package majors", () => {
+test("locks mature security fixes across qualified package versions", () => {
   for (const version of [
     "seroval@1.6.11",
     "hono@4.13.11",
     "@hono/node-server@2.1.3",
-    "@vitest/mocker@4.1.12",
+    "@vitest/mocker@5.0.5",
     "smol-toml@1.9.0",
     "fast-uri@3.1.9",
   ])
