@@ -1,5 +1,5 @@
 import { type Logger, loggerMessages } from "@package/logger";
-import cronParser from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 import {
   runQueueProcessorJob,
   runSourceProducerJob,
@@ -85,11 +85,10 @@ export async function runRailwayCronJob({
     return {
       source,
       schedule,
-      latestSlot: cronParser
-        .parseExpression(schedule, {
-          currentDate: new Date(snapshot + 1),
-          tz: "UTC",
-        })
+      latestSlot: CronExpressionParser.parse(schedule, {
+        currentDate: new Date(snapshot + 1),
+        tz: "UTC",
+      })
         .prev()
         .toDate(),
     };
