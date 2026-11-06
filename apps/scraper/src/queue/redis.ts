@@ -9,6 +9,9 @@ import { Redis } from "ioredis";
  */
 export function createRedisConnection(redisUrl: string): Redis {
   const redis = new Redis(redisUrl, {
+    // Preserve the Redis 5 wire protocol and TCP keep-alive behavior.
+    protocol: 2,
+    keepAlive: 0,
     connectTimeout: 5_000,
     enableReadyCheck: false,
     maxRetriesPerRequest: null,
