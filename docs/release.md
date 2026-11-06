@@ -63,17 +63,13 @@ deployment succeeds.
 
 Use the Node and pnpm versions declared in [package.json](../package.json). Follow [dependency coding standards](coding-standards-references/dependencies-secrets.md) for release-age policy, approved exact-version exceptions and security audits.
 
-Roy must approve each vulnerability exception. Every exception requires a GHSA,
-an owner, a follow-up Linear issue, and a UTC expiry within seven days.
-Record the metadata in `security-audit-exceptions.json` and the matching GHSA in
-`auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`. The
-`scripts/security-audit.mjs` validator rejects incomplete, mismatched, overlong,
-or expired exceptions before pnpm audits dependencies.
+Roy must approve each vulnerability exception. Record its GHSA, owner,
+follow-up issue, approval time and expiry within seven days in
+`security-audit-exceptions.json`. The `scripts/security-audit.mjs` validator
+checks metadata and scope before auditing dependencies.
 
-`GHSA-vfj7-8cjw-p6xm` has a temporary exception. No patched `braces` release
-exists, and the affected paths are development tooling. Roy Anger owns the
-exception. [ENG-337](https://linear.app/pocket-trash/issue/ENG-337) tracks its
-removal. The renewed exception expires at `2026-10-30T02:34:35Z`.
+Track exception reviews and follow-up work in
+[Dependency policy and exception cleanup](https://linear.app/pocket-trash/project/dependency-policy-and-exception-cleanup-8585f316e087).
 
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).
