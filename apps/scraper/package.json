@@ -26,7 +26,7 @@
     "@package/queue": "workspace:*",
     "@package/services": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
-    "cron-parser": "4.9.0",
+    "cron-parser": "5.4.0",
     "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.13.11",
     "ioredis": "^5.11.1",

@@ -45,7 +45,7 @@ export async function loggedMutation<T>(
           return await action();
         } catch (error) {
           failure = { error };
-          // eslint-disable-next-line preserve-caught-error -- The original is rethrown below; attaching it here leaks SQL parameters into logs.
+          // Rethrow the original below; attaching it here leaks SQL parameters into logs.
           throw new Error("Database mutation failed.");
         }
       },
