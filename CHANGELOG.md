@@ -36,6 +36,39 @@
 
 
 
+
+## 0.15.0
+
+### Minor Changes
+
+* Unify material-option editing, clarify alloys and reusable materials, and use a centered desktop modal with accessible icon actions. (@app/web)
+* Preselect an explicitly filtered product type when creating a product, name creation actions by type, and explain pen actuators consistently. (@app/web)
+* Group collection item details and start personal descriptions with catalog text. (@app/web)
+* Choose a catalog product before collection-item details, reveal useful browsing controls progressively, and safely reset product-specific selections when changing products. (@app/web)
+* Explain optional product aliases beside product identity and replace live comma parsing with validated Add/Enter entry and removable badges. (@app/web)
+* Connect an owned actuating part to its installed physical mechanism while keeping multi-role parts installed once. (@app/web, @package/services, @package/database)
+* Allow confirmed customization exceptions when installing owned pen parts. (@app/web, @package/services, @package/database)
+* Assign multiple functional roles to one pen part and share its compatibility across roles. (@app/web, @package/services)
+* Associate physical actuating parts with the mechanisms they operate from either product editor. (@app/web, @package/services, @package/database)
+* Record pen interchangeability and require confirmation for customized compatible parts. (@app/web, @package/services, @package/database)
+* Persist collection item visibility and use consistent binary switches. (@app/web, @package/services)
+
+### Patch Changes
+
+* Qualify BullMQ 6 with the existing Redis client and retained queue-job behavior. (@package/queue)
+* Wait for collection detail navigation before checking public item visibility. (@app/web)
+* Update Changesets CLI while preserving private-package release planning. (@app/web)
+* Cover UTC scheduling boundaries and invalid cron fields. (@app/scraper)
+* Use cron-parser 5 while preserving UTC scraper schedule selection. (@app/scraper)
+* Update JSDoc lint tooling to the qualified 65.x release. (@package/lint)
+* Honor Vitest worker limits during local tests and release validation. (@app/api, @app/discord-bot, @app/scraper, @app/web, @package/database, @package/feature-flags, @package/infisical-runner, @package/lint, @package/logger, @package/markdown, @package/queue, @package/services, @package/storage)
+* Remove matured Clerk, TanStack and Storybook release-age exceptions. (@app/web)
+* Allow visual checks to read the complete catalog source within bounded limits. (@app/web)
+* Remove the matured use-effect-reducer release-age exception. (@app/web)
+* Remove an unused logging lint suppression while preserving SQL-parameter redaction. (@package/services)
+* Renew the scoped Vercel tooling security exception for seven days. (@app/web)
+* Remove the duplicate Miniflare Undici override. (@app/api, @app/web)
+
 ## 0.14.0
 
 ### Minor Changes

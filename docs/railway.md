@@ -361,9 +361,13 @@ the workflow:
 
 1. Selects the isolated `preview-pr-<number>` Neon branch for database-changing
    PRs, or the shared `preview` branch otherwise.
-2. Stages the selected `DATABASE_URL`, Bunny image prefix, cron flag, deployment
-   metadata, and the Redis service reference on `pocket-trash (preview)` with
-   `--skip-deploys`.
+2. Uses `scripts/railway-preview-variables.mjs` to batch the selected
+   `DATABASE_URL`, Bunny image prefix, cron flag, deployment metadata, and Redis
+   service reference on `pocket-trash (preview)`, together with queue logging
+   metadata. GraphQL variables travel over stdin with `skipDeploys: true` and
+   `replace: false`; unchanged settings skip writes and readback verifies all
+   owned keys. Quota failures respect Railway's cooldown, with three attempts
+   per call and a shared 60-minute retry budget inside the 90-minute preview job.
 3. Activates the queue with Railway's `environmentUnskipService` operation when
    Focused PR Environments skipped its service and inherited volume. A redeploy
    alone does not activate skipped resources. This is scoped to a verified

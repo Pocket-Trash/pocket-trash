@@ -14,4 +14,4 @@
 "@package/storage": patch
 ---
 
-Honor Vitest worker limits during local tests and release validation.
+Compile with TypeScript 7 while preserving compiler API compatibility for lint tooling.

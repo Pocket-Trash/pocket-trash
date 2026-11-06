@@ -42,10 +42,15 @@ api() {
   response_file="$(mktemp)"
   local status
   local curl_status
+  local curl_options=(--connect-timeout 15 --max-time 60)
+  # Retry reads only: replaying a deployment POST can create duplicate deployments.
+  if [[ "$method" == "GET" ]]; then
+    curl_options+=(--retry 4 --retry-all-errors --retry-delay 2 --retry-max-time 180)
+  fi
 
   set +e
   if [[ -n "$body" ]]; then
-    status="$(curl --silent --show-error \
+    status="$(curl --silent --show-error "${curl_options[@]}" \
       --output "$response_file" \
       --write-out "%{http_code}" \
       --request "$method" \
@@ -54,7 +59,7 @@ api() {
       --data "$body" \
       "${VERCEL_API_BASE}${path}")"
   else
-    status="$(curl --silent --show-error \
+    status="$(curl --silent --show-error "${curl_options[@]}" \
       --output "$response_file" \
       --write-out "%{http_code}" \
       --request "$method" \
