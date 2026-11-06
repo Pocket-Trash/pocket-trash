@@ -250,7 +250,12 @@ const changeClassificationRules = [
   },
   {
     category: "dependency-policy",
-    paths: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"],
+    paths: [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      ".github/dependabot.yml",
+    ],
     prefixes: ["patches/"],
     domains: ["validation"],
   },
