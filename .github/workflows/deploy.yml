@@ -98,6 +98,7 @@ jobs:
     concurrency:
       group: preview-${{ github.event.pull_request.number }}
       cancel-in-progress: true
+    timeout-minutes: 90
     runs-on: ubuntu-26.04
     outputs:
       can_deploy: ${{ steps.db.outputs.can_deploy }}
@@ -635,7 +636,7 @@ jobs:
           env-slug: preview
           secret-path: tools/github/secrets
 
-      - name: Configure Railway scraper preview database and cron
+      - name: Configure Railway preview variables
         if: steps.db.outputs.can_deploy == 'true'
         shell: bash
         env:
@@ -643,139 +644,7 @@ jobs:
           ISOLATED: ${{ steps.db.outputs.isolated }}
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-
-          : "${FONTAWESOME_PACKAGE_TOKEN:?FONTAWESOME_PACKAGE_TOKEN is required}"
-          printf '::add-mask::%s\n' "$DATABASE_URL"
-          printf '::add-mask::%s\n' "$FONTAWESOME_PACKAGE_TOKEN"
-
-          railway_environment="pocket-trash-pr-${PR_NUMBER}"
-          if [[ "$ISOLATED" == "true" ]]; then
-            image_folder_prefix="images/preview/pr-${PR_NUMBER}"
-          else
-            image_folder_prefix="images/preview"
-          fi
-          if [[ "$DB_CHANGING" == "true" ]]; then
-            scraper_cron_enabled="true"
-          else
-            scraper_cron_enabled="false"
-          fi
-          redis_url_reference='$'"{{${RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME}.REDIS_PUBLIC_URL}}"
-
-          jq -cn \
-            --arg app "ci" \
-            --arg environment "github-actions" \
-            --arg level "info" \
-            --arg message "ci.railway.preview.imageFolderPrefix.selected" \
-            --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-            --arg railway_environment "$railway_environment" \
-            --arg service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --arg image_folder_prefix "$image_folder_prefix" \
-            --arg scraper_cron_enabled "$scraper_cron_enabled" \
-            --argjson database "$DB_CHANGING" \
-            '{
-              app: $app,
-              environment: $environment,
-              level: $level,
-              message: $message,
-              timestamp: $timestamp,
-              attributes: {
-                databaseChanged: $database,
-                railwayEnvironment: $railway_environment,
-                service: $service,
-                imageFolderPrefix: $image_folder_prefix,
-                scraperCronEnabled: $scraper_cron_enabled
-              }
-            }'
-
-          printf '%s' "$DATABASE_URL" | pnpm exec railway variable set DATABASE_URL \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "$FONTAWESOME_PACKAGE_TOKEN" | pnpm exec railway variable set FONTAWESOME_PACKAGE_TOKEN \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline" | pnpm exec railway variable set RAILPACK_INSTALL_CMD \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "$image_folder_prefix" | pnpm exec railway variable set BUNNY_IMAGE_FOLDER_PREFIX \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "$redis_url_reference" | pnpm exec railway variable set REDIS_URL \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "$scraper_cron_enabled" | pnpm exec railway variable set SCRAPER_CRON_ENABLED \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "$railway_environment" | pnpm exec railway variable set LOG_DEPLOYMENT_ID \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          railway_image_folder_prefix="$(
-            pnpm exec railway variable list \
-              --kv \
-              --project "$RAILWAY_PROJECT_ID" \
-              --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-              --environment "$railway_environment" |
-              awk -F= '$1 == "BUNNY_IMAGE_FOLDER_PREFIX" {print substr($0, index($0, "=") + 1)}'
-          )"
-
-          if [[ "$railway_image_folder_prefix" != "$image_folder_prefix" ]]; then
-            echo "Railway BUNNY_IMAGE_FOLDER_PREFIX did not match expected preview prefix." >&2
-            echo "Expected: ${image_folder_prefix}" >&2
-            echo "Actual: ${railway_image_folder_prefix:-<unset>}" >&2
-            exit 1
-          fi
-
-          railway_scraper_cron_enabled="$(
-            pnpm exec railway variable list \
-              --kv \
-              --project "$RAILWAY_PROJECT_ID" \
-              --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
-              --environment "$railway_environment" |
-              awk -F= '$1 == "SCRAPER_CRON_ENABLED" {print substr($0, index($0, "=") + 1)}'
-          )"
-
-          if [[ "$railway_scraper_cron_enabled" != "$scraper_cron_enabled" ]]; then
-            echo "Railway SCRAPER_CRON_ENABLED did not match expected preview setting." >&2
-            echo "Expected: ${scraper_cron_enabled}" >&2
-            echo "Actual: ${railway_scraper_cron_enabled:-<unset>}" >&2
-            exit 1
-          fi
+        run: pnpm exec tsx scripts/railway-preview-variables.mjs
 
       - name: Clear Font Awesome package token after Railway preview configuration
         if: ${{ always() && steps.db.outputs.can_deploy == 'true' }}
@@ -810,20 +679,6 @@ jobs:
                 service: $service
               }
             }'
-
-          printf '%s' "$railway_environment" | pnpm exec railway variable set LOG_DEPLOYMENT_ID \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
-
-          printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
-            --stdin \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
-            --environment "$railway_environment"
 
           node scripts/railway-preview-queue.mjs "$railway_environment"
 

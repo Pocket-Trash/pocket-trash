@@ -199,14 +199,7 @@ test("hands native previews to their environment-local shared queue", () => {
     "pocket-trash-queue",
   );
   const source = readFileSync(".github/workflows/deploy.yml", "utf8");
-  assert.match(
-    source,
-    /\$\{RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME\}\.REDIS_PUBLIC_URL/,
-  );
-  assert.match(
-    source,
-    /--service "\$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME"/,
-  );
+  assert.match(source, /pnpm exec tsx scripts\/railway-preview-variables\.mjs/);
   assert.doesNotMatch(source, /["']scraper-queue["']/);
   assert.match(
     source,

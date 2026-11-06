@@ -166,6 +166,34 @@ describe("Railway scraper cron", () => {
     ).toEqual(["autmog", "grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"]);
   });
 
+  it.each([
+    ["2026-07-13T01:59:59.999Z", []],
+    [
+      "2026-07-13T02:00:00.000Z",
+      ["autmog", "grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"],
+    ],
+    [
+      "2026-07-12T22:00:00.000-04:00",
+      ["autmog", "grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"],
+    ],
+    [
+      "2026-07-13T02:04:59.999Z",
+      ["autmog", "grimsmo-fjell", "grimsmo-norseman", "grimsmo-rask"],
+    ],
+    ["2026-07-13T02:05:00.000Z", []],
+  ])("dispatches the UTC slot at %s", async (time, sources) => {
+    await runRailwayCronJob({
+      context: createContext(),
+      env: createEnv(),
+      logger: createNoopLogger(),
+      now: new Date(time),
+    });
+    expect(
+      vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
+    ).toEqual(sources);
+    expect(runQueueProcessorJob).toHaveBeenCalledOnce();
+  });
+
   it("establishes a baseline off the dispatcher tick and still processes the queue", async () => {
     const context = createContext();
     await runRailwayCronJob({
@@ -189,6 +217,9 @@ describe("Railway scraper cron", () => {
     "0 0 L * *",
     "0 0 * * MON#2",
     "0 99 * * *",
+    "60 2 * * 1",
+    "0 2 * 13 *",
+    "0 2 * * 8",
   ])("rejects %s before any task side effects", async (schedule) => {
     const context = createContext();
     const original = scraperSchedules["grimsmo-saga"];
