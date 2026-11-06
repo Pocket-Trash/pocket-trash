@@ -52,7 +52,7 @@ process.stdout.write(JSON.stringify({data}));
       ["--import", "tsx", "scripts/railway-preview-variables.mjs"],
       {
         encoding: "utf8",
-        timeout: mode === "longRate" ? 1500 : 15_000,
+        timeout: mode === "longRate" ? 3000 : 15_000,
         env: {
           ...process.env,
           PATH: `${directory}:${process.env.PATH}`,
@@ -141,6 +141,7 @@ test("rate limits are retried rather than hidden", (t) => {
 });
 test("a long provider cooldown does not trigger an immediate retry storm", (t) => {
   const { result, calls } = configure(t, "longRate");
+  assert.equal(result.error?.code, "ETIMEDOUT");
   assert.notEqual(result.status, 0);
   assert.equal(calls.length, 1);
 });
