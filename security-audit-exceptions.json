@@ -3,8 +3,8 @@
     "advisory": "GHSA-mrhx-c7xc-m3w5",
     "owner": "Roy Anger",
     "followUpIssue": "ENG-574",
-    "approvedAt": "2026-10-30T23:08:14Z",
-    "expiresAt": "2026-11-06T23:08:14Z",
+    "approvedAt": "2026-11-05T20:44:03Z",
+    "expiresAt": "2026-11-12T20:44:03Z",
     "reason": "Temporary exception for Zod 3.22.4 on six reviewed Vercel CLI development-tooling paths only. The audit validates version, development-only status and exact paths before excluding this finding; all application Zod 4 resolutions remain patched. Crafted build inputs can exhaust tooling memory."
   }
 ]
