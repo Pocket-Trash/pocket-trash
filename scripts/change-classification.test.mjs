@@ -1021,6 +1021,13 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   );
 });
 
+test("classifies paused Dependabot policy as validated configuration", () => {
+  const result = classifyChanges([".github/dependabot.yml"]);
+  assert.equal(result.domains.validation, true);
+  assert.equal(result.domains.mutation_e2e, false);
+  assert.deepEqual(result.unknownPaths, []);
+});
+
 test("dependency-only tooling does not request mutation isolation", () => {
   const result = classifyChanges(["pnpm-lock.yaml", "pnpm-workspace.yaml"], {
     dependencyChanges: [],
