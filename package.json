@@ -79,7 +79,7 @@
     "typescript": "6.0.2",
     "typescript-eslint": "latest",
     "vercel": "59.26.0",
-    "vitest": "4.1.12",
+    "vitest": "5.0.5",
     "yaml": "^2.9.0"
   }
 }
