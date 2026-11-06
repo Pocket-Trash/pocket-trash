@@ -649,7 +649,7 @@ test("syncs Font Awesome authentication into Railway before source builds", () =
     [
       "preview",
       "preview",
-      "Configure Railway scraper preview database and cron",
+      "Configure Railway preview variables",
       "Clear Font Awesome package token after Railway preview configuration",
     ],
     [
@@ -675,16 +675,23 @@ test("syncs Font Awesome authentication into Railway before source builds", () =
     );
 
     assert.ok(fetchIndex >= 0, jobName);
-    assert.match(
-      steps[configureIndex].run,
-      /variable set FONTAWESOME_PACKAGE_TOKEN[\s\S]*--stdin[\s\S]*--skip-deploys/u,
-      jobName,
-    );
-    assert.match(
-      steps[configureIndex].run,
-      /pnpm-install\.sh --frozen-lockfile --prefer-offline[\s\S]*variable set RAILPACK_INSTALL_CMD[\s\S]*--stdin[\s\S]*--skip-deploys/u,
-      jobName,
-    );
+    if (jobName === "preview") {
+      assert.equal(
+        steps[configureIndex].run,
+        "pnpm exec tsx scripts/railway-preview-variables.mjs",
+      );
+    } else {
+      assert.match(
+        steps[configureIndex].run,
+        /variable set FONTAWESOME_PACKAGE_TOKEN[\s\S]*--stdin[\s\S]*--skip-deploys/u,
+        jobName,
+      );
+      assert.match(
+        steps[configureIndex].run,
+        /pnpm-install\.sh --frozen-lockfile --prefer-offline[\s\S]*variable set RAILPACK_INSTALL_CMD[\s\S]*--stdin[\s\S]*--skip-deploys/u,
+        jobName,
+      );
+    }
     assert.ok(clearIndex > configureIndex, jobName);
   }
 });
