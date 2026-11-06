@@ -85,39 +85,37 @@ it("converts populated M390 without merging generic assignments or changing imag
   ).resolves.toMatchObject({ rows: [] });
 }, 60_000);
 
-it.each([
-  "live upload",
-  "Autmog reference",
-  "destination collision",
-])("rolls back conversion on %s", async (blocker) => {
-  const baseline = mkdtempSync(join(tmpdir(), "material-blocker-"));
-  onTestFinished(() => rmSync(baseline, { recursive: true, force: true }));
-  for (const name of [
-    "20261008225705_fresh_baseline",
-    "20261008225717_database_protections",
-    ...(blocker === "destination collision"
-      ? ["20261009061932_clean_mojo"]
-      : []),
-  ]) {
-    cpSync(join(migrationsFolder, name), join(baseline, name), {
-      recursive: true,
-    });
-  }
-  const database = new PGlite();
-  onTestFinished(() => database.close());
-  const db = drizzle({ client: database });
-  await migrate(db, { migrationsFolder: baseline });
-  await database.exec(`INSERT INTO materials (name, slug) VALUES
+it.each(["live upload", "Autmog reference", "destination collision"])(
+  "rolls back conversion on %s",
+  async (blocker) => {
+    const baseline = mkdtempSync(join(tmpdir(), "material-blocker-"));
+    onTestFinished(() => rmSync(baseline, { recursive: true, force: true }));
+    for (const name of [
+      "20261008225705_fresh_baseline",
+      "20261008225717_database_protections",
+      ...(blocker === "destination collision"
+        ? ["20261009061932_clean_mojo"]
+        : []),
+    ]) {
+      cpSync(join(migrationsFolder, name), join(baseline, name), {
+        recursive: true,
+      });
+    }
+    const database = new PGlite();
+    onTestFinished(() => database.close());
+    const db = drizzle({ client: database });
+    await migrate(db, { migrationsFolder: baseline });
+    await database.exec(`INSERT INTO materials (name, slug) VALUES
     ('Stainless Steel', 'stainless-steel'), ('M390 Steel', 'm390-steel');`);
-  if (blocker === "live upload")
-    await database.exec(`INSERT INTO upload_session
+    if (blocker === "live upload")
+      await database.exec(`INSERT INTO upload_session
     (id, uploader_clerk_id, target_type, target_id, expires_at)
     VALUES ('00000000-0000-4000-8000-000000000001', 'pending-owner', 'material', 1001, now() + interval '1 hour');`);
-  if (blocker === "destination collision")
-    await database.exec(`INSERT INTO material_specific
+    if (blocker === "destination collision")
+      await database.exec(`INSERT INTO material_specific
     (material_id, name, slug) VALUES (1000, 'Existing M390', 'm390-steel');`);
-  if (blocker === "Autmog reference")
-    await database.exec(`
+    if (blocker === "Autmog reference")
+      await database.exec(`
     INSERT INTO makers (name, slug) VALUES ('Autmog', 'autmog');
     INSERT INTO tmp_products (source) VALUES ('autmog');
     INSERT INTO tmp_autmog_pens (product_id, maker_id, source_product_id, source_handle, title,
@@ -125,29 +123,31 @@ it.each([
       VALUES (1000, 1000, 'source-pen', 'source-pen', 'Source pen', 'https://example.com/pen', '{}', repeat('a',64), repeat('b',64));
     INSERT INTO tmp_autmog_pen_materials (pen_id, material_id) VALUES (1000, 1001);
   `);
-  const autmogBefore = await database.query(
-    `SELECT row_to_json(p) AS data FROM tmp_autmog_pens p`,
-  );
-  const definitionsBefore =
-    await database.query(`SELECT table_name, column_name, data_type FROM information_schema.columns
-    WHERE table_name LIKE 'tmp_autmog_%' ORDER BY table_name, ordinal_position`);
-  await expect(migrate(db, { migrationsFolder })).rejects.toThrow(
-    /upload|Autmog|destination/iu,
-  );
-  await expect(
-    database.query(`SELECT id::int FROM materials WHERE slug = 'm390-steel'`),
-  ).resolves.toMatchObject({ rows: [{ id: 1001 }] });
-  expect(
-    (
-      await database.query(
-        `SELECT row_to_json(p) AS data FROM tmp_autmog_pens p`,
-      )
-    ).rows,
-  ).toEqual(autmogBefore.rows);
-  expect(
-    (
+    const autmogBefore = await database.query(
+      `SELECT row_to_json(p) AS data FROM tmp_autmog_pens p`,
+    );
+    const definitionsBefore =
       await database.query(`SELECT table_name, column_name, data_type FROM information_schema.columns
+    WHERE table_name LIKE 'tmp_autmog_%' ORDER BY table_name, ordinal_position`);
+    await expect(migrate(db, { migrationsFolder })).rejects.toThrow(
+      /upload|Autmog|destination/iu,
+    );
+    await expect(
+      database.query(`SELECT id::int FROM materials WHERE slug = 'm390-steel'`),
+    ).resolves.toMatchObject({ rows: [{ id: 1001 }] });
+    expect(
+      (
+        await database.query(
+          `SELECT row_to_json(p) AS data FROM tmp_autmog_pens p`,
+        )
+      ).rows,
+    ).toEqual(autmogBefore.rows);
+    expect(
+      (
+        await database.query(`SELECT table_name, column_name, data_type FROM information_schema.columns
     WHERE table_name LIKE 'tmp_autmog_%' ORDER BY table_name, ordinal_position`)
-    ).rows,
-  ).toEqual(definitionsBefore.rows);
-}, 60_000);
+      ).rows,
+    ).toEqual(definitionsBefore.rows);
+  },
+  60_000,
+);

@@ -456,30 +456,30 @@ describe("image uploads", () => {
 });
 
 describe("localized upload copy", () => {
-  it.each([
-    "en-US",
-    "es-MX",
-  ] as const)("formats binary sizes and preserves validation parameters in %s", (locale) => {
-    expect(formatMiB(25 * 1024 * 1024, locale)).toBe("25 MiB");
-    expect(formatMiB(1.5 * 1024 * 1024, locale)).toBe("1.5 MiB");
-    expect(
-      validateResourceUpload(
-        [file("large.pdf", 20 * 1024 * 1024 + 1)],
-        [],
-        false,
+  it.each(["en-US", "es-MX"] as const)(
+    "formats binary sizes and preserves validation parameters in %s",
+    (locale) => {
+      expect(formatMiB(25 * 1024 * 1024, locale)).toBe("25 MiB");
+      expect(formatMiB(1.5 * 1024 * 1024, locale)).toBe("1.5 MiB");
+      expect(
+        validateResourceUpload(
+          [file("large.pdf", 20 * 1024 * 1024 + 1)],
+          [],
+          false,
+          locale,
+        ),
+      ).toEqual({
+        key: "web.resources.validation.fileTooLarge",
+        params: { filename: "large.pdf", maxSize: "20 MiB" },
+      });
+      const copy = formatTranslation(
+        "web.resources.upload.fileTypes",
+        {},
         locale,
-      ),
-    ).toEqual({
-      key: "web.resources.validation.fileTooLarge",
-      params: { filename: "large.pdf", maxSize: "20 MiB" },
-    });
-    const copy = formatTranslation(
-      "web.resources.upload.fileTypes",
-      {},
-      locale,
-    );
-    for (const type of ["JPEG", "PNG", "WebP"]) expect(copy).toContain(type);
-  });
+      );
+      for (const type of ["JPEG", "PNG", "WebP"]) expect(copy).toContain(type);
+    },
+  );
 
   it("uses the released generic upload failures in both locales", () => {
     const save = getUploadErrorTranslation(new Error("unexpected"));

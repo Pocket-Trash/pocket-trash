@@ -107,31 +107,29 @@ it("requests the selected model with strict schema and ZDR without using signed 
   expect(http).toHaveBeenCalledTimes(1);
 });
 
-it.each([
-  "non-zdr",
-  "refusal",
-  "truncated",
-  "invalid-json",
-])("fails closed for %s output without retries", async (mode) => {
-  const http = vi.fn<typeof fetch>().mockResolvedValue(
-    Response.json({
-      billing: { status: "settled", zero_data_retention: mode !== "non-zdr" },
-      choices: [
-        {
-          finish_reason: mode === "truncated" ? "length" : "stop",
-          message: {
-            content: mode === "invalid-json" ? "no" : JSON.stringify(summary),
-            refusal: mode === "refusal" ? "denied" : null,
+it.each(["non-zdr", "refusal", "truncated", "invalid-json"])(
+  "fails closed for %s output without retries",
+  async (mode) => {
+    const http = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        billing: { status: "settled", zero_data_retention: mode !== "non-zdr" },
+        choices: [
+          {
+            finish_reason: mode === "truncated" ? "length" : "stop",
+            message: {
+              content: mode === "invalid-json" ? "no" : JSON.stringify(summary),
+              refusal: mode === "refusal" ? "denied" : null,
+            },
           },
-        },
-      ],
-    }),
-  );
-  await expect(
-    createTicketSummarizer({ apiKey: "test-key", fetch: http })(snapshot, []),
-  ).rejects.toThrow();
-  expect(http).toHaveBeenCalledTimes(1);
-});
+        ],
+      }),
+    );
+    await expect(
+      createTicketSummarizer({ apiKey: "test-key", fetch: http })(snapshot, []),
+    ).rejects.toThrow();
+    expect(http).toHaveBeenCalledTimes(1);
+  },
+);
 
 it("normalizes generated image bytes and explicitly represents invalid evidence", async () => {
   const bytes = await sharp({

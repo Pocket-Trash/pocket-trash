@@ -837,46 +837,49 @@ describe("catalog mutation lifetimes", () => {
       "Catalog description",
       "Catalog description",
     ],
-  ])("preserves %s description semantics when editing", async (_case, originalOverride, edited, expected) => {
-    const product = {
-      ...productFixture(1000, "Spinner", "spinner"),
-      description: "Catalog description",
-    };
-    const item = {
-      ...collectionFixture(42, product, 1003),
-      descriptionOverride: originalOverride,
-    };
-    vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
-    await act(async () =>
-      root.render(
-        <CollectionEditPage
-          buttonProducts={[]}
-          collections={[collection]}
-          item={item}
-          options={options}
-          ownedButtons={[]}
-          product={product}
-        />,
-      ),
-    );
-    const editor = container.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="Description"]',
-    );
-    if (!editor) throw new Error("Missing description");
-    expect(editor.value).toBe(originalOverride ?? product.description);
-    if (edited !== editor.value)
-      await act(async () => {
-        Object.getOwnPropertyDescriptor(
-          HTMLTextAreaElement.prototype,
-          "value",
-        )?.set?.call(editor, edited);
-        editor.dispatchEvent(new Event("input", { bubbles: true }));
+  ])(
+    "preserves %s description semantics when editing",
+    async (_case, originalOverride, edited, expected) => {
+      const product = {
+        ...productFixture(1000, "Spinner", "spinner"),
+        description: "Catalog description",
+      };
+      const item = {
+        ...collectionFixture(42, product, 1003),
+        descriptionOverride: originalOverride,
+      };
+      vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
+      await act(async () =>
+        root.render(
+          <CollectionEditPage
+            buttonProducts={[]}
+            collections={[collection]}
+            item={item}
+            options={options}
+            ownedButtons={[]}
+            product={product}
+          />,
+        ),
+      );
+      const editor = container.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Description"]',
+      );
+      if (!editor) throw new Error("Missing description");
+      expect(editor.value).toBe(originalOverride ?? product.description);
+      if (edited !== editor.value)
+        await act(async () => {
+          Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            "value",
+          )?.set?.call(editor, edited);
+          editor.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      await click(container, "Save");
+      expect(updateCollectionItem).toHaveBeenCalledWith({
+        data: expect.objectContaining({ description: expected }),
       });
-    await click(container, "Save");
-    expect(updateCollectionItem).toHaveBeenCalledWith({
-      data: expect.objectContaining({ description: expected }),
-    });
-  });
+    },
+  );
 
   it("prefills a directly selected product without freezing its catalog description", async () => {
     const product = {
@@ -1127,37 +1130,37 @@ describe("catalog mutation lifetimes", () => {
     });
   });
 
-  it.each([
-    { isAdminPrivate: true },
-    { privacyInheritedFromItemId: 70 },
-  ])("keeps constrained visibility unchanged while saving item details", async (constraint) => {
-    const product = productFixture(1000, "Spinner", "spinner");
-    const item = {
-      ...collectionFixture(42, product, 1003),
-      isOwner: true,
-      isPrivate: true,
-      ...constraint,
-    };
-    vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
-    await act(async () =>
-      root.render(
-        <CollectionEditPage
-          buttonProducts={[]}
-          collections={[collection]}
-          item={item}
-          options={options}
-          ownedButtons={[]}
-          product={product}
-        />,
-      ),
-    );
-    const control = collectionVisibilitySwitch(container);
-    expect(control?.getAttribute("aria-disabled")).toBe("true");
-    expect(control?.getAttribute("aria-checked")).toBe("false");
-    await click(container, "Save");
-    const data = vi.mocked(updateCollectionItem).mock.calls[0]?.[0]?.data;
-    expect(data).not.toHaveProperty("isPrivate");
-  });
+  it.each([{ isAdminPrivate: true }, { privacyInheritedFromItemId: 70 }])(
+    "keeps constrained visibility unchanged while saving item details",
+    async (constraint) => {
+      const product = productFixture(1000, "Spinner", "spinner");
+      const item = {
+        ...collectionFixture(42, product, 1003),
+        isOwner: true,
+        isPrivate: true,
+        ...constraint,
+      };
+      vi.mocked(updateCollectionItem).mockResolvedValue({ ok: true });
+      await act(async () =>
+        root.render(
+          <CollectionEditPage
+            buttonProducts={[]}
+            collections={[collection]}
+            item={item}
+            options={options}
+            ownedButtons={[]}
+            product={product}
+          />,
+        ),
+      );
+      const control = collectionVisibilitySwitch(container);
+      expect(control?.getAttribute("aria-disabled")).toBe("true");
+      expect(control?.getAttribute("aria-checked")).toBe("false");
+      await click(container, "Save");
+      const data = vi.mocked(updateCollectionItem).mock.calls[0]?.[0]?.data;
+      expect(data).not.toHaveProperty("isPrivate");
+    },
+  );
 
   it("does not persist a toggled item when editing is canceled", async () => {
     const product = productFixture(1000, "Spinner", "spinner");

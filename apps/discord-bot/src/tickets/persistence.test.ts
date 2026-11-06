@@ -307,19 +307,19 @@ describe("recoverable Discord-to-Linear persistence", () => {
     expect(f.issues.size).toBe(1);
   });
 
-  it.each([
-    "metadata",
-    "bytes",
-  ])("records rejected %s without dropping the ticket", async (stage) => {
-    const f = fixture();
-    if (stage === "metadata")
-      vi.mocked(f.linear.prepareUpload).mockResolvedValueOnce(null);
-    else vi.mocked(f.linear.putUpload).mockResolvedValueOnce(false);
-    const result = await f.service.persist(request);
-    expect(result.phase).toBe("persisted");
-    expect(result.files?.[0]?.status).toBe("omitted");
-    expect([...f.comments.values()][0]).toContain("omitted");
-  });
+  it.each(["metadata", "bytes"])(
+    "records rejected %s without dropping the ticket",
+    async (stage) => {
+      const f = fixture();
+      if (stage === "metadata")
+        vi.mocked(f.linear.prepareUpload).mockResolvedValueOnce(null);
+      else vi.mocked(f.linear.putUpload).mockResolvedValueOnce(false);
+      const result = await f.service.persist(request);
+      expect(result.phase).toBe("persisted");
+      expect(result.files?.[0]?.status).toBe("omitted");
+      expect([...f.comments.values()][0]).toContain("omitted");
+    },
+  );
 
   it("enforces both per-file and aggregate attachment caps before reading bytes", async () => {
     const f = fixture();

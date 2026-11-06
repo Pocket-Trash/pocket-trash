@@ -6,43 +6,40 @@ import {
 } from "./env.schema.js";
 
 describe("scraper env", () => {
-  it.each([
-    undefined,
-    "",
-    " ",
-    "images/preview/../",
-    "other",
-  ])("rejects missing or invalid image prefixes (%s) in both startup modes", (prefix) => {
-    const runtimeEnv = {
-      BUNNY_IMAGE_FOLDER_PREFIX: prefix,
-      DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
-      REDIS_URL: "redis://localhost:4008",
-      SCRAPER_DRY_RUN: "true",
-    };
-    expect(() => createScraperEnv(runtimeEnv)).toThrow(
-      "Invalid environment variables: BUNNY_IMAGE_FOLDER_PREFIX",
-    );
-    expect(() => createScraperJobEnv(runtimeEnv)).toThrow(
-      "Invalid environment variables: BUNNY_IMAGE_FOLDER_PREFIX",
-    );
-  });
+  it.each([undefined, "", " ", "images/preview/../", "other"])(
+    "rejects missing or invalid image prefixes (%s) in both startup modes",
+    (prefix) => {
+      const runtimeEnv = {
+        BUNNY_IMAGE_FOLDER_PREFIX: prefix,
+        DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
+        REDIS_URL: "redis://localhost:4008",
+        SCRAPER_DRY_RUN: "true",
+      };
+      expect(() => createScraperEnv(runtimeEnv)).toThrow(
+        "Invalid environment variables: BUNNY_IMAGE_FOLDER_PREFIX",
+      );
+      expect(() => createScraperJobEnv(runtimeEnv)).toThrow(
+        "Invalid environment variables: BUNNY_IMAGE_FOLDER_PREFIX",
+      );
+    },
+  );
 
-  it.each([
-    "images",
-    "images/dev",
-    "images/preview",
-    "images/preview/pr-119",
-  ])("accepts explicitly configured image prefix %s", (prefix) => {
-    const runtimeEnv = {
-      BUNNY_IMAGE_FOLDER_PREFIX: prefix,
-      DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
-      REDIS_URL: "redis://localhost:4008",
-    };
-    expect(createScraperEnv(runtimeEnv).BUNNY_IMAGE_FOLDER_PREFIX).toBe(prefix);
-    expect(createScraperJobEnv(runtimeEnv).BUNNY_IMAGE_FOLDER_PREFIX).toBe(
-      prefix,
-    );
-  });
+  it.each(["images", "images/dev", "images/preview", "images/preview/pr-119"])(
+    "accepts explicitly configured image prefix %s",
+    (prefix) => {
+      const runtimeEnv = {
+        BUNNY_IMAGE_FOLDER_PREFIX: prefix,
+        DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
+        REDIS_URL: "redis://localhost:4008",
+      };
+      expect(createScraperEnv(runtimeEnv).BUNNY_IMAGE_FOLDER_PREFIX).toBe(
+        prefix,
+      );
+      expect(createScraperJobEnv(runtimeEnv).BUNNY_IMAGE_FOLDER_PREFIX).toBe(
+        prefix,
+      );
+    },
+  );
 
   it("validates scraper environment variables", () => {
     const env = createScraperEnv({

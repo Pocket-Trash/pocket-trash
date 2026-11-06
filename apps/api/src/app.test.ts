@@ -449,40 +449,40 @@ function createUploadServiceMock() {
 }
 
 describe("upload runtime lifecycle", () => {
-  it.each([
-    false,
-    true,
-  ])("resolves one runtime per request and flushes its logger (failure=%s)", async (fails) => {
-    const service = createUploadServiceMock();
-    if (fails)
-      service.deleteFile.mockRejectedValueOnce(
-        new Error("private SQL payload"),
+  it.each([false, true])(
+    "resolves one runtime per request and flushes its logger (failure=%s)",
+    async (fails) => {
+      const service = createUploadServiceMock();
+      if (fails)
+        service.deleteFile.mockRejectedValueOnce(
+          new Error("private SQL payload"),
+        );
+      const flush = vi.fn(async () => {});
+      const logger = { ...createNoopLogger(), flush };
+      const getUploadRuntime = vi.fn(() => ({
+        logger,
+        service,
+        /**
+         * Returns the authenticated owner used by the lifecycle request.
+         *
+         * @returns Authenticated test actor.
+         */
+        authenticate: async () => ({ clerkId: "owner", role: "user" as const }),
+        /**
+         * Allows every origin for the runtime lifecycle test.
+         *
+         * @returns Always `true`.
+         */
+        isAllowedOrigin: () => true,
+      }));
+      const app = createApp({ getUploadRuntime });
+      const response = await app.request(
+        "/api/v0/storage/file/product_image/42",
+        { method: "DELETE" },
       );
-    const flush = vi.fn(async () => {});
-    const logger = { ...createNoopLogger(), flush };
-    const getUploadRuntime = vi.fn(() => ({
-      logger,
-      service,
-      /**
-       * Returns the authenticated owner used by the lifecycle request.
-       *
-       * @returns Authenticated test actor.
-       */
-      authenticate: async () => ({ clerkId: "owner", role: "user" as const }),
-      /**
-       * Allows every origin for the runtime lifecycle test.
-       *
-       * @returns Always `true`.
-       */
-      isAllowedOrigin: () => true,
-    }));
-    const app = createApp({ getUploadRuntime });
-    const response = await app.request(
-      "/api/v0/storage/file/product_image/42",
-      { method: "DELETE" },
-    );
-    expect(response.status).toBe(fails ? 500 : 204);
-    expect(getUploadRuntime).toHaveBeenCalledOnce();
-    expect(flush).toHaveBeenCalledOnce();
-  });
+      expect(response.status).toBe(fails ? 500 : 204);
+      expect(getUploadRuntime).toHaveBeenCalledOnce();
+      expect(flush).toHaveBeenCalledOnce();
+    },
+  );
 });

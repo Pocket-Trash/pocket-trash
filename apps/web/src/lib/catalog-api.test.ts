@@ -570,18 +570,18 @@ describe("product source details", () => {
     ).toBe(false);
   });
 
-  it.each([
-    "javascript:alert(1)",
-    "ftp://maker.example/spinner",
-  ])("rejects the non-web product URL %s", (productLink) => {
-    expect(
-      productFormSchema.safeParse({
-        ...base,
-        finishOptions: validFinishOptions,
-        productLinks: [productLink],
-      }).success,
-    ).toBe(false);
-  });
+  it.each(["javascript:alert(1)", "ftp://maker.example/spinner"])(
+    "rejects the non-web product URL %s",
+    (productLink) => {
+      expect(
+        productFormSchema.safeParse({
+          ...base,
+          finishOptions: validFinishOptions,
+          productLinks: [productLink],
+        }).success,
+      ).toBe(false);
+    },
+  );
 
   it("rejects duplicate normalized product links", () => {
     expect(
@@ -617,23 +617,22 @@ describe("product source details", () => {
 });
 
 describe("slider catalog product validation", () => {
-  it.each([
-    "slider",
-    "slider-plate",
-    "slider-insert",
-  ] as const)("accepts the %s product type", (productTypeSlug) => {
-    expect(
-      productFormSchema.safeParse({
-        ...base,
-        magnetLayout:
-          productTypeSlug === "slider" || productTypeSlug === "slider-insert"
-            ? "2x4"
-            : null,
-        usesInserts: productTypeSlug === "slider" ? false : null,
-        productTypeSlug,
-      }).success,
-    ).toBe(true);
-  });
+  it.each(["slider", "slider-plate", "slider-insert"] as const)(
+    "accepts the %s product type",
+    (productTypeSlug) => {
+      expect(
+        productFormSchema.safeParse({
+          ...base,
+          magnetLayout:
+            productTypeSlug === "slider" || productTypeSlug === "slider-insert"
+              ? "2x4"
+              : null,
+          usesInserts: productTypeSlug === "slider" ? false : null,
+          productTypeSlug,
+        }).success,
+      ).toBe(true);
+    },
+  );
 
   it("requires an explicit insert choice and rejects retired weight basis", () => {
     expect(
