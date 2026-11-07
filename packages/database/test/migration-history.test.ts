@@ -80,20 +80,20 @@ test("loads UTC timestamp folders and hashes unmodified SQL without a journal", 
   );
 });
 
-test.each([
-  "0000_legacy.sql",
-  "unexpected",
-  "20260230000000_invalid",
-])("rejects unsupported or incomplete artifact %s", (name) => {
-  const directory = mkdtempSync(join(tmpdir(), "migration-history-invalid-"));
-  onTestFinished(() => rmSync(directory, { force: true, recursive: true }));
-  if (name.endsWith(".sql")) writeFileSync(join(directory, name), "select 1;");
-  else {
-    mkdirSync(join(directory, name));
-    writeFileSync(join(directory, name, "migration.sql"), "select 1;");
-  }
-  expect(() => loadRepositoryMigrations(directory)).toThrow();
-});
+test.each(["0000_legacy.sql", "unexpected", "20260230000000_invalid"])(
+  "rejects unsupported or incomplete artifact %s",
+  (name) => {
+    const directory = mkdtempSync(join(tmpdir(), "migration-history-invalid-"));
+    onTestFinished(() => rmSync(directory, { force: true, recursive: true }));
+    if (name.endsWith(".sql"))
+      writeFileSync(join(directory, name), "select 1;");
+    else {
+      mkdirSync(join(directory, name));
+      writeFileSync(join(directory, name, "migration.sql"), "select 1;");
+    }
+    expect(() => loadRepositoryMigrations(directory)).toThrow();
+  },
+);
 
 test("rejects a migration folder missing its SQL instead of silently skipping it", (context) => {
   const directory = mkdtempSync(

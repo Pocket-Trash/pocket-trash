@@ -49,18 +49,21 @@ describe("self-erasure receipt route data", () => {
     ["running", "processing"],
     ["completed", "completed"],
     ["needs_attention", "needs_support"],
-  ])("preserves the existing %s protocol while binding snapshots to their authenticated account", async (internal, visible) => {
-    service.receipt.mockResolvedValue({ id: "request_a", status: internal });
-    await expect(getSelfErasureStatus()).resolves.toEqual({
-      requestId: "request_a",
-      status: visible,
-    });
-    await expect(getSelfErasureStatusSnapshot()).resolves.toEqual({
-      actorId: "user_a",
-      status: { requestId: "request_a", status: visible },
-    });
-    expect(service.receipt.mock.calls[0]?.[0]).not.toBe("user_a");
-  });
+  ])(
+    "preserves the existing %s protocol while binding snapshots to their authenticated account",
+    async (internal, visible) => {
+      service.receipt.mockResolvedValue({ id: "request_a", status: internal });
+      await expect(getSelfErasureStatus()).resolves.toEqual({
+        requestId: "request_a",
+        status: visible,
+      });
+      await expect(getSelfErasureStatusSnapshot()).resolves.toEqual({
+        actorId: "user_a",
+        status: { requestId: "request_a", status: visible },
+      });
+      expect(service.receipt.mock.calls[0]?.[0]).not.toBe("user_a");
+    },
+  );
 
   it("preserves signed-out/missing-receipt redirects without reading another account's receipt", async () => {
     service.auth.mockResolvedValue({ isAuthenticated: false, userId: null });

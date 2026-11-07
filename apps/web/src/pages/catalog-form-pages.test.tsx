@@ -544,123 +544,122 @@ describe("product form conditional fields", () => {
     expect(slugInputs).toContainEqual(expect.stringContaining('value=""'));
   });
 
-  it.each([
-    "spinner",
-    "spinner-button",
-  ] as const)("renders spinner-only fields correctly for %s add and edit forms", (productTypeSlug) => {
-    const product = productFixture(1005, "Test product", productTypeSlug);
-    const props = {
-      options: {
-        ...emptyCatalogOptions,
-        productTypes: [
-          {
-            id: product.productTypeId,
-            ...productTypeImage,
-            isPartOrAccessory: false,
-            name: product.productTypeName,
-            slug: productTypeSlug,
-          },
-        ],
-      },
-      productTypeSlug,
-    };
-    const addHtml = renderToStaticMarkup(createElement(ProductEditor, props));
-    const editHtml = renderToStaticMarkup(
-      createElement(ProductEditor, { ...props, initialProduct: product }),
-    );
-
-    for (const html of [addHtml, editHtml]) {
-      expect(html).toContain("lg:grid-cols-2");
-      expect(html).toContain("lg:col-span-2");
-      expect(html).toContain(">Cancel</button>");
-      expect(html).toContain("0 / 5,000 characters");
-      if (productTypeSlug === "spinner") {
-        expect(html).toContain('aria-label="Bearing"');
-        expect(html).toContain('aria-label="Spin diameter"');
-      } else {
-        expect(html).not.toContain('aria-label="Bearing"');
-        expect(html).not.toContain('aria-label="Spin diameter"');
-      }
-    }
-  });
-
-  it.each([
-    "slider",
-    "slider-plate",
-    "slider-insert",
-  ] as const)("renders exhaustive slider catalog fields for %s", (productTypeSlug) => {
-    const product = productFixture(1010, "Slider product", productTypeSlug);
-    const relationshipProduct = productFixture(
-      1011,
-      "Matched plates",
-      "slider-plate",
-    );
-    const html = renderToStaticMarkup(
-      createElement(ProductEditor, {
-        initialProduct: product,
+  it.each(["spinner", "spinner-button"] as const)(
+    "renders spinner-only fields correctly for %s add and edit forms",
+    (productTypeSlug) => {
+      const product = productFixture(1005, "Test product", productTypeSlug);
+      const props = {
         options: {
           ...emptyCatalogOptions,
-          makers: [
-            {
-              description: null,
-              id: product.makerId,
-              images: [],
-              name: product.makerName,
-              rootUrl: null,
-              slug: "slider-maker",
-            },
-          ],
           productTypes: [
             {
               id: product.productTypeId,
               ...productTypeImage,
-              isPartOrAccessory: productTypeSlug !== "slider",
+              isPartOrAccessory: false,
               name: product.productTypeName,
               slug: productTypeSlug,
             },
           ],
-          relationshipProducts: [relationshipProduct],
         },
         productTypeSlug,
-      }),
-    );
+      };
+      const addHtml = renderToStaticMarkup(createElement(ProductEditor, props));
+      const editHtml = renderToStaticMarkup(
+        createElement(ProductEditor, { ...props, initialProduct: product }),
+      );
 
-    expect(html).not.toContain("Compatibility families");
-    expect(html).not.toContain("Reviewed advisory");
-    expect(html).toContain("Maker terminology");
-    expect(html).toContain("Add terminology alias");
-    if (
-      productTypeSlug === "slider-plate" ||
-      productTypeSlug === "slider-insert"
-    ) {
-      expect(html).not.toContain('aria-label="Length"');
-      expect(html).not.toContain('aria-label="Weight"');
-    } else {
-      expect(html).toContain('aria-label="Length"');
-    }
-    expect(html).not.toContain('aria-label="Diameter"');
-    if (productTypeSlug === "slider") {
-      expect(html).toContain("This slider uses inserts");
-      expect(html).toContain('aria-label="Magnet layout"');
-      expect(html).not.toContain('aria-label="Weight basis"');
-      expect(html).not.toContain('aria-label="Click count"');
-      expect(html).toContain("Magnet configuration");
-      expect(html).toContain("Included plates");
-      expect(html).toContain("Add plates");
-      expect(html).not.toContain("Included parts");
-    } else {
-      expect(html).not.toContain("This slider uses inserts");
-      expect(html).not.toContain("Included parts");
-      if (productTypeSlug === "slider-insert") {
-        expect(html).not.toContain("Appearance");
-        expect(html).not.toContain("Available insert setups");
-      } else {
-        expect(html).not.toContain(
-          "Plate and insert measurements and weight describe the complete matched set.",
-        );
+      for (const html of [addHtml, editHtml]) {
+        expect(html).toContain("lg:grid-cols-2");
+        expect(html).toContain("lg:col-span-2");
+        expect(html).toContain(">Cancel</button>");
+        expect(html).toContain("0 / 5,000 characters");
+        if (productTypeSlug === "spinner") {
+          expect(html).toContain('aria-label="Bearing"');
+          expect(html).toContain('aria-label="Spin diameter"');
+        } else {
+          expect(html).not.toContain('aria-label="Bearing"');
+          expect(html).not.toContain('aria-label="Spin diameter"');
+        }
       }
-    }
-  });
+    },
+  );
+
+  it.each(["slider", "slider-plate", "slider-insert"] as const)(
+    "renders exhaustive slider catalog fields for %s",
+    (productTypeSlug) => {
+      const product = productFixture(1010, "Slider product", productTypeSlug);
+      const relationshipProduct = productFixture(
+        1011,
+        "Matched plates",
+        "slider-plate",
+      );
+      const html = renderToStaticMarkup(
+        createElement(ProductEditor, {
+          initialProduct: product,
+          options: {
+            ...emptyCatalogOptions,
+            makers: [
+              {
+                description: null,
+                id: product.makerId,
+                images: [],
+                name: product.makerName,
+                rootUrl: null,
+                slug: "slider-maker",
+              },
+            ],
+            productTypes: [
+              {
+                id: product.productTypeId,
+                ...productTypeImage,
+                isPartOrAccessory: productTypeSlug !== "slider",
+                name: product.productTypeName,
+                slug: productTypeSlug,
+              },
+            ],
+            relationshipProducts: [relationshipProduct],
+          },
+          productTypeSlug,
+        }),
+      );
+
+      expect(html).not.toContain("Compatibility families");
+      expect(html).not.toContain("Reviewed advisory");
+      expect(html).toContain("Maker terminology");
+      expect(html).toContain("Add terminology alias");
+      if (
+        productTypeSlug === "slider-plate" ||
+        productTypeSlug === "slider-insert"
+      ) {
+        expect(html).not.toContain('aria-label="Length"');
+        expect(html).not.toContain('aria-label="Weight"');
+      } else {
+        expect(html).toContain('aria-label="Length"');
+      }
+      expect(html).not.toContain('aria-label="Diameter"');
+      if (productTypeSlug === "slider") {
+        expect(html).toContain("This slider uses inserts");
+        expect(html).toContain('aria-label="Magnet layout"');
+        expect(html).not.toContain('aria-label="Weight basis"');
+        expect(html).not.toContain('aria-label="Click count"');
+        expect(html).toContain("Magnet configuration");
+        expect(html).toContain("Included plates");
+        expect(html).toContain("Add plates");
+        expect(html).not.toContain("Included parts");
+      } else {
+        expect(html).not.toContain("This slider uses inserts");
+        expect(html).not.toContain("Included parts");
+        if (productTypeSlug === "slider-insert") {
+          expect(html).not.toContain("Appearance");
+          expect(html).not.toContain("Available insert setups");
+        } else {
+          expect(html).not.toContain(
+            "Plate and insert measurements and weight describe the complete matched set.",
+          );
+        }
+      }
+    },
+  );
 
   it("limits inline plate creation to the requested fields", () => {
     const html = renderToStaticMarkup(
@@ -752,80 +751,80 @@ describe("collection edit conditional fields", () => {
     expect(html).toContain("Acquisition recorded Sep 11, 2025");
   });
 
-  it.each([
-    "spinner",
-    "spinner-button",
-  ] as const)("renders the bearing override correctly for %s items", (productTypeSlug) => {
-    const product = productFixture(1006, "Test product", productTypeSlug);
-    const item = collectionFixture(30, product, 1007);
-    item.images = [
-      {
-        contentType: "image/webp",
-        createdAt: new Date(0),
-        deletedAt: null,
-        deletedByClerkId: null,
-        deletedByRole: null,
-        fileName: `${"long-name-".repeat(20)}.webp`,
-        id: 1008,
-        objectPath: "collections/1000/long-name.webp",
-        position: 0,
-        size: 1024,
-        url: "https://cdn.test/long-name.webp",
-      },
-    ];
-    const html = renderToStaticMarkup(
-      createElement(CollectionEditPage, {
-        buttonProducts: [],
-        collections: [],
-        item,
-        options: emptyCatalogOptions,
-        ownedButtons: [],
-        product,
-      }),
-    );
+  it.each(["spinner", "spinner-button"] as const)(
+    "renders the bearing override correctly for %s items",
+    (productTypeSlug) => {
+      const product = productFixture(1006, "Test product", productTypeSlug);
+      const item = collectionFixture(30, product, 1007);
+      item.images = [
+        {
+          contentType: "image/webp",
+          createdAt: new Date(0),
+          deletedAt: null,
+          deletedByClerkId: null,
+          deletedByRole: null,
+          fileName: `${"long-name-".repeat(20)}.webp`,
+          id: 1008,
+          objectPath: "collections/1000/long-name.webp",
+          position: 0,
+          size: 1024,
+          url: "https://cdn.test/long-name.webp",
+        },
+      ];
+      const html = renderToStaticMarkup(
+        createElement(CollectionEditPage, {
+          buttonProducts: [],
+          collections: [],
+          item,
+          options: emptyCatalogOptions,
+          ownedButtons: [],
+          product,
+        }),
+      );
 
-    if (productTypeSlug === "spinner") {
-      expect(html).toContain('aria-label="Bearing"');
-    } else {
-      expect(html).not.toContain('aria-label="Bearing"');
-    }
-    expect(html).toContain("max-w-6xl");
-    expect(html).toContain(">Item details</legend>");
-    expect(html).not.toContain("lg:grid-cols-2");
-    expect(html).not.toContain("lg:col-span-2");
-    expect(html.indexOf('id="collection-edit-images"')).toBeLessThan(
-      html.indexOf("Ownership history"),
-    );
-    expect(html).toContain(">Cancel</button>");
-    expect(html).toContain("flex min-w-0 items-center");
-    expect(html).toContain("min-w-0 flex-1 truncate");
-    expect(html).toContain("0 / 5,000 characters");
-  });
+      if (productTypeSlug === "spinner") {
+        expect(html).toContain('aria-label="Bearing"');
+      } else {
+        expect(html).not.toContain('aria-label="Bearing"');
+      }
+      expect(html).toContain("max-w-6xl");
+      expect(html).toContain(">Item details</legend>");
+      expect(html).not.toContain("lg:grid-cols-2");
+      expect(html).not.toContain("lg:col-span-2");
+      expect(html.indexOf('id="collection-edit-images"')).toBeLessThan(
+        html.indexOf("Ownership history"),
+      );
+      expect(html).toContain(">Cancel</button>");
+      expect(html).toContain("flex min-w-0 items-center");
+      expect(html).toContain("min-w-0 flex-1 truncate");
+      expect(html).toContain("0 / 5,000 characters");
+    },
+  );
 });
 
 describe("collection add form", () => {
-  it.each([
-    undefined,
-    9999,
-  ])("retains product selection without a valid preselected product (%s)", (initialProductId) => {
-    const html = renderToStaticMarkup(
-      createElement(CollectionAddPage, {
-        collections: [],
-        defaultCollectionName: null,
-        initialProductId,
-        options: emptyCatalogOptions,
-        products: [],
-      }),
-    );
-    expect(html).toContain('aria-label="Product type"');
-    expect(html).toMatch(/<details[^>]* open=""/u);
-    expect(html).not.toContain('aria-label="Display name"');
-    expect(html).not.toContain('type="search"');
-    expect(html).not.toContain("Previous page");
-    expect(html).not.toContain("Next page");
-    expect(html).not.toContain("Page 1 of 1");
-    expect(html).not.toContain("Ownership history");
-  });
+  it.each([undefined, 9999])(
+    "retains product selection without a valid preselected product (%s)",
+    (initialProductId) => {
+      const html = renderToStaticMarkup(
+        createElement(CollectionAddPage, {
+          collections: [],
+          defaultCollectionName: null,
+          initialProductId,
+          options: emptyCatalogOptions,
+          products: [],
+        }),
+      );
+      expect(html).toContain('aria-label="Product type"');
+      expect(html).toMatch(/<details[^>]* open=""/u);
+      expect(html).not.toContain('aria-label="Display name"');
+      expect(html).not.toContain('type="search"');
+      expect(html).not.toContain("Previous page");
+      expect(html).not.toContain("Next page");
+      expect(html).not.toContain("Page 1 of 1");
+      expect(html).not.toContain("Ownership history");
+    },
+  );
 
   it("renders localized collection copy and a disabled primary action", () => {
     const product = {
@@ -900,56 +899,56 @@ describe("collection add form", () => {
     { finishCount: 0, materialCount: 2 },
     { finishCount: 1, materialCount: 2 },
     { finishCount: 2, materialCount: 2 },
-  ])("defaults only sole choices for $materialCount materials and $finishCount finishes", ({
-    finishCount,
-    materialCount,
-  }) => {
-    const base = productFixture(1010, "Default choices", "spinner");
-    const product = {
-      ...base,
-      finishOptions: [
-        ...base.finishOptions,
-        {
-          colorEffect: null,
-          colors: [],
-          finishes: [{ id: 1014, name: "Blasted", slug: "blasted" }],
-          id: 1015,
-          pattern: null,
-        },
-      ].slice(0, finishCount),
-      materials: [
-        ...base.materials,
-        {
-          assignmentId: 1016,
-          weight: null,
-          materials: [
-            {
-              id: 1016,
-              name: "Steel",
-              slug: "steel",
-              specific: null,
-            },
-          ],
-        },
-      ].slice(0, materialCount),
-    };
-    const html = renderToStaticMarkup(
-      createElement(CollectionAddPage, {
-        collections: [],
-        defaultCollectionName: null,
-        initialProductId: product.id,
-        options: emptyCatalogOptions,
-        products: [product],
-      }),
-    );
+  ])(
+    "defaults only sole choices for $materialCount materials and $finishCount finishes",
+    ({ finishCount, materialCount }) => {
+      const base = productFixture(1010, "Default choices", "spinner");
+      const product = {
+        ...base,
+        finishOptions: [
+          ...base.finishOptions,
+          {
+            colorEffect: null,
+            colors: [],
+            finishes: [{ id: 1014, name: "Blasted", slug: "blasted" }],
+            id: 1015,
+            pattern: null,
+          },
+        ].slice(0, finishCount),
+        materials: [
+          ...base.materials,
+          {
+            assignmentId: 1016,
+            weight: null,
+            materials: [
+              {
+                id: 1016,
+                name: "Steel",
+                slug: "steel",
+                specific: null,
+              },
+            ],
+          },
+        ].slice(0, materialCount),
+      };
+      const html = renderToStaticMarkup(
+        createElement(CollectionAddPage, {
+          collections: [],
+          defaultCollectionName: null,
+          initialProductId: product.id,
+          options: emptyCatalogOptions,
+          products: [product],
+        }),
+      );
 
-    expect(html.includes('aria-label="Close: Bronze"')).toBe(
-      materialCount === 1,
-    );
-    expect(html.includes('aria-label="Close: Polished"')).toBe(
-      finishCount === 1,
-    );
-  });
+      expect(html.includes('aria-label="Close: Bronze"')).toBe(
+        materialCount === 1,
+      );
+      expect(html.includes('aria-label="Close: Polished"')).toBe(
+        finishCount === 1,
+      );
+    },
+  );
 
   it("does not offer a bearing override for a button", () => {
     const product = productFixture(1004, "Button", "spinner-button");
@@ -980,38 +979,37 @@ describe("collection add form", () => {
     expect(html).not.toContain('aria-label="Bearing"');
   });
 
-  it.each([
-    "slider",
-    "slider-plate",
-    "slider-insert",
-  ] as const)("offers standalone %s collection items without spinner-only controls", (productTypeSlug) => {
-    const product = productFixture(1100, "Slider product", productTypeSlug);
-    const html = renderToStaticMarkup(
-      createElement(CollectionAddPage, {
-        collections: [],
-        defaultCollectionName: "Tester's Collection",
-        initialProductId: product.id,
-        options: {
-          ...emptyCatalogOptions,
-          productTypes: [
-            {
-              id: product.productTypeId,
-              ...productTypeImage,
-              isPartOrAccessory: productTypeSlug !== "slider",
-              name: product.productTypeName,
-              slug: productTypeSlug,
-            },
-          ],
-        },
-        products: [product],
-      }),
-    );
+  it.each(["slider", "slider-plate", "slider-insert"] as const)(
+    "offers standalone %s collection items without spinner-only controls",
+    (productTypeSlug) => {
+      const product = productFixture(1100, "Slider product", productTypeSlug);
+      const html = renderToStaticMarkup(
+        createElement(CollectionAddPage, {
+          collections: [],
+          defaultCollectionName: "Tester's Collection",
+          initialProductId: product.id,
+          options: {
+            ...emptyCatalogOptions,
+            productTypes: [
+              {
+                id: product.productTypeId,
+                ...productTypeImage,
+                isPartOrAccessory: productTypeSlug !== "slider",
+                name: product.productTypeName,
+                slug: productTypeSlug,
+              },
+            ],
+          },
+          products: [product],
+        }),
+      );
 
-    expect(html).toContain("Slider product");
-    expect(html).not.toContain("Unsupported product type");
-    expect(html).not.toContain('aria-label="Bearing"');
-    expect(html).not.toContain('aria-label="Button"');
-  });
+      expect(html).toContain("Slider product");
+      expect(html).not.toContain("Unsupported product type");
+      expect(html).not.toContain('aria-label="Bearing"');
+      expect(html).not.toContain('aria-label="Button"');
+    },
+  );
 
   it("presents included slider components as explicit suggestions only", () => {
     const product = {
@@ -1187,19 +1185,18 @@ describe("product type creation context", () => {
     expect(html).toContain('value="Pen mechanism"');
     expect(html).toContain("Add pen mechanism");
   });
-  it.each([
-    undefined,
-    "invalid",
-    "spinner",
-  ])("keeps unavailable %s context unselected", (initialProductTypeSlug) => {
-    const html = renderToStaticMarkup(
-      <ProductFormPage
-        options={options}
-        initialProductTypeSlug={initialProductTypeSlug}
-      />,
-    );
-    expect(html).not.toContain("<form");
-  });
+  it.each([undefined, "invalid", "spinner"])(
+    "keeps unavailable %s context unselected",
+    (initialProductTypeSlug) => {
+      const html = renderToStaticMarkup(
+        <ProductFormPage
+          options={options}
+          initialProductTypeSlug={initialProductTypeSlug}
+        />,
+      );
+      expect(html).not.toContain("<form");
+    },
+  );
   it.each([
     ["pen", "Add pen"],
     ["pen-actuator", "Add pen actuator"],
@@ -1213,17 +1210,20 @@ describe("product type creation context", () => {
     ["slider-plate", "Add slider plate"],
     ["spinner", "Add spinner"],
     ["spinner-button", "Add spinner button"],
-  ] as const)("names %s creation, including embedded creation", (productTypeSlug, label) => {
-    const html = renderToStaticMarkup(
-      <ProductEditor
-        options={options}
-        productTypeSlug={productTypeSlug}
-        onCreated={() => {}}
-      />,
-    );
-    expect(html).toContain(label);
-    expect(html).not.toContain(">Add product</button>");
-  });
+  ] as const)(
+    "names %s creation, including embedded creation",
+    (productTypeSlug, label) => {
+      const html = renderToStaticMarkup(
+        <ProductEditor
+          options={options}
+          productTypeSlug={productTypeSlug}
+          onCreated={() => {}}
+        />,
+      );
+      expect(html).toContain(label);
+      expect(html).not.toContain(">Add product</button>");
+    },
+  );
 });
 
 describe("product alias placement", () => {

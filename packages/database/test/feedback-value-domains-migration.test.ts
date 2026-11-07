@@ -34,16 +34,16 @@ describe("feedback value domains baseline", () => {
     ).resolves.toBeDefined();
   });
 
-  it.each([
-    "submitted",
-    "completed",
-  ])("allows the %s notification type", async (type) => {
-    await expect(
-      database.exec(
-        `INSERT INTO "feedback_notifications" ("feedback_id", "type") VALUES (1000, '${type}')`,
-      ),
-    ).resolves.toBeDefined();
-  });
+  it.each(["submitted", "completed"])(
+    "allows the %s notification type",
+    async (type) => {
+      await expect(
+        database.exec(
+          `INSERT INTO "feedback_notifications" ("feedback_id", "type") VALUES (1000, '${type}')`,
+        ),
+      ).resolves.toBeDefined();
+    },
+  );
 
   it("rejects an invalid category insert and update", async () => {
     await expect(

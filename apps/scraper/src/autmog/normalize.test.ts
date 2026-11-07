@@ -48,17 +48,16 @@ describe("normalizeAutmogProduct", () => {
     expect(item.bodyDetails).toEqual([]);
   });
 
-  it.each([
-    "Pen Clips",
-    "Pen Tray",
-    "Clip Add-on for Pen",
-  ])("does not classify %s as a pen", (title) => {
-    const item = normalizeAutmogProduct(
-      createProduct({ body_html: `<p>${title}</p>`, title }),
-    );
+  it.each(["Pen Clips", "Pen Tray", "Clip Add-on for Pen"])(
+    "does not classify %s as a pen",
+    (title) => {
+      const item = normalizeAutmogProduct(
+        createProduct({ body_html: `<p>${title}</p>`, title }),
+      );
 
-    expect(item.productTypes).not.toContain("pen");
-  });
+      expect(item.productTypes).not.toContain("pen");
+    },
+  );
 });
 
 /**

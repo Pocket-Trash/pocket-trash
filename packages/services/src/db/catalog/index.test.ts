@@ -1297,86 +1297,83 @@ describe("catalog lookup writes", () => {
     );
   });
 
-  it.each([
-    "product",
-    "collection_item",
-  ] as const)("treats an already-deleted %s image as a successful delete", async (targetType) => {
-    const update = vi.fn();
-    const db = {
-      select: vi.fn((fields: Record<string, unknown>) => {
-        const rows = Object.hasOwn(fields, "deletedAt")
-          ? [
-              {
-                deletedAt: new Date("2026-09-23T03:57:30.447Z"),
-                ownerClerkId: "user-secret",
-              },
-            ]
-          : [];
-        const query = {
-          from: vi.fn(() => query),
-          innerJoin: vi.fn(() => query),
-          leftJoin: vi.fn(() => query),
-          where: vi.fn(() => query),
-          limit: vi.fn().mockResolvedValue(rows),
-        };
-        return query;
-      }),
-      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
-        callback(db),
-      ),
-      update,
-    } as unknown as Database;
-    const service = createCatalogService(
-      db,
-      createLogger({ app: "api", environment: "test" }),
-      {
-        getByClerkId: vi.fn().mockResolvedValue({ id: 1000, username: null }),
-      } as never,
-      { write: vi.fn() } as never,
-    );
+  it.each(["product", "collection_item"] as const)(
+    "treats an already-deleted %s image as a successful delete",
+    async (targetType) => {
+      const update = vi.fn();
+      const db = {
+        select: vi.fn((fields: Record<string, unknown>) => {
+          const rows = Object.hasOwn(fields, "deletedAt")
+            ? [
+                {
+                  deletedAt: new Date("2026-09-23T03:57:30.447Z"),
+                  ownerClerkId: "user-secret",
+                },
+              ]
+            : [];
+          const query = {
+            from: vi.fn(() => query),
+            innerJoin: vi.fn(() => query),
+            leftJoin: vi.fn(() => query),
+            where: vi.fn(() => query),
+            limit: vi.fn().mockResolvedValue(rows),
+          };
+          return query;
+        }),
+        transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+          callback(db),
+        ),
+        update,
+      } as unknown as Database;
+      const service = createCatalogService(
+        db,
+        createLogger({ app: "api", environment: "test" }),
+        {
+          getByClerkId: vi.fn().mockResolvedValue({ id: 1000, username: null }),
+        } as never,
+        { write: vi.fn() } as never,
+      );
 
-    await expect(
-      service.softDeleteImage({
-        actor: actor("user-secret"),
-        imageId: 1000,
-        targetType,
-      }),
-    ).resolves.toBeUndefined();
-    expect(update).not.toHaveBeenCalled();
-  });
+      await expect(
+        service.softDeleteImage({
+          actor: actor("user-secret"),
+          imageId: 1000,
+          targetType,
+        }),
+      ).resolves.toBeUndefined();
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
 
-  it.each([
-    "color",
-    "finish",
-    "maker",
-    "material",
-    "pattern",
-  ] as const)("rejects a case-insensitive duplicate %s name", async (kind) => {
-    const insert = vi.fn();
-    const db = {
-      execute: vi.fn(),
-      insert,
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([{ id: 1000 }]),
+  it.each(["color", "finish", "maker", "material", "pattern"] as const)(
+    "rejects a case-insensitive duplicate %s name",
+    async (kind) => {
+      const insert = vi.fn();
+      const db = {
+        execute: vi.fn(),
+        insert,
+        select: vi.fn(() => ({
+          from: vi.fn(() => ({
+            where: vi.fn(() => ({
+              limit: vi.fn().mockResolvedValue([{ id: 1000 }]),
+            })),
           })),
         })),
-      })),
-      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
-        callback(db),
-      ),
-    } as unknown as Database;
-    const service = createCatalogService(
-      db,
-      createLogger({ app: "api", environment: "test" }),
-    );
+        transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+          callback(db),
+        ),
+      } as unknown as Database;
+      const service = createCatalogService(
+        db,
+        createLogger({ app: "api", environment: "test" }),
+      );
 
-    const result = createLookup(service, kind);
+      const result = createLookup(service, kind);
 
-    await expect(result).rejects.toThrow(/already exists/i);
-    expect(insert).not.toHaveBeenCalled();
-  });
+      await expect(result).rejects.toThrow(/already exists/i);
+      expect(insert).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     ["color", "color_name_case_insensitive_unique", "Color"],
@@ -1384,41 +1381,44 @@ describe("catalog lookup writes", () => {
     ["maker", "makers_name_case_insensitive_unique", "Maker"],
     ["material", "materials_name_case_insensitive_unique", "Material"],
     ["pattern", "pattern_name_case_insensitive_unique", "Pattern"],
-  ] as const)("maps a concurrent duplicate %s name to the existing domain error", async (kind, constraint, label) => {
-    const databaseError = new Error("Query failed", {
-      cause: { code: "23505", constraint },
-    });
-    const db = {
-      execute: vi.fn().mockResolvedValue([]),
-      insert: vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn().mockRejectedValue(databaseError),
+  ] as const)(
+    "maps a concurrent duplicate %s name to the existing domain error",
+    async (kind, constraint, label) => {
+      const databaseError = new Error("Query failed", {
+        cause: { code: "23505", constraint },
+      });
+      const db = {
+        execute: vi.fn().mockResolvedValue([]),
+        insert: vi.fn(() => ({
+          values: vi.fn(() => ({
+            returning: vi.fn().mockRejectedValue(databaseError),
+          })),
         })),
-      })),
-      select: vi.fn((fields: Record<string, unknown>) => ({
-        from: vi.fn(() =>
-          Object.hasOwn(fields, "slug")
-            ? Promise.resolve([])
-            : {
-                where: vi.fn(() => ({
-                  limit: vi.fn().mockResolvedValue([]),
-                })),
-              },
+        select: vi.fn((fields: Record<string, unknown>) => ({
+          from: vi.fn(() =>
+            Object.hasOwn(fields, "slug")
+              ? Promise.resolve([])
+              : {
+                  where: vi.fn(() => ({
+                    limit: vi.fn().mockResolvedValue([]),
+                  })),
+                },
+          ),
+        })),
+        transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+          callback(db),
         ),
-      })),
-      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
-        callback(db),
-      ),
-    } as unknown as Database;
-    const service = createCatalogService(
-      db,
-      createLogger({ app: "api", environment: "test" }),
-    );
+      } as unknown as Database;
+      const service = createCatalogService(
+        db,
+        createLogger({ app: "api", environment: "test" }),
+      );
 
-    await expect(createLookup(service, kind)).rejects.toThrow(
-      `${label} name already exists.`,
-    );
-  });
+      await expect(createLookup(service, kind)).rejects.toThrow(
+        `${label} name already exists.`,
+      );
+    },
+  );
 });
 
 describe("catalog finish validation", () => {
