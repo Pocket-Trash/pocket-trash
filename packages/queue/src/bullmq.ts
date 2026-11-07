@@ -33,6 +33,9 @@ export function createBullMqQueueAdapter(options: {
   recoverAfterOutage?: boolean;
 }): QueueAdapter {
   const connection = new Redis(options.redisUrl, {
+    // Preserve the Redis 5 wire protocol and TCP keep-alive behavior.
+    protocol: 2,
+    keepAlive: 0,
     connectTimeout: 5_000,
     enableReadyCheck: false,
     maxRetriesPerRequest: null,
