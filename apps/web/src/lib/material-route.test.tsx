@@ -65,34 +65,34 @@ describe("material-specific route", () => {
   });
 });
 
-it.each([
-  Route,
-  GeneralRoute,
-])("keeps the other pager's URL value when either production route changes a page", (route) => {
-  vi.spyOn(route, "useLoaderData").mockReturnValue({} as never);
-  vi.spyOn(route, "useSearch").mockReturnValue({
-    productsPage: 2,
-    collectionItemsPage: 3,
-  });
-  vi.spyOn(route, "useParams").mockReturnValue({
-    materialSlug: "zirconium",
-    materialSpecificSlug: "705",
-  });
-  const Component = route.options.component;
-  if (!Component) throw new Error("Material route component is missing.");
-  renderToStaticMarkup(<Component />);
-  const props = detailPage.mock.calls.at(-1)?.[0];
-  if (!props) throw new Error("Missing material page callbacks.");
-  props.onProductsPageChange(4);
-  expect(navigate).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      search: { productsPage: 4, collectionItemsPage: 3 },
-    }),
-  );
-  props.onCollectionItemsPageChange(5);
-  expect(navigate).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      search: { productsPage: 2, collectionItemsPage: 5 },
-    }),
-  );
-});
+it.each([Route, GeneralRoute])(
+  "keeps the other pager's URL value when either production route changes a page",
+  (route) => {
+    vi.spyOn(route, "useLoaderData").mockReturnValue({} as never);
+    vi.spyOn(route, "useSearch").mockReturnValue({
+      productsPage: 2,
+      collectionItemsPage: 3,
+    });
+    vi.spyOn(route, "useParams").mockReturnValue({
+      materialSlug: "zirconium",
+      materialSpecificSlug: "705",
+    });
+    const Component = route.options.component;
+    if (!Component) throw new Error("Material route component is missing.");
+    renderToStaticMarkup(<Component />);
+    const props = detailPage.mock.calls.at(-1)?.[0];
+    if (!props) throw new Error("Missing material page callbacks.");
+    props.onProductsPageChange(4);
+    expect(navigate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        search: { productsPage: 4, collectionItemsPage: 3 },
+      }),
+    );
+    props.onCollectionItemsPageChange(5);
+    expect(navigate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        search: { productsPage: 2, collectionItemsPage: 5 },
+      }),
+    );
+  },
+);

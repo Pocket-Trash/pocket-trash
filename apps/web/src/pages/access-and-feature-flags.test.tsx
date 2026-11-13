@@ -273,48 +273,50 @@ describe("user access and feature-flag consumers", () => {
     expect(inputs[0]?.disabled).toBe(false);
   });
 
-  it.each([
-    false,
-    true,
-  ])("recovers acknowledged creation after a failed refresh (edited=%s)", async (edited) => {
-    vi.mocked(createAdminFeatureFlag).mockResolvedValue({
-      ...flag,
-      audience: "user",
-    });
-    vi.mocked(updateAdminFeatureFlag).mockResolvedValue({
-      ...flag,
-      name: "Changed after create",
-    });
-    session.invalidate
-      .mockRejectedValueOnce(new Error("Refresh offline"))
-      .mockResolvedValueOnce(undefined);
-    await act(async () =>
-      root.render(<AdminFeatureFlagsPage actorId="user_a" initialFlags={[]} />),
-    );
-    const fields = container.querySelectorAll<HTMLInputElement>(
-      'aside input:not([type="checkbox"])',
-    );
-    await change(fields[0] ?? null, flag.slug);
-    await change(fields[1] ?? null, flag.name);
-    await click(formatTranslation("web.action.saveFlag", {}, "en-US"));
-    expect(container.textContent).toContain("Refresh offline");
-    expect(fields[0]?.disabled).toBe(true);
-    if (edited) await change(fields[1] ?? null, "Changed after create");
-    await click(formatTranslation("web.action.saveFlag", {}, "en-US"));
-    expect(createAdminFeatureFlag).toHaveBeenCalledTimes(1);
-    expect(updateAdminFeatureFlag).toHaveBeenCalledTimes(edited ? 1 : 0);
-    if (edited)
-      expect(updateAdminFeatureFlag).toHaveBeenCalledWith({
-        data: {
-          name: "Changed after create",
-          description: null,
-          defaultEnabled: false,
-          slug: flag.slug,
-        },
+  it.each([false, true])(
+    "recovers acknowledged creation after a failed refresh (edited=%s)",
+    async (edited) => {
+      vi.mocked(createAdminFeatureFlag).mockResolvedValue({
+        ...flag,
+        audience: "user",
       });
-    expect(session.invalidate).toHaveBeenCalledTimes(2);
-    expect(fields[0]?.value).toBe("");
-  });
+      vi.mocked(updateAdminFeatureFlag).mockResolvedValue({
+        ...flag,
+        name: "Changed after create",
+      });
+      session.invalidate
+        .mockRejectedValueOnce(new Error("Refresh offline"))
+        .mockResolvedValueOnce(undefined);
+      await act(async () =>
+        root.render(
+          <AdminFeatureFlagsPage actorId="user_a" initialFlags={[]} />,
+        ),
+      );
+      const fields = container.querySelectorAll<HTMLInputElement>(
+        'aside input:not([type="checkbox"])',
+      );
+      await change(fields[0] ?? null, flag.slug);
+      await change(fields[1] ?? null, flag.name);
+      await click(formatTranslation("web.action.saveFlag", {}, "en-US"));
+      expect(container.textContent).toContain("Refresh offline");
+      expect(fields[0]?.disabled).toBe(true);
+      if (edited) await change(fields[1] ?? null, "Changed after create");
+      await click(formatTranslation("web.action.saveFlag", {}, "en-US"));
+      expect(createAdminFeatureFlag).toHaveBeenCalledTimes(1);
+      expect(updateAdminFeatureFlag).toHaveBeenCalledTimes(edited ? 1 : 0);
+      if (edited)
+        expect(updateAdminFeatureFlag).toHaveBeenCalledWith({
+          data: {
+            name: "Changed after create",
+            description: null,
+            defaultEnabled: false,
+            slug: flag.slug,
+          },
+        });
+      expect(session.invalidate).toHaveBeenCalledTimes(2);
+      expect(fields[0]?.value).toBe("");
+    },
+  );
 
   it("ignores stale targeting lookups and disposes mutations when the selected user changes", async () => {
     vi.mocked(searchFeatureFlagUsers).mockResolvedValue([

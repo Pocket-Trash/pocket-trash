@@ -63,36 +63,36 @@ describe("router error reporting callbacks", () => {
     await act(async () => root.unmount());
     container.remove();
   });
-  it.each([
-    "/products",
-    "/makers",
-  ] as const)("reports %s failures through the actual boundary once with only the pathname", async (pathname) => {
-    const router = getRouter();
-    router.update({
-      history: createMemoryHistory({
-        initialEntries: [`${pathname}?token=secret#fragment`],
-      }),
-    });
-    await router.load();
-    await act(async () =>
-      root.render(
-        <StrictMode>
-          <RouterProvider router={router} />
-        </StrictMode>,
-      ),
-    );
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
-    expect(report).toHaveBeenCalledExactlyOnceWith("web.route.error", {
-      attributes: { route: pathname },
-      error: expect.any(Error),
-    });
-    await act(async () =>
-      root.render(
-        <StrictMode>
-          <RouterProvider router={router} />
-        </StrictMode>,
-      ),
-    );
-    expect(report).toHaveBeenCalledOnce();
-  });
+  it.each(["/products", "/makers"] as const)(
+    "reports %s failures through the actual boundary once with only the pathname",
+    async (pathname) => {
+      const router = getRouter();
+      router.update({
+        history: createMemoryHistory({
+          initialEntries: [`${pathname}?token=secret#fragment`],
+        }),
+      });
+      await router.load();
+      await act(async () =>
+        root.render(
+          <StrictMode>
+            <RouterProvider router={router} />
+          </StrictMode>,
+        ),
+      );
+      expect(container.querySelector('[role="alert"]')).not.toBeNull();
+      expect(report).toHaveBeenCalledExactlyOnceWith("web.route.error", {
+        attributes: { route: pathname },
+        error: expect.any(Error),
+      });
+      await act(async () =>
+        root.render(
+          <StrictMode>
+            <RouterProvider router={router} />
+          </StrictMode>,
+        ),
+      );
+      expect(report).toHaveBeenCalledOnce();
+    },
+  );
 });

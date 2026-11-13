@@ -30,19 +30,12 @@ describe("changelog content", () => {
     expect(getChangelogEntries("en-US", "bug")).toEqual([]);
   });
 
-  it.each([
-    undefined,
-    "",
-    "nope",
-    "0",
-    "-2",
-    "1.5",
-    "0x2",
-    [2],
-    [999],
-  ])("normalizes page %j to the first page", (value) => {
-    expect(parseChangelogPage(value)).toBe(1);
-  });
+  it.each([undefined, "", "nope", "0", "-2", "1.5", "0x2", [2], [999]])(
+    "normalizes page %j to the first page",
+    (value) => {
+      expect(parseChangelogPage(value)).toBe(1);
+    },
+  );
 
   it("returns ten full entries per page and rejects valid pages past the end", () => {
     const sample = getChangelogEntries("en-US")[0];

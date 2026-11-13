@@ -179,24 +179,27 @@ describe("database service logging", () => {
     ["updated", [[{ id: 1000 }]], []],
     ["inserted", [[]], [[{ id: 1000 }]]],
     ["unchanged", [[]], [[]]],
-  ] as const)("reports Clerk user syncs as %s", async (expected, updateRows, insertRows) => {
-    const users = createUsersService(
-      createDbMock({
-        insertRows: insertRows.map((row) => [...row]),
-        updateRows: updateRows.map((row) => [...row]),
-      }),
-      captureLogger([]),
-    );
+  ] as const)(
+    "reports Clerk user syncs as %s",
+    async (expected, updateRows, insertRows) => {
+      const users = createUsersService(
+        createDbMock({
+          insertRows: insertRows.map((row) => [...row]),
+          updateRows: updateRows.map((row) => [...row]),
+        }),
+        captureLogger([]),
+      );
 
-    await expect(
-      users.syncFromClerk({
-        clerkId: "user_123",
-        clerkUpdatedAt: new Date("2026-09-22T12:00:00.000Z"),
-        imageUrl: null,
-        username: "roy",
-      }),
-    ).resolves.toBe(expected);
-  });
+      await expect(
+        users.syncFromClerk({
+          clerkId: "user_123",
+          clerkUpdatedAt: new Date("2026-09-22T12:00:00.000Z"),
+          imageUrl: null,
+          username: "roy",
+        }),
+      ).resolves.toBe(expected);
+    },
+  );
 
   it("logs users.ensure failures with a failure outcome", async () => {
     const events: LogEvent[] = [];

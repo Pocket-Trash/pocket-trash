@@ -119,48 +119,50 @@ vi.mock("@base-ui/react/combobox", () => {
 
 import { CatalogCombobox, CatalogMultiCombobox } from "./combobox";
 
-describe.each([
-  CatalogCombobox,
-  CatalogMultiCombobox,
-])("combobox close behavior", (Component) => {
-  let root: Root;
-  let container: HTMLDivElement;
+describe.each([CatalogCombobox, CatalogMultiCombobox])(
+  "combobox close behavior",
+  (Component) => {
+    let root: Root;
+    let container: HTMLDivElement;
 
-  beforeEach(() => {
-    states.open.length = 0;
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-  });
+    beforeEach(() => {
+      states.open.length = 0;
+      container = document.createElement("div");
+      document.body.append(container);
+      root = createRoot(container);
+    });
 
-  afterEach(() => {
-    act(() => root.unmount());
-    document.body.replaceChildren();
-  });
+    afterEach(() => {
+      act(() => root.unmount());
+      document.body.replaceChildren();
+    });
 
-  it("closes after selecting a value", () => {
-    const item = { id: 1, name: "Bronze" };
-    act(() =>
-      root.render(
-        <Component
-          ariaLabel="Material"
-          items={[item]}
-          onValueChange={vi.fn() as never}
-          placeholder="Material"
-          removeLabel="Remove"
-          value={(Component === CatalogMultiCombobox ? [] : null) as never}
-        />,
-      ),
-    );
-    act(() =>
-      (container.querySelector('[data-testid="open"]') as HTMLElement).click(),
-    );
-    expect(states.open.at(-1)).toBe(true);
-    act(() =>
-      (
-        container.querySelector('[data-testid="select"]') as HTMLElement
-      ).click(),
-    );
-    expect(states.open.at(-1)).toBe(false);
-  });
-});
+    it("closes after selecting a value", () => {
+      const item = { id: 1, name: "Bronze" };
+      act(() =>
+        root.render(
+          <Component
+            ariaLabel="Material"
+            items={[item]}
+            onValueChange={vi.fn() as never}
+            placeholder="Material"
+            removeLabel="Remove"
+            value={(Component === CatalogMultiCombobox ? [] : null) as never}
+          />,
+        ),
+      );
+      act(() =>
+        (
+          container.querySelector('[data-testid="open"]') as HTMLElement
+        ).click(),
+      );
+      expect(states.open.at(-1)).toBe(true);
+      act(() =>
+        (
+          container.querySelector('[data-testid="select"]') as HTMLElement
+        ).click(),
+      );
+      expect(states.open.at(-1)).toBe(false);
+    });
+  },
+);

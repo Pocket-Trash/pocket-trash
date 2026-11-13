@@ -500,22 +500,21 @@ describe("PublicCollectionPage", () => {
 });
 
 describe("UserCollectionsPage", () => {
-  it.each([
-    "name",
-    "summary",
-    "description",
-  ] as const)("finds an empty private collection by its %s", (field) => {
-    const collection = owners[0]?.collections[1];
-    if (!collection) throw new Error("Collection fixture required.");
-    const html = renderToStaticMarkup(
-      <UserCollectionsPage
-        collections={[{ ...collection, [field]: "Café archive" }]}
-        filters={{ ...emptyCatalogFilters(), query: "cafe" }}
-        items={[]}
-      />,
-    );
-    expect(html).toContain(`/user/collections/${collection.id}`);
-  });
+  it.each(["name", "summary", "description"] as const)(
+    "finds an empty private collection by its %s",
+    (field) => {
+      const collection = owners[0]?.collections[1];
+      if (!collection) throw new Error("Collection fixture required.");
+      const html = renderToStaticMarkup(
+        <UserCollectionsPage
+          collections={[{ ...collection, [field]: "Café archive" }]}
+          filters={{ ...emptyCatalogFilters(), query: "cafe" }}
+          items={[]}
+        />,
+      );
+      expect(html).toContain(`/user/collections/${collection.id}`);
+    },
+  );
 
   it("intersects collection text matches with item facets", () => {
     const collection = owners[0]?.collections[0];
@@ -596,23 +595,24 @@ describe("UserCollectionsPage", () => {
 });
 
 describe("CollectionPage", () => {
-  it.each([
-    "name",
-    "description",
-  ] as const)("finds private items by their %s in the owner area", (field) => {
-    const collection = owners[0]?.collections[0];
-    const item = owners[0]?.items[0];
-    if (!collection || !item) throw new Error("Collection fixtures required.");
-    const html = renderToStaticMarkup(
-      <CollectionPage
-        collection={{ ...collection, isPrivate: true }}
-        filters={{ ...emptyCatalogFilters(), query: "engraving" }}
-        items={[{ ...item, isPrivate: true, [field]: "Unique engraving" }]}
-        userArea
-      />,
-    );
-    expect(html).toContain(item.displayName);
-  });
+  it.each(["name", "description"] as const)(
+    "finds private items by their %s in the owner area",
+    (field) => {
+      const collection = owners[0]?.collections[0];
+      const item = owners[0]?.items[0];
+      if (!collection || !item)
+        throw new Error("Collection fixtures required.");
+      const html = renderToStaticMarkup(
+        <CollectionPage
+          collection={{ ...collection, isPrivate: true }}
+          filters={{ ...emptyCatalogFilters(), query: "engraving" }}
+          items={[{ ...item, isPrivate: true, [field]: "Unique engraving" }]}
+          userArea
+        />,
+      );
+      expect(html).toContain(item.displayName);
+    },
+  );
 
   it("keeps private collection search client-side", () => {
     const collection = owners[0]?.collections[0];
@@ -982,29 +982,28 @@ describe("ProductGrid", () => {
 });
 
 describe("ProductsPage", () => {
-  it.each([
-    "pen-clip",
-    "pen-mechanism",
-    "spinner",
-  ] as const)("carries explicit %s context even with no products", (productType) => {
-    const html = renderToStaticMarkup(
-      <ProductsPage
-        filters={{
-          ...emptyCatalogFilters(),
-          productType,
-          makerIds: [42],
-          materialIds: [10],
-          query: "model 36",
-        }}
-        onFiltersChange={() => {}}
-        products={[]}
-      />,
-    );
-    expect(html).toContain(`/products/add?type=${productType}`);
-    expect(html).not.toContain("/products/add?maker");
-    expect(html).not.toContain("/products/add?material");
-    expect(html).not.toContain("/products/add?q");
-  });
+  it.each(["pen-clip", "pen-mechanism", "spinner"] as const)(
+    "carries explicit %s context even with no products",
+    (productType) => {
+      const html = renderToStaticMarkup(
+        <ProductsPage
+          filters={{
+            ...emptyCatalogFilters(),
+            productType,
+            makerIds: [42],
+            materialIds: [10],
+            query: "model 36",
+          }}
+          onFiltersChange={() => {}}
+          products={[]}
+        />,
+      );
+      expect(html).toContain(`/products/add?type=${productType}`);
+      expect(html).not.toContain("/products/add?maker");
+      expect(html).not.toContain("/products/add?material");
+      expect(html).not.toContain("/products/add?q");
+    },
+  );
   it("does not infer a type from one result", () => {
     const html = renderToStaticMarkup(
       <ProductsPage onFiltersChange={() => {}} products={[product]} />,

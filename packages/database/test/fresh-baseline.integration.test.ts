@@ -32,24 +32,26 @@ describe("fresh subtype baseline", () => {
     await database.close();
   });
 
-  it.each(
-    detailTables,
-  )("preserves shared IDs in %s", async (table, _view, id) => {
-    await expect(
-      database.query<{
-        /** Preserved detail identifier. */
-        id: number;
-      }>(`SELECT id::integer AS id FROM "${table}"`),
-    ).resolves.toMatchObject({ rows: [{ id }] });
-  });
+  it.each(detailTables)(
+    "preserves shared IDs in %s",
+    async (table, _view, id) => {
+      await expect(
+        database.query<{
+          /** Preserved detail identifier. */
+          id: number;
+        }>(`SELECT id::integer AS id FROM "${table}"`),
+      ).resolves.toMatchObject({ rows: [{ id }] });
+    },
+  );
 
-  it.each(
-    detailTables,
-  )("never creates the obsolete name %s / %s", async (_table, oldName) => {
-    await expect(database.query(`SELECT id FROM "${oldName}"`)).rejects.toThrow(
-      /does not exist/iu,
-    );
-  });
+  it.each(detailTables)(
+    "never creates the obsolete name %s / %s",
+    async (_table, oldName) => {
+      await expect(
+        database.query(`SELECT id FROM "${oldName}"`),
+      ).rejects.toThrow(/does not exist/iu);
+    },
+  );
 
   it("supports current-table locking and CRUD with cascading base deletion", async () => {
     await expect(
@@ -118,26 +120,29 @@ describe("fresh subtype baseline", () => {
     ["product_detail_slider", 1002, "length", "mm"],
     ["product_detail_slider", 1002, "width", "mm"],
     ["product_detail_slider", 1002, "thickness", "mm"],
-  ])("enforces positive paired measurements in %s.%s / %s", async (table, id, measurement, unit) => {
-    await database.exec(
-      `UPDATE "${table}" SET "${measurement}_value" = 1, "${measurement}_unit" = '${unit}' WHERE id = ${id}`,
-    );
-    for (const value of [0, -1]) {
+  ])(
+    "enforces positive paired measurements in %s.%s / %s",
+    async (table, id, measurement, unit) => {
+      await database.exec(
+        `UPDATE "${table}" SET "${measurement}_value" = 1, "${measurement}_unit" = '${unit}' WHERE id = ${id}`,
+      );
+      for (const value of [0, -1]) {
+        await expect(
+          database.exec(
+            `UPDATE "${table}" SET "${measurement}_value" = ${value} WHERE id = ${id}`,
+          ),
+        ).rejects.toThrow(/constraint/iu);
+      }
       await expect(
         database.exec(
-          `UPDATE "${table}" SET "${measurement}_value" = ${value} WHERE id = ${id}`,
+          `UPDATE "${table}" SET "${measurement}_unit" = NULL WHERE id = ${id}`,
         ),
       ).rejects.toThrow(/constraint/iu);
-    }
-    await expect(
-      database.exec(
-        `UPDATE "${table}" SET "${measurement}_unit" = NULL WHERE id = ${id}`,
-      ),
-    ).rejects.toThrow(/constraint/iu);
-    await database.exec(
-      `UPDATE "${table}" SET "${measurement}_value" = NULL, "${measurement}_unit" = NULL WHERE id = ${id}`,
-    );
-  });
+      await database.exec(
+        `UPDATE "${table}" SET "${measurement}_value" = NULL, "${measurement}_unit" = NULL WHERE id = ${id}`,
+      );
+    },
+  );
 
   it("enforces positive paired product material weights", async () => {
     await database.exec(

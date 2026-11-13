@@ -25,79 +25,79 @@ function issue(kind: "bug" | "feature" = "bug") {
   };
 }
 
-it.each([
-  "bug",
-  "feature",
-] as const)("writes exact %s routing, priority and label policy", async (kind) => {
-  const stateId = randomUUID();
-  const http = vi
-    .fn<typeof fetch>()
-    .mockResolvedValueOnce(
-      Response.json({
-        data: {
-          team: {
-            states: {
-              nodes: [
-                {
-                  id: stateId,
-                  name: kind === "bug" ? "Todo" : "Triage",
-                  type: kind === "bug" ? "unstarted" : "triage",
-                },
-              ],
+it.each(["bug", "feature"] as const)(
+  "writes exact %s routing, priority and label policy",
+  async (kind) => {
+    const stateId = randomUUID();
+    const http = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          data: {
+            team: {
+              states: {
+                nodes: [
+                  {
+                    id: stateId,
+                    name: kind === "bug" ? "Todo" : "Triage",
+                    type: kind === "bug" ? "unstarted" : "triage",
+                  },
+                ],
+              },
             },
           },
-        },
-      }),
-    )
-    .mockResolvedValueOnce(
-      Response.json({
-        data: { issueCreate: { success: true, issue: issue(kind) } },
-      }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          data: { issueCreate: { success: true, issue: issue(kind) } },
+        }),
+      );
+    const operation: TicketOperation = {
+      version: 1,
+      threadId: "223456789012345678",
+      issueId: id,
+      kind,
+      priority: 2,
+      phase: "processing",
+      commentIds: [],
+      summary: {
+        title: "Ticket",
+        summary: "Observed defect",
+        reproductionSteps: [],
+        expectedBehavior: "",
+        actualBehavior: "",
+        environment: [],
+        userImpact: "",
+        openQuestions: [],
+      },
+    };
+    await createTicketLinear({ apiKey: "test-key", fetch: http }).createIssue(
+      operation,
+      "Description",
     );
-  const operation: TicketOperation = {
-    version: 1,
-    threadId: "223456789012345678",
-    issueId: id,
-    kind,
-    priority: 2,
-    phase: "processing",
-    commentIds: [],
-    summary: {
-      title: "Ticket",
-      summary: "Observed defect",
-      reproductionSteps: [],
-      expectedBehavior: "",
-      actualBehavior: "",
-      environment: [],
-      userImpact: "",
-      openQuestions: [],
-    },
-  };
-  await createTicketLinear({ apiKey: "test-key", fetch: http }).createIssue(
-    operation,
-    "Description",
-  );
-  const init = http.mock.calls[1]?.[1];
-  const input = JSON.parse(String(init?.body)).variables.input;
-  expect(input).toMatchObject({
-    id,
-    teamId: linearTicketTargets.teamId,
-    projectId: issue(kind).project.id,
-    stateId,
-    priority: kind === "bug" ? 2 : 0,
-    labelIds:
-      kind === "bug"
-        ? [
-            "3f455699-3d1b-4dfb-8e3a-7b9eb3949f05",
-            "eeff2955-1593-47b1-8bcd-f24555ad86c7",
-          ]
-        : [],
-  });
-  expect(init?.headers).toEqual({
-    authorization: "test-key",
-    "content-type": "application/json",
-  });
-});
+    const init = http.mock.calls[1]?.[1];
+    const input = JSON.parse(String(init?.body)).variables.input;
+    expect(input).toMatchObject({
+      id,
+      teamId: linearTicketTargets.teamId,
+      projectId: issue(kind).project.id,
+      stateId,
+      priority: kind === "bug" ? 2 : 0,
+      labelIds:
+        kind === "bug"
+          ? [
+              "3f455699-3d1b-4dfb-8e3a-7b9eb3949f05",
+              "eeff2955-1593-47b1-8bcd-f24555ad86c7",
+            ]
+          : [],
+    });
+    expect(init?.headers).toEqual({
+      authorization: "test-key",
+      "content-type": "application/json",
+    });
+  },
+);
 
 it("distinguishes a confirmed absent UUID from GraphQL or transport failure", async () => {
   const http = vi
