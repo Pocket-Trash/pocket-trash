@@ -26,10 +26,21 @@ export function createAxiomCursorStore(options: {
 }) {
   const key = `discord-bot:axiom-cursor:${options.guildId}:${options.channelId}`;
   const connection = new Redis(options.redisUrl, {
+    // Preserve the Redis 5 wire protocol and TCP keep-alive behavior.
+    protocol: 2,
+    keepAlive: 0,
     connectTimeout: 5_000,
     enableOfflineQueue: false,
     lazyConnect: true,
     maxRetriesPerRequest: 1,
+    /**
+     * Preserves the existing bounded Redis 5 reconnect delay.
+     * @param times - Consecutive reconnect attempt number.
+     * @returns Reconnection delay in milliseconds.
+     */
+    retryStrategy(times) {
+      return Math.min(times * 50, 2_000);
+    },
   });
   connection.on("error", () => {
     /* Callers observe operation failures. */
