@@ -107,24 +107,22 @@ describe("calibrated Axiom fallback", () => {
     expect(h.enqueue).toHaveBeenCalledWith(event.eventId, direct?.payload);
   });
 
-  it.each([
-    "content",
-    "fields",
-    "missing",
-    "truncated",
-  ])("rejects uncalibrated %s shapes", (shape) => {
-    const bad =
-      shape === "content"
-        ? { content: capturedDescription, embeds: [] }
-        : {
-            content: "",
-            embeds:
-              shape === "missing"
-                ? []
-                : [{ description: shape === "truncated" ? "```{..." : null }],
-          };
-    expect(() => parseAxiomMessage(bad)).toThrow();
-  });
+  it.each(["content", "fields", "missing", "truncated"])(
+    "rejects uncalibrated %s shapes",
+    (shape) => {
+      const bad =
+        shape === "content"
+          ? { content: capturedDescription, embeds: [] }
+          : {
+              content: "",
+              embeds:
+                shape === "missing"
+                  ? []
+                  : [{ description: shape === "truncated" ? "```{..." : null }],
+            };
+      expect(() => parseAxiomMessage(bad)).toThrow();
+    },
+  );
 
   it("accepts nullable optional projected columns and strips unprojected fields", () => {
     const value = {
@@ -145,41 +143,40 @@ describe("calibrated Axiom fallback", () => {
     expect(event).not.toHaveProperty("stack");
   });
 
-  it.each([
-    "wrong-channel",
-    "wrong-webhook",
-    "own-bot",
-  ])("rejects %s before inspecting content", async (kind) => {
-    const untrusted = message({
-      channelId: kind === "wrong-channel" ? "other" : source.channelId,
-      webhookId: kind === "wrong-webhook" ? "other" : source.webhookId,
-      authorId: kind === "own-bot" ? source.botUserId : source.webhookId,
-    });
-    Object.defineProperties(untrusted, {
-      content: {
-        /**
-         * Detects unauthorized content inspection.
-         * @throws Always when content is inspected.
-         */
-        get() {
-          throw Error("content was inspected");
+  it.each(["wrong-channel", "wrong-webhook", "own-bot"])(
+    "rejects %s before inspecting content",
+    async (kind) => {
+      const untrusted = message({
+        channelId: kind === "wrong-channel" ? "other" : source.channelId,
+        webhookId: kind === "wrong-webhook" ? "other" : source.webhookId,
+        authorId: kind === "own-bot" ? source.botUserId : source.webhookId,
+      });
+      Object.defineProperties(untrusted, {
+        content: {
+          /**
+           * Detects unauthorized content inspection.
+           * @throws Always when content is inspected.
+           */
+          get() {
+            throw Error("content was inspected");
+          },
         },
-      },
-      embeds: {
-        /**
-         * Detects unauthorized embed inspection.
-         * @throws Always when embeds are inspected.
-         */
-        get() {
-          throw Error("embeds were inspected");
+        embeds: {
+          /**
+           * Detects unauthorized embed inspection.
+           * @throws Always when embeds are inspected.
+           */
+          get() {
+            throw Error("embeds were inspected");
+          },
         },
-      },
-    });
-    const h = harness([untrusted]);
-    await h.reconciler.reconcile();
-    expect(h.enqueue).not.toHaveBeenCalled();
-    expect(h.saved()?.messageId).toBe(untrusted.id);
-  });
+      });
+      const h = harness([untrusted]);
+      await h.reconciler.reconcile();
+      expect(h.enqueue).not.toHaveBeenCalled();
+      expect(h.saved()?.messageId).toBe(untrusted.id);
+    },
+  );
 
   it("persists parser health before advancing even for an already delivered event", async () => {
     const h = harness([message({ embeds: [{ description: "invalid" }] })]);
@@ -293,44 +290,43 @@ describe("calibrated Axiom fallback", () => {
     expect(h.enqueue).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "direct-first",
-    "fallback-first",
-    "concurrent",
-  ])("shares retained queue identity for %s arrival", async (order) => {
-    const adapter = createInMemoryQueueAdapter();
-    const deliver = vi.fn().mockResolvedValue(undefined);
-    const queue = createDeliveryQueueRuntime({ adapter, deliver });
-    const h = harness();
-    h.enqueue.mockImplementation((id, payload) =>
-      queue.enqueue({ id, name: "notification", payload }),
-    );
-    /**
-     * Simulates direct acceptance and timeout-after-acceptance retries.
-     * @returns Durable enqueue completion.
-     */
-    const direct = async () => {
-      const event = parseAxiomMessage(fixture);
-      const { createLoggerDelivery } = await import("./logger-webhook.js");
-      await queue.enqueue({
-        id: event.eventId,
-        name: "direct",
-        payload: createLoggerDelivery(event, source.destinationChannelId),
-      });
-    };
-    if (order === "concurrent")
-      await Promise.all([direct(), h.reconciler.reconcile()]);
-    else if (order === "direct-first") {
+  it.each(["direct-first", "fallback-first", "concurrent"])(
+    "shares retained queue identity for %s arrival",
+    async (order) => {
+      const adapter = createInMemoryQueueAdapter();
+      const deliver = vi.fn().mockResolvedValue(undefined);
+      const queue = createDeliveryQueueRuntime({ adapter, deliver });
+      const h = harness();
+      h.enqueue.mockImplementation((id, payload) =>
+        queue.enqueue({ id, name: "notification", payload }),
+      );
+      /**
+       * Simulates direct acceptance and timeout-after-acceptance retries.
+       * @returns Durable enqueue completion.
+       */
+      const direct = async () => {
+        const event = parseAxiomMessage(fixture);
+        const { createLoggerDelivery } = await import("./logger-webhook.js");
+        await queue.enqueue({
+          id: event.eventId,
+          name: "direct",
+          payload: createLoggerDelivery(event, source.destinationChannelId),
+        });
+      };
+      if (order === "concurrent")
+        await Promise.all([direct(), h.reconciler.reconcile()]);
+      else if (order === "direct-first") {
+        await direct();
+        await h.reconciler.reconcile();
+      } else {
+        await h.reconciler.reconcile();
+        await direct();
+      }
+      await queue.start();
+      await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
       await direct();
-      await h.reconciler.reconcile();
-    } else {
-      await h.reconciler.reconcile();
-      await direct();
-    }
-    await queue.start();
-    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
-    await direct();
-    expect(deliver).toHaveBeenCalledTimes(1);
-    await queue.close();
-  });
+      expect(deliver).toHaveBeenCalledTimes(1);
+      await queue.close();
+    },
+  );
 });

@@ -42,9 +42,20 @@ export interface TicketOperationStore {
  */
 export function createTicketOperationStore(redisUrl: string) {
   const redis = new Redis(redisUrl, {
+    // Preserve the Redis 5 wire protocol and TCP keep-alive behavior.
+    protocol: 2,
+    keepAlive: 0,
     lazyConnect: true,
     enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
+    /**
+     * Preserves the existing bounded Redis 5 reconnect delay.
+     * @param times - Consecutive reconnect attempt number.
+     * @returns Reconnection delay in milliseconds.
+     */
+    retryStrategy(times) {
+      return Math.min(times * 50, 2_000);
+    },
     connectTimeout: 5000,
   });
   redis.on("error", () => {

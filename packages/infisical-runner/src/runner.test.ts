@@ -87,26 +87,29 @@ describe("buildInfisicalRunArgs", () => {
   it.each([
     ["deploy", "prod", ""],
     ["deploy:preview", "preview", "preview"],
-  ])("builds API %s args with Cloudflare secrets", (command, env, workerEnv) => {
-    expect(
-      buildInfisicalRunArgs({
-        app: "api",
-        command,
-        commandArgs: ["wrangler", "deploy", `--env=${workerEnv}`],
-        repoRoot: "/repo",
-      }),
-    ).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      `--env=${env}`,
-      "--path=/tools/cloudflare",
-      "--",
-      "wrangler",
-      "deploy",
-      `--env=${workerEnv}`,
-    ]);
-  });
+  ])(
+    "builds API %s args with Cloudflare secrets",
+    (command, env, workerEnv) => {
+      expect(
+        buildInfisicalRunArgs({
+          app: "api",
+          command,
+          commandArgs: ["wrangler", "deploy", `--env=${workerEnv}`],
+          repoRoot: "/repo",
+        }),
+      ).toEqual([
+        "run",
+        ...quietArgs,
+        "--project-config-dir=/repo",
+        `--env=${env}`,
+        "--path=/tools/cloudflare",
+        "--",
+        "wrangler",
+        "deploy",
+        `--env=${workerEnv}`,
+      ]);
+    },
+  );
 
   it.each([
     ["cron:run"],

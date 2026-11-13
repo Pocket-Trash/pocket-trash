@@ -93,12 +93,15 @@ describe("markdownToHtml", () => {
       "Readable",
       "<script",
     ],
-  ])("downgrades unsupported %s to readable text", (_name, markdown, text, tag) => {
-    const html = markdownToHtml(markdown);
+  ])(
+    "downgrades unsupported %s to readable text",
+    (_name, markdown, text, tag) => {
+      const html = markdownToHtml(markdown);
 
-    expect(html).toContain(text);
-    expect(html).not.toContain(tag);
-  });
+      expect(html).toContain(text);
+      expect(html).not.toContain(tag);
+    },
+  );
 
   it("opens only external HTTP links in a new tab", () => {
     const relative = markdownToHtml("[Help](../help)");
@@ -179,7 +182,8 @@ describe("isSafeMarkdownLink", () => {
     "https://example.com",
     "HTTP://example.com",
   ])("accepts safe destination %s", (url) =>
-    expect(isSafeMarkdownLink(url)).toBe(true));
+    expect(isSafeMarkdownLink(url)).toBe(true),
+  );
 
   it.each([
     "mailto:test@example.com",
@@ -188,5 +192,6 @@ describe("isSafeMarkdownLink", () => {
     "//example.com",
     "",
   ])("rejects unsafe destination %s", (url) =>
-    expect(isSafeMarkdownLink(url)).toBe(false));
+    expect(isSafeMarkdownLink(url)).toBe(false),
+  );
 });

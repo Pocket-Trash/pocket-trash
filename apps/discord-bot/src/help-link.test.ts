@@ -40,24 +40,24 @@ describe("staff help-link command", () => {
     });
   });
 
-  it.each([
-    roles.ownerRoleId,
-    roles.moderatorRoleId,
-  ])("allows configured staff role %s and posts an English public link", async (roleId) => {
-    const reply = vi.fn();
-    const command = createHelpLinkCommand(roles);
-    await createInteractionRegistry([command.handler]).dispatch("help-link", {
-      memberRoleIds: [roleId],
-      commandOptions: { topic: "how-to-use-markdown", userId: null },
-      reply,
-    });
-    expect(reply).toHaveBeenCalledWith({
-      content:
-        "How to Use Markdown\nhttps://pocket-trash.app/help/how-to-use-markdown",
-      ephemeral: false,
-      allowedMentions: { parse: [], users: [] },
-    });
-  });
+  it.each([roles.ownerRoleId, roles.moderatorRoleId])(
+    "allows configured staff role %s and posts an English public link",
+    async (roleId) => {
+      const reply = vi.fn();
+      const command = createHelpLinkCommand(roles);
+      await createInteractionRegistry([command.handler]).dispatch("help-link", {
+        memberRoleIds: [roleId],
+        commandOptions: { topic: "how-to-use-markdown", userId: null },
+        reply,
+      });
+      expect(reply).toHaveBeenCalledWith({
+        content:
+          "How to Use Markdown\nhttps://pocket-trash.app/help/how-to-use-markdown",
+        ephemeral: false,
+        allowedMentions: { parse: [], users: [] },
+      });
+    },
+  );
 
   it("mentions only the explicitly selected member", async () => {
     const reply = vi.fn();
@@ -88,21 +88,21 @@ describe("staff help-link command", () => {
     });
   });
 
-  it.each([
-    "stale-topic",
-    "../secrets",
-  ])("rejects stale or invalid topic %s ephemerally", async (topic) => {
-    const reply = vi.fn();
-    await createHelpLinkCommand(roles).handler.execute({
-      memberRoleIds: [roles.ownerRoleId],
-      commandOptions: { topic, userId: null },
-      reply,
-    });
-    expect(reply).toHaveBeenCalledWith({
-      content: "Something went wrong.",
-      ephemeral: true,
-    });
-  });
+  it.each(["stale-topic", "../secrets"])(
+    "rejects stale or invalid topic %s ephemerally",
+    async (topic) => {
+      const reply = vi.fn();
+      await createHelpLinkCommand(roles).handler.execute({
+        memberRoleIds: [roles.ownerRoleId],
+        commandOptions: { topic, userId: null },
+        reply,
+      });
+      expect(reply).toHaveBeenCalledWith({
+        content: "Something went wrong.",
+        ephemeral: true,
+      });
+    },
+  );
 
   it("rejects empty or duplicate compiled metadata before registering", () => {
     expect(() => createHelpLinkCommand({ ...roles, topics: [] })).toThrow();

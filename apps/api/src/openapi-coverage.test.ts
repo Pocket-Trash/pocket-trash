@@ -88,38 +88,37 @@ describe("OpenAPI coverage", () => {
     ]);
   });
 
-  it.each([
-    "all",
-    "use",
-  ] as const)("rejects opaque ALL registrations through %s", (registration) => {
-    const app = new OpenAPIHono();
-    /**
-     * Serves a response from an opaque middleware registration.
-     *
-     * @param context - Test request context.
-     * @param next - Remaining handlers.
-     * @returns Empty response when requested, or completion of the next handler.
-     */
-    const handler: MiddlewareHandler = async (context, next) => {
-      if (context.req.header("x-return")) return context.body(null, 204);
-      await next();
-    };
-    if (registration === "all") app.all("/hidden/*", handler);
-    else app.use("/hidden/*", handler);
-    expect(findOpenApiCoverageErrors(app.routes, {}).join("\n")).toContain(
-      "Unsupported route registration: ALL /hidden/*",
-    );
-  });
+  it.each(["all", "use"] as const)(
+    "rejects opaque ALL registrations through %s",
+    (registration) => {
+      const app = new OpenAPIHono();
+      /**
+       * Serves a response from an opaque middleware registration.
+       *
+       * @param context - Test request context.
+       * @param next - Remaining handlers.
+       * @returns Empty response when requested, or completion of the next handler.
+       */
+      const handler: MiddlewareHandler = async (context, next) => {
+        if (context.req.header("x-return")) return context.body(null, 204);
+        await next();
+      };
+      if (registration === "all") app.all("/hidden/*", handler);
+      else app.use("/hidden/*", handler);
+      expect(findOpenApiCoverageErrors(app.routes, {}).join("\n")).toContain(
+        "Unsupported route registration: ALL /hidden/*",
+      );
+    },
+  );
 
-  it.each([
-    "/items/:id?",
-    "/items/:id{[0-9]+}",
-    "/items/*/edit",
-  ])("rejects unrepresentable patterns: %s", (path) => {
-    expect(
-      findOpenApiCoverageErrors([{ method: "GET", path }], {}).join("\n"),
-    ).toContain(`Unsupported route registration: GET ${path}`);
-  });
+  it.each(["/items/:id?", "/items/:id{[0-9]+}", "/items/*/edit"])(
+    "rejects unrepresentable patterns: %s",
+    (path) => {
+      expect(
+        findOpenApiCoverageErrors([{ method: "GET", path }], {}).join("\n"),
+      ).toContain(`Unsupported route registration: GET ${path}`);
+    },
+  );
 
   it("requires the exact catch-all extension for wildcard endpoints", () => {
     const routes = [{ method: "OPTIONS", path: "/storage/*" }];

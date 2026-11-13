@@ -76,20 +76,20 @@ function pullRequestPayload(fullName = repository.full_name) {
 }
 
 describe("GitHub webhook intake", () => {
-  it.each([
-    "requested",
-    "in_progress",
-  ])("ignores the normal workflow_run %s lifecycle action", async (action) => {
-    const enqueue = vi.fn();
-    const handle = createWebhookIntake({
-      enqueue,
-      normalize: createGitHubWebhookNormalizer(destinations),
-    });
-    expect(
-      await handle(githubRequest("workflow_run", { action })),
-    ).toMatchObject({ status: 204 });
-    expect(enqueue).not.toHaveBeenCalled();
-  });
+  it.each(["requested", "in_progress"])(
+    "ignores the normal workflow_run %s lifecycle action",
+    async (action) => {
+      const enqueue = vi.fn();
+      const handle = createWebhookIntake({
+        enqueue,
+        normalize: createGitHubWebhookNormalizer(destinations),
+      });
+      expect(
+        await handle(githubRequest("workflow_run", { action })),
+      ).toMatchObject({ status: 204 });
+      expect(enqueue).not.toHaveBeenCalled();
+    },
+  );
 
   it("authenticates and queues a normalized pull-request delivery", async () => {
     const enqueue = vi.fn().mockResolvedValue({ accepted: true });
@@ -179,33 +179,33 @@ describe("GitHub webhook intake", () => {
     });
   });
 
-  it.each([
-    "submitted",
-    "dismissed",
-  ])("accepts the pull-request review %s action", async (action) => {
-    const enqueue = vi.fn().mockResolvedValue({ accepted: true });
-    const handle = createWebhookIntake({
-      enqueue,
-      normalize: createGitHubWebhookNormalizer(destinations),
-    });
-    const pullRequest = pullRequestPayload().pull_request;
-    const payload = {
-      action,
-      pull_request: pullRequest,
-      repository,
-      review: {
-        body: "The queue boundary looks good.",
-        html_url: `${pullRequest.html_url}#pullrequestreview-1`,
-        state: "approved",
-        submitted_at: "2026-10-17T20:05:00.000Z",
-      },
-      sender,
-    };
+  it.each(["submitted", "dismissed"])(
+    "accepts the pull-request review %s action",
+    async (action) => {
+      const enqueue = vi.fn().mockResolvedValue({ accepted: true });
+      const handle = createWebhookIntake({
+        enqueue,
+        normalize: createGitHubWebhookNormalizer(destinations),
+      });
+      const pullRequest = pullRequestPayload().pull_request;
+      const payload = {
+        action,
+        pull_request: pullRequest,
+        repository,
+        review: {
+          body: "The queue boundary looks good.",
+          html_url: `${pullRequest.html_url}#pullrequestreview-1`,
+          state: "approved",
+          submitted_at: "2026-10-17T20:05:00.000Z",
+        },
+        sender,
+      };
 
-    expect(
-      await handle(githubRequest("pull_request_review", payload)),
-    ).toMatchObject({ status: 202 });
-  });
+      expect(
+        await handle(githubRequest("pull_request_review", payload)),
+      ).toMatchObject({ status: 202 });
+    },
+  );
 
   it("accepts a manual workflow dispatch test", async () => {
     const enqueue = vi.fn().mockResolvedValue({ accepted: true });
