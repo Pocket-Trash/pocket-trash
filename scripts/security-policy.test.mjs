@@ -7,6 +7,7 @@ import {
   readFile,
   rm,
   stat,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -410,13 +411,13 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
   );
 });
 
-test("removes the withdrawn braces exception and retains only scoped Vercel Zod approval", async () => {
+test("retains only the approved scoped Zod and Picomatch exceptions", async () => {
   const exceptions = JSON.parse(
     await readFile("security-audit-exceptions.json", "utf8"),
   );
   assert.deepEqual(
     exceptions.map(({ advisory }) => advisory),
-    ["GHSA-mrhx-c7xc-m3w5"],
+    ["GHSA-mrhx-c7xc-m3w5", "GHSA-fc5q-39xc-vjpf"],
   );
   assert.doesNotMatch(workspacePolicy, /GHSA-vfj7-8cjw-p6xm|ignoreGhsas:/);
 });
@@ -445,6 +446,64 @@ test("locks mature security fixes across qualified package versions", () => {
 test("allows only the reviewed Vercel development Zod finding", async (t) => {
   const result = await runScopedZodAudit(t, scopedZodAudit);
   assert.equal(result.code, 0, result.output);
+});
+
+test("allows the patched Picomatch finding only with explicit temporary approval", async (t) => {
+  const exceptions = JSON.parse(
+    await readFile("security-audit-exceptions.json", "utf8"),
+  ).filter(({ advisory }) => advisory !== "GHSA-fc5q-39xc-vjpf");
+  const unapprovedExceptions = [...exceptions];
+  exceptions.push({
+    advisory: "GHSA-fc5q-39xc-vjpf",
+    owner: "Test fixture",
+    followUpIssue: "ENG-686",
+    approvedAt: new Date(Date.now() - 60_000).toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    reason: "Fixture approval for the exact patched dependency graph.",
+  });
+  const audit = structuredClone(scopedZodAudit);
+  audit.advisories[456] = {
+    github_advisory_id: "GHSA-fc5q-39xc-vjpf",
+    module_name: "picomatch",
+    severity: "high",
+    title: "Picomatch repeated extglob ReDoS",
+    findings: [
+      { version: "2.3.2", dev: true, paths: [".>vercel>picomatch"] },
+      { version: "4.0.7", dev: false, paths: ["apps/web>picomatch"] },
+    ],
+  };
+  const unapproved = await runScopedZodAudit(t, audit, unapprovedExceptions);
+  assert.notEqual(unapproved.code, 0, unapproved.output);
+  const approved = await runScopedZodAudit(t, audit, exceptions);
+  assert.equal(approved.code, 0, approved.output);
+  for (const change of [
+    { module_name: "other-package" },
+    { severity: "critical" },
+    { findings: [] },
+    { findings: [{ version: "4.0.8", paths: [".>picomatch"] }] },
+    { findings: [{ version: "4.0.7", paths: [] }] },
+  ]) {
+    const outside = structuredClone(audit);
+    Object.assign(outside.advisories[456], change);
+    const result = await runScopedZodAudit(t, outside, exceptions);
+    assert.notEqual(result.code, 0, JSON.stringify(change));
+  }
+  for (const files of [
+    { "pnpm-lock.yaml": workspaceLockfile + "\n" },
+    { "pnpm-workspace.yaml": fixturePolicy },
+    { "patches/picomatch@2.3.2.patch": "" },
+    { "patches/picomatch@4.0.7.patch": "" },
+  ]) {
+    const result = await runScopedZodAudit(t, audit, exceptions, files);
+    assert.notEqual(result.code, 0, JSON.stringify(Object.keys(files)));
+    assert.match(result.output, /Picomatch/);
+  }
+  audit.advisories[789] = {
+    ...audit.advisories[456],
+    github_advisory_id: "GHSA-grv7-fg5c-xmjg",
+  };
+  const unrelated = await runScopedZodAudit(t, audit, exceptions);
+  assert.notEqual(unrelated.code, 0, unrelated.output);
 });
 
 test("blocks changes to the reviewed Zod version, development status or paths", async (t) => {
@@ -494,9 +553,11 @@ test("a higher severity requires a new review of the Zod exception", async (t) =
  * Exercises the public audit command with a deterministic package-manager response.
  * @param t - Test context owning the temporary executable.
  * @param audit - Audit JSON or malformed output.
+ * @param exceptions - Optional fixture-only exception metadata.
+ * @param files - Optional isolated repository files to alter.
  * @returns The captured audit command result.
  */
-async function runScopedZodAudit(t, audit) {
+async function runScopedZodAudit(t, audit, exceptions, files) {
   const directory = await mkdtemp(path.join(tmpdir(), "scoped-zod-audit-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const output = typeof audit === "string" ? audit : JSON.stringify(audit);
@@ -505,7 +566,32 @@ async function runScopedZodAudit(t, audit) {
     `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(output)}); process.exitCode=1;\n`,
     { mode: 0o700 },
   );
-  return run(process.execPath, ["scripts/security-audit.mjs"], process.cwd(), {
+  const args = ["scripts/security-audit.mjs"];
+  let cwd = process.cwd();
+  if (files) {
+    cwd = path.join(directory, "repository");
+    for (const file of [
+      "scripts/security-audit.mjs",
+      "pnpm-workspace.yaml",
+      "pnpm-lock.yaml",
+      "patches/picomatch@2.3.2.patch",
+      "patches/picomatch@4.0.7.patch",
+    ]) {
+      const target = path.join(cwd, file);
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, files[file] ?? (await readFile(file)));
+    }
+    await symlink(
+      path.join(process.cwd(), "node_modules"),
+      path.join(cwd, "node_modules"),
+    );
+  }
+  if (exceptions) {
+    const file = path.join(directory, "exceptions.json");
+    await writeFile(file, JSON.stringify(exceptions));
+    args.push("--exceptions-file", file);
+  }
+  return run(process.execPath, args, cwd, {
     PATH: directory + path.delimiter + process.env.PATH,
   });
 }
