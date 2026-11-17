@@ -8,7 +8,8 @@ Storybook, web tests, lint, and whole-repository typechecking.
 The API scope also includes `@package/queue` for the preview Redis probe.
 
 `scripts/pnpm-install-scope.sh` owns the selectors. Every scope uses a frozen
-lockfile and prefers cached downloads. Tooling installs skip lifecycle scripts.
+lockfile and prefers cached downloads. Repository-approved lifecycle scripts
+remain enabled so root tooling such as the Railway CLI is usable.
 The pnpm store cache includes OS, architecture, actual Node/pnpm versions,
 scope, and lockfile hash. Older lockfile caches restore only within the same
 scope; backend caches cannot satisfy a full-workspace cache key. Dependency

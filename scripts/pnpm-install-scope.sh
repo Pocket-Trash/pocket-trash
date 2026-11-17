@@ -3,7 +3,7 @@
 set -eu
 
 case "${1:-}" in
-  tools) set -- --filter=pocket-trash.app... --ignore-scripts ;;
+  tools) set -- --filter=pocket-trash.app... ;;
   # API preview orchestration also probes Redis through the queue package.
   api) set -- --filter=pocket-trash.app... --filter=@app/api... --filter=@package/queue... ;;
   scraper|discord-bot) set -- --filter=pocket-trash.app... "--filter=@app/$1..." ;;

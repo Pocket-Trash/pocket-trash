@@ -230,6 +230,9 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
   const packages = {
     ".": {
       name: "pocket-trash.app",
+      scripts: {
+        prepare: `node -e 'require("node:fs").writeFileSync("prepared", "ready")'`,
+      },
       devDependencies: {
         "fixture-tool": "1.0.0",
         "@package/lint": "workspace:*",
@@ -300,8 +303,13 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
         FONTAWESOME_PACKAGE_TOKEN: "fixture-token",
         PNPM_CONFIG_STORE_DIR: path.join(directory, `store-${scope}`),
       };
+      await rm(path.join(directory, "prepared"), { force: true });
       const cold = await run("sh", [script, scope], directory, env);
       assert.equal(cold.code, 0, cold.output);
+      assert.equal(
+        await readFile(path.join(directory, "prepared"), "utf8"),
+        "ready",
+      );
       const icons = requests.filter((request) =>
         /(?:fortawesome|awesome.me).*\/-\//u.test(request),
       );
@@ -328,6 +336,7 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
         recursive: true,
         force: true,
       });
+      await rm(path.join(directory, "prepared"));
       requests.length = 0;
       const warm = await run("sh", [script, scope], directory, env);
       assert.equal(warm.code, 0, warm.output);
