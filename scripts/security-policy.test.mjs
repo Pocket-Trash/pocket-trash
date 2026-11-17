@@ -401,6 +401,11 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
           contents.replaceAll(registry, freshRegistry),
         );
       }
+      // The cold policy check must not inherit links to the full-install store.
+      await rm(path.join(directory, "node_modules"), {
+        recursive: true,
+        force: true,
+      });
       const rejected = await run("sh", [script, "tools"], directory, {
         FONTAWESOME_PACKAGE_TOKEN: "fixture-token",
         PNPM_CONFIG_STORE_DIR: path.join(directory, "fresh-policy-store"),
