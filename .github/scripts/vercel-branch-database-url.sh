@@ -330,7 +330,7 @@ deploy_preview() {
     }')"
 
   local response
-  response="$(api POST "/v13/deployments$(team_query_prefix)&forceNew=1&skipAutoDetectionConfirmation=1" "$body")"
+  response="$(api POST "/v13/deployments$(team_query_prefix)&forceNew=1&withCache=1&skipAutoDetectionConfirmation=1" "$body")"
 
   local deployment_id
   deployment_id="$(jq -er '.id' <<< "$response")"
