@@ -6,6 +6,7 @@ scope. `tools` installs root tooling and its workspace dependencies; `api`,
 dependency closure. `full` installs the complete workspace for web builds,
 Storybook, web tests, lint, and whole-repository typechecking.
 The API scope also includes `@package/queue` for the preview Redis probe.
+The database scope includes `@package/storage` for database seed tooling.
 
 `scripts/pnpm-install-scope.sh` owns the selectors. Every scope uses a frozen
 lockfile and prefers cached downloads. Repository-approved lifecycle scripts

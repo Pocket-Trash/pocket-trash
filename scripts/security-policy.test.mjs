@@ -208,6 +208,7 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
     "fixture-tool",
     "fixture-backend",
     "fixture-queue",
+    "fixture-storage",
     "@fortawesome/pro-light-svg-icons",
     "@awesome.me/kit-fixture",
   ]) {
@@ -249,6 +250,10 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
     "packages/queue": {
       name: "@package/queue",
       dependencies: { "fixture-queue": "1.0.0" },
+    },
+    "packages/storage": {
+      name: "@package/storage",
+      dependencies: { "fixture-storage": "1.0.0" },
     },
     ...Object.fromEntries(
       ["api", "scraper", "discord-bot"].map((name) => [
@@ -306,6 +311,11 @@ test("scoped installs omit private icon payloads while warm stores reuse web pac
       await rm(path.join(directory, "prepared"), { force: true });
       const cold = await run("sh", [script, scope], directory, env);
       assert.equal(cold.code, 0, cold.output);
+      assert.equal(
+        requests.some((request) => /fixture-storage\/-\//u.test(request)),
+        scope === "database" || scope === "full",
+        cold.output,
+      );
       assert.equal(
         await readFile(path.join(directory, "prepared"), "utf8"),
         "ready",
