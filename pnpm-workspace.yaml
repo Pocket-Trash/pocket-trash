@@ -3,6 +3,8 @@ packages:
   - "packages/*"
 patchedDependencies:
   "@railway/cli@5.71.0": patches/@railway__cli@5.71.0.patch
+  picomatch@2.3.2: patches/picomatch@2.3.2.patch
+  picomatch@4.0.7: patches/picomatch@4.0.7.patch
 allowBuilds:
   "@railway/cli": true
   bufferutil: false

@@ -6,5 +6,13 @@
     "approvedAt": "2026-11-17T16:33:45Z",
     "expiresAt": "2026-11-20T20:52:00Z",
     "reason": "Temporary exception for Zod 3.22.4 on six reviewed Vercel CLI development-tooling paths only. The audit validates version, development-only status and exact paths before excluding this finding; all application Zod 4 resolutions remain patched. Crafted build inputs can exhaust tooling memory."
+  },
+  {
+    "advisory": "GHSA-fc5q-39xc-vjpf",
+    "owner": "Roy Anger",
+    "followUpIssue": "ENG-686",
+    "approvedAt": "2026-11-17T20:07:16Z",
+    "expiresAt": "2026-11-20T20:52:00Z",
+    "reason": "Roy approved the temporary exception for the exact locked graph and locally patched Picomatch 2.3.2/4.0.7. The upstream PR 254 adaptation mitigates ordinary single-branch extglobs while preserving separator and escape compatibility. Related multi-branch patterns, complex escaped/separator branches and the explicit guard opt-out remain vulnerable. The audit verifies the lockfile and both patch hashes/configuration, and rejects changed versions, severity or unrelated advisories. Replace the mitigation with an official fix and remove this exception under ENG-686."
   }
 ]
