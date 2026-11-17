@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { execFileSync, spawn } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -320,6 +327,139 @@ test("rejects an incomplete audit exception", async (t) => {
   assert.match(result.output, /owner/);
 });
 
+test("Railway native sources and trimmed uploads install no web icon payloads", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "railway-install-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(path.join(directory, "package"));
+  const entries = {};
+  for (const name of [
+    "fixture-tool",
+    "fixture-backend",
+    "@fortawesome/pro-light-svg-icons",
+    "@awesome.me/kit-fixture",
+  ]) {
+    await writeFile(
+      path.join(directory, "package/package.json"),
+      JSON.stringify({ name, version: "1.0.0" }),
+    );
+    entries[name] = {
+      publishedAt: "2020-01-01T00:00:00.000Z",
+      tarball: execFileSync("tar", ["-czf", "-", "package"], {
+        cwd: directory,
+      }),
+      blockTarball: name.startsWith("@"),
+    };
+  }
+  const requests = [];
+  const registry = await startRegistry(t, entries, (request) =>
+    requests.push(request),
+  );
+  const packages = {
+    ".": {
+      name: "pocket-trash.app",
+      devDependencies: { "fixture-tool": "1.0.0" },
+    },
+    "apps/scraper": {
+      name: "@app/scraper",
+      dependencies: { "@package/database": "workspace:*" },
+    },
+    "apps/discord-bot": {
+      name: "@app/discord-bot",
+      dependencies: { "@package/queue": "workspace:*" },
+    },
+    "packages/database": {
+      name: "@package/database",
+      dependencies: { "fixture-backend": "1.0.0" },
+    },
+    "packages/queue": {
+      name: "@package/queue",
+      dependencies: { "fixture-backend": "1.0.0" },
+    },
+    "apps/web": {
+      name: "@app/web",
+      dependencies: {
+        "@fortawesome/pro-light-svg-icons": "1.0.0",
+        "@awesome.me/kit-fixture": "1.0.0",
+      },
+    },
+  };
+  for (const [location, manifest] of Object.entries(packages)) {
+    await mkdir(path.join(directory, location), { recursive: true });
+    await writeFile(
+      path.join(directory, location, "package.json"),
+      JSON.stringify(manifest),
+    );
+  }
+  await mkdir(path.join(directory, "scripts"));
+  await writeFile(
+    path.join(directory, "scripts/pnpm-install.sh"),
+    await readFile("scripts/pnpm-install.sh"),
+    { mode: 0o755 },
+  );
+  await writeFile(path.join(directory, "pnpm-workspace.yaml"), fixturePolicy);
+  await writeFile(
+    path.join(directory, ".npmrc"),
+    `registry=${registry}\n@fortawesome:registry=${registry}\n@awesome.me:registry=${registry}\n`,
+  );
+  const seeded = await run(
+    "pnpm",
+    ["install", "--lockfile-only", "--ignore-scripts"],
+    directory,
+    { PNPM_CONFIG_STORE_DIR: path.join(directory, "seed-store") },
+  );
+  assert.equal(seeded.code, 0, seeded.output);
+  const command = JSON.parse(await readFile("railpack.json", "utf8")).steps
+    .install.commands[0];
+  for (const context of ["native", "trimmed-upload"]) {
+    await t.test(context, async () => {
+      if (context === "trimmed-upload") {
+        await rm(path.join(directory, "apps/web"), { recursive: true });
+        await rm(path.join(directory, "node_modules"), { recursive: true });
+      }
+      requests.length = 0;
+      const installed = await run("sh", ["-c", command], directory, {
+        FONTAWESOME_PACKAGE_TOKEN: "fixture-token",
+        PNPM_CONFIG_STORE_DIR: path.join(directory, `store-${context}`),
+        PNPM_CONFIG_FETCH_RETRIES: "0",
+      });
+      assert.equal(installed.code, 0, installed.output);
+      assert.deepEqual(
+        requests.filter((request) => request.includes("/-/")).sort(),
+        [
+          "fixture-backend/-/package-1.0.0.tgz",
+          "fixture-tool/-/package-1.0.0.tgz",
+        ],
+      );
+    });
+  }
+  await t.test(
+    "trimmed uploads retain full-lockfile release-age checks",
+    async () => {
+      const freshRegistry = await startRegistry(t, {
+        ...entries,
+        "@awesome.me/kit-fixture": {
+          ...entries["@awesome.me/kit-fixture"],
+          publishedAt: new Date().toISOString(),
+        },
+      });
+      for (const filename of [".npmrc", "pnpm-lock.yaml"]) {
+        const contents = await readFile(path.join(directory, filename), "utf8");
+        await writeFile(
+          path.join(directory, filename),
+          contents.replaceAll(registry, freshRegistry),
+        );
+      }
+      const rejected = await run("sh", ["-c", command], directory, {
+        FONTAWESOME_PACKAGE_TOKEN: "fixture-token",
+        PNPM_CONFIG_STORE_DIR: path.join(directory, "store-fresh"),
+        PNPM_CONFIG_FETCH_RETRIES: "0",
+      });
+      assert.notEqual(rejected.code, 0, rejected.output);
+      assert.match(rejected.output, /ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION/u);
+    },
+  );
+});
+
 test("rejects an expired audit exception", async (t) => {
   const result = await runAuditWithExceptions(t, [
     {
@@ -517,19 +657,31 @@ async function installFixture(
  * Starts a minimal package metadata registry.
  *
  * @param t - Node test context.
- * @param packages - Package metadata keyed by name.
+ * @param packages - Package metadata and optional generated tarballs keyed by name.
+ * @param onRequest - Optional observer for metadata and payload requests.
  * @returns The registry URL.
  * @throws When the registry cannot start.
  */
-async function startRegistry(t, packages) {
+async function startRegistry(t, packages, onRequest = () => {}) {
   // A unique URL prevents stale metadata reuse when the OS recycles a port.
   const registryPath = `/${randomUUID()}/`;
   const server = createServer((request, response) => {
-    const name = decodeURIComponent(request.url.slice(registryPath.length));
+    const requestPath = decodeURIComponent(
+      request.url.slice(registryPath.length),
+    );
+    onRequest(requestPath);
+    const name = requestPath.split("/-/")[0];
     const entry = packages[name];
 
     if (!entry) {
       response.writeHead(404).end();
+      return;
+    }
+
+    if (requestPath.includes("/-/")) {
+      response
+        .writeHead(entry.tarball && !entry.blockTarball ? 200 : 403)
+        .end(entry.blockTarball ? undefined : entry.tarball);
       return;
     }
 
@@ -544,9 +696,10 @@ async function startRegistry(t, packages) {
             name,
             version: "1.0.0",
             dist: {
-              integrity:
-                "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
-              tarball: `${registry}/${name}/-/package-1.0.0.tgz`,
+              integrity: entry.tarball
+                ? `sha512-${createHash("sha512").update(entry.tarball).digest("base64")}`
+                : "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+              tarball: `${registry}${registryPath}${name}/-/package-1.0.0.tgz`,
             },
           },
         },

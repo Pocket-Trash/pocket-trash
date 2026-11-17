@@ -67,7 +67,12 @@ build inputs before upload. When adding build inputs, update the allowlist and
 the watched paths in `.railway/railway.ts` together.
 
 Railway needs `FONTAWESOME_PACKAGE_TOKEN` while installing the workspace because
-the supply-chain audit resolves the complete lockfile, including web-only packages.
+full-lockfile supply-chain checks can resolve metadata for web-only packages.
+Native builds and CLI uploads install root tooling plus the scraper and Discord
+bot dependency closures with a frozen lockfile and `--prefer-offline`. The web
+app is excluded, so these installs do not download its icon-package tarballs.
+`railpack.json`, IaC's `RAILPACK_INSTALL_CMD`, preview-variable generation, and
+the production workflow carry the same filters.
 The tracked `.npmrc` routes `@fortawesome` packages to `npm.fontawesome.com`; it
 contains no credentials. Keep it in CLI uploads so pnpm does not request private
 packages from the public npm registry. The Deploy workflow copies
@@ -76,7 +81,9 @@ builds. Railpack runs `scripts/pnpm-install.sh` so credentials stay in a
 permission-restricted temporary npm user config. Keep the preview template
 initialized with the same non-production token so the first native PR build can
 authenticate before GitHub Actions configures that PR environment. The token is
-not used by scraper application code.
+not used by scraper application code. Retain the registry configuration and token
+until upload-equivalent testing proves both installation and full-lockfile policy
+verification work without them; filtering alone does not establish that.
 
 ## Infrastructure changes
 

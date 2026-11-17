@@ -91,7 +91,8 @@ for (const environment of ["production", "preview"]) {
     ]);
     assert.deepEqual(scraper.variables.RAILPACK_INSTALL_CMD, {
       type: "literal",
-      value: "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+      value:
+        "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot...",
     });
     for (const [name, value] of Object.entries(scraper.variables)) {
       if (name === "RAILPACK_INSTALL_CMD" || name === "REDIS_URL") continue;
@@ -227,7 +228,7 @@ test("authenticates native Railpack installs from source", () => {
   );
 
   assert.deepEqual(config.steps.install.commands, [
-    "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+    "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot...",
   ]);
   assert.deepEqual(config.secrets, ["FONTAWESOME_PACKAGE_TOKEN"]);
   assert.deepEqual(config.steps.install.secrets, ["FONTAWESOME_PACKAGE_TOKEN"]);

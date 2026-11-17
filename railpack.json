@@ -5,7 +5,7 @@
   "steps": {
     "install": {
       "commands": [
-        "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline"
+        "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot..."
       ],
       "secrets": ["FONTAWESOME_PACKAGE_TOKEN"]
     }

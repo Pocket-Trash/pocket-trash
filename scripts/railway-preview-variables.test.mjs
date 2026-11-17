@@ -107,7 +107,7 @@ test("preview variables are batched, scoped and verified without deploying", (t)
   );
   assert.equal(
     body.scraper.variables.RAILPACK_INSTALL_CMD,
-    "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+    "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot...",
   );
   assert.equal(
     body.scraper.variables.REDIS_URL,
