@@ -83,15 +83,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -103,8 +94,10 @@ jobs:
           env-slug: preview
           secret-path: tools/github/secrets
 
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: api
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"

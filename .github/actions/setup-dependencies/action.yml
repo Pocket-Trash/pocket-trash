@@ -1,0 +1,36 @@
+name: Set up scoped dependencies
+description: Install locked workspace consumers with an isolated reusable pnpm store cache.
+inputs:
+  scope:
+    description: tools, api, database, scraper, discord-bot, or full
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24.21.0
+        package-manager-cache: false
+    - name: Enable Corepack
+      shell: bash
+      run: corepack enable
+    - name: Read cache identity
+      id: identity
+      shell: bash
+      run: |
+        echo "node=$(node --version)" >> "$GITHUB_OUTPUT"
+        echo "pnpm=$(pnpm --version)" >> "$GITHUB_OUTPUT"
+        echo "store=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+    - name: Cache scoped pnpm store
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.identity.outputs.store }}
+        key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ steps.identity.outputs.node }}-${{ steps.identity.outputs.pnpm }}-${{ inputs.scope }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-${{ runner.os }}-${{ runner.arch }}-${{ steps.identity.outputs.node }}-${{ steps.identity.outputs.pnpm }}-${{ inputs.scope }}-
+    - name: Install selected dependencies
+      shell: bash
+      env:
+        INSTALL_SCOPE: ${{ inputs.scope }}
+      run: ./scripts/pnpm-install-scope.sh "$INSTALL_SCOPE"

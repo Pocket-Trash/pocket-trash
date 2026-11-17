@@ -470,6 +470,8 @@ test("classifies workflow and root build configuration conservatively", () => {
   for (const path of [
     ".npmrc",
     ".github/workflows/ci.yml",
+    ".github/actions/setup-dependencies/action.yml",
+    "scripts/pnpm-install-scope.sh",
     ".github/scripts/ci-log.sh",
     "package.json",
     "pnpm-lock.yaml",
@@ -492,6 +494,97 @@ test("configures Font Awesome authentication in a temporary user config", () => 
   assert.match(installScript, /umask 077/u);
   assert.match(installScript, /NPM_CONFIG_USERCONFIG/u);
   assert.match(installScript, /trap .*rm -f/u);
+});
+
+test("workflow consumers select isolated dependency scopes", () => {
+  const expectedScopes = {
+    "ci.yml": {
+      "classify-changes": "tools",
+      metadata: "tools",
+      security: "tools",
+      "scraper-artifact": "scraper",
+      "discord-bot-artifact": "discord-bot",
+      "api-artifact": "api",
+      "web-artifact": "full",
+      lint: "full",
+      test: "full",
+      "storybook-test": "full",
+      "drizzle-check": "database",
+    },
+    "deploy.yml": {
+      "classify-changes": "tools",
+      preview: "api",
+      e2e: "full",
+      "mutation-e2e": "full",
+      "development-api": "api",
+      "preview-webhook-cleanup": "api",
+      production: "api",
+      "railway-production": "tools",
+      "web-production": "full",
+    },
+    "logger-live.yml": { "logger-live-axiom": "api" },
+    "preview-infrastructure-cleanup.yml": { "preview-closed": "api" },
+    "preview-refresh.yml": { refresh: "database" },
+    "railway-config.yml": { drift: "tools" },
+  };
+  for (const [filename, jobs] of Object.entries(expectedScopes)) {
+    const workflow = parse(
+      readFileSync(
+        new URL(`../.github/workflows/${filename}`, import.meta.url),
+        "utf8",
+      ),
+    );
+    for (const [name, scope] of Object.entries(jobs)) {
+      const steps = workflow.jobs[name].steps;
+      const setup = steps.filter(
+        (step) => step.uses === "./.github/actions/setup-dependencies",
+      );
+      assert.equal(setup.length, 1, `${filename}:${name}`);
+      assert.equal(setup[0].with.scope, scope, `${filename}:${name}`);
+      assert.ok(
+        !steps.some((step) => step.with?.cache === "pnpm"),
+        `${filename}:${name}`,
+      );
+    }
+  }
+});
+
+test("dependency caches isolate scopes and reuse older compatible lockfiles", () => {
+  const action = parse(
+    readFileSync(
+      new URL(
+        "../.github/actions/setup-dependencies/action.yml",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  const steps = action.runs.steps;
+  const cache = steps.find((step) => step.uses === "actions/cache@v4");
+  assert.ok(cache);
+  for (const identity of [
+    "runner.os",
+    "runner.arch",
+    "steps.identity.outputs.node",
+    "steps.identity.outputs.pnpm",
+    "inputs.scope",
+    "hashFiles('pnpm-lock.yaml')",
+  ]) {
+    assert.ok(cache.with.key.includes(`\u0024{{ ${identity} }}`), identity);
+  }
+  assert.equal(
+    cache.with["restore-keys"].trim(),
+    cache.with.key.replace("\u0024{{ hashFiles('pnpm-lock.yaml') }}", ""),
+  );
+  const install = steps.at(-1);
+  assert.equal(install.run, './scripts/pnpm-install-scope.sh "$INSTALL_SCOPE"');
+  assert.equal(install.if, undefined);
+  assert.equal(
+    steps.find((step) => step.uses?.startsWith("actions/setup-node@")).with[
+      "package-manager-cache"
+    ],
+    false,
+  );
 });
 
 test("private package install removes its temporary credentials", () => {
@@ -553,10 +646,12 @@ test("authenticates and clears private package access around every workflow inst
 
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = job.steps ?? [];
-      const installIndex = steps.findIndex((step) =>
-        /(?:^|\n)\s*(?:\.\/)?(?:scripts\/pnpm-install\.sh|pnpm install)\b/u.test(
-          step.run ?? "",
-        ),
+      const installIndex = steps.findIndex(
+        (step) =>
+          step.uses === "./.github/actions/setup-dependencies" ||
+          /(?:^|\n)\s*(?:\.\/)?(?:scripts\/pnpm-install\.sh|pnpm install)\b/u.test(
+            step.run ?? "",
+          ),
       );
       if (installIndex === -1) continue;
 
@@ -588,9 +683,9 @@ test("authenticates and clears private package access around every workflow inst
         productionInstall ? "prod" : "preview",
         `${filename}:${jobName}`,
       );
-      assert.match(
-        steps[installIndex].run,
-        /scripts\/pnpm-install\.sh/u,
+      assert.equal(
+        steps[installIndex].uses,
+        "./.github/actions/setup-dependencies",
         `${filename}:${jobName}`,
       );
 
