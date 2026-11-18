@@ -1,5 +1,9 @@
+import {
+  faDesktop,
+  faMoon,
+  faSun,
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faDesktop, faMoon, faSun } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,

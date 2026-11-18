@@ -1,10 +1,10 @@
-import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faArrowRotateLeft,
   faIndustry,
   faPencil,
   faTrash,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogImage, CatalogMaker } from "@package/services";
 import {

@@ -1,4 +1,4 @@
-import { faBell } from "@fortawesome/pro-light-svg-icons";
+import { faBell } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,

@@ -1,4 +1,4 @@
-import { faTriangleExclamation } from "@fortawesome/pro-light-svg-icons";
+import { faTriangleExclamation } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CollectionItemMetadataWrite,

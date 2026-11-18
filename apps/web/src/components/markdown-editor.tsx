@@ -1,4 +1,3 @@
-import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faBlockQuote,
   faBold,
@@ -12,7 +11,8 @@ import {
   faMinus,
   faStrikethrough,
   faTable,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   htmlToMarkdown,

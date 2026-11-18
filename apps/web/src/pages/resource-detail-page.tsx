@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faChevronDown,
   faChevronUp,
@@ -8,7 +7,8 @@ import {
   faPencil,
   faTrash,
   faUserLock,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,

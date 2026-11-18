@@ -1,9 +1,9 @@
-import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import {
   faCheck,
   faChevronDown,
   faXmark,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import React from "react";
 import { cn } from "@/lib/utils";

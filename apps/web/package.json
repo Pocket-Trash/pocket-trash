@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx ../../packages/infisical-runner/src/cli.ts web dev -- vite dev",
-    "build": "tsx ../../packages/infisical-runner/src/cli.ts web build -- vite build",
-    "build:ci": "vite build",
+    "build": "pnpm --dir ../.. icons:check && tsx ../../packages/infisical-runner/src/cli.ts web build -- vite build",
+    "build:ci": "pnpm --dir ../.. icons:check && vite build",
     "start": "vite preview",
     "start:ci": "node .output/server/index.mjs",
     "storybook": "storybook dev -p 6006",
@@ -22,6 +22,7 @@
     "test:watch:no-infisical": "vitest --project=unit --passWithNoTests"
   },
   "dependencies": {
+    "@awesome.me/kit-64c2f1f813": "1.0.4",
     "@base-ui/react": "1.9.0",
     "@clerk/localizations": "4.24.3",
     "@clerk/shared": "4.43.0",
@@ -29,9 +30,6 @@
     "@clerk/ui": "1.42.1",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
-    "@fortawesome/free-brands-svg-icons": "^7.3.1",
-    "@fortawesome/pro-light-svg-icons": "^7.3.1",
-    "@fortawesome/pro-solid-svg-icons": "^7.3.1",
     "@fortawesome/react-fontawesome": "^3.5.0",
     "@milkdown/core": "7.23.0",
     "@milkdown/plugin-clipboard": "7.23.0",

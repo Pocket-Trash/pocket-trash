@@ -1,5 +1,5 @@
+import { faCheck } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { useAuth } from "@clerk/tanstack-react-start";
-import { faCheck } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,

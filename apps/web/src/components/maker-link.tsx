@@ -1,4 +1,4 @@
-import { faArrowUpRightFromSquare } from "@fortawesome/pro-light-svg-icons";
+import { faArrowUpRightFromSquare } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";

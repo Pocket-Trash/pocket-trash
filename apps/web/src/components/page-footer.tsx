@@ -1,4 +1,7 @@
-import { faDiscord, faXTwitter } from "@fortawesome/free-brands-svg-icons";
+import {
+  faDiscord,
+  faXTwitter,
+} from "@awesome.me/kit-64c2f1f813/icons/classic/brands";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,

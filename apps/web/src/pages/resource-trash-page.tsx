@@ -1,5 +1,8 @@
+import {
+  faArrowRotateLeft,
+  faTrash,
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { useAuth } from "@clerk/tanstack-react-start";
-import { faArrowRotateLeft, faTrash } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   formatTranslation,

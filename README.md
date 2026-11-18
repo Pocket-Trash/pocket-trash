@@ -124,6 +124,7 @@ No hosted Redis service or Infisical Redis secret is required. See
 | `pnpm build` | Builds all apps and packages through Turborepo. |
 | `pnpm build:ci` | Builds all apps and packages with CI-provided environment variables. |
 | `pnpm format` | Formats files and organizes imports with Biome. |
+| `pnpm icons:check` | Checks web imports and installed Kit exports against the reviewed icon inventory. |
 | `pnpm lint` | Runs repository ESLint and the complete JSDoc check. |
 | `pnpm lint:jsdoc` | Checks JSDoc on eligible tracked JavaScript and TypeScript declarations. |
 | `pnpm lint:openapi` | Checks every API endpoint against the live OpenAPI document. |
@@ -138,6 +139,7 @@ suite without the Infisical authentication check.
 | --- | --- |
 | `pnpm test` | Runs repository checks and all app and package tests with local secrets where required. |
 | `pnpm test:ci` | Runs repository checks and CI test tasks without local Infisical authentication. |
+| `pnpm test:icons` | Tests the icon inventory validator through its public CLI. |
 | `pnpm test:jsdoc` | Tests the repository JSDoc checker. |
 | `pnpm test:logger:axiom` | Runs the live Axiom logger integration test. |
 | `pnpm test:watch` | Starts supported tests in watch mode with development secrets. |

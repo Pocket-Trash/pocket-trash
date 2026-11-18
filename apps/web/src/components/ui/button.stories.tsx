@@ -1,4 +1,4 @@
-import { faPlus } from "@fortawesome/pro-light-svg-icons";
+import { faPlus } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, fn } from "storybook/test";
