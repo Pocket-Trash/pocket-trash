@@ -41,6 +41,12 @@ Confirm the same behavior in Vercel:
 
 Branch previews should remain enabled through Vercel's Git integration.
 
+Workflow-created previews request a fresh deployment with `forceNew=1` and
+retain the build cache with `withCache=1`. Each request still names the intended
+commit, repository, branch, and PR. The workflow updates branch-specific API,
+database, and asset configuration before creating the new deployment; cache
+reuse does not reuse an earlier deployment or skip those configuration steps.
+
 The preview workflow's API helper bounds each connection to 15 seconds and each
 request to 60 seconds. GET requests retry transient failures up to four times
 within a 180-second retry window. Writes, including deployment creation, are
