@@ -1443,7 +1443,7 @@ jobs:
             --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
             --environment production
 
-          printf '%s' "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline" | pnpm exec railway variable set RAILPACK_INSTALL_CMD \
+          printf '%s' "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot..." | pnpm exec railway variable set RAILPACK_INSTALL_CMD \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \

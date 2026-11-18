@@ -113,7 +113,7 @@ export default defineRailway((ctx) => {
         LOGGER_NOTIFICATION_URL: preserve(),
         REDIS_URL: sharedQueue.env.REDIS_URL,
         RAILPACK_INSTALL_CMD:
-          "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+          "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot...",
         SCRAPER_CRON_ENABLED: preserve(),
         SCRAPER_IMAGE_BATCH_SIZE: preserve(),
         SCRAPER_ITEM_BATCH_SIZE: preserve(),
@@ -142,6 +142,8 @@ export default defineRailway((ctx) => {
             ".railway/**",
             ".railwayignore",
             ".npmrc",
+            "railpack.json",
+            "scripts/pnpm-install.sh",
             "scripts/security-audit.mjs",
             "security-audit-exceptions.json",
             "turbo.json",

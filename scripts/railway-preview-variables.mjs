@@ -105,7 +105,7 @@ function configurePreview() {
       DATABASE_URL: databaseUrl,
       FONTAWESOME_PACKAGE_TOKEN: token,
       RAILPACK_INSTALL_CMD:
-        "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline",
+        "./scripts/pnpm-install.sh --frozen-lockfile --prefer-offline --filter=pocket-trash.app... --filter=@app/scraper... --filter=@app/discord-bot...",
       BUNNY_IMAGE_FOLDER_PREFIX:
         isolated === "true" ? `images/preview/pr-${pr}` : "images/preview",
       REDIS_URL: "${{pocket-trash-queue.REDIS_PUBLIC_URL}}",
