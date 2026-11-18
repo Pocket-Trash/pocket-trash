@@ -371,6 +371,7 @@ const changeClassificationRules = [
       "turbo.json",
     ],
     prefixes: [
+      ".github/actions/",
       ".github/scripts/",
       ".github/workflows/",
       ".githooks/",

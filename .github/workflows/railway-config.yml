@@ -40,17 +40,10 @@ jobs:
           env-slug: prod
           secret-path: tools/github/secrets
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
         with:
-          node-version: 22.20.0
-          cache: pnpm
-
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+          scope: tools
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"

@@ -40,9 +40,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -53,8 +50,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install classifier dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile --ignore-scripts
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: tools
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -115,15 +114,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -134,8 +124,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: tools
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -156,15 +148,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -175,8 +158,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: tools
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -223,15 +208,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -242,8 +218,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: scraper
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -270,15 +248,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -289,8 +258,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: discord-bot
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -318,15 +289,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -337,8 +299,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: api
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -365,15 +329,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -384,8 +339,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: full
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -421,15 +378,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -440,8 +388,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: full
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -468,15 +418,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -487,8 +428,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: full
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -517,15 +460,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -536,8 +470,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: full
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"
@@ -564,15 +500,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -583,8 +510,10 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
-      - name: Install dependencies
-        run: ./scripts/pnpm-install.sh --frozen-lockfile
+      - name: Set up dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          scope: database
 
       - name: Clear Font Awesome package token
         run: echo "FONTAWESOME_PACKAGE_TOKEN=" >> "$GITHUB_ENV"

@@ -200,6 +200,222 @@ test("blocks artifacts for a high-severity development advisory", async (t) => {
   );
 });
 
+test("scoped installs omit private icon payloads while warm stores reuse web packages", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "pnpm-install-scopes-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(path.join(directory, "package"));
+  const entries = {};
+  for (const name of [
+    "fixture-tool",
+    "fixture-backend",
+    "fixture-queue",
+    "fixture-storage",
+    "@fortawesome/pro-light-svg-icons",
+    "@awesome.me/kit-fixture",
+  ]) {
+    await writeFile(
+      path.join(directory, "package/package.json"),
+      JSON.stringify({ name, version: "1.0.0" }),
+    );
+    entries[name] = {
+      publishedAt: "2020-01-01T00:00:00.000Z",
+      tarball: execFileSync("tar", ["-czf", "-", "package"], {
+        cwd: directory,
+      }),
+      blockTarball: name.startsWith("@"),
+    };
+  }
+  const requests = [];
+  const registry = await startRegistry(t, entries, (request) =>
+    requests.push(request),
+  );
+  const packages = {
+    ".": {
+      name: "pocket-trash.app",
+      scripts: {
+        prepare: `node -e 'require("node:fs").writeFileSync("prepared", "ready")'`,
+      },
+      devDependencies: {
+        "fixture-tool": "1.0.0",
+        "@package/lint": "workspace:*",
+      },
+    },
+    "packages/lint": {
+      name: "@package/lint",
+      dependencies: { "fixture-tool": "1.0.0" },
+    },
+    "packages/database": {
+      name: "@package/database",
+      dependencies: { "fixture-backend": "1.0.0" },
+    },
+    "packages/queue": {
+      name: "@package/queue",
+      dependencies: { "fixture-queue": "1.0.0" },
+    },
+    "packages/storage": {
+      name: "@package/storage",
+      dependencies: { "fixture-storage": "1.0.0" },
+    },
+    ...Object.fromEntries(
+      ["api", "scraper", "discord-bot"].map((name) => [
+        `apps/${name}`,
+        {
+          name: `@app/${name}`,
+          dependencies: { "@package/database": "workspace:*" },
+        },
+      ]),
+    ),
+    "apps/web": {
+      name: "@app/web",
+      dependencies: {
+        "@fortawesome/pro-light-svg-icons": "1.0.0",
+        "@awesome.me/kit-fixture": "1.0.0",
+      },
+    },
+  };
+  for (const [location, manifest] of Object.entries(packages)) {
+    await mkdir(path.join(directory, location), { recursive: true });
+    await writeFile(
+      path.join(directory, location, "package.json"),
+      JSON.stringify(manifest),
+    );
+  }
+  await writeFile(path.join(directory, "pnpm-workspace.yaml"), fixturePolicy);
+  await writeFile(
+    path.join(directory, ".npmrc"),
+    `registry=${registry}\n@fortawesome:registry=${registry}\n@awesome.me:registry=${registry}\n`,
+  );
+  const seeded = await run(
+    "pnpm",
+    ["install", "--lockfile-only", "--ignore-scripts"],
+    directory,
+    { PNPM_CONFIG_STORE_DIR: path.join(directory, "seed-store") },
+  );
+  assert.equal(seeded.code, 0, seeded.output);
+  const script = new URL("./pnpm-install-scope.sh", import.meta.url).pathname;
+  for (const scope of [
+    "tools",
+    "api",
+    "database",
+    "scraper",
+    "discord-bot",
+    "full",
+  ]) {
+    await t.test(scope, async () => {
+      if (scope === "full")
+        for (const entry of Object.values(entries)) entry.blockTarball = false;
+      requests.length = 0;
+      const env = {
+        FONTAWESOME_PACKAGE_TOKEN: "fixture-token",
+        PNPM_CONFIG_STORE_DIR: path.join(directory, `store-${scope}`),
+      };
+      await rm(path.join(directory, "prepared"), { force: true });
+      const cold = await run("sh", [script, scope], directory, env);
+      assert.equal(cold.code, 0, cold.output);
+      assert.equal(
+        requests.some((request) => /fixture-storage\/-\//u.test(request)),
+        scope === "database" || scope === "full",
+        cold.output,
+      );
+      assert.equal(
+        await readFile(path.join(directory, "prepared"), "utf8"),
+        "ready",
+      );
+      const icons = requests.filter((request) =>
+        /(?:fortawesome|awesome.me).*\/-\//u.test(request),
+      );
+      assert.equal(
+        icons.length,
+        scope === "full" ? 2 : 0,
+        JSON.stringify(requests),
+      );
+      assert.ok(
+        requests.some((request) => /fixture-tool\/-\//u.test(request)),
+        cold.output,
+      );
+      assert.equal(
+        requests.some((request) => /fixture-queue\/-\//u.test(request)),
+        scope === "api" || scope === "full",
+        cold.output,
+      );
+      if (scope !== "tools")
+        assert.ok(
+          requests.some((request) => /fixture-backend\/-\//u.test(request)),
+          cold.output,
+        );
+      await rm(path.join(directory, "node_modules"), {
+        recursive: true,
+        force: true,
+      });
+      await rm(path.join(directory, "prepared"));
+      requests.length = 0;
+      const warm = await run("sh", [script, scope], directory, env);
+      assert.equal(warm.code, 0, warm.output);
+      assert.equal(
+        requests.filter((request) => request.includes("/-/")).length,
+        0,
+        JSON.stringify(requests),
+      );
+      await rm(path.join(directory, "node_modules"), {
+        recursive: true,
+        force: true,
+      });
+      if (scope === "full") {
+        await mkdir(path.join(directory, "packages/unrelated"));
+        await writeFile(
+          path.join(directory, "packages/unrelated/package.json"),
+          JSON.stringify({ name: "unrelated-package", version: "1.0.0" }),
+        );
+        const changed = await run(
+          "pnpm",
+          ["install", "--lockfile-only", "--ignore-scripts"],
+          directory,
+          env,
+        );
+        assert.equal(changed.code, 0, changed.output);
+        requests.length = 0;
+        const restored = await run("sh", [script, scope], directory, env);
+        assert.equal(restored.code, 0, restored.output);
+        assert.equal(
+          requests.filter((request) => request.includes("/-/")).length,
+          0,
+          JSON.stringify(requests),
+        );
+      }
+    });
+  }
+  await t.test(
+    "tooling still rejects an immature unselected web dependency",
+    async () => {
+      const freshRegistry = await startRegistry(t, {
+        ...entries,
+        "@fortawesome/pro-light-svg-icons": {
+          ...entries["@fortawesome/pro-light-svg-icons"],
+          publishedAt: new Date().toISOString(),
+        },
+      });
+      for (const filename of [".npmrc", "pnpm-lock.yaml"]) {
+        const contents = await readFile(path.join(directory, filename), "utf8");
+        await writeFile(
+          path.join(directory, filename),
+          contents.replaceAll(registry, freshRegistry),
+        );
+      }
+      // The cold policy check must not inherit links to the full-install store.
+      await rm(path.join(directory, "node_modules"), {
+        recursive: true,
+        force: true,
+      });
+      const rejected = await run("sh", [script, "tools"], directory, {
+        FONTAWESOME_PACKAGE_TOKEN: "fixture-token",
+        PNPM_CONFIG_STORE_DIR: path.join(directory, "fresh-policy-store"),
+      });
+      assert.notEqual(rejected.code, 0, rejected.output);
+      assert.match(rejected.output, /ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION/u);
+    },
+  );
+});
+
 test("retains only the approved scoped Zod and Picomatch exceptions", async () => {
   const exceptions = JSON.parse(
     await readFile("security-audit-exceptions.json", "utf8"),

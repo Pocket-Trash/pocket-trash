@@ -11,9 +11,13 @@ import test from "node:test";
  */
 async function deploy(t, mode) {
   const requests = [];
-  const server = createServer((request, response) => {
+  const creations = [];
+  const server = createServer(async (request, response) => {
     requests.push(request.method);
-    request.resume();
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    if (request.method === "POST")
+      creations.push({ url: request.url, body: JSON.parse(body) });
     const reads = requests.filter((method) => method === "GET").length;
     if (
       (mode === "disconnect" && reads === 1) ||
@@ -74,8 +78,38 @@ async function deploy(t, mode) {
   });
   assert.ok(!output.includes("sensitive-token"));
   assert.ok(!output.includes("sensitive-provider-body"));
-  return { status, output, requests };
+  return { status, output, requests, creations };
 }
+
+test("fresh previews retain cache and the requested commit and branch metadata", async (t) => {
+  const result = await deploy(t, "normal");
+  assert.equal(result.status, 0, result.output);
+  assert.equal(result.creations.length, 1);
+  const creation = result.creations[0];
+  const url = new URL(creation.url, "http://provider.example.test");
+  assert.equal(url.pathname, "/v13/deployments");
+  assert.deepEqual(Object.fromEntries(url.searchParams), {
+    teamId: "team",
+    forceNew: "1",
+    withCache: "1",
+    skipAutoDetectionConfirmation: "1",
+  });
+  assert.deepEqual(creation.body, {
+    name: "pocket-trash",
+    project: "project",
+    gitSource: {
+      type: "github",
+      ref: "ra/preview",
+      repoId: 123,
+      sha: "a".repeat(40),
+    },
+    meta: {
+      githubCommitRef: "ra/preview",
+      githubCommitSha: "a".repeat(40),
+      githubPrId: "485",
+    },
+  });
+});
 
 for (const mode of ["transient", "disconnect"])
   test(`Vercel status reads recover from ${mode} failures`, async (t) => {
