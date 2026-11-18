@@ -1,4 +1,4 @@
-import { faUserLock } from "@fortawesome/pro-light-svg-icons";
+import { faUserLock } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 

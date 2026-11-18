@@ -1,9 +1,9 @@
-import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import {
   faCheck,
   faChevronRight,
   faCircle,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type React from "react";
 

@@ -1,4 +1,7 @@
-import { faChevronRight, faHouse } from "@fortawesome/pro-light-svg-icons";
+import {
+  faChevronRight,
+  faHouse,
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { DEFAULT_LOCALE, formatTranslation } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";

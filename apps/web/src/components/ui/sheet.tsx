@@ -1,5 +1,5 @@
+import { faXmark } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { Drawer as SheetPrimitive } from "@base-ui/react/drawer";
-import { faXmark } from "@fortawesome/pro-light-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { formatTranslation } from "@pocket-trash/localizations";
 import type React from "react";

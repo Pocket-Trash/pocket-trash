@@ -2,8 +2,8 @@ import {
   faMagnifyingGlass as faMagnifyingGlassLight,
   faUserLock,
   faXmark,
-} from "@fortawesome/pro-light-svg-icons";
-import { faMagnifyingGlass } from "@fortawesome/pro-solid-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { faMagnifyingGlass } from "@awesome.me/kit-64c2f1f813/icons/classic/solid";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { SearchResult } from "@package/services";
 import {

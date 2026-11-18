@@ -1,4 +1,4 @@
-import { faXmark } from "@fortawesome/pro-light-svg-icons";
+import { faXmark } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useId, useRef } from "react";

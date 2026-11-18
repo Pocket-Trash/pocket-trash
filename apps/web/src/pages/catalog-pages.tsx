@@ -1,4 +1,7 @@
-import { faQuestionCircle, faUserLock } from "@fortawesome/pro-light-svg-icons";
+import {
+  faCircleQuestion as faQuestionCircle,
+  faUserLock,
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogApprovalAction,

@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faBell,
   faBoxesStacked,
@@ -9,7 +8,8 @@ import {
   faShieldCheck,
   faSliders,
   faUsers,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { hasPermission, normalizeActor } from "@package/services/authorization";
 import {

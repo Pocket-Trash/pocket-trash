@@ -1,4 +1,3 @@
-import { useAuth, useClerk } from "@clerk/tanstack-react-start";
 import {
   faArrowRightFromBracket,
   faChartBar,
@@ -8,7 +7,8 @@ import {
   faGear,
   faShield,
   faUser,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { useAuth, useClerk } from "@clerk/tanstack-react-start";
 import {
   hasStaffPermission,
   normalizeActor,

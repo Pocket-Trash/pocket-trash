@@ -236,6 +236,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@awesome.me/kit-64c2f1f813':
+        specifier: 1.0.4
+        version: 1.0.4
       '@base-ui/react':
         specifier: 1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -255,15 +258,6 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0
       '@fortawesome/fontawesome-svg-core':
-        specifier: ^7.3.1
-        version: 7.3.1
-      '@fortawesome/free-brands-svg-icons':
-        specifier: ^7.3.1
-        version: 7.3.1
-      '@fortawesome/pro-light-svg-icons':
-        specifier: ^7.3.1
-        version: 7.3.1
-      '@fortawesome/pro-solid-svg-icons':
         specifier: ^7.3.1
         version: 7.3.1
       '@fortawesome/react-fontawesome':
@@ -642,6 +636,10 @@ packages:
     resolution: {integrity: sha512-pLMeRgRYS7/vZIgAAkOe2P6+XGTifR1MT9pqDoxZ11EmcJJ+DPmdPqLN8ZZF4U8R9KHCCQCS9c2wtuE8wSrfkw==}
     peerDependencies:
       zod: 4.6.6
+
+  '@awesome.me/kit-64c2f1f813@1.0.4':
+    resolution: {integrity: sha512-Z5NxQOI6pVudV+/uw81n7ipRKMAxwlLTCMWN496dPbyKbMLor9lGzz1yxXDHhmrotvJPcwvKUsQivqFByOE0wg==}
+    engines: {node: '>=16'}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1890,18 +1888,6 @@ packages:
 
   '@fortawesome/fontawesome-svg-core@7.3.1':
     resolution: {integrity: sha512-BoxVN3PKnMbgStHhjoaky/oWdxHomDqmBVA24IA3KEmssFGeI7u9YT/BJceOjIum/t6TpPa/vcMKaVYQeIQ/3Q==}
-    engines: {node: '>=6'}
-
-  '@fortawesome/free-brands-svg-icons@7.3.1':
-    resolution: {integrity: sha512-8eiNzycuFhy3mZsi5EVO8JpO3H8l7/kSCl4Gk4iUew9hJuzYFqAAD6kqgeEup3+YZ9hL+5cjjorGzrRLkYuURg==}
-    engines: {node: '>=6'}
-
-  '@fortawesome/pro-light-svg-icons@7.3.1':
-    resolution: {integrity: sha512-NwexkEyu5WPQQkxk+dmuq0sKtFEB0Ge80DGBA+b6tcIsaAMJFGdC9oUWwWBVHAW6xGjArZ+v9I8rzUp8E7CI6g==}
-    engines: {node: '>=6'}
-
-  '@fortawesome/pro-solid-svg-icons@7.3.1':
-    resolution: {integrity: sha512-GIpB5nFXFtHJwMSRfNPOP0HekDAUdMi0RgKmMIebXtB8bcPA+vpLmzEryYhdnEpnMRp099u44ewLZ8IIIy9Psw==}
     engines: {node: '>=6'}
 
   '@fortawesome/react-fontawesome@3.5.0':
@@ -7819,6 +7805,10 @@ snapshots:
       openapi3-ts: 4.6.1
       zod: 4.6.6
 
+  '@awesome.me/kit-64c2f1f813@1.0.4':
+    dependencies:
+      '@fortawesome/fontawesome-common-types': 7.3.1
+
   '@babel/code-frame@7.29.7':
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
@@ -8978,18 +8968,6 @@ snapshots:
   '@fortawesome/fontawesome-common-types@7.3.1': {}
 
   '@fortawesome/fontawesome-svg-core@7.3.1':
-    dependencies:
-      '@fortawesome/fontawesome-common-types': 7.3.1
-
-  '@fortawesome/free-brands-svg-icons@7.3.1':
-    dependencies:
-      '@fortawesome/fontawesome-common-types': 7.3.1
-
-  '@fortawesome/pro-light-svg-icons@7.3.1':
-    dependencies:
-      '@fortawesome/fontawesome-common-types': 7.3.1
-
-  '@fortawesome/pro-solid-svg-icons@7.3.1':
     dependencies:
       '@fortawesome/fontawesome-common-types': 7.3.1
 

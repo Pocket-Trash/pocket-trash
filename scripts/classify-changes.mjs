@@ -61,6 +61,15 @@ const changeClassificationRules = [
     domains: ["validation"],
   },
   {
+    category: "web-icons",
+    paths: [
+      "docs/fontawesome-icons.txt",
+      "scripts/check-fontawesome-icons.mjs",
+      "scripts/check-fontawesome-icons.test.mjs",
+    ],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+  },
+  {
     category: "documentation",
     paths: [
       ".github/pull_request_template.md",

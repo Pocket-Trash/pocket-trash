@@ -76,6 +76,18 @@ function expected(
   };
 }
 
+test("icon inventory and validator changes select web and browser validation", () => {
+  for (const path of [
+    "docs/fontawesome-icons.txt",
+    "scripts/check-fontawesome-icons.mjs",
+    "scripts/check-fontawesome-icons.test.mjs",
+  ])
+    assert.deepEqual(
+      classifyChanges([path]),
+      expected(["web", "storybook", "preview", "safe_e2e", "validation"]),
+    );
+});
+
 test("shared local Redis tooling validates both consumers", () => {
   for (const path of ["scripts/dev-redis.mjs", "scripts/dev-redis.test.mjs"]) {
     assert.deepEqual(

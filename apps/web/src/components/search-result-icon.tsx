@@ -7,7 +7,7 @@ import {
   faGem,
   faIndustry,
   faUser,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { SearchKind, SearchResult } from "@package/services";
 import { Fragment } from "react";

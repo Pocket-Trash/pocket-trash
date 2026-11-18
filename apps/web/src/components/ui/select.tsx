@@ -1,9 +1,9 @@
-import { Select as SelectPrimitive } from "@base-ui/react/select";
 import {
   faCheck,
   faChevronDown,
   faChevronUp,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type React from "react";
 import { cn } from "@/lib/utils";

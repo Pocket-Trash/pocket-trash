@@ -1,4 +1,4 @@
-import { faIndustry } from "@fortawesome/pro-light-svg-icons";
+import { faIndustry } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { PublicMakerSummary } from "@package/services";
 import { AppShell } from "@/components/app-shell";

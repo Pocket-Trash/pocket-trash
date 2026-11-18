@@ -1,4 +1,4 @@
-import { faSliders } from "@fortawesome/pro-light-svg-icons";
+import { faSliders } from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { CatalogColor } from "@package/services";
 import React from "react";

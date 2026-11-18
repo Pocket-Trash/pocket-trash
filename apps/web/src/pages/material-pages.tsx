@@ -1,7 +1,7 @@
 import {
   faChevronLeft,
   faChevronRight,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type {
   CatalogProduct,

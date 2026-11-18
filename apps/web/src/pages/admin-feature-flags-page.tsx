@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/tanstack-react-start";
 import {
   faBoxArchive,
   faCheck,
@@ -6,7 +5,8 @@ import {
   faShield,
   faSlidersSimple,
   faToggleOff,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { FeatureFlagAudience } from "@package/feature-flags";
 import {

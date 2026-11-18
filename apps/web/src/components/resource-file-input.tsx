@@ -3,7 +3,7 @@ import {
   faTriangleExclamation,
   faUpload,
   faXmark,
-} from "@fortawesome/pro-light-svg-icons";
+} from "@awesome.me/kit-64c2f1f813/icons/classic/light";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { resourceMimeTypesByExtension } from "@package/services/constants";
 import { useReducer } from "react";
