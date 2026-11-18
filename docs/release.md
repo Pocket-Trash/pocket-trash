@@ -71,31 +71,6 @@ checks metadata and scope before auditing dependencies.
 Track exception reviews and follow-up work in
 [Dependency policy and exception cleanup](https://linear.app/pocket-trash/project/dependency-policy-and-exception-cleanup-8585f316e087).
 
-### Temporary Picomatch mitigation
-
-The local patches for Picomatch 2.3.2 and 4.0.7 adapt
-[upstream PR 254](https://github.com/micromatch/picomatch/pull/254) at
-`c63a5bf4e61dbdb81bc41e97dc2616c30acce337`. They remove the nested repetition
-in ordinary single-branch wildcard extglobs reported by
-[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf).
-This is an unmerged mitigation, not an official fixed release. Multi-branch
-patterns such as `+(*a|b)` remain vulnerable, and the explicit
-`maxExtglobRecursion: false` option still disables the guard.
-Outer captures remain the full match; the inner wildcard capture covers the
-flattened body instead of the last repetition.
-Local compatibility guards leave escaped bodies and branches whose character
-classes admit path separators on their existing handling; those complex
-single-branch patterns are not covered by the mitigation.
-
-The version-based audit continues to report both releases. Any temporary
-exception requires Roy's approval in `security-audit-exceptions.json` and expires
-within seven days. Roy approved the current exception on November 17, 2026,
-through November 20 at 20:52 UTC. The scoped audit additionally verifies the exact lockfile,
-both patch files and their workspace configuration; dependency or patch changes
-fail closed. It does not add the advisory to pnpm's global ignore list. Track
-replacement with an official fix and removal of the exception in
-[ENG-686](https://linear.app/pocket-trash/issue/ENG-686/resolve-picomatch-advisory-blocking-dependency-audits).
-
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).
 
