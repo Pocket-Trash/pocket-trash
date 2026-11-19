@@ -156,6 +156,35 @@ test("accepts an exact reviewed age exception", async (t) => {
   assert.equal(result.code, 0, result.output);
 });
 
+test("accepts fresh revisions of the user-managed Font Awesome Kit", async (t) => {
+  const kit = "@awesome.me/kit-64c2f1f813";
+  const registry = await startRegistry(t, {
+    [kit]: { version: "1.0.5", publishedAt: new Date().toISOString() },
+  });
+
+  const result = await installFixture(t, registry, { [kit]: "1.0.5" });
+
+  assert.equal(result.code, 0, result.output);
+});
+
+test("keeps other Font Awesome packages subject to release age", async (t) => {
+  for (const name of [
+    "@awesome.me/kit-other",
+    "@awesome.me/kit-64c2f1f813-extra",
+    "@fortawesome/fontawesome-svg-core",
+  ]) {
+    await t.test(name, async (t) => {
+      const registry = await startRegistry(t, {
+        [name]: { publishedAt: new Date().toISOString() },
+      });
+      const result = await installFixture(t, registry, { [name]: "1.0.0" });
+
+      assert.notEqual(result.code, 0, result.output);
+      assert.match(result.output, /ERR_PNPM_NO_MATURE_MATCHING_VERSION/);
+    });
+  }
+});
+
 test("revalidates committed lockfiles against the current policy", async (t) => {
   const registry = await startRegistry(t, {
     "external-package": { publishedAt: new Date().toISOString() },
@@ -919,24 +948,25 @@ async function startRegistry(t, packages, onRequest = () => {}) {
     }
 
     const registry = `http://127.0.0.1:${server.address().port}`;
+    const version = entry.version ?? "1.0.0";
     response.setHeader("content-type", "application/json");
     response.end(
       JSON.stringify({
         name,
-        "dist-tags": { latest: "1.0.0" },
+        "dist-tags": { latest: version },
         versions: {
-          "1.0.0": {
+          [version]: {
             name,
-            version: "1.0.0",
+            version,
             dist: {
               integrity: entry.tarball
                 ? `sha512-${createHash("sha512").update(entry.tarball).digest("base64")}`
                 : "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
-              tarball: `${registry}${registryPath}${name}/-/package-1.0.0.tgz`,
+              tarball: `${registry}${registryPath}${name}/-/package-${version}.tgz`,
             },
           },
         },
-        time: entry.publishedAt ? { "1.0.0": entry.publishedAt } : undefined,
+        time: entry.publishedAt ? { [version]: entry.publishedAt } : undefined,
       }),
     );
   });

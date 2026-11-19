@@ -22,10 +22,14 @@ preserved. Web builds and the root test commands run this check; backend builds
 do not require the Kit. `pnpm test:icons` exercises the validator's public CLI
 using synthetic definitions, without downloading or copying Pro assets.
 
-Roy approved a temporary release-age exception only for the initial Kit revision
-`1.0.4`. [ENG-687](https://linear.app/pocket-trash/issue/ENG-687/remove-the-temporary-kit-104-release-age-exception-after-maturity)
-tracks removal after **2026-11-24T16:56:13Z**, when that revision matures. All other
-packages and future Kit revisions retain the existing seven-day rule.
+Roy approved a permanent release-age exception for this exact package name in
+[ENG-687](https://linear.app/pocket-trash/issue/ENG-687/permanently-exempt-the-user-managed-font-awesome-kit-from-release-age).
+Editing the existing Kit publishes a new package version with the same Kit ID;
+those revisions do not need a seven-day wait or temporary exception. Creating a
+different Kit produces a different package name and requires a separate review.
+Other Font Awesome packages retain the seven-day rule. Exact pins, lockfile
+integrity, inventory checks and audits still apply. See the
+[Kit trust decision](../decisions/security/eng-687-user-managed-font-awesome-kit.md).
 
 ## Updating icons
 
@@ -40,9 +44,9 @@ packages and future Kit revisions retain the existing seven-day rule.
    unless a version change is also explicitly reviewed.
 3. Read the generated npm package metadata and verify its exports against the
    inventory. Record the exact new version, integrity, compressed size, and
-   publication time in the supporting Linear issue. Preserve the seven-day
-   release-age policy; do not add an exemption for a new Kit revision.
-4. Once eligible, pin the exact package version and commit the lockfile update
+   publication time in the supporting Linear issue. The permanent exception
+   covers this Kit's revisions only; do not broaden it to the package scope.
+4. Pin the exact package version and commit the lockfile update
    with the inventory and import changes. Use individual style imports through
    `icons/classic/light`, `icons/classic/solid`, or `icons/classic/brands` and
    preserve local aliases. Run `pnpm icons:check`, `pnpm test:icons`, the existing

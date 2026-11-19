@@ -18,8 +18,8 @@ minimumReleaseAgeExclude:
   - "@pocket-trash/skills"
   # ENG-364: accept the patched source-map release; remove after 2026-10-07T14:08:09.382Z.
   - "source-map-js@1.2.2"
-  # ENG-687: Roy approved this reviewed Kit revision for ENG-684 on 2026-11-18; remove after 2026-11-24T16:56:13Z.
-  - "@awesome.me/kit-64c2f1f813@1.0.4"
+  # ENG-687: Roy controls this Kit's generated revisions; keep exact dependency pins and inventory review.
+  - "@awesome.me/kit-64c2f1f813"
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeStrict: true
 overrides:
