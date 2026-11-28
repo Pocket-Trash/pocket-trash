@@ -70,10 +70,14 @@ it("backfills every canonical product type before requiring image metadata", asy
   await migrate(db, { migrationsFolder });
 
   await expect(
-    database.query(`SELECT count(*)::int AS count
+    database.query(
+      `SELECT count(*)::int AS count
       FROM product_types
       WHERE image_url = 'https://cdn.pocket-trash.app/assets/static/no-image.png'
-        AND image_alt = 'No image set'`),
+        AND image_alt = 'No image set'
+        AND slug = ANY($1)`,
+      [[...productTypeSlugs]],
+    ),
   ).resolves.toMatchObject({ rows: [{ count: productTypeSlugs.length }] });
   await expect(
     database.exec(`INSERT INTO product_types

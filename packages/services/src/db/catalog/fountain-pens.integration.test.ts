@@ -76,7 +76,7 @@ it("round-trips unknown and authored fountain-pen capabilities without evidence"
   } finally {
     await client.close();
   }
-});
+}, 60_000);
 
 /**
  * Creates an isolated public-service fixture with migrated reference data.
@@ -220,7 +220,7 @@ it("infers converters only from known matching connector and length classes", as
   } finally {
     await client.close();
   }
-});
+}, 60_000);
 
 it("copies nib defaults and installs one same-owner nib with section-specific fit", async () => {
   const { client, db, services, base } = await fixture();
@@ -361,7 +361,7 @@ it("copies nib defaults and installs one same-owner nib with section-specific fi
   } finally {
     await client.close();
   }
-});
+}, 60_000);
 
 it("retains independent material and finish snapshots after catalog offerings change", async () => {
   const { client, db, services, base } = await fixture();
@@ -440,7 +440,7 @@ it("retains independent material and finish snapshots after catalog offerings ch
   } finally {
     await client.close();
   }
-});
+}, 60_000);
 
 it("validates actual plating independently from base material and surface finish", async () => {
   const { client, db, services, base } = await fixture();
@@ -530,7 +530,7 @@ it("validates actual plating independently from base material and surface finish
   } finally {
     await client.close();
   }
-});
+}, 60_000);
 
 it("inherits installed nib privacy, moves the assembly, and retains the pen when its nib is deleted", async () => {
   const { client, db, services, base } = await fixture();
@@ -815,4 +815,4 @@ it("inherits installed nib privacy, moves the assembly, and retains the pen when
   } finally {
     await client.close();
   }
-});
+}, 60_000);

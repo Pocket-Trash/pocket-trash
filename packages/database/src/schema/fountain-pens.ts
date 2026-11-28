@@ -560,7 +560,7 @@ export const collectionDetailFountainPen = pgTable(
     installedNibCollectionItemId: bigint("installed_nib_collection_item_id", {
       mode: "number",
     })
-      .unique()
+      .unique("collection_detail_fountain_pen_installed_nib_unique")
       .references(() => collectionDetailNib.id, { onDelete: "restrict" }),
     customizedNib: boolean("customized_nib").default(false).notNull(),
     ...timestamps,

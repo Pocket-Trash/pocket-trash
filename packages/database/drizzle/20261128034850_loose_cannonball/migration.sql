@@ -1,0 +1,1 @@
+ALTER TABLE "collection_detail_fountain_pen" RENAME CONSTRAINT "collection_detail_fountain_pe_installed_nib_collection_item_key" TO "collection_detail_fountain_pen_installed_nib_unique";
