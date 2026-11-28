@@ -36,10 +36,6 @@ import type {
 import {
   CollectionAssemblyPrivacyBlockedError,
   CollectionItemPrivacyInheritedError,
-  fountainPenItemSchema,
-  fountainPenSchema,
-  nibItemSchema,
-  nibSchema,
 } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
 import {
@@ -54,6 +50,12 @@ import {
   sliderMagnetLayoutDetails,
   sliderMagnetLayouts,
 } from "@package/services/constants";
+import {
+  fountainPenItemSchema,
+  fountainPenSchema,
+  nibItemSchema,
+  nibSchema,
+} from "@package/services/fountain-pens";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";

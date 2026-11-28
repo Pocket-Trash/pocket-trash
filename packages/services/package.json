@@ -14,6 +14,10 @@
       "types": "./dist/constants.d.ts",
       "default": "./dist/constants.js"
     },
+    "./fountain-pens": {
+      "types": "./dist/fountain-pens.d.ts",
+      "default": "./dist/fountain-pens.js"
+    },
     "./authorization": {
       "types": "./dist/authorization.d.ts",
       "default": "./dist/authorization.js"
