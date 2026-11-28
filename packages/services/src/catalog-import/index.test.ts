@@ -95,6 +95,53 @@ const manifest: CatalogImportManifest = {
   schemaVersion: "catalog-import-v1",
 };
 
+it("accepts dependency-ordered fountain-pen references and rejects retired converter settings", () => {
+  const input = {
+    ...manifest,
+    images: [],
+    records: [
+      {
+        entity: "fountain-pen-connector-family",
+        key: "connector:international",
+        expected: { state: "absent" },
+        payload: { name: "International", slug: "international" },
+        references: {},
+      },
+      { ...manifest.records[0] },
+      {
+        ...manifest.records[1],
+        payload: {
+          ...manifest.records[1]?.payload,
+          productTypeSlug: "fountain-pen",
+        },
+      },
+      {
+        entity: "product-fountain-pen",
+        key: "fountain:family",
+        expected: { state: "absent" },
+        payload: { postable: null, cartridgeConverterLength: "short-and-long" },
+        references: {
+          product: "product:slider",
+          connectorFamily: "connector:international",
+        },
+      },
+    ],
+  };
+  expect(parseCatalogImportManifest(input).records).toHaveLength(4);
+  expect(() =>
+    parseCatalogImportManifest({
+      ...input,
+      records: [
+        ...input.records.slice(0, 3),
+        {
+          ...input.records[3],
+          payload: { ...input.records[3]?.payload, acceptsConverters: true },
+        },
+      ],
+    }),
+  ).toThrow();
+});
+
 /**
  * Builds isolated in-memory collaborators for one runner test.
  *

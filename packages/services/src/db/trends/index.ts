@@ -1102,17 +1102,7 @@ export function createTrendsService(
           productTypeId: number | string;
         }>(sql`
           with item_products as (
-            select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
-            union all select id, product_pen_clip_id from collection_detail_pen_clip
-            union all select id, product_pen_tip_id from collection_detail_pen_tip
-            union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
-            union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
-            union all select id, product_pen_actuator_id from collection_detail_pen_actuator
-            union all select id, product_spinner_id from collection_detail_spinner
-            union all select id, product_spinner_button_id from collection_detail_spinner_button
-            union all select id, product_slider_id from collection_detail_slider
-            union all select id, product_slider_plate_id from collection_detail_slider_plate
-            union all select id, product_slider_insert_id from collection_detail_slider_insert
+            select collection_item_id, product_id from collection_item_search_products
           )
           select
             count(distinct collection_item.owner_id)::integer as "contributorCount",
@@ -1166,17 +1156,7 @@ export function createTrendsService(
           productTypeId: number | string | null;
         }>(sql`
           with item_products as (
-            select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
-            union all select id, product_pen_clip_id from collection_detail_pen_clip
-            union all select id, product_pen_tip_id from collection_detail_pen_tip
-            union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
-            union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
-            union all select id, product_pen_actuator_id from collection_detail_pen_actuator
-            union all select id, product_spinner_id from collection_detail_spinner
-            union all select id, product_spinner_button_id from collection_detail_spinner_button
-            union all select id, product_slider_id from collection_detail_slider
-            union all select id, product_slider_plate_id from collection_detail_slider_plate
-            union all select id, product_slider_insert_id from collection_detail_slider_insert
+            select collection_item_id, product_id from collection_item_search_products
           ), eligible_items as (
             select
               collection_item.id,
@@ -1251,17 +1231,7 @@ export function createTrendsService(
           productTypeId: number | string | null;
         }>(sql`
           with item_products as (
-            select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
-            union all select id, product_pen_clip_id from collection_detail_pen_clip
-            union all select id, product_pen_tip_id from collection_detail_pen_tip
-            union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
-            union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
-            union all select id, product_pen_actuator_id from collection_detail_pen_actuator
-            union all select id, product_spinner_id from collection_detail_spinner
-            union all select id, product_spinner_button_id from collection_detail_spinner_button
-            union all select id, product_slider_id from collection_detail_slider
-            union all select id, product_slider_plate_id from collection_detail_slider_plate
-            union all select id, product_slider_insert_id from collection_detail_slider_insert
+            select collection_item_id, product_id from collection_item_search_products
           ), eligible_items as (
             select distinct
               collection_item.id,
@@ -1342,17 +1312,7 @@ export function createTrendsService(
           productTypeId: number | string | null;
         }>(sql`
           with item_products as (
-            select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
-            union all select id, product_pen_clip_id from collection_detail_pen_clip
-            union all select id, product_pen_tip_id from collection_detail_pen_tip
-            union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
-            union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
-            union all select id, product_pen_actuator_id from collection_detail_pen_actuator
-            union all select id, product_spinner_id from collection_detail_spinner
-            union all select id, product_spinner_button_id from collection_detail_spinner_button
-            union all select id, product_slider_id from collection_detail_slider
-            union all select id, product_slider_plate_id from collection_detail_slider_plate
-            union all select id, product_slider_insert_id from collection_detail_slider_insert
+            select collection_item_id, product_id from collection_item_search_products
           ), eligible_periods as (
             select distinct
               ownership_period.id,

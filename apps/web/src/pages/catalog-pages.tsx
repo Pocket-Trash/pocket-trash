@@ -200,6 +200,8 @@ function catalogFilterCopy(
 
 /** English canonical product-type labels retained as locale fallback search terms. */
 const englishProductTypeLabels: Record<CatalogProductType, string> = {
+  "fountain-pen": "Fountain pen",
+  nib: "Nib",
   pen: "Pen",
   "pen-actuator": "Pen actuator",
   "pen-clip": "Pen clip",
@@ -228,6 +230,8 @@ function localizedProductTypeLabel(
   fallback: string,
 ) {
   const key = {
+    "fountain-pen": "web.fountainPen.productType",
+    nib: "web.nib.productType",
     pen: "web.pens.productType.pen",
     "pen-actuator": "web.pens.productType.actuator",
     "pen-clip": "web.pens.productType.clip",

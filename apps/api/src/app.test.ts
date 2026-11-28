@@ -18,6 +18,38 @@ import {
 } from "./app.js";
 
 describe("api", () => {
+  it("publishes the shared fountain-pen nib-state union in live OpenAPI", async () => {
+    const response = await createApp().request(openApiJsonPath);
+    const document = (await response.json()) as {
+      /** Published OpenAPI components. */
+      components: {
+        /** Reusable schemas keyed by their public contract names. */
+        schemas: Record<
+          string,
+          {
+            /** Alternatives of a discriminated state. */
+            oneOf?: Array<{
+              /** Fields exposed by one state. */
+              properties: {
+                /** Nib-state discriminator. */
+                mode: {
+                  /** Allowed state label. */
+                  enum: string[];
+                };
+              };
+            }>;
+          }
+        >;
+      };
+    };
+    expect(document.components.schemas).toHaveProperty("FountainPenDetails");
+    expect(document.components.schemas).toHaveProperty("NibDetails");
+    expect(
+      document.components.schemas.FountainPenNibState?.oneOf?.map(
+        (option) => option.properties.mode.enum[0],
+      ),
+    ).toEqual(["default", "owned", "none"]);
+  });
   it("serves only the restored API shell", async () => {
     const app = createApp();
     const healthResponse = await app.request(healthPath);

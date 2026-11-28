@@ -25,6 +25,26 @@ export const catalogImportEntityTypes = [
   "product-slider-insert",
   "slider-magnet-preset",
   "catalog-terminology-alias",
+  "catalog-terminology-concept",
+  "material-specific",
+  "product-fountain-pen",
+  "product-nib",
+  "fountain-pen-filling-mechanism",
+  "fountain-pen-connector-family",
+  "fountain-pen-converter",
+  "fountain-pen-filling-mechanism-assignment",
+  "fountain-pen-section-option",
+  "fountain-pen-finial-option",
+  "fountain-pen-compatible-nib",
+  "fountain-pen-section-compatible-nib",
+  "nib-mount",
+  "nib-width",
+  "nib-width-offering",
+  "nib-mount-compatibility",
+  "nib-plating-style",
+  "nib-plating-metal",
+  "nib-plating-style-offering",
+  "nib-plating-metal-offering",
 ] as const;
 
 /** One table from the catalog-only import allowlist. */
@@ -191,6 +211,53 @@ const manifestSchema = z
         }
       }
       records.set(record.key, record.entity);
+      if (record.entity === "product-fountain-pen") {
+        for (const retiredField of [
+          "acceptsCartridges",
+          "acceptsConverters",
+          "compatibleConverterIds",
+          "compatibleConverterProductIds",
+          "hasInkShutoff",
+          "inkShutoff",
+        ]) {
+          if (retiredField in record.payload)
+            context.addIssue({
+              code: "custom",
+              message: `Fountain-pen field ${retiredField} is not supported.`,
+              path: ["records", index, "payload", retiredField],
+            });
+        }
+        for (const field of [
+          "postable",
+          "ownerReplaceableNib",
+          "hasClip",
+          "hasInkWindow",
+        ]) {
+          const value = record.payload[field];
+          if (
+            value !== undefined &&
+            value !== null &&
+            typeof value !== "boolean"
+          )
+            context.addIssue({
+              code: "custom",
+              message:
+                "Fountain-pen capabilities must be true, false, or unknown.",
+              path: ["records", index, "payload", field],
+            });
+        }
+        const length = record.payload.cartridgeConverterLength;
+        if (
+          length !== undefined &&
+          length !== null &&
+          !["short", "long", "short-and-long"].includes(String(length))
+        )
+          context.addIssue({
+            code: "custom",
+            message: "Invalid cartridge/converter length class.",
+            path: ["records", index, "payload", "cartridgeConverterLength"],
+          });
+      }
       if (
         record.entity === "product-spinner" ||
         record.entity === "product-spinner-button" ||

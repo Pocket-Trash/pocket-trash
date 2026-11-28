@@ -8,6 +8,11 @@ import {
 } from "@package/logger";
 import {
   fileTypes,
+  fountainPenItemSchema,
+  fountainPenNibStateSchema,
+  fountainPenSchema,
+  nibItemSchema,
+  nibSchema,
   type StorageService,
   type UploadActor,
   UploadSessionError,
@@ -623,6 +628,20 @@ export function createApp(dependencies: AppDependencies = {}) {
     },
   });
 
+  api.openAPIRegistry.register(
+    "FountainPenDetails",
+    z.object(fountainPenSchema.shape),
+  );
+  api.openAPIRegistry.register(
+    "FountainPenNibState",
+    z.discriminatedUnion("mode", fountainPenNibStateSchema.options),
+  );
+  api.openAPIRegistry.register(
+    "FountainPenItem",
+    z.object(fountainPenItemSchema.shape),
+  );
+  api.openAPIRegistry.register("NibDetails", z.object(nibSchema.shape));
+  api.openAPIRegistry.register("NibItem", z.object(nibItemSchema.shape));
   api.openAPIRegistry.registerComponent("securitySchemes", "ClerkBearer", {
     type: "http",
     scheme: "bearer",

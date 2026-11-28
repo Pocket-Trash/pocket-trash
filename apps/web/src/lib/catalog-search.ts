@@ -1,5 +1,7 @@
 /** Canonical product-type keys supported by shared search. */
 export type SearchableCatalogProductType =
+  | "fountain-pen"
+  | "nib"
   | "pen"
   | "pen-actuator"
   | "pen-clip"

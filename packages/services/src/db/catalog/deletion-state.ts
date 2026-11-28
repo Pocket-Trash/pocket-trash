@@ -17,6 +17,8 @@ export async function collectionItemDeletionState(
   if (!ids.length) return [];
   // Freeze child keys and rows so FK writers cannot change the allowlisted pre-state.
   for (const table of [
+    "collection_detail_fountain_pen",
+    "collection_detail_nib",
     "collection_detail_spinner_button",
     "collection_detail_spinner",
     "collection_detail_slider",
@@ -66,6 +68,17 @@ export async function collectionItemDeletionState(
       'isPrivate', item.is_private, 'privateReason', item.private_reason,
       'privatedAt', item.privated_at,
       'createdAt', item.created_at, 'updatedAt', item.updated_at,
+      'fountainPen', (select jsonb_build_object(
+        'productId', f.product_fountain_pen_id, 'sectionOptionId', f.section_option_id,
+        'finialOptionId', f.finial_option_id, 'nibMode', f.nib_mode,
+        'defaultNibWidthId', f.default_nib_width_id, 'installedNibCollectionItemId', f.installed_nib_collection_item_id,
+        'customizedNib', f.customized_nib) from collection_detail_fountain_pen f where f.id = item.id),
+      'nib', (select jsonb_build_object(
+        'productId', n.product_nib_id, 'widthId', n.width_id,
+        'feedMaterial', n.feed_material, 'housingMaterial', n.housing_material,
+        'platingStyle', n.plating_style, 'coatingMetalId', n.coating_metal_id,
+        'bodyCoatingMetalId', n.body_coating_metal_id, 'tinesCoatingMetalId', n.tines_coating_metal_id)
+        from collection_detail_nib n where n.id = item.id),
       'productSpinnerId', spinner.product_spinner_id,
       'installedButtonId', spinner.installed_button_id, 'bearing', spinner.bearing,
       'productSpinnerButtonId', button.product_spinner_button_id,
