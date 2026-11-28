@@ -243,6 +243,10 @@ export async function eraseAccountDatabaseData(
     `);
 
     if (account) {
+      await tx.execute(sql`update collection_detail_fountain_pen pen
+        set nib_mode = 'none', default_nib_width_id = null, installed_nib_collection_item_id = null, customized_nib = false
+        where pen.id in (select id from collection_item where owner_id = ${account.id})
+          or pen.installed_nib_collection_item_id in (select id from collection_item where owner_id = ${account.id})`);
       await tx.delete(schema.user).where(eq(schema.user.id, account.id));
     }
     await tx.execute(sql`set constraints all immediate`);

@@ -8,6 +8,7 @@ import type {
   CatalogPensAdminOptions,
   CatalogProduct,
   CatalogProductTypeSummary,
+  CatalogService,
   CatalogTerminologyAlias,
   PensAdminWriteInput,
   ProductWriteInput,
@@ -49,6 +50,12 @@ import {
   sliderMagnetLayoutDetails,
   sliderMagnetLayouts,
 } from "@package/services/constants";
+import {
+  fountainPenItemSchema,
+  fountainPenSchema,
+  nibItemSchema,
+  nibSchema,
+} from "@package/services/fountain-pens";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";
@@ -136,6 +143,8 @@ const urlMessage = "web.catalog.error.url";
  * Schema for supported catalog product-type slugs.
  */
 const catalogProductTypeSchema = z.enum([
+  "fountain-pen",
+  "nib",
   "pen",
   "pen-actuator",
   "pen-clip",
@@ -155,6 +164,8 @@ const productTypeSchema = catalogProductTypeSchema;
 export type EditableCatalogProductType = z.infer<typeof productTypeSchema>;
 /** Pen product types supported by owned-item configuration. */
 const penCollectionProductTypeSchema = z.enum([
+  "fountain-pen",
+  "nib",
   "pen",
   "pen-actuator",
   "pen-clip",
@@ -164,6 +175,8 @@ const penCollectionProductTypeSchema = z.enum([
 ]);
 /** Product types supported by the standalone collection-item editor. */
 const collectionProductTypeSchema = z.enum([
+  "fountain-pen",
+  "nib",
   "pen",
   "pen-actuator",
   "pen-clip",
@@ -472,6 +485,8 @@ export const productAliasesSchema = z
  */
 export const productFormSchema = z
   .object({
+    fountainPen: fountainPenSchema.optional(),
+    nib: nibSchema.optional(),
     aliases: productAliasesSchema.default([]),
     bearing: optionalBearingSchema,
     buttonDiameter: dimensionMeasurementSchema,
@@ -554,6 +569,9 @@ export const productFormSchema = z
         magnetConfiguration,
         magnetLayout,
         mechanismId,
+        fountainPen,
+        nib,
+        productId,
         productTypeSlug,
         penPartRoles: selectedPartRoles,
         actuatedMechanismProductIds,
@@ -569,6 +587,34 @@ export const productFormSchema = z
       },
       context,
     ) => {
+      if (fountainPen !== undefined && productTypeSlug !== "fountain-pen")
+        context.addIssue({
+          code: "custom",
+          path: ["fountainPen"],
+          message: "web.catalog.error.form",
+        });
+      if (nib !== undefined && productTypeSlug !== "nib")
+        context.addIssue({
+          code: "custom",
+          path: ["nib"],
+          message: "web.catalog.error.form",
+        });
+      if (productTypeSlug === "nib" && productId === null && nib === undefined)
+        context.addIssue({
+          code: "custom",
+          path: ["nib"],
+          message: requiredMessage,
+        });
+      if (
+        productTypeSlug === "nib" &&
+        (materialAssignments.length !== 1 ||
+          materialAssignments[0]?.materials.length !== 1)
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["materialAssignments"],
+          message: "web.nib.validation.baseMaterial",
+        });
       if (
         selectedPartRoles !== undefined &&
         (new Set(selectedPartRoles).size !== selectedPartRoles.length ||
@@ -1146,6 +1192,9 @@ const installedPenActuationSchema = z.object({
 /** Validated create-item fields, including optional owner metadata. */
 const collectionAddSchema = z
   .object({
+    fountainPen: fountainPenItemSchema.optional(),
+    nib: nibItemSchema.optional(),
+    materialAssignmentIds: z.array(idSchema).min(1).max(200).optional(),
     bearing: optionalBearingSchema,
     buttonCustomFinish: finishOptionSchema.nullable(),
     buttonFinishOptionId: idSchema.nullable(),
@@ -1181,6 +1230,30 @@ const collectionAddSchema = z
       .default(null),
   })
   .superRefine((input, context) => {
+    if (
+      input.fountainPen !== undefined &&
+      input.productTypeSlug !== "fountain-pen"
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["fountainPen"],
+        message: "web.catalog.error.form",
+      });
+    if (input.nib !== undefined && input.productTypeSlug !== "nib")
+      context.addIssue({
+        code: "custom",
+        path: ["nib"],
+        message: "web.catalog.error.form",
+      });
+    if (
+      input.materialAssignmentIds !== undefined &&
+      input.productTypeSlug !== "fountain-pen"
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["materialAssignmentIds"],
+        message: "web.catalog.error.form",
+      });
     const finishCount = [input.finishOptionId, input.customFinish].filter(
       (value) => value !== null,
     ).length;
@@ -1221,7 +1294,11 @@ const collectionAddSchema = z
     }
     if (
       !input.productTypeSlug.startsWith("pen") &&
-      input.materialAssignmentId === null
+      input.materialAssignmentId === null &&
+      !(
+        input.productTypeSlug === "fountain-pen" &&
+        input.materialAssignmentIds?.length
+      )
     ) {
       context.addIssue({
         code: "custom",
@@ -1247,6 +1324,9 @@ const collectionAddSchema = z
  */
 const collectionEditSchema = z
   .object({
+    fountainPen: fountainPenItemSchema.optional(),
+    nib: nibItemSchema.optional(),
+    materialAssignmentIds: z.array(idSchema).min(1).max(200).optional(),
     bearing: optionalBearingSchema,
     collectionId: idSchema.optional(),
     collectionItemId: idSchema,
@@ -1323,6 +1403,10 @@ export type ProductFormValue = z.output<typeof productFormSchema>;
  * Lookup values and spinner buttons required by catalog forms.
  */
 export type CatalogOptions = {
+  /** Canonical fountain-pen and nib lookup lists. */
+  fountainPenOptions?: Awaited<
+    ReturnType<CatalogService["listFountainPenOptions"]>
+  >;
   /** Maker-scoped registered catalog terminology aliases. */
   terminologyAliases?: CatalogTerminologyAlias[];
   /**
@@ -1398,6 +1482,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       relationshipProducts,
       spinnerButtons,
       terminologyAliases,
+      fountainPenOptions,
     ] = await Promise.all([
       listColorEffects(),
       listColors(),
@@ -1416,6 +1501,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       s.db.catalog.listProducts(undefined, viewer),
       s.db.catalog.listProducts("spinner-button", viewer),
       s.db.catalog.listTerminologyAliases(),
+      s.db.catalog.listFountainPenOptions(),
     ]);
     return {
       colorEffects,
@@ -1433,6 +1519,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       relationshipProducts,
       spinnerButtons,
       terminologyAliases,
+      fountainPenOptions,
     };
   },
 );
@@ -2374,6 +2461,8 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
+      fountainPen: parsed.data.fountainPen,
+      nib: parsed.data.nib,
       aliases: parsed.data.aliases,
       actuatedMechanismProductIds: parsed.data.actuatedMechanismProductIds,
       actuatingPartProductIds: parsed.data.actuatingPartProductIds,
@@ -2500,6 +2589,9 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
       if (penProductType.success) {
         collectionItemId = await s.db.collections.addPenProduct({
           actor,
+          fountainPen: parsed.data.fountainPen,
+          nib: parsed.data.nib,
+          materialAssignmentIds: parsed.data.materialAssignmentIds,
           ...(parsed.data.isPrivate !== undefined
             ? { isPrivate: parsed.data.isPrivate }
             : {}),
@@ -3497,6 +3589,21 @@ function validationFailure(error: z.ZodError) {
  * @returns The standard mutation failure payload.
  */
 function mutationFailure(error: unknown) {
+  if (
+    error instanceof Error &&
+    (error.message.startsWith("web.fountainPen.") ||
+      error.message.startsWith("web.nib.validation."))
+  )
+    return {
+      fieldErrors: {
+        [error.message.startsWith("web.nib.") ? "nib" : "fountainPen"]: [
+          error.message,
+        ],
+      },
+      formError: error.message,
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
   if (
     error instanceof Error &&
     ["web.pens.partRoles.inUse", "web.pens.actuation.roleInUse"].includes(

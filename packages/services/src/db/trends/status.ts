@@ -70,17 +70,7 @@ export async function writePublicCollectionStatusTrends(
       | string;
   }>(sql`
     with item_products as (
-      select id as collection_item_id, product_pen_id as product_id from collection_detail_pen
-      union all select id, product_pen_clip_id from collection_detail_pen_clip
-      union all select id, product_pen_tip_id from collection_detail_pen_tip
-      union all select id, product_pen_top_cap_id from collection_detail_pen_top_cap
-      union all select id, product_pen_mechanism_id from collection_detail_pen_mechanism
-      union all select id, product_pen_actuator_id from collection_detail_pen_actuator
-      union all select id, product_spinner_id from collection_detail_spinner
-      union all select id, product_spinner_button_id from collection_detail_spinner_button
-      union all select id, product_slider_id from collection_detail_slider
-      union all select id, product_slider_plate_id from collection_detail_slider_plate
-      union all select id, product_slider_insert_id from collection_detail_slider_insert
+      select collection_item_id, product_id from collection_item_search_products
     ), latest_state as (
       select item.id, item.owner_id,
         item.owned and item.sold_at is null as current,

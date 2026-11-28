@@ -36,6 +36,16 @@ import {
   sliderMagnetLayoutDetails,
   sliderMagnetLayouts,
 } from "../../constants.js";
+import type {
+  FountainPenDetails,
+  FountainPenItemDetails,
+  FountainPenItemWrite,
+  FountainPenWrite,
+  NibDetails,
+  NibItemDetails,
+  NibItemWrite,
+  NibWrite,
+} from "../../fountain-pens.js";
 import { hashLogIdentifier, loggedMutation } from "../../logging.js";
 import type {
   DimensionMeasurement,
@@ -67,6 +77,18 @@ import {
   collectionDeletionState,
   collectionItemDeletionState,
 } from "./deletion-state.js";
+import {
+  assertFountainPenProduct,
+  type FountainPenOptions,
+  fountainPenItemAuditState,
+  listFountainPenOptions,
+  loadFountainPenItems,
+  loadFountainPenProducts,
+  writeFountainPenItem,
+  writeFountainPenProduct,
+  writeNibItem,
+  writeNibProduct,
+} from "./fountain-pens.js";
 
 /** Entry reason codes accepted by collection lifecycle writes. */
 export const collectionOwnershipEntryReasons = schema.ownershipEntryReasons;
@@ -211,6 +233,8 @@ function mapCatalogNameConflict(error: unknown): never {
  * Product category supported by the spinner catalog.
  */
 export type CatalogProductType =
+  | "fountain-pen"
+  | "nib"
   | "pen"
   | "pen-actuator"
   | "pen-clip"
@@ -227,6 +251,8 @@ export type CatalogProductType =
 /** Product types supported by the pre-Pens catalog editor. */
 export type WritableCatalogProductType = Extract<
   CatalogProductType,
+  | "fountain-pen"
+  | "nib"
   | "pen"
   | "pen-actuator"
   | "pen-clip"
@@ -323,6 +349,8 @@ function catalogProductType(value: string): CatalogProductType {
     case "spinner":
     case "spinner-button":
     case "pen":
+    case "fountain-pen":
+    case "nib":
     case "pen-actuator":
     case "pen-clip":
     case "pen-mechanism":
@@ -723,6 +751,12 @@ export function resolveEffectiveSliderSetup(input: {
  * Fully hydrated catalog product returned to callers.
  */
 export type CatalogProduct = {
+  /** Fountain-pen facts, independent offerings, and model-owned options. */
+  fountainPen?: FountainPenDetails;
+  /** Material-specific nib specifications and offered widths/mounts/plating. */
+  nib?: NibDetails;
+  /** Converter references inferred only from known connector and length classes. */
+  compatibleConverters?: Array<typeof schema.fountainPenConverter.$inferSelect>;
   /** Physical mechanisms operated by this actuator-role part. */
   actuatedMechanisms?: CatalogPenActuationPart[];
   /** Physical actuator-role parts that operate this mechanism product. */
@@ -1005,6 +1039,10 @@ export type CatalogPensAdminOptions = {
  * Validated fields accepted when creating or updating a catalog product.
  */
 export type ProductWriteInput = {
+  /** Complete fountain-pen subtype replacement; omission on edit preserves facts. */
+  fountainPen?: FountainPenWrite;
+  /** Complete nib subtype replacement; omission on edit preserves specifications. */
+  nib?: NibWrite;
   /** Complete forward relationship replacement; omission preserves existing links. */
   actuatedMechanismProductIds?: number[];
   /** Complete reverse relationship replacement on a physical mechanism. */
@@ -1187,6 +1225,11 @@ export type PensAdminWriteInput =
  * Catalog reads and audited mutations exposed to application callers.
  */
 export type CatalogService = {
+  /** Reads canonical filling, fit, nib, and plating form references.
+   * @returns Shared fountain-pen and nib reference lists.
+   * @rejects When reference data cannot be queried.
+   */
+  listFountainPenOptions(): Promise<FountainPenOptions>;
   /**
    * Appends one validated structured Pens catalog record.
    *
@@ -2101,6 +2144,10 @@ export type InstalledPenActuationInput = Omit<
 
 /** Owned collection item with its product snapshot and visibility state. */
 export type UserCollectionItem = {
+  /** Owned fountain-pen section, finial, and explicit installed-nib state. */
+  fountainPen?: FountainPenItemDetails;
+  /** Owned nib width, component materials, and actual plating snapshot. */
+  nib?: NibItemDetails;
   /** Relationships between the physical installed mechanisms and actuating parts. */
   installedPenActuations?: InstalledPenActuation[];
   /** Functional roles of the source physical Pen-part product. */
@@ -2459,6 +2506,12 @@ export type CollectionsService = {
    * @rejects When the product type, configuration, ownership, persistence, auditing, or logging fails.
    */
   addPenProduct(input: {
+    /** Complete authored fountain-pen owned choices. */
+    fountainPen?: FountainPenItemWrite;
+    /** Actual owned-nib width, component materials, and plating. */
+    nib?: NibItemWrite;
+    /** Independently selected material options for an owned fountain pen. */
+    materialAssignmentIds?: number[];
     /** Requested item privacy, when authored by the caller. */
     isPrivate?: boolean;
     /** Authenticated actor. */
@@ -2495,6 +2548,8 @@ export type CollectionsService = {
     productId: number;
     /** Exact Pen or Pen-part subtype. */
     productTypeSlug:
+      | "fountain-pen"
+      | "nib"
       | "pen"
       | "pen-actuator"
       | "pen-clip"
@@ -2968,6 +3023,12 @@ export type CollectionsService = {
    * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
    */
   updateItem(input: {
+    /** Complete replacement fountain-pen choices. */
+    fountainPen?: FountainPenItemWrite;
+    /** Replacement owned-nib actual selections. */
+    nib?: NibItemWrite;
+    /** Independent material-option selections for fountain pens. */
+    materialAssignmentIds?: number[];
     /** Requested item privacy, when authored by the caller. */
     isPrivate?: boolean;
     /**
@@ -3097,6 +3158,14 @@ export function createCatalogService(
   audit?: AuditService,
 ): CatalogService {
   return {
+    /**
+     * Reads shared fountain-pen form references.
+     * @returns Canonical lookup lists.
+     * @rejects When reference queries fail.
+     */
+    async listFountainPenOptions() {
+      return await listFountainPenOptions(db);
+    },
     /**
      * Appends one validated structured Pens catalog record.
      *
@@ -4120,6 +4189,8 @@ export function createCatalogService(
               .where(eq(schema.productDetailSpinnerButton.id, row.id))
               .for("update");
             for (const subtype of [
+              schema.productDetailFountainPen,
+              schema.productDetailNib,
               schema.productDetailSlider,
               schema.productDetailSliderPlate,
               schema.productDetailSliderInsert,
@@ -4143,6 +4214,12 @@ export function createCatalogService(
             union all select 1 from product_detail_slider where included_plate_product_id = ${row.id}
             union all select 1 from product_detail_slider where included_insert_product_id = ${row.id}
             union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
+            union all select 1 from collection_detail_fountain_pen where product_fountain_pen_id = ${row.id}
+            union all select 1 from collection_detail_nib where product_nib_id = ${row.id}
+            union all select 1 from product_detail_fountain_pen where default_nib_product_id = ${row.id}
+            union all select 1 from fountain_pen_section_option where default_nib_product_id = ${row.id}
+            union all select 1 from fountain_pen_compatible_nib where nib_product_id = ${row.id}
+            union all select 1 from fountain_pen_section_compatible_nib where nib_product_id = ${row.id}
             limit 1`);
             if (references.rows.length) return false;
             const product = (
@@ -6046,6 +6123,25 @@ export function createCatalogService(
                 ),
               )
               .where(eq(schema.productMaterial.productId, input.productId));
+            if (input.productTypeSlug === "nib") {
+              const [owned] = await tx
+                .select({ id: schema.collectionDetailNib.id })
+                .from(schema.collectionDetailNib)
+                .where(
+                  eq(schema.collectionDetailNib.productNibId, input.productId),
+                )
+                .limit(1);
+              const selected = input.materialAssignments[0]?.materials[0];
+              if (
+                owned &&
+                (!selected ||
+                  assignments.length !== 1 ||
+                  assignments[0]?.materialId !== selected.materialId ||
+                  assignments[0]?.materialSpecificId !==
+                    selected.materialSpecificId)
+              )
+                throw new Error("web.nib.validation.baseMaterial");
+            }
             const componentsByAssignment = new Map<
               number,
               MaterialSelection[]
@@ -6186,11 +6282,18 @@ export function createCollectionsService(
         installedButtonId: schema.collectionDetailSpinner.installedButtonId,
         installedInsertId: schema.collectionDetailSlider.installedInsertId,
         installedPlateId: schema.collectionDetailSlider.installedPlateId,
+        fountainPenId: sql<
+          number | null
+        >`(select id from collection_detail_fountain_pen where id = ${schema.collectionItem.id})`,
+        installedNibId: sql<
+          number | null
+        >`(select installed_nib_collection_item_id from collection_detail_fountain_pen where id = ${schema.collectionItem.id})`,
         installedParentId: sql<number | null>`coalesce(
               (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
               (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
               (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id}),
-          (select pen_collection_item_id from collection_item_installed_pen_part where part_collection_item_id = ${schema.collectionItem.id})
+          (select id from collection_detail_fountain_pen where installed_nib_collection_item_id = ${schema.collectionItem.id}),
+    (select pen_collection_item_id from collection_item_installed_pen_part where part_collection_item_id = ${schema.collectionItem.id})
             )`,
         isPrivate: schema.collectionItem.isPrivate,
         ownerId: schema.collectionItem.ownerId,
@@ -6231,8 +6334,11 @@ export function createCollectionsService(
       item.installedButtonId,
       item.installedPlateId,
       item.installedInsertId,
+      item.installedNibId,
     ].filter((id): id is number => id !== null);
     if (item.isPrivate && !input.isPrivate && !item.collectionIsPrivate) {
+      if (item.fountainPenId != null)
+        await assertFountainPenNibsMayBePublic(tx, [item.fountainPenId]);
       await assertAssemblyComponentsMayBePublic(tx, {
         componentIds: installedComponentIds,
         operation: "publish",
@@ -6464,7 +6570,12 @@ export function createCollectionsService(
               });
             }
             const [product] = await tx
-              .select({ slug: schema.productType.slug })
+              .select({
+                slug: schema.productType.slug,
+                ownerClerkId: schema.product.ownerClerkId,
+                isPrivate: schema.product.isPrivate,
+                approvalStatus: schema.product.approvalStatus,
+              })
               .from(schema.product)
               .innerJoin(
                 schema.productType,
@@ -6475,13 +6586,42 @@ export function createCollectionsService(
             if (product?.slug !== input.productTypeSlug) {
               throw new Error("Collection product type does not match.");
             }
-            const materialSelection = input.materialAssignmentId
-              ? await resolveProductMaterial(
-                  tx,
-                  input.productId,
-                  input.materialAssignmentId,
-                )
-              : [];
+            if (
+              input.materialAssignmentIds !== undefined &&
+              input.productTypeSlug !== "fountain-pen"
+            )
+              throw new Error(
+                "Only fountain pens support multiple material selections.",
+              );
+            if (
+              input.fountainPen !== undefined &&
+              input.productTypeSlug !== "fountain-pen"
+            )
+              throw new Error("Only fountain pens may declare nib setup.");
+            if (input.nib !== undefined && input.productTypeSlug !== "nib")
+              throw new Error("Only nibs may declare nib specifications.");
+            if (
+              (input.productTypeSlug === "fountain-pen" ||
+                input.productTypeSlug === "nib") &&
+              !hasPermission(input.actor, "products.manage") &&
+              product.ownerClerkId !== input.actor.clerkId &&
+              (product.isPrivate || product.approvalStatus !== "approved")
+            )
+              throw new Error("Product does not exist.");
+            const materialSelection =
+              input.materialAssignmentIds !== undefined
+                ? await resolveIndependentProductMaterials(
+                    tx,
+                    input.productId,
+                    input.materialAssignmentIds,
+                  )
+                : input.materialAssignmentId
+                  ? await resolveProductMaterial(
+                      tx,
+                      input.productId,
+                      input.materialAssignmentId,
+                    )
+                  : [];
             const [item] = await tx
               .insert(schema.collectionItem)
               .values({
@@ -6500,7 +6640,44 @@ export function createCollectionsService(
             );
             await createInitialOwnershipPeriod(tx, item.id, input.ownership);
             await applyCollectionItemMetadata(tx, item.id, input.metadata);
-            if (input.productTypeSlug === "pen") {
+            if (input.productTypeSlug === "fountain-pen") {
+              await writeFountainPenItem(
+                tx,
+                item.id,
+                input.productId,
+                input.fountainPen,
+                owner.id,
+                resolvedCollection.id,
+                true,
+              );
+              if (input.fountainPen?.nib?.mode === "owned") {
+                const nibId = input.fountainPen.nib.ownedNibCollectionItemId;
+                const [saved] = await tx
+                  .select({ isPrivate: schema.collectionItem.isPrivate })
+                  .from(schema.collectionItem)
+                  .where(eq(schema.collectionItem.id, nibId));
+                if (!saved) throw new Error("web.fountainPen.unavailableNib");
+                await writeCollectionAudit(audit, tx, {
+                  actor: input.actor,
+                  actorUser: owner,
+                  before: {
+                    effectiveIsPrivate: saved.isPrivate,
+                    inheritedFromItemId: null,
+                    savedIsPrivate: saved.isPrivate,
+                  },
+                  after: {
+                    effectiveIsPrivate: false,
+                    inheritedFromItemId: item.id,
+                    savedIsPrivate: saved.isPrivate,
+                  },
+                  definition: collectionAudit.itemUpdated,
+                  ownerUserId: owner.id,
+                  targetId: nibId,
+                });
+              }
+            } else if (input.productTypeSlug === "nib") {
+              await writeNibItem(tx, item.id, input.productId, input.nib, true);
+            } else if (input.productTypeSlug === "pen") {
               await tx.insert(schema.collectionDetailPen).values({
                 id: item.id,
                 installedRefillOfferingId: input.installedRefillOfferingId,
@@ -6533,16 +6710,20 @@ export function createCollectionsService(
                 productPenActuatorId: input.productId,
               });
             }
-            await replaceInstalledPenParts(tx, {
-              collectionId: resolvedCollection.id,
-              collectionItemId: item.id,
-              ownerId: owner.id,
-              productId: input.productId,
-              partCollectionItemIds: input.installedPenPartCollectionItemIds,
-              customizationConfirmedPartCollectionItemIds:
-                input.customizationConfirmedPartCollectionItemIds,
-              installedPenActuations: input.installedPenActuations,
-            });
+            if (
+              input.productTypeSlug !== "fountain-pen" &&
+              input.productTypeSlug !== "nib"
+            )
+              await replaceInstalledPenParts(tx, {
+                collectionId: resolvedCollection.id,
+                collectionItemId: item.id,
+                ownerId: owner.id,
+                productId: input.productId,
+                partCollectionItemIds: input.installedPenPartCollectionItemIds,
+                customizationConfirmedPartCollectionItemIds:
+                  input.customizationConfirmedPartCollectionItemIds,
+                installedPenActuations: input.installedPenActuations,
+              });
             await createCollectionFinishOption(tx, {
               collectionItemId: item.id,
               customFinish: input.customFinish,
@@ -6565,6 +6746,10 @@ export function createCollectionsService(
               actor: input.actor,
               actorUser: owner,
               after: {
+                ...(input.productTypeSlug === "fountain-pen" ||
+                input.productTypeSlug === "nib"
+                  ? await fountainPenItemAuditState(tx, item.id)
+                  : {}),
                 collectionId: resolvedCollection.id,
                 installedPenActuations: await installedPenActuationAuditState(
                   tx,
@@ -8093,6 +8278,12 @@ export function createCollectionsService(
                   schema.collectionDetailSlider.magnetConfiguration,
                 usesInserts: schema.productDetailSlider.usesInserts,
                 ownerId: schema.collectionItem.ownerId,
+                fountainPenProductId:
+                  schema.collectionDetailFountainPen.productFountainPenId,
+                nibProductId: schema.collectionDetailNib.productNibId,
+                installedNibId:
+                  schema.collectionDetailFountainPen
+                    .installedNibCollectionItemId,
                 penProductId: schema.collectionDetailPen.productPenId,
                 penActuatorProductId:
                   schema.collectionDetailPenActuator.productPenActuatorId,
@@ -8153,6 +8344,17 @@ export function createCollectionsService(
                 ),
               )
               .leftJoin(
+                schema.collectionDetailFountainPen,
+                eq(
+                  schema.collectionItem.id,
+                  schema.collectionDetailFountainPen.id,
+                ),
+              )
+              .leftJoin(
+                schema.collectionDetailNib,
+                eq(schema.collectionItem.id, schema.collectionDetailNib.id),
+              )
+              .leftJoin(
                 schema.collectionDetailPen,
                 eq(schema.collectionItem.id, schema.collectionDetailPen.id),
               )
@@ -8203,6 +8405,8 @@ export function createCollectionsService(
               item?.sliderProductId ??
               item?.sliderPlateProductId ??
               item?.sliderInsertProductId ??
+              item?.fountainPenProductId ??
+              item?.nibProductId ??
               item?.penProductId ??
               item?.penActuatorProductId ??
               item?.penClipProductId ??
@@ -8250,6 +8454,9 @@ export function createCollectionsService(
                   )
               : [];
             const before = {
+              ...(item.fountainPenProductId != null || item.nibProductId != null
+                ? await fountainPenItemAuditState(tx, input.collectionItemId)
+                : {}),
               ...(item.penProductId != null
                 ? {
                     installedPenActuations:
@@ -8383,6 +8590,36 @@ export function createCollectionsService(
                   }
                 }
               }
+              if (
+                item.fountainPenProductId != null ||
+                item.nibProductId != null
+              ) {
+                const fountainLinks = await tx
+                  .select({
+                    id: schema.collectionDetailFountainPen.id,
+                    nibId:
+                      schema.collectionDetailFountainPen
+                        .installedNibCollectionItemId,
+                  })
+                  .from(schema.collectionDetailFountainPen)
+                  .where(
+                    or(
+                      eq(
+                        schema.collectionDetailFountainPen.id,
+                        input.collectionItemId,
+                      ),
+                      eq(
+                        schema.collectionDetailFountainPen
+                          .installedNibCollectionItemId,
+                        input.collectionItemId,
+                      ),
+                    ),
+                  );
+                for (const link of fountainLinks) {
+                  linkedItemIds.add(link.id);
+                  if (link.nibId !== null) linkedItemIds.add(link.nibId);
+                }
+              }
               await tx
                 .update(schema.collectionItem)
                 .set({
@@ -8396,11 +8633,59 @@ export function createCollectionsService(
               ]);
             }
 
+            if (item.fountainPenProductId != null) {
+              await writeFountainPenItem(
+                tx,
+                input.collectionItemId,
+                productId,
+                input.fountainPen,
+                item.ownerId,
+                input.collectionId ?? item.collectionId,
+                false,
+              );
+              if (
+                item.approvalStatus === "approved" &&
+                !(input.isPrivate ?? item.isPrivate) &&
+                !targetCollection.isPrivate
+              ) {
+                if (input.fountainPen?.nib?.mode === "owned")
+                  await assertAssemblyComponentsMayBePublic(tx, {
+                    componentIds: [
+                      input.fountainPen.nib.ownedNibCollectionItemId,
+                    ],
+                    operation: "install",
+                  });
+                await assertFountainPenNibsMayBePublic(tx, [
+                  input.collectionItemId,
+                ]);
+              }
+            } else if (input.fountainPen !== undefined)
+              throw new Error(
+                "Only fountain pens may declare installed nib choices.",
+              );
+            if (item.nibProductId != null)
+              await writeNibItem(
+                tx,
+                input.collectionItemId,
+                productId,
+                input.nib,
+                false,
+              );
+            else if (input.nib !== undefined)
+              throw new Error("Only nibs may declare nib choices.");
+            if (
+              input.materialAssignmentIds !== undefined &&
+              item.fountainPenProductId == null
+            )
+              throw new Error(
+                "Only fountain pens support multiple material selections.",
+              );
             const selectedMaterial = await updateCollectionItemSnapshot(tx, {
               collectionItemId: input.collectionItemId,
               customFinish: input.customFinish,
               finishOptionId: input.finishOptionId,
               materialAssignmentId: input.materialAssignmentId,
+              materialAssignmentIds: input.materialAssignmentIds,
               productId,
             });
             await tx
@@ -8698,6 +8983,15 @@ export function createCollectionsService(
               }
             }
             const membershipChanges = [
+              input.fountainPen === undefined
+                ? null
+                : {
+                    beforeId: item.installedNibId ?? null,
+                    afterId:
+                      input.fountainPen.nib?.mode === "owned"
+                        ? input.fountainPen.nib.ownedNibCollectionItemId
+                        : null,
+                  },
               input.installedButton === undefined
                 ? null
                 : {
@@ -8807,6 +9101,9 @@ export function createCollectionsService(
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
+              ...(item.fountainPenProductId != null || item.nibProductId != null
+                ? await fountainPenItemAuditState(tx, input.collectionItemId)
+                : {}),
               isPrivate: input.isPrivate ?? item.isPrivate,
               ...(item.penProductId != null
                 ? {
@@ -9199,6 +9496,8 @@ function requireProductAudit(
  */
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
+    fountainPen: product.fountainPen ?? null,
+    nib: product.nib ?? null,
     aliases: product.aliases,
     bearing: product.bearing,
     buttonDiameter: product.buttonDiameter,
@@ -9594,6 +9893,25 @@ async function applyOwnershipWrite(
     )
     .limit(1);
   const open = latest?.effectiveEndDate === null ? latest : undefined;
+  if (!open)
+    await tx
+      .update(schema.collectionDetailFountainPen)
+      .set({
+        nibMode: "none",
+        defaultNibWidthId: null,
+        installedNibCollectionItemId: null,
+        customizedNib: false,
+        updatedAt: recordedAt,
+      })
+      .where(
+        or(
+          eq(schema.collectionDetailFountainPen.id, collectionItemId),
+          eq(
+            schema.collectionDetailFountainPen.installedNibCollectionItemId,
+            collectionItemId,
+          ),
+        ),
+      );
   await tx
     .update(schema.collectionItem)
     .set({
@@ -10112,6 +10430,9 @@ function effectiveCollectionItemIsPrivate() {
          from collection_item_installed_pen_part installation
          inner join collection_item parent on parent.id = installation.pen_collection_item_id
         where installation.part_collection_item_id = ${schema.collectionItem.id}),
+      (select parent.is_private from collection_detail_fountain_pen pen
+         inner join collection_item parent on parent.id = pen.id
+         where pen.installed_nib_collection_item_id = ${schema.collectionItem.id}),
       ${schema.collectionItem.isPrivate}
     )
   end`;
@@ -10139,6 +10460,7 @@ function publicCollectionItemCondition(includeDepartedSold = false) {
     eq(effectiveCollectionItemIsPrivate(), false),
     eq(schema.product.approvalStatus, "approved"),
     eq(schema.product.isPrivate, false),
+    sql`fountain_pen_nib_publicly_available(${schema.collectionItem.id})`,
   )}`;
 }
 
@@ -10354,6 +10676,8 @@ async function updateCollectionItemSnapshot(
      * Material identifier.
      */
     materialAssignmentId?: number | null;
+    /** Independent material options selected for a fountain pen. */
+    materialAssignmentIds?: number[];
     /**
      * Product identifier.
      */
@@ -10361,7 +10685,14 @@ async function updateCollectionItemSnapshot(
   },
 ) {
   let materials: MaterialSelection[];
-  if (input.materialAssignmentId === undefined) {
+  if (input.materialAssignmentIds !== undefined) {
+    materials = await resolveIndependentProductMaterials(
+      tx,
+      input.productId,
+      input.materialAssignmentIds,
+    );
+    await replaceCollectionItemMaterials(tx, input.collectionItemId, materials);
+  } else if (input.materialAssignmentId === undefined) {
     materials = await tx
       .select({
         materialId: schema.collectionItemMaterial.materialId,
@@ -10821,6 +11152,7 @@ async function queryProducts(
   }
   const result = [...products.values()];
   await Promise.all([
+    loadFountainPenProducts(db, result, viewer),
     loadFinishOptions(db, result),
     loadPensCatalogDetails(db, result, viewer),
     loadProductImages(db, result, viewer),
@@ -11502,6 +11834,7 @@ async function queryOwnedItems(
     (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
     (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
     (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id}),
+    (select id from collection_detail_fountain_pen where installed_nib_collection_item_id = ${schema.collectionItem.id}),
     (select pen_collection_item_id from collection_item_installed_pen_part where part_collection_item_id = ${schema.collectionItem.id})
   )`;
   const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
@@ -11729,6 +12062,14 @@ async function queryOwnedItems(
       eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
     )
     .leftJoin(
+      schema.collectionDetailFountainPen,
+      eq(schema.collectionItem.id, schema.collectionDetailFountainPen.id),
+    )
+    .leftJoin(
+      schema.collectionDetailNib,
+      eq(schema.collectionItem.id, schema.collectionDetailNib.id),
+    )
+    .leftJoin(
       schema.collectionDetailPen,
       eq(schema.collectionItem.id, schema.collectionDetailPen.id),
     )
@@ -11756,7 +12097,7 @@ async function queryOwnedItems(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId}, ${schema.collectionDetailPen.productPenId}, ${schema.collectionDetailPenActuator.productPenActuatorId}, ${schema.collectionDetailPenClip.productPenClipId}, ${schema.collectionDetailPenMechanism.productPenMechanismId}, ${schema.collectionDetailPenTip.productPenTipId}, ${schema.collectionDetailPenTopCap.productPenTopCapId})`,
+        sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId}, ${schema.collectionDetailFountainPen.productFountainPenId}, ${schema.collectionDetailNib.productNibId}, ${schema.collectionDetailPen.productPenId}, ${schema.collectionDetailPenActuator.productPenActuatorId}, ${schema.collectionDetailPenClip.productPenClipId}, ${schema.collectionDetailPenMechanism.productPenMechanismId}, ${schema.collectionDetailPenTip.productPenTipId}, ${schema.collectionDetailPenTopCap.productPenTopCapId})`,
       ),
     )
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -11953,6 +12294,7 @@ async function queryOwnedItems(
       sourceProductFinishOptionId: row.sourceProductFinishOptionId,
     };
   });
+  await loadFountainPenItems(db, items);
   await loadCollectionImages(
     db,
     items,
@@ -12717,7 +13059,7 @@ async function queryPublicMaterialSummaries(db: Database, materialId?: number) {
         schema.product,
         eq(
           schema.product.id,
-          sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId})`,
+          sql`collection_catalog_product(${schema.collectionItem.id})`,
         ),
       )
       .where(
@@ -13269,7 +13611,7 @@ async function listCatalogImageTrash(
         schema.product,
         eq(
           schema.product.id,
-          sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId})`,
+          sql`collection_catalog_product(${schema.collectionItem.id})`,
         ),
       )
       .where(
@@ -13693,11 +14035,15 @@ async function assertAssemblyComponentsMayBePublic(
       schema.collectionDetailSliderInsert,
       eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
     )
+    .leftJoin(
+      schema.collectionDetailNib,
+      eq(schema.collectionItem.id, schema.collectionDetailNib.id),
+    )
     .innerJoin(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId})`,
+        sql`coalesce(${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId}, ${schema.collectionDetailNib.productNibId})`,
       ),
     )
     .innerJoin(
@@ -13718,6 +14064,8 @@ async function assertAssemblyComponentsMayBePublic(
       component.productIsPrivate
     ) {
       const componentType = component.productTypeSlug;
+      if (componentType === "nib")
+        throw new Error("web.fountainPen.unavailableNib");
       if (
         componentType !== "spinner-button" &&
         componentType !== "slider-plate" &&
@@ -13738,6 +14086,30 @@ async function assertAssemblyComponentsMayBePublic(
 }
 
 /**
+ * Rejects disclosure when a fountain pen's owned or default nib is unavailable.
+ * @param tx - Caller-owned publication or installation transaction.
+ * @param penIds - Owned fountain pens that would be public.
+ * @rejects When a nib or its catalog model is unreviewed or staff-private.
+ */
+async function assertFountainPenNibsMayBePublic(
+  tx: CatalogTransaction,
+  penIds: number[],
+) {
+  if (!penIds.length) return;
+  const [blocked] = await tx
+    .select({ id: schema.collectionDetailFountainPen.id })
+    .from(schema.collectionDetailFountainPen)
+    .where(
+      and(
+        inArray(schema.collectionDetailFountainPen.id, penIds),
+        sql`not fountain_pen_nib_publicly_available(${schema.collectionDetailFountainPen.id})`,
+      ),
+    )
+    .limit(1);
+  if (blocked) throw new Error("web.fountainPen.unavailableNib");
+}
+
+/**
  * Ensures every assembly that a collection publication would expose is safe.
  *
  * @param tx - Caller-owned transaction containing the collection mutation.
@@ -13749,7 +14121,7 @@ async function assertCollectionAssembliesMayBePublic(
   tx: CatalogTransaction,
   collectionId: number,
 ) {
-  const [spinners, sliders] = await Promise.all([
+  const [spinners, sliders, fountainPens] = await Promise.all([
     tx
       .select({ componentId: schema.collectionDetailSpinner.installedButtonId })
       .from(schema.collectionDetailSpinner)
@@ -13780,10 +14152,32 @@ async function assertCollectionAssembliesMayBePublic(
           eq(schema.collectionItem.isPrivate, false),
         ),
       ),
+    tx
+      .select({
+        id: schema.collectionDetailFountainPen.id,
+        componentId:
+          schema.collectionDetailFountainPen.installedNibCollectionItemId,
+      })
+      .from(schema.collectionDetailFountainPen)
+      .innerJoin(
+        schema.collectionItem,
+        eq(schema.collectionItem.id, schema.collectionDetailFountainPen.id),
+      )
+      .where(
+        and(
+          eq(schema.collectionItem.collectionId, collectionId),
+          eq(schema.collectionItem.isPrivate, false),
+        ),
+      ),
   ]);
+  await assertFountainPenNibsMayBePublic(
+    tx,
+    fountainPens.map(({ id }) => id),
+  );
   await assertAssemblyComponentsMayBePublic(tx, {
     componentIds: [
       ...spinners.map(({ componentId }) => componentId),
+      ...fountainPens.map(({ componentId }) => componentId),
       ...sliders.flatMap(({ installedInsertId, installedPlateId }) => [
         installedPlateId,
         installedInsertId,
@@ -14027,6 +14421,8 @@ function assertPensProductFields(input: ProductWriteInput) {
     throw new Error("Only refill products may declare a refill model.");
   }
   if (
+    input.productTypeSlug === "fountain-pen" ||
+    input.productTypeSlug === "nib" ||
     input.productTypeSlug === "pen" ||
     input.productTypeSlug.startsWith("pen-") ||
     input.productTypeSlug === "refill"
@@ -14673,6 +15069,18 @@ async function insertProductSubtype(
 ) {
   const { specs } = input;
   switch (input.productTypeSlug) {
+    case "fountain-pen":
+      await writeFountainPenProduct(
+        tx,
+        productId,
+        input.fountainPen,
+        input.actor,
+        true,
+      );
+      return;
+    case "nib":
+      await writeNibProduct(tx, productId, input.nib, true);
+      return;
     case "pen":
       await tx.insert(schema.productDetailPen).values({
         id: productId,
@@ -14783,6 +15191,18 @@ async function updateProductSubtype(
   const updatedAt = new Date();
   const { specs } = input;
   switch (input.productTypeSlug) {
+    case "fountain-pen":
+      await writeFountainPenProduct(
+        tx,
+        productId,
+        input.fountainPen,
+        input.actor,
+        false,
+      );
+      return;
+    case "nib":
+      await writeNibProduct(tx, productId, input.nib, false);
+      return;
     case "pen":
       if (input.interchangeableParts)
         await tx
@@ -14941,6 +15361,39 @@ async function assertProductRelationships(
       throw new Error("Slider magnet configuration does not match its layout.");
     }
   }
+}
+
+/**
+ * Resolves independently selected fountain-pen materials into one canonical owner snapshot.
+ * @param tx - Caller-owned item transaction.
+ * @param productId - Fountain-pen catalog identity.
+ * @param assignmentIds - Nonempty unique set of currently offered material options.
+ * @returns Distinct canonical material components from every selected option.
+ * @rejects When a selection is empty, duplicated, or not offered by this product.
+ */
+async function resolveIndependentProductMaterials(
+  tx: CatalogTransaction,
+  productId: number,
+  assignmentIds: number[],
+): Promise<MaterialSelection[]> {
+  if (
+    !assignmentIds.length ||
+    new Set(assignmentIds).size !== assignmentIds.length
+  )
+    throw new Error("web.catalog.error.productMaterialRequired");
+  const selections = await Promise.all(
+    assignmentIds.map((id) => resolveProductMaterial(tx, productId, id)),
+  );
+  return [
+    ...new Map(
+      selections
+        .flat()
+        .map((selection) => [
+          `${selection.materialId}:${selection.materialSpecificId ?? "general"}`,
+          selection,
+        ]),
+    ).values(),
+  ];
 }
 
 /**
@@ -15383,6 +15836,7 @@ async function insertProductMaterialCombinations(
  * @throws When required materials are missing or inserts carry unsupported appearance.
  */
 function assertProductMaterialsAndAppearance(input: ProductWriteInput) {
+  assertFountainPenProduct(input);
   if (!input.materialAssignments.length && input.productTypeSlug !== "refill")
     throw new Error("At least one material is required.");
   for (const combination of input.materialAssignments) {

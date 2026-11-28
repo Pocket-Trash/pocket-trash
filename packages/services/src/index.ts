@@ -481,6 +481,7 @@ export type {
   UploadStorageConfig,
 } from "@package/storage";
 export { signResourceUrl } from "@package/storage";
+export * from "./fountain-pens.js";
 export { signImages } from "./images/sign-images.js";
 export type {
   CreateResourceInput,
@@ -499,7 +500,6 @@ export {
   createConfiguredResourcesService,
   createResourcesService,
 } from "./resources/index.js";
-
 export * from "./storage/index.js";
 export type { ImagesService };
 export { createImagesService };

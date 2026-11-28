@@ -14,6 +14,69 @@ import {
   redactPublicCollectionOwner,
 } from "./catalog-api";
 
+describe("fountain-pen and nib catalog contracts", () => {
+  it("accepts unknown capabilities without evidence fields", () => {
+    const parsed = productFormSchema.parse({
+      ...base,
+      name: "OG1",
+      productTypeSlug: "fountain-pen",
+      fountainPen: {
+        postable: null,
+        ownerReplaceableNib: true,
+        hasClip: false,
+      },
+    });
+    expect(parsed.fountainPen).toMatchObject({
+      postable: null,
+      ownerReplaceableNib: true,
+      hasClip: false,
+    });
+  });
+  it("requires a material-specific nib specification and rejects unrelated subtype data", () => {
+    const input = { ...base, name: "Bock 250 Steel", productTypeSlug: "nib" };
+    expect(productFormSchema.safeParse(input).success).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...input,
+        nib: { manufacturerSizeCode: "250" },
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...input,
+        nib: { manufacturerSizeCode: "250" },
+        fountainPen: {},
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...input,
+        nib: { manufacturerSizeCode: "250" },
+        materialAssignments: [
+          ...base.materialAssignments,
+          ...base.materialAssignments,
+        ],
+      }).success,
+    ).toBe(false);
+  });
+  it("rejects retired acceptance and ink-shutoff fields", () => {
+    for (const field of [
+      "acceptsConverters",
+      "acceptsCartridges",
+      "hasInkShutoff",
+      "compatibleConverterIds",
+    ]) {
+      expect(
+        productFormSchema.safeParse({
+          ...base,
+          productTypeSlug: "fountain-pen",
+          fountainPen: { [field]: true },
+        }).success,
+      ).toBe(false);
+    }
+  });
+});
+
 describe("public catalog products", () => {
   it("removes the contributor Clerk identifier", () => {
     const product = redactPublicCatalogProduct({

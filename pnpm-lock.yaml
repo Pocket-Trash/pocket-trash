@@ -303,8 +303,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.57.2
-        version: 0.57.2
+        specifier: ^0.58.0
+        version: 0.58.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(@typescript/typescript6@6.0.2)(zod@4.6.6)
@@ -582,8 +582,8 @@ importers:
         specifier: workspace:*
         version: link:../storage
       '@pocket-trash/localizations':
-        specifier: ^0.41.0
-        version: 0.41.0
+        specifier: ^0.58.0
+        version: 0.58.0
       drizzle-orm:
         specifier: 1.0.0-rc.4
         version: 1.0.0-rc.4(@cloudflare/workers-types@5.20261030.1)(@electric-sql/pglite@0.5.13)(@neondatabase/serverless@1.2.0)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.6)
@@ -2903,16 +2903,12 @@ packages:
     resolution: {integrity: sha512-pOr5+q1fLYKwFN3LAJuGZEnfXDcQ73zqgDHMtGy+K+uIoUqyY+6MeDCWFwfu+4EFuq76I5EPFofoNAI+Bmmq4A==}
     engines: {node: '>=22.13'}
 
-  '@pocket-trash/localizations@0.41.0':
-    resolution: {integrity: sha512-dePJBAlom7oXAbgTUgPpqtWaRkv0mkkctX6YeXzfdqF3ni8v4+LNZ8AYRlFeLXIgEYUcNUph/HHgeKkC1WNtrQ==}
-    engines: {node: '>=22.20.0 <23'}
-
   '@pocket-trash/localizations@0.45.0':
     resolution: {integrity: sha512-jOHFO2c7t4z5xTUR3xP87RT2UCUQ16vjQjBmknaUGa7mE8ZH/hdLRvOfH/RF1SsVgk9lMIapnJ7x6QcPvkiqZg==}
     engines: {node: '>=22.20.0 <23'}
 
-  '@pocket-trash/localizations@0.57.2':
-    resolution: {integrity: sha512-Y2u6I6XZ5KqRhj3anjCFjI7SMGMlve9bwlzqCMjunvqrd6CAKiYSpA+fIe8acLGp7w3yqF0JtzR6vRQ8HVP3Jg==}
+  '@pocket-trash/localizations@0.58.0':
+    resolution: {integrity: sha512-ApgOfRuRvTgDye6mE61LDOPz4u0Nuh6NVheNyENGvgZEZzOtS12Jayzopc55nXE7bd6h/IQJLDIT6H/VoZ2ofA==}
     engines: {node: '>=22.20.0 <23'}
 
   '@polka/url@1.0.0-next.29':
@@ -9750,11 +9746,9 @@ snapshots:
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 
-  '@pocket-trash/localizations@0.41.0': {}
-
   '@pocket-trash/localizations@0.45.0': {}
 
-  '@pocket-trash/localizations@0.57.2': {}
+  '@pocket-trash/localizations@0.58.0': {}
 
   '@polka/url@1.0.0-next.29': {}
 

@@ -5,6 +5,7 @@ import * as collectionSchema from "./collection.js";
 import * as erasureSchema from "./erasure.js";
 import * as featureFlagSchema from "./feature-flags.js";
 import * as feedbackSchema from "./feedback.js";
+import * as fountainPenSchema from "./fountain-pens.js";
 import * as pensSchema from "./pens.js";
 import * as resourceSchema from "./resources.js";
 import * as scraperSchema from "./scraper.js";
@@ -20,6 +21,7 @@ const tables = {
   ...erasureSchema,
   ...featureFlagSchema,
   ...feedbackSchema,
+  ...fountainPenSchema,
   ...pensSchema,
   ...resourceSchema,
   ...scraperSchema,
