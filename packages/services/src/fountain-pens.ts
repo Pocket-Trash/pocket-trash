@@ -11,7 +11,7 @@ const ids = z
   .default([])
   .refine(
     (values) => new Set(values).size === values.length,
-    "Duplicate selections are not allowed.",
+    "web.catalog.error.form",
   );
 /** Generic feed and housing materials; these never imply a mounting interface. */
 export const nibComponentMaterials = [
@@ -86,7 +86,7 @@ export const nibSchema = z.strictObject({
     .default(["unplated"])
     .refine(
       (values) => new Set(values).size === values.length,
-      "Duplicate plating styles are not allowed.",
+      "web.catalog.error.form",
     ),
   platingMetalIds: ids,
 });

@@ -2148,8 +2148,6 @@ export type UserCollectionItem = {
   fountainPen?: FountainPenItemDetails;
   /** Owned nib width, component materials, and actual plating snapshot. */
   nib?: NibItemDetails;
-  /** Whether an installed nib is hidden from this viewer by moderation. */
-  installedNibUnavailable?: boolean;
   /** Relationships between the physical installed mechanisms and actuating parts. */
   installedPenActuations?: InstalledPenActuation[];
   /** Functional roles of the source physical Pen-part product. */
@@ -6284,6 +6282,9 @@ export function createCollectionsService(
         installedButtonId: schema.collectionDetailSpinner.installedButtonId,
         installedInsertId: schema.collectionDetailSlider.installedInsertId,
         installedPlateId: schema.collectionDetailSlider.installedPlateId,
+        fountainPenId: sql<
+          number | null
+        >`(select id from collection_detail_fountain_pen where id = ${schema.collectionItem.id})`,
         installedNibId: sql<
           number | null
         >`(select installed_nib_collection_item_id from collection_detail_fountain_pen where id = ${schema.collectionItem.id})`,
@@ -6336,6 +6337,8 @@ export function createCollectionsService(
       item.installedNibId,
     ].filter((id): id is number => id !== null);
     if (item.isPrivate && !input.isPrivate && !item.collectionIsPrivate) {
+      if (item.fountainPenId != null)
+        await assertFountainPenNibsMayBePublic(tx, [item.fountainPenId]);
       await assertAssemblyComponentsMayBePublic(tx, {
         componentIds: installedComponentIds,
         operation: "publish",
@@ -6647,6 +6650,31 @@ export function createCollectionsService(
                 resolvedCollection.id,
                 true,
               );
+              if (input.fountainPen?.nib?.mode === "owned") {
+                const nibId = input.fountainPen.nib.ownedNibCollectionItemId;
+                const [saved] = await tx
+                  .select({ isPrivate: schema.collectionItem.isPrivate })
+                  .from(schema.collectionItem)
+                  .where(eq(schema.collectionItem.id, nibId));
+                if (!saved) throw new Error("web.fountainPen.unavailableNib");
+                await writeCollectionAudit(audit, tx, {
+                  actor: input.actor,
+                  actorUser: owner,
+                  before: {
+                    effectiveIsPrivate: saved.isPrivate,
+                    inheritedFromItemId: null,
+                    savedIsPrivate: saved.isPrivate,
+                  },
+                  after: {
+                    effectiveIsPrivate: false,
+                    inheritedFromItemId: item.id,
+                    savedIsPrivate: saved.isPrivate,
+                  },
+                  definition: collectionAudit.itemUpdated,
+                  ownerUserId: owner.id,
+                  targetId: nibId,
+                });
+              }
             } else if (input.productTypeSlug === "nib") {
               await writeNibItem(tx, item.id, input.productId, input.nib, true);
             } else if (input.productTypeSlug === "pen") {
@@ -6718,7 +6746,10 @@ export function createCollectionsService(
               actor: input.actor,
               actorUser: owner,
               after: {
-                ...(await fountainPenItemAuditState(tx, item.id)),
+                ...(input.productTypeSlug === "fountain-pen" ||
+                input.productTypeSlug === "nib"
+                  ? await fountainPenItemAuditState(tx, item.id)
+                  : {}),
                 collectionId: resolvedCollection.id,
                 installedPenActuations: await installedPenActuationAuditState(
                   tx,
@@ -8250,6 +8281,9 @@ export function createCollectionsService(
                 fountainPenProductId:
                   schema.collectionDetailFountainPen.productFountainPenId,
                 nibProductId: schema.collectionDetailNib.productNibId,
+                installedNibId:
+                  schema.collectionDetailFountainPen
+                    .installedNibCollectionItemId,
                 penProductId: schema.collectionDetailPen.productPenId,
                 penActuatorProductId:
                   schema.collectionDetailPenActuator.productPenActuatorId,
@@ -8420,7 +8454,9 @@ export function createCollectionsService(
                   )
               : [];
             const before = {
-              ...(await fountainPenItemAuditState(tx, input.collectionItemId)),
+              ...(item.fountainPenProductId != null || item.nibProductId != null
+                ? await fountainPenItemAuditState(tx, input.collectionItemId)
+                : {}),
               ...(item.penProductId != null
                 ? {
                     installedPenActuations:
@@ -8554,30 +8590,35 @@ export function createCollectionsService(
                   }
                 }
               }
-              const fountainLinks = await tx
-                .select({
-                  id: schema.collectionDetailFountainPen.id,
-                  nibId:
-                    schema.collectionDetailFountainPen
-                      .installedNibCollectionItemId,
-                })
-                .from(schema.collectionDetailFountainPen)
-                .where(
-                  or(
-                    eq(
-                      schema.collectionDetailFountainPen.id,
-                      input.collectionItemId,
-                    ),
-                    eq(
+              if (
+                item.fountainPenProductId != null ||
+                item.nibProductId != null
+              ) {
+                const fountainLinks = await tx
+                  .select({
+                    id: schema.collectionDetailFountainPen.id,
+                    nibId:
                       schema.collectionDetailFountainPen
                         .installedNibCollectionItemId,
-                      input.collectionItemId,
+                  })
+                  .from(schema.collectionDetailFountainPen)
+                  .where(
+                    or(
+                      eq(
+                        schema.collectionDetailFountainPen.id,
+                        input.collectionItemId,
+                      ),
+                      eq(
+                        schema.collectionDetailFountainPen
+                          .installedNibCollectionItemId,
+                        input.collectionItemId,
+                      ),
                     ),
-                  ),
-                );
-              for (const link of fountainLinks) {
-                linkedItemIds.add(link.id);
-                if (link.nibId !== null) linkedItemIds.add(link.nibId);
+                  );
+                for (const link of fountainLinks) {
+                  linkedItemIds.add(link.id);
+                  if (link.nibId !== null) linkedItemIds.add(link.nibId);
+                }
               }
               await tx
                 .update(schema.collectionItem)
@@ -8592,7 +8633,7 @@ export function createCollectionsService(
               ]);
             }
 
-            if (item.fountainPenProductId != null)
+            if (item.fountainPenProductId != null) {
               await writeFountainPenItem(
                 tx,
                 input.collectionItemId,
@@ -8602,7 +8643,23 @@ export function createCollectionsService(
                 input.collectionId ?? item.collectionId,
                 false,
               );
-            else if (input.fountainPen !== undefined)
+              if (
+                item.approvalStatus === "approved" &&
+                !(input.isPrivate ?? item.isPrivate) &&
+                !targetCollection.isPrivate
+              ) {
+                if (input.fountainPen?.nib?.mode === "owned")
+                  await assertAssemblyComponentsMayBePublic(tx, {
+                    componentIds: [
+                      input.fountainPen.nib.ownedNibCollectionItemId,
+                    ],
+                    operation: "install",
+                  });
+                await assertFountainPenNibsMayBePublic(tx, [
+                  input.collectionItemId,
+                ]);
+              }
+            } else if (input.fountainPen !== undefined)
               throw new Error(
                 "Only fountain pens may declare installed nib choices.",
               );
@@ -8926,6 +8983,15 @@ export function createCollectionsService(
               }
             }
             const membershipChanges = [
+              input.fountainPen === undefined
+                ? null
+                : {
+                    beforeId: item.installedNibId ?? null,
+                    afterId:
+                      input.fountainPen.nib?.mode === "owned"
+                        ? input.fountainPen.nib.ownedNibCollectionItemId
+                        : null,
+                  },
               input.installedButton === undefined
                 ? null
                 : {
@@ -9035,7 +9101,9 @@ export function createCollectionsService(
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
-              ...(await fountainPenItemAuditState(tx, input.collectionItemId)),
+              ...(item.fountainPenProductId != null || item.nibProductId != null
+                ? await fountainPenItemAuditState(tx, input.collectionItemId)
+                : {}),
               isPrivate: input.isPrivate ?? item.isPrivate,
               ...(item.penProductId != null
                 ? {
@@ -14018,6 +14086,30 @@ async function assertAssemblyComponentsMayBePublic(
 }
 
 /**
+ * Rejects disclosure when a fountain pen's owned or default nib is unavailable.
+ * @param tx - Caller-owned publication or installation transaction.
+ * @param penIds - Owned fountain pens that would be public.
+ * @rejects When a nib or its catalog model is unreviewed or staff-private.
+ */
+async function assertFountainPenNibsMayBePublic(
+  tx: CatalogTransaction,
+  penIds: number[],
+) {
+  if (!penIds.length) return;
+  const [blocked] = await tx
+    .select({ id: schema.collectionDetailFountainPen.id })
+    .from(schema.collectionDetailFountainPen)
+    .where(
+      and(
+        inArray(schema.collectionDetailFountainPen.id, penIds),
+        sql`not fountain_pen_nib_publicly_available(${schema.collectionDetailFountainPen.id})`,
+      ),
+    )
+    .limit(1);
+  if (blocked) throw new Error("web.fountainPen.unavailableNib");
+}
+
+/**
  * Ensures every assembly that a collection publication would expose is safe.
  *
  * @param tx - Caller-owned transaction containing the collection mutation.
@@ -14062,6 +14154,7 @@ async function assertCollectionAssembliesMayBePublic(
       ),
     tx
       .select({
+        id: schema.collectionDetailFountainPen.id,
         componentId:
           schema.collectionDetailFountainPen.installedNibCollectionItemId,
       })
@@ -14074,12 +14167,13 @@ async function assertCollectionAssembliesMayBePublic(
         and(
           eq(schema.collectionItem.collectionId, collectionId),
           eq(schema.collectionItem.isPrivate, false),
-          isNotNull(
-            schema.collectionDetailFountainPen.installedNibCollectionItemId,
-          ),
         ),
       ),
   ]);
+  await assertFountainPenNibsMayBePublic(
+    tx,
+    fountainPens.map(({ id }) => id),
+  );
   await assertAssemblyComponentsMayBePublic(tx, {
     componentIds: [
       ...spinners.map(({ componentId }) => componentId),

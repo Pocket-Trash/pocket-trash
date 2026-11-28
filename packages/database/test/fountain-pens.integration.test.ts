@@ -112,6 +112,10 @@ describe("fountain-pen database protections", () => {
       "renaming an active Cartridge/converter reference",
       `INSERT INTO fountain_pen_filling_mechanism_assignment (pen_product_id, mechanism_id) SELECT p.id, m.id FROM product_detail_fountain_pen p, fountain_pen_filling_mechanism m WHERE m.slug = 'cartridge-converter'; UPDATE product_detail_fountain_pen SET cartridge_converter_length = 'short'; UPDATE fountain_pen_filling_mechanism SET slug = 'renamed' WHERE slug = 'cartridge-converter'`,
     ],
+    [
+      "removing the mount that permits an active installation",
+      `UPDATE collection_detail_fountain_pen SET nib_mode = 'owned', installed_nib_collection_item_id = (SELECT id FROM collection_item WHERE display_name = 'Nib One'); DELETE FROM nib_mount_compatibility`,
+    ],
   ])("rejects %s through the database boundary", async (_name, statements) => {
     await expect(
       database.exec(`${statements}; SET CONSTRAINTS ALL IMMEDIATE;`),

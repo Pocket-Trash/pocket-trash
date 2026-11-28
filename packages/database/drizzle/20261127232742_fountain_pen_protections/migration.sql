@@ -157,7 +157,28 @@ BEGIN
 END $$;
 --> statement-breakpoint
 CREATE FUNCTION validate_fountain_pen_installations() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE candidate_ids bigint[];
 BEGIN
+ IF TG_TABLE_NAME IN ('collection_item', 'collection_detail_nib') THEN
+   SELECT array_agg(id) INTO candidate_ids FROM collection_detail_fountain_pen
+   WHERE id IN (NEW.id, OLD.id) OR installed_nib_collection_item_id IN (NEW.id, OLD.id);
+ ELSIF TG_TABLE_NAME = 'collection_detail_fountain_pen' THEN
+   candidate_ids := ARRAY[NEW.id, OLD.id];
+ ELSIF TG_TABLE_NAME = 'product_detail_fountain_pen' THEN
+   SELECT array_agg(id) INTO candidate_ids FROM collection_detail_fountain_pen WHERE product_fountain_pen_id IN (NEW.id, OLD.id);
+ ELSIF TG_TABLE_NAME IN ('fountain_pen_section_option', 'fountain_pen_finial_option', 'fountain_pen_compatible_nib') THEN
+   SELECT array_agg(id) INTO candidate_ids FROM collection_detail_fountain_pen WHERE product_fountain_pen_id IN (NEW.pen_product_id, OLD.pen_product_id);
+ ELSIF TG_TABLE_NAME = 'fountain_pen_section_compatible_nib' THEN
+   SELECT array_agg(id) INTO candidate_ids FROM collection_detail_fountain_pen WHERE section_option_id IN (NEW.section_option_id, OLD.section_option_id);
+ ELSE
+   SELECT array_agg(pen.id) INTO candidate_ids FROM collection_detail_fountain_pen pen
+   JOIN product_detail_fountain_pen model ON model.id = pen.product_fountain_pen_id
+   LEFT JOIN fountain_pen_section_option section ON section.id = pen.section_option_id
+   LEFT JOIN collection_detail_nib nib ON nib.id = pen.installed_nib_collection_item_id
+   WHERE nib.product_nib_id IN (NEW.nib_product_id, OLD.nib_product_id)
+      OR (pen.nib_mode = 'default' AND CASE WHEN section.id IS NOT NULL THEN section.default_nib_product_id ELSE model.default_nib_product_id END IN (NEW.nib_product_id, OLD.nib_product_id));
+ END IF;
+ IF candidate_ids IS NULL THEN RETURN NULL; END IF;
  IF EXISTS (
    SELECT 1 FROM collection_detail_fountain_pen pen
    JOIN collection_item pen_item ON pen_item.id = pen.id
@@ -166,7 +187,7 @@ BEGIN
    LEFT JOIN fountain_pen_finial_option finial ON finial.id = pen.finial_option_id
    LEFT JOIN collection_detail_nib nib ON nib.id = pen.installed_nib_collection_item_id
    LEFT JOIN collection_item nib_item ON nib_item.id = nib.id
-   WHERE (pen.section_option_id IS NOT NULL AND section.pen_product_id IS DISTINCT FROM model.id)
+   WHERE pen.id = ANY(candidate_ids) AND ((pen.section_option_id IS NOT NULL AND section.pen_product_id IS DISTINCT FROM model.id)
       OR (pen.finial_option_id IS NOT NULL AND finial.pen_product_id IS DISTINCT FROM model.id)
       OR (pen.nib_mode = 'default' AND (
         CASE WHEN section.id IS NOT NULL THEN section.default_nib_product_id WHEN NOT EXISTS (SELECT 1 FROM fountain_pen_section_option available WHERE available.pen_product_id = model.id) THEN model.default_nib_product_id ELSE NULL END IS NULL
@@ -187,7 +208,7 @@ BEGIN
           )
         ))
       ))
- ) THEN RAISE EXCEPTION 'Installed nib requires same current owner, collection, and compatible mount or confirmed customization'; END IF;
+ )) THEN RAISE EXCEPTION 'Installed nib requires same current owner, collection, and compatible mount or confirmed customization'; END IF;
  RETURN NULL;
 END $$;
 --> statement-breakpoint

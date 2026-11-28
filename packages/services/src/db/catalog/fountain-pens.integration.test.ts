@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { type Database, schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { expect, it } from "vitest";
@@ -533,7 +533,7 @@ it("validates actual plating independently from base material and surface finish
 });
 
 it("inherits installed nib privacy, moves the assembly, and retains the pen when its nib is deleted", async () => {
-  const { client, services, base } = await fixture();
+  const { client, db, services, base } = await fixture();
   try {
     const nib = await services.catalog.createProduct({
       ...base,
@@ -612,6 +612,76 @@ it("inherits installed nib privacy, moves the assembly, and retains the pen when
       savedIsPrivate: true,
       privacyInheritedFromItemId: penId,
     });
+    const installation = {
+      actor: base.actor,
+      collectionItemId: penId,
+      collectionId: collection.id,
+      displayName: "",
+      customFinish: null,
+      finishOptionId: null,
+    };
+    await services.collections.updateItem({
+      ...installation,
+      fountainPen: { nib: { mode: "none" } },
+    });
+    await services.collections.decideItemApproval({
+      actor: admin,
+      collectionItemId: nibId,
+      action: "reverse",
+      reason: "Pending replacement fixture",
+    });
+    const replacement = {
+      ...installation,
+      fountainPen: {
+        nib: { mode: "owned" as const, ownedNibCollectionItemId: nibId },
+      },
+    };
+    await expect(services.collections.updateItem(replacement)).rejects.toThrow(
+      "web.fountainPen.unavailableNib",
+    );
+    expect(
+      (await services.collections.getOwnedItem(base.actor, penId))?.fountainPen
+        ?.nib,
+    ).toEqual({ mode: "none" });
+    await services.collections.decideItemApproval({
+      actor: admin,
+      collectionItemId: nibId,
+      action: "approve",
+      reason: "Replacement reviewed",
+    });
+    await services.catalog.setVisibility({
+      actor: base.actor,
+      productId: nib.id,
+      isPrivate: true,
+    });
+    await expect(services.collections.updateItem(replacement)).rejects.toThrow(
+      "web.fountainPen.unavailableNib",
+    );
+    await services.catalog.setVisibility({
+      actor: base.actor,
+      productId: nib.id,
+      isPrivate: false,
+    });
+    await services.collections.updateItem(replacement);
+    const membershipAudits = await db
+      .select({ afterState: schema.auditEvent.afterState })
+      .from(schema.auditEvent)
+      .where(
+        and(
+          eq(schema.auditEvent.action, "collections.item.updated"),
+          eq(schema.auditEvent.targetId, String(nibId)),
+        ),
+      );
+    expect(membershipAudits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          afterState: expect.objectContaining({ inheritedFromItemId: penId }),
+        }),
+        expect.objectContaining({
+          afterState: expect.objectContaining({ inheritedFromItemId: null }),
+        }),
+      ]),
+    );
     await expect(
       services.collections.setItemVisibility({
         actor: base.actor,
